@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>마라톤국어</title>
+
+<!-- 학생·학부모 개인 페이지. 주소의 # 뒤 코드로만 열린다. 검색에 노출하지 않는다. -->
+<meta name="robots" content="noindex, nofollow">
+<meta name="googlebot" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#E8E6F8">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="📘 마라톤국어 학습 페이지">
+<meta property="og:description" content="반 공지 · 주간 레포트 · 앱 과제 기록을 한곳에서 확인하세요">
+<meta property="og:locale" content="ko_KR">
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" as="style" crossorigin
+      href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/report.css?v=20261012a">
+<link rel="stylesheet" href="../assets/hub.css?v=20261012a">
+</head>
+<body>
+
+<div class="container">
+
+  <header class="hub-head" id="hubHead" hidden>
+    <span class="hub-head__brand" data-brand="brandName">마라톤국어</span>
+    <div class="hub-head__name" id="hubName"></div>
+    <div class="hub-head__meta" id="hubMeta"></div>
+  </header>
+
+  <nav class="hub-tabs" id="hubTabs" role="tablist" aria-label="보기 선택" hidden>
+    <button class="hub-tab" id="tabNotice" role="tab" type="button" aria-selected="true">반 공지</button>
+    <button class="hub-tab" id="tabReport" role="tab" type="button" aria-selected="false">내 레포트</button>
+    <button class="hub-tab" id="tabApp"    role="tab" type="button" aria-selected="false">앱 과제</button>
+  </nav>
+
+  <main id="hubRoot">
+    <div class="empty">불러오는 중입니다…</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-sign">
+      <span class="footer-heart" data-brand="signEmoji">✒️</span>
+      <span data-brand="signName">김종현 T 드림</span>
+    </div>
+    <div class="footer-brand" data-brand="brandName">마라톤국어</div>
+    <div class="footer-contact">
+      문의 · <span data-brand="contactName">김종현 T</span>
+      <a data-brand-tel href="tel:01072009055">010-7200-9055</a>
+    </div>
+    <a class="footer-kakao" data-brand-kakao href="http://pf.kakao.com/_hxaLJxj/chat">카카오채널 문의</a>
+  </footer>
+
+</div>
+
+<script src="../assets/config.js?v=20261012a"></script>
+<script src="../assets/brand.js?v=20261012a"></script>
+<script src="../assets/report-view.js?v=20261012a"></script>
+<script src="../assets/hub.js?v=20261012a"></script>
+<script>Hub.bootMe();</script>
+</body>
+</html>

@@ -1,0 +1,1170 @@
+/* ============================================================
+   app.js — 공용 화면 도구 · ① 명단 탭
+
+   100명까지 느려지지 않도록
+     · 목록은 DocumentFragment 로 한 번에 붙인다
+     · 행마다 리스너를 달지 않고 이벤트 위임을 쓴다
+     · 검색은 0.15초 묶어서 처리한다
+   ============================================================ */
+
+(function () {
+  'use strict';
+
+  var $  = function (sel, root) { return (root || document).querySelector(sel); };
+  var $$ = function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); };
+
+  /* ============================================================
+     공용 — 토스트 · 확인 창 · 복사 · 탭
+     ============================================================ */
+
+  function toast(msg, kind) {
+    var el = document.createElement('div');
+    el.className = 'toast' + (kind ? ' toast--' + kind : '');
+    el.textContent = msg;
+    $('#toastHost').appendChild(el);
+    setTimeout(function () {
+      el.style.transition = 'opacity .2s';
+      el.style.opacity = '0';
+      setTimeout(function () { el.remove(); }, 220);
+    }, 2400);
+  }
+
+  var confirmModal = $('#confirmModal');
+
+  function confirmAsk(title, desc, okLabel) {
+    return new Promise(function (resolve) {
+      $('#confirmTitle').textContent = title;
+      $('#confirmDesc').textContent = desc;
+      $('#btnConfirmYes').textContent = okLabel || '삭제';
+      function cleanup(result) {
+        $('#btnConfirmYes').removeEventListener('click', onYes);
+        $('#btnConfirmNo').removeEventListener('click', onNo);
+        confirmModal.close();
+        resolve(result);
+      }
+      function onYes() { cleanup(true); }
+      function onNo()  { cleanup(false); }
+      $('#btnConfirmYes').addEventListener('click', onYes);
+      $('#btnConfirmNo').addEventListener('click', onNo);
+      confirmModal.showModal();
+    });
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text).catch(fallback);
+    }
+    return fallback();
+
+    function fallback() {
+      return new Promise(function (resolve, reject) {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.cssText = 'position:fixed;top:-1000px;opacity:0';
+        document.body.appendChild(ta);
+        ta.select();
+        var ok = false;
+        try { ok = document.execCommand('copy'); } catch (e) {}
+        ta.remove();
+        ok ? resolve() : reject(new Error('복사하지 못했습니다. 길게 눌러 직접 복사해 주세요.'));
+      });
+    }
+  }
+
+  function whoami() { return ($('#whoami') && $('#whoami').textContent) || ''; }
+
+  var TABS = [
+    { tab: '#tab-roster',  panel: '#panel-roster'  },
+    { tab: '#tab-write',   panel: '#panel-write'   },
+    { tab: '#tab-publish', panel: '#panel-publish' },
+    { tab: '#tab-send',    panel: '#panel-send'    },
+    { tab: '#tab-notice',  panel: '#panel-notice'  }
+  ];
+
+  function selectTab(idx) {
+    TABS.forEach(function (t, i) {
+      var on = i === idx;
+      $(t.tab).setAttribute('aria-selected', on ? 'true' : 'false');
+      $(t.panel).hidden = !on;
+    });
+    document.dispatchEvent(new CustomEvent('jt:tab', { detail: { index: idx } }));
+  }
+
+  TABS.forEach(function (t, i) {
+    $(t.tab).addEventListener('click', function () { selectTab(i); });
+  });
+
+  /* 공용 PC 안내 — 닫으면 기억한다 */
+  var settings = Store.read(Store.KEYS.settings, {});
+  if (!settings.hidePublicPcNotice) $('#publicPcNotice').hidden = false;
+  $('#publicPcClose').addEventListener('click', function () {
+    $('#publicPcNotice').hidden = true;
+    settings.hidePublicPcNotice = true;
+    Store.writeLocal(Store.KEYS.settings, settings);
+  });
+
+  /* ============================================================
+     개인 링크 발급
+     ============================================================ */
+
+  /* 학생 한 명에게 새 코드를 준다. 재발급이면 예전 링크는 바로 막힌다. */
+  function issueLink(studentId) {
+    var code = Store.randomCode(24);
+    return DB.saveLink(studentId, { hubCode: code }).then(function (link) {
+      var cur = Store.linkOf(studentId);
+      cur.hubCode = link.hubCode || code;
+      cur.hubIssuedAt = link.hubIssuedAt || new Date().toISOString();
+      if (link.appCode !== undefined) cur.appCode = link.appCode;
+      Store.setLinkLocal(studentId, cur);
+      return cur.hubCode;
+    });
+  }
+
+  /* 링크가 없는 학생 여럿에게 한 번에 */
+  function issueMissing(ids) {
+    var list = ids.map(function (id) { return { studentId: id, hubCode: Store.randomCode(24) }; });
+    return DB.saveLinks(list).then(function () {
+      list.forEach(function (p) {
+        var cur = Store.linkOf(p.studentId);
+        cur.hubCode = p.hubCode;
+        cur.hubIssuedAt = new Date().toISOString();
+        Store.setLinkLocal(p.studentId, cur);
+      });
+      return list.length;
+    });
+  }
+
+  /* ============================================================
+     명단 — 상태
+     ============================================================ */
+
+  var students = Store.getStudents();
+  var fields = Store.getFieldDefs('student');
+  var classFields = Store.getFieldDefs('class');
+  var collapsed = {};
+  var filterText = '';
+  var filterClass = '';
+  var showArchived = false;
+
+  var rosterList = $('#rosterList');
+  var ARCHIVE_GROUP = '퇴원';
+
+  function sortStudents(list) {
+    return list.slice().sort(function (a, b) {
+      var c = (a.className || '￿').localeCompare(b.className || '￿', 'ko');
+      if (c !== 0) return c;
+      return (a.name || '').localeCompare(b.name || '', 'ko');
+    });
+  }
+
+  function matches(s) {
+    if (s.archived && !showArchived) return false;
+    if (filterClass && (s.className || '') !== filterClass) return false;
+    if (!filterText) return true;
+    var hay = [s.name, s.school, s.grade, s.className, s.parentPhone, s.studentPhone];
+    fields.forEach(function (f) { hay.push(Store.fieldText(s, f)); });
+    return hay.join(' ').toLowerCase().indexOf(filterText) !== -1;
+  }
+
+  function tableFields() {
+    return fields.filter(function (f) { return f.showInTable !== false; });
+  }
+
+  function rowHtml() {
+    var extra = tableFields().map(function () {
+      return '<td class="roster__extra"><span class="roster__extraval"></span></td>';
+    }).join('');
+    return '' +
+      '<td data-label="이름"><span class="roster__name"></span></td>' +
+      '<td data-label="학교"></td>' +
+      '<td data-label="학년"></td>' +
+      '<td data-label="연락처"><span class="phone-lines"></span></td>' +
+      extra +
+      '<td data-label="개인 링크" class="roster__link"></td>' +
+      '<td data-label="앱 과제" class="roster__app"></td>' +
+      '<td class="roster__actions">' +
+        '<button class="btn btn--sm" data-act="edit">수정</button>' +
+      '</td>';
+  }
+
+  /* textContent 로 넣어 이름·학교에 든 특수문자를 안전하게 표시한다 */
+  function fillRow(tr, s) {
+    tr.dataset.id = s.id;
+    tr.innerHTML = rowHtml();
+    tr.classList.toggle('is-archived', !!s.archived);
+    var tds = tr.children;
+    tds[0].querySelector('.roster__name').textContent = s.name || '';
+    tds[1].textContent = s.school || '-';
+    tds[2].textContent = s.grade || '-';
+
+    var phones = Store.phonesOf(s);
+    var box = tds[3].querySelector('.phone-lines');
+    if (!phones.length) {
+      box.innerHTML = '<span class="roster__phone is-empty">없음</span>';
+    } else {
+      phones.forEach(function (p) {
+        var line = document.createElement('span');
+        line.className = 'phone-line';
+        line.innerHTML = '<span class="phone-line__title"></span><span class="phone-line__num"></span>';
+        line.firstChild.textContent = p.label;
+        line.lastChild.textContent = Store.phoneFormat(p.number);
+        box.appendChild(line);
+      });
+    }
+
+    tableFields().forEach(function (f, i) {
+      var td = tds[4 + i];
+      if (!td) return;
+      td.setAttribute('data-label', f.label);
+      var v = Store.fieldText(s, f);
+      var el = td.querySelector('.roster__extraval');
+      el.textContent = v || '-';
+      el.classList.toggle('is-empty', !v);
+      td.classList.toggle('is-empty', !v);
+    });
+
+    var link = Store.linkOf(s.id);
+    var linkTd = tds[4 + tableFields().length];
+    var appTd = tds[5 + tableFields().length];
+
+    if (s.archived) {
+      linkTd.innerHTML = '<span class="link-tag link-tag--off">퇴원 · 막힘</span>';
+    } else if (link.hubCode) {
+      linkTd.innerHTML = '<button class="btn btn--sm" data-act="copylink">링크 복사</button>';
+    } else {
+      linkTd.innerHTML = '<button class="btn btn--sm btn--primary" data-act="issue">발급</button>';
+    }
+    appTd.innerHTML = link.appCode
+      ? '<span class="link-tag link-tag--on">연결됨</span>'
+      : '<span class="link-tag">없음</span>';
+  }
+
+  function render() {
+    var visible = sortStudents(students).filter(matches);
+    var active = students.filter(function (s) { return !s.archived; });
+
+    $('#brandCount').textContent = '학생 ' + active.length + '명';
+    $('#rosterHint').textContent = (filterText || filterClass) && students.length
+      ? visible.length + '명 표시 중'
+      : '서버에 저장되어 모든 기기에서 같이 보입니다';
+
+    renderLinkNotice();
+    rosterList.textContent = '';
+
+    if (!students.length) {
+      rosterList.innerHTML =
+        '<div class="empty-state">아직 등록된 학생이 없습니다.<br>' +
+        '<b>+ 학생 추가</b> 또는 <b>엑셀·CSV로 넣기</b>로 시작하세요.</div>';
+      refreshClassOptions();
+      renderClassInfo();
+      return;
+    }
+    if (!visible.length) {
+      rosterList.innerHTML = '<div class="empty-state">조건에 맞는 학생이 없습니다.</div>';
+      refreshClassOptions();
+      renderClassInfo();
+      return;
+    }
+
+    var groups = [];
+    var index = {};
+    visible.forEach(function (s) {
+      var key = s.archived ? ARCHIVE_GROUP : ((s.className || '').trim() || '(반 없음)');
+      if (!(key in index)) { index[key] = groups.length; groups.push({ name: key, rows: [] }); }
+      groups[index[key]].rows.push(s);
+    });
+    /* 퇴원 묶음은 맨 아래 */
+    groups.sort(function (a, b) {
+      return (a.name === ARCHIVE_GROUP) - (b.name === ARCHIVE_GROUP);
+    });
+
+    var frag = document.createDocumentFragment();
+    var forceExpand = !!(filterText || filterClass);
+
+    groups.forEach(function (g) {
+      var wrap = document.createElement('div');
+      wrap.className = 'class-group' + (!forceExpand && collapsed[g.name] ? ' is-collapsed' : '') +
+                       (g.name === ARCHIVE_GROUP ? ' class-group--archived' : '');
+      wrap.dataset.cls = g.name;
+
+      var head = document.createElement('button');
+      head.type = 'button';
+      head.className = 'class-head';
+      head.dataset.act = 'toggle';
+      head.innerHTML = '<span class="class-head__name"></span>' +
+                       '<span class="class-head__count">' + g.rows.length + '명</span>' +
+                       '<span class="class-head__caret" aria-hidden="true">▾</span>';
+      head.querySelector('.class-head__name').textContent = g.name;
+      wrap.appendChild(head);
+
+      var table = document.createElement('table');
+      table.className = 'roster';
+      table.innerHTML = '<thead><tr><th>이름</th><th>학교</th><th>학년</th><th>연락처</th>' +
+        tableFields().map(function () { return '<th></th>'; }).join('') +
+        '<th>개인 링크</th><th>앱 과제</th><th></th></tr></thead><tbody></tbody>';
+      var ths = table.querySelectorAll('thead th');
+      tableFields().forEach(function (f, i) { ths[4 + i].textContent = f.label; });
+
+      var tbody = table.querySelector('tbody');
+      g.rows.forEach(function (s) {
+        var tr = document.createElement('tr');
+        fillRow(tr, s);
+        tbody.appendChild(tr);
+      });
+
+      var scroller = document.createElement('div');
+      scroller.className = 'roster-scroll';
+      scroller.appendChild(table);
+      wrap.appendChild(scroller);
+      frag.appendChild(wrap);
+    });
+
+    rosterList.appendChild(frag);
+    refreshClassOptions();
+    syncExpandButton();
+    renderClassInfo();
+  }
+
+  function missingLinkIds() {
+    return students.filter(function (s) {
+      return !s.archived && !Store.linkOf(s.id).hubCode;
+    }).map(function (s) { return s.id; });
+  }
+
+  function renderLinkNotice() {
+    var n = missingLinkIds().length;
+    $('#linkBulkNotice').hidden = !n;
+    $('#linkBulkText').textContent = '개인 링크가 없는 학생이 ' + n + '명 있습니다.';
+  }
+
+  $('#btnIssueAll').addEventListener('click', function () {
+    var ids = missingLinkIds();
+    if (!ids.length) return;
+    var btn = this;
+    btn.disabled = true;
+    issueMissing(ids).then(function (n) {
+      btn.disabled = false;
+      render();
+      toast(n + '명에게 개인 링크를 발급했습니다', 'good');
+    }).catch(function (e) {
+      btn.disabled = false;
+      toast('발급하지 못했습니다 — ' + e.message, 'bad');
+    });
+  });
+
+  function collapseIfCrowded() {
+    if (students.length <= 30) return;
+    Store.getClasses().forEach(function (c) { collapsed[c.name] = true; });
+    collapsed['(반 없음)'] = true;
+    collapsed[ARCHIVE_GROUP] = true;
+  }
+
+  function refreshClassOptions() {
+    var classes = Store.getClasses();
+    var sel = $('#classFilter');
+    var keep = sel.value;
+    sel.textContent = '';
+    var optAll = document.createElement('option');
+    optAll.value = ''; optAll.textContent = '전체 반';
+    sel.appendChild(optAll);
+    classes.forEach(function (c) {
+      var o = document.createElement('option');
+      o.value = c.name;
+      o.textContent = c.name + ' (' + c.count + ')';
+      sel.appendChild(o);
+    });
+    sel.value = classes.some(function (c) { return c.name === keep; }) ? keep : '';
+
+    var dl = $('#classOptions');
+    dl.textContent = '';
+    classes.forEach(function (c) {
+      var o = document.createElement('option');
+      o.value = c.name;
+      dl.appendChild(o);
+    });
+  }
+
+  rosterList.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-act]');
+    if (!btn) return;
+
+    if (btn.dataset.act === 'toggle') {
+      var g = btn.closest('.class-group');
+      collapsed[g.dataset.cls] = !collapsed[g.dataset.cls];
+      g.classList.toggle('is-collapsed', !!collapsed[g.dataset.cls]);
+      syncExpandButton();
+      return;
+    }
+
+    var tr = btn.closest('tr');
+    var s = tr && students.find(function (x) { return x.id === tr.dataset.id; });
+    if (!s) return;
+
+    if (btn.dataset.act === 'edit') openStudentModal(s);
+
+    if (btn.dataset.act === 'copylink') {
+      copyText(Store.hubUrl(Store.linkOf(s.id).hubCode))
+        .then(function () { toast(s.name + ' 개인 링크를 복사했습니다', 'good'); })
+        .catch(function (err) { toast(err.message, 'bad'); });
+    }
+
+    if (btn.dataset.act === 'issue') {
+      btn.disabled = true;
+      issueLink(s.id).then(function () {
+        fillRow(tr, s);
+        renderLinkNotice();
+        toast(s.name + ' 개인 링크를 발급했습니다', 'good');
+      }).catch(function (err) {
+        btn.disabled = false;
+        toast('발급하지 못했습니다 — ' + err.message, 'bad');
+      });
+    }
+  });
+
+  var searchTimer = null;
+  $('#searchInput').addEventListener('input', function (e) {
+    var v = e.target.value.trim().toLowerCase();
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(function () { filterText = v; render(); }, 150);
+  });
+
+  $('#classFilter').addEventListener('change', function (e) { filterClass = e.target.value; render(); });
+  $('#showArchived').addEventListener('change', function (e) { showArchived = e.target.checked; render(); });
+
+  function visibleClassNames() {
+    return $$('.class-group', rosterList).map(function (g) { return g.dataset.cls; });
+  }
+
+  function syncExpandButton() {
+    var names = visibleClassNames();
+    var anyCollapsed = names.some(function (n) { return collapsed[n]; });
+    var btn = $('#btnExpandAll');
+    btn.textContent = anyCollapsed ? '모두 펼치기' : '모두 접기';
+    btn.hidden = names.length < 2 || !!(filterText || filterClass);
+  }
+
+  $('#btnExpandAll').addEventListener('click', function () {
+    var names = visibleClassNames();
+    var anyCollapsed = names.some(function (n) { return collapsed[n]; });
+    names.forEach(function (n) { collapsed[n] = !anyCollapsed; });
+    render();
+  });
+
+  /* ============================================================
+     학생 추가 · 수정
+     ============================================================ */
+
+  var studentModal = $('#studentModal');
+  var editingId = null;
+
+  function showStudentError(msg) {
+    var box = $('#studentError');
+    box.textContent = msg || '';
+    box.classList.toggle('is-on', !!msg);
+  }
+
+  function extraFieldNode(f) {
+    var wrap = document.createElement('label');
+    wrap.className = 'field';
+    wrap.dataset.key = f.key;
+
+    var lab = document.createElement('span');
+    lab.className = 'field__label';
+    lab.textContent = f.label;
+
+    var input;
+    if (f.type === 'textarea') {
+      input = document.createElement('textarea');
+      input.className = 'textarea';
+    } else if (f.type === 'select') {
+      input = document.createElement('select');
+      input.className = 'select';
+      var blank = document.createElement('option');
+      blank.value = ''; blank.textContent = '(비움)';
+      input.appendChild(blank);
+      (f.options || []).forEach(function (o) {
+        var el = document.createElement('option');
+        el.value = o; el.textContent = o;
+        input.appendChild(el);
+      });
+    } else if (f.type === 'checkbox') {
+      input = document.createElement('input');
+      input.type = 'checkbox';
+      wrap.className = 'check-line';
+      wrap.appendChild(input);
+      var t = document.createElement('span');
+      t.textContent = f.label;
+      wrap.appendChild(t);
+      input.dataset.role = 'extra';
+      return wrap;
+    } else {
+      input = document.createElement('input');
+      input.className = 'input';
+      input.type = f.type === 'date' ? 'date' : 'text';
+      input.autocomplete = 'off';
+    }
+    input.dataset.role = 'extra';
+    wrap.appendChild(lab);
+    wrap.appendChild(input);
+    return wrap;
+  }
+
+  function renderExtraFields(s) {
+    var host = $('#extraFields');
+    host.textContent = '';
+    if (!fields.length) return;
+
+    var head = document.createElement('div');
+    head.className = 'extra-head';
+    head.innerHTML = '<span class="extra-head__title">내가 만든 칸</span>';
+    host.appendChild(head);
+
+    var grid = document.createElement('div');
+    grid.className = 'grid2';
+    fields.forEach(function (f) {
+      var node = extraFieldNode(f);
+      if (f.type === 'textarea') node.classList.add('grid2__full');
+      var input = node.querySelector('[data-role="extra"]');
+      var v = s ? Store.fieldValue(s, f) : '';
+      if (f.type === 'checkbox') input.checked = !!v;
+      else input.value = v == null ? '' : String(v);
+      grid.appendChild(node);
+    });
+    host.appendChild(grid);
+  }
+
+  /* 지금 없는 칸(나중에 지운 칸)에 적혀 있던 값은 그대로 둔다 */
+  function collectExtra(s) {
+    var out = {};
+    var known = {};
+    fields.forEach(function (f) { known[f.key] = true; });
+    Object.keys((s && s.extra) || {}).forEach(function (k) { if (!known[k]) out[k] = s.extra[k]; });
+    fields.forEach(function (f) {
+      var wrap = $('#extraFields [data-key="' + f.key + '"]');
+      var input = wrap && wrap.querySelector('[data-role="extra"]');
+      if (!input) return;
+      if (f.type === 'checkbox') { if (input.checked) out[f.key] = true; return; }
+      var v = String(input.value || '').trim();
+      if (v) out[f.key] = v;
+    });
+    return out;
+  }
+
+  function renderLinkBox() {
+    var isNew = !editingId;
+    var link = isNew ? {} : Store.linkOf(editingId);
+    var url = Store.hubUrl(link.hubCode);
+
+    $('#fHubUrl').textContent = url || (isNew ? '저장하면 자동 발급' : '아직 없음');
+    $('#btnHubIssue').textContent = link.hubCode ? '재발급' : '발급';
+    $('#btnHubIssue').hidden = isNew;
+    $('#btnHubCopy').hidden = !url;
+    $('#btnHubOpen').hidden = !url;
+    if (url) $('#btnHubOpen').href = url;
+    $('#linkBoxNew').hidden = !isNew;
+  }
+
+  function openStudentModal(s) {
+    editingId = s ? s.id : null;
+
+    $('#studentModalTitle').textContent = s ? '학생 수정' : '학생 추가';
+    $('#fName').value   = s ? (s.name || '') : '';
+    $('#fSchool').value = s ? (s.school || '') : (settings.lastSchool || '');
+    $('#fGrade').value  = s ? (s.grade || '') : (settings.lastGrade || '');
+    $('#fClass').value  = s ? (s.className || '') : (settings.lastClass || '');
+    $('#fParentTitle').value = s ? (s.parentTitle || '') : (settings.lastParentTitle || '');
+    $('#fPhone').value  = s && s.parentPhone ? Store.phoneFormat(s.parentPhone) : '';
+    $('#fPhone2').value = s && s.studentPhone ? Store.phoneFormat(s.studentPhone) : '';
+    $('#fArchived').checked = !!(s && s.archived);
+
+    var link = s ? Store.linkOf(s.id) : {};
+    $('#fAppCode').value = link.appCode ? 'https://marathonstudy.com/share/report/' + link.appCode : '';
+    $('#fAppHint').textContent = link.appUpdatedAt
+      ? '마지막 갱신 ' + new Date(link.appUpdatedAt).toLocaleDateString('ko-KR') + ' · 링크 전체를 붙여 넣어도 코드만 저장됩니다.'
+      : '링크 전체를 붙여 넣어도 코드만 저장됩니다.';
+    $('#btnStudentDelete').hidden = !s;
+
+    renderLinkBox();
+    renderExtraFields(s);
+    showStudentError('');
+    studentModal.showModal();
+    setTimeout(function () { $('#fName').focus(); }, 30);
+  }
+
+  $('#btnAddStudent').addEventListener('click', function () { openStudentModal(null); });
+  $('#btnStudentCancel').addEventListener('click', function () { studentModal.close(); });
+
+  ['#fPhone', '#fPhone2'].forEach(function (sel) {
+    $(sel).addEventListener('blur', function (e) {
+      var d = Store.phoneDigits(e.target.value);
+      if (d) e.target.value = Store.phoneFormat(d);
+    });
+  });
+
+  $('#btnHubIssue').addEventListener('click', function () {
+    if (!editingId) return;
+    var had = !!Store.linkOf(editingId).hubCode;
+    var go = had
+      ? confirmAsk('개인 링크 재발급', '새 링크를 만들면 지금까지 보낸 링크는 바로 열리지 않습니다. 새 링크를 다시 보내야 합니다.', '재발급')
+      : Promise.resolve(true);
+    go.then(function (ok) {
+      if (!ok) return;
+      return issueLink(editingId).then(function () {
+        renderLinkBox();
+        render();
+        toast(had ? '새 링크를 만들었습니다. 예전 링크는 막혔습니다' : '개인 링크를 발급했습니다', 'good');
+      });
+    }).catch(function (e) { toast('발급하지 못했습니다 — ' + e.message, 'bad'); });
+  });
+
+  $('#btnHubCopy').addEventListener('click', function () {
+    var url = Store.hubUrl(Store.linkOf(editingId).hubCode);
+    copyText(url).then(function () { toast('개인 링크를 복사했습니다', 'good'); })
+      .catch(function (e) { toast(e.message, 'bad'); });
+  });
+
+  $('#btnStudentDelete').addEventListener('click', function () {
+    var s = students.find(function (x) { return x.id === editingId; });
+    if (!s) return;
+    confirmAsk('학생 삭제',
+      '‘' + s.name + '’ 학생과 그 학생의 작성 내용·공개한 레포트·개인 링크를 모두 지웁니다. 되돌릴 수 없습니다. ' +
+      '다니지 않게 된 학생은 지우지 말고 [퇴원]에 체크하세요.', '삭제')
+      .then(function (ok) {
+        if (!ok) return;
+        studentModal.close();
+        Store.deleteStudent(s.id);
+        students = Store.getStudents();
+        render();
+        toast(s.name + ' 학생을 지웠습니다');
+      });
+  });
+
+  $('#studentForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+
+    var name   = $('#fName').value.trim();
+    var phone  = Store.phoneDigits($('#fPhone').value);
+    var phone2 = Store.phoneDigits($('#fPhone2').value);
+    var appCode = Store.extractAppCode($('#fAppCode').value);
+
+    if (!name) { showStudentError('이름을 입력해 주세요.'); return; }
+    if (!Store.phoneValid(phone))  { showStudentError('학부모 연락처의 자릿수를 확인해 주세요.'); return; }
+    if (!Store.phoneValid(phone2)) { showStudentError('학생 연락처의 자릿수를 확인해 주세요.'); return; }
+    if (appCode === null) {
+      showStudentError('앱 공유 링크를 알아볼 수 없습니다. marathonstudy.com/share/report/… 주소를 그대로 붙여 넣어 주세요.');
+      return;
+    }
+
+    /* 이름 + 학부모 번호가 같은 학생이 이미 있으면 막는다 (엑셀 넣기와 같은 규칙) */
+    var dup = phone && students.find(function (x) {
+      return x.id !== editingId && x.name === name && x.parentPhone === phone;
+    });
+    if (dup) { showStudentError('이름과 학부모 연락처가 같은 학생이 이미 있습니다 (' + (dup.className || '반 없음') + ').'); return; }
+
+    var prev = editingId ? students.find(function (x) { return x.id === editingId; }) : null;
+    var rec = {
+      id: editingId || Store.newId(),
+      name: name,
+      school: $('#fSchool').value.trim(),
+      grade: $('#fGrade').value.trim(),
+      className: $('#fClass').value.trim(),
+      parentTitle: $('#fParentTitle').value.trim(),
+      parentPhone: phone,
+      studentPhone: phone2,
+      archived: $('#fArchived').checked,
+      extra: collectExtra(prev),
+      sortOrder: prev ? prev.sortOrder || 0 : 0,
+      createdAt: prev ? prev.createdAt : new Date().toISOString()
+    };
+
+    Store.upsertStudent(rec);
+    students = Store.getStudents();
+
+    settings.lastGrade = rec.grade;
+    settings.lastClass = rec.className;
+    settings.lastSchool = rec.school;
+    settings.lastParentTitle = rec.parentTitle;
+    Store.writeLocal(Store.KEYS.settings, settings);
+
+    var link = Store.linkOf(rec.id);
+    var needIssue = !rec.archived && !link.hubCode;
+    var appChanged = (appCode || '') !== (link.appCode || '');
+
+    studentModal.close();
+    render();
+
+    if (!needIssue && !appChanged) {
+      toast(prev ? rec.name + ' 학생을 수정했습니다' : rec.name + ' 학생을 추가했습니다', 'good');
+      return;
+    }
+
+    /* 링크는 학생 줄이 서버에 생긴 뒤에 저장할 수 있다 */
+    var btn = $('#btnStudentSave');
+    btn.disabled = true;
+    Store.flushNow(Store.KEYS.students, students)
+      .then(function () { return needIssue ? issueLink(rec.id) : null; })
+      .then(function () {
+        if (!appChanged) return null;
+        return DB.saveLink(rec.id, { appCode: appCode || '' }).then(function (l) {
+          var cur = Store.linkOf(rec.id);
+          cur.appCode = l.appCode;
+          cur.appUpdatedAt = l.appUpdatedAt;
+          Store.setLinkLocal(rec.id, cur);
+        });
+      })
+      .then(function () {
+        btn.disabled = false;
+        render();
+        toast(rec.name + ' 학생을 저장했습니다' + (needIssue ? ' · 개인 링크 발급' : '') +
+              (appChanged ? ' · 앱 코드 ' + (appCode ? '저장' : '지움') : ''), 'good');
+      })
+      .catch(function (err) {
+        btn.disabled = false;
+        render();
+        toast('학생은 저장했지만 링크를 저장하지 못했습니다 — ' + err.message, 'bad');
+      });
+  });
+
+  /* ============================================================
+     반 현황
+     ============================================================ */
+
+  var classInfoModal = $('#classInfoModal');
+  var editingClass = null;
+
+  function renderClassInfo() {
+    var host = $('#classInfoList');
+    var classes = Store.getClasses();
+    host.textContent = '';
+
+    if (!classes.length) {
+      host.innerHTML = '<div class="empty-state">아직 반이 없습니다.<br>학생을 추가하면서 반 이름을 적으면 여기에 나옵니다.</div>';
+      return;
+    }
+    if (!classFields.length) {
+      host.innerHTML = '<div class="empty-state">아직 만든 반 칸이 없습니다.<br>' +
+                       '<b>반 칸 관리</b>에서 시험 범위·수업 진도 같은 칸을 만들어 보세요.</div>';
+      return;
+    }
+
+    var frag = document.createDocumentFragment();
+    classes.forEach(function (c) {
+      var bag = Store.classExtra(c.name);
+      var card = document.createElement('div');
+      card.className = 'cinfo';
+      card.dataset.cls = c.name;
+
+      var head = document.createElement('div');
+      head.className = 'cinfo__head';
+      head.innerHTML = '<span class="cinfo__name"></span><span class="cinfo__count"></span>' +
+                       '<span class="spacer"></span>' +
+                       '<button class="btn btn--sm" type="button" data-cact="edit">적기</button>';
+      head.querySelector('.cinfo__name').textContent = c.name;
+      head.querySelector('.cinfo__count').textContent = c.count + '명';
+      card.appendChild(head);
+
+      var body = document.createElement('div');
+      body.className = 'cinfo__body';
+      classFields.forEach(function (f) {
+        var v = Store.fieldText(bag, f);
+        var line = document.createElement('div');
+        line.className = 'cinfo__line' + (v ? '' : ' is-empty');
+        var name = document.createElement('span');
+        name.className = 'cinfo__label';
+        name.textContent = f.label;
+        var val = document.createElement('span');
+        val.className = 'cinfo__val';
+        val.textContent = v || '비어 있음';
+        line.appendChild(name);
+        line.appendChild(val);
+        body.appendChild(line);
+      });
+      card.appendChild(body);
+      frag.appendChild(card);
+    });
+    host.appendChild(frag);
+  }
+
+  function openClassInfoModal(name) {
+    editingClass = name;
+    $('#classInfoTitle').textContent = name + ' 반 현황';
+    $('#classInfoDesc').textContent = '여기에 적은 내용은 ' + name + ' 반 학생 전체에 쓰입니다';
+    var host = $('#classInfoFields');
+    host.textContent = '';
+    var bag = Store.classExtra(name);
+    var grid = document.createElement('div');
+    grid.className = 'grid2';
+    classFields.forEach(function (f) {
+      var node = extraFieldNode(f);
+      if (f.type === 'textarea') node.classList.add('grid2__full');
+      var input = node.querySelector('[data-role="extra"]');
+      var v = bag[f.key];
+      if (f.type === 'checkbox') input.checked = !!v;
+      else input.value = v == null ? '' : String(v);
+      grid.appendChild(node);
+    });
+    host.appendChild(grid);
+    classInfoModal.showModal();
+  }
+
+  $('#classInfoList').addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-cact="edit"]');
+    var card = btn && btn.closest('.cinfo');
+    if (card) openClassInfoModal(card.dataset.cls);
+  });
+
+  $('#btnClassInfoCancel').addEventListener('click', function () { classInfoModal.close(); });
+
+  $('#classInfoForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (!editingClass) { classInfoModal.close(); return; }
+    var out = {};
+    var known = {};
+    classFields.forEach(function (f) { known[f.key] = true; });
+    var old = Store.classExtra(editingClass);
+    Object.keys(old).forEach(function (k) { if (!known[k]) out[k] = old[k]; });
+    classFields.forEach(function (f) {
+      var wrap = $('#classInfoFields [data-key="' + f.key + '"]');
+      var input = wrap && wrap.querySelector('[data-role="extra"]');
+      if (!input) return;
+      if (f.type === 'checkbox') { if (input.checked) out[f.key] = true; return; }
+      var v = String(input.value || '').trim();
+      if (v) out[f.key] = v;
+    });
+    Store.setClassExtra(editingClass, out);
+    classInfoModal.close();
+    renderClassInfo();
+    toast(editingClass + ' 반 현황을 저장했습니다', 'good');
+  });
+
+  /* ============================================================
+     칸 관리
+     ============================================================ */
+
+  var fieldsModal = $('#fieldsModal');
+  var fieldEditModal = $('#fieldEditModal');
+  var editingFieldId = null;
+  var fieldScope = 'student';
+
+  function scopeList() { return fieldScope === 'class' ? classFields : fields; }
+  function scopeName() { return Store.SCOPES[fieldScope].name; }
+  function typeName(t) {
+    var hit = Store.FIELD_TYPES.find(function (x) { return x.type === t; });
+    return hit ? hit.name : t;
+  }
+
+  function usedCount(f) {
+    function has(bag) {
+      var v = (bag || {})[f.key];
+      return v !== undefined && v !== '' && v !== false;
+    }
+    if (Store.scopeOf(f) === 'class') {
+      var info = Store.getClassInfo();
+      return Object.keys(info).filter(function (n) { return has(info[n]); }).length;
+    }
+    return students.filter(function (s) { return has(s.extra); }).length;
+  }
+  function usedUnit(f) { return Store.scopeOf(f) === 'class' ? '개 반' : '명'; }
+
+  function renderFieldList() {
+    var host = $('#fieldList');
+    var list = scopeList();
+    host.textContent = '';
+    $('#fieldsTitle').textContent = scopeName() + ' 관리';
+    $('#fieldsDesc').textContent = fieldScope === 'class'
+      ? '반마다 한 번만 적으면 되는 칸을 만듭니다. 만든 칸은 명단 아래 [반 현황]에 나옵니다.'
+      : '학생마다 따로 적어 둘 칸을 만듭니다. 학생·학부모 화면에는 나가지 않습니다.';
+    $('#fieldsCount').textContent = list.length ? list.length + '개' : '';
+
+    if (!list.length) {
+      host.innerHTML = '<div class="empty-state">아직 만든 ' + scopeName() + '이 없습니다.</div>';
+      return;
+    }
+
+    list.forEach(function (f, i) {
+      var row = document.createElement('div');
+      row.className = 'field-row';
+      row.dataset.id = f.id;
+      row.innerHTML =
+        '<div class="field-row__main"><span class="field-row__label"></span><span class="field-row__meta"></span></div>' +
+        '<div class="field-row__acts">' +
+          '<button class="btn btn--sm btn--ghost" type="button" data-fact="up"' + (i === 0 ? ' disabled' : '') + ' aria-label="위로">↑</button>' +
+          '<button class="btn btn--sm btn--ghost" type="button" data-fact="down"' + (i === list.length - 1 ? ' disabled' : '') + ' aria-label="아래로">↓</button>' +
+          '<button class="btn btn--sm" type="button" data-fact="edit">수정</button>' +
+          '<button class="btn btn--sm btn--danger" type="button" data-fact="del">삭제</button>' +
+        '</div>';
+      row.querySelector('.field-row__label').textContent = f.label;
+      var meta = [typeName(f.type)];
+      if (fieldScope !== 'class') meta.push(f.showInTable !== false ? '표에 보임' : '표에 숨김');
+      var n = usedCount(f);
+      if (n) meta.push(n + usedUnit(f) + ' 작성됨');
+      row.querySelector('.field-row__meta').textContent = meta.join(' · ');
+      host.appendChild(row);
+    });
+  }
+
+  function showFieldEditError(msg) {
+    var box = $('#fieldEditError');
+    box.textContent = msg || '';
+    box.classList.toggle('is-on', !!msg);
+  }
+
+  Store.FIELD_TYPES.forEach(function (t) {
+    var o = document.createElement('option');
+    o.value = t.type; o.textContent = t.name;
+    $('#fdType').appendChild(o);
+  });
+
+  function syncTypeUi() {
+    var t = $('#fdType').value;
+    var hit = Store.FIELD_TYPES.find(function (x) { return x.type === t; });
+    $('#fdTypeHint').textContent = hit ? hit.hint : '';
+    $('#fdOptionsWrap').hidden = t !== 'select';
+    $('#fdTableWrap').hidden = fieldScope === 'class';
+    if (t === 'textarea' && editingFieldId === null) $('#fdShowInTable').checked = false;
+  }
+  $('#fdType').addEventListener('change', syncTypeUi);
+
+  function openFieldEdit(f) {
+    editingFieldId = f ? f.id : null;
+    $('#fieldEditTitle').textContent = scopeName() + (f ? ' 수정' : ' 추가');
+    $('#fdLabel').value = f ? (f.label || '') : '';
+    $('#fdType').value = f ? (f.type || 'text') : 'text';
+    $('#fdOptions').value = f && Array.isArray(f.options) ? f.options.join('\n') : '';
+    $('#fdShowInTable').checked = f ? f.showInTable !== false : true;
+    syncTypeUi();
+    showFieldEditError('');
+    fieldEditModal.showModal();
+  }
+
+  function saveFields(next) {
+    Store.saveFieldDefs(next, fieldScope);
+    fields = Store.getFieldDefs('student');
+    classFields = Store.getFieldDefs('class');
+    renderFieldList();
+    render();
+    window.dispatchEvent(new CustomEvent('jt:fields'));
+  }
+
+  function openFieldsModal(scope) {
+    fieldScope = scope;
+    renderFieldList();
+    fieldsModal.showModal();
+  }
+
+  $('#btnManageFields').addEventListener('click', function () { openFieldsModal('student'); });
+  $('#btnManageClassFields').addEventListener('click', function () { openFieldsModal('class'); });
+  $('#btnFieldAdd').addEventListener('click', function () { openFieldEdit(null); });
+  $('#btnFieldEditCancel').addEventListener('click', function () { fieldEditModal.close(); });
+
+  $('#fieldList').addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-fact]');
+    if (!btn) return;
+    var id = btn.closest('.field-row').dataset.id;
+    var list = scopeList();
+    var i = list.findIndex(function (f) { return f.id === id; });
+    if (i < 0) return;
+    var next = list.slice();
+    var act = btn.dataset.fact;
+
+    if (act === 'up' && i > 0) { next.splice(i - 1, 0, next.splice(i, 1)[0]); saveFields(next); }
+    else if (act === 'down' && i < next.length - 1) { next.splice(i + 1, 0, next.splice(i, 1)[0]); saveFields(next); }
+    else if (act === 'edit') openFieldEdit(list[i]);
+    else if (act === 'del') {
+      var f = list[i];
+      var n = usedCount(f);
+      confirmAsk('‘' + f.label + '’ ' + scopeName() + '을 지울까요?',
+        n ? n + usedUnit(f) + '이 적어 둔 내용이 화면에서 사라집니다.' : '아직 아무 데도 적지 않은 칸입니다.',
+        '지우기').then(function (ok) {
+          if (!ok) return;
+          next.splice(i, 1);
+          saveFields(next);
+        });
+    }
+  });
+
+  $('#fieldEditForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var label = $('#fdLabel').value.trim();
+    var type = $('#fdType').value;
+    var opts = $('#fdOptions').value.split('\n')
+      .map(function (x) { return x.trim(); })
+      .filter(function (x, i2, arr) { return x && arr.indexOf(x) === i2; });
+
+    if (!label) { showFieldEditError('칸 이름을 적어 주세요.'); return; }
+    var list = scopeList();
+    if (list.some(function (f) { return f.label === label && f.id !== editingFieldId; })) {
+      showFieldEditError('‘' + label + '’ ' + scopeName() + '이 이미 있습니다.');
+      return;
+    }
+    if (type === 'select' && !opts.length) { showFieldEditError('선택지를 한 줄에 하나씩 적어 주세요.'); return; }
+
+    var next = list.slice();
+    var i = next.findIndex(function (f) { return f.id === editingFieldId; });
+    var inTable = fieldScope === 'class' ? false : $('#fdShowInTable').checked;
+    if (i >= 0) {
+      next[i] = { id: next[i].id, key: next[i].key, label: label, type: type, options: opts,
+                  showInTable: inTable, scope: fieldScope, sortOrder: next[i].sortOrder };
+    } else {
+      next.push({ id: Store.newId(), key: Store.newFieldKey(), label: label, type: type, options: opts,
+                  showInTable: inTable, scope: fieldScope, sortOrder: next.length });
+    }
+    saveFields(next);
+    fieldEditModal.close();
+    if (studentModal.open) renderExtraFields(students.find(function (x) { return x.id === editingId; }));
+    if (classInfoModal.open && editingClass) openClassInfoModal(editingClass);
+  });
+
+  /* ============================================================
+     암호 백업
+     ============================================================ */
+
+  var passModal = $('#passModal');
+  var passResolve = null;
+
+  function askPassword(mode) {
+    return new Promise(function (resolve) {
+      passResolve = resolve;
+      var isExport = mode === 'export';
+      $('#passTitle').textContent = isExport ? '백업 암호 정하기' : '백업 암호 입력';
+      $('#passDesc').textContent = isExport
+        ? '이 암호로 파일을 잠급니다. 암호를 잊으면 다시 열 수 없습니다.'
+        : '이 백업 파일을 잠글 때 쓴 암호를 넣어 주세요.';
+      $('#passConfirmField').hidden = !isExport;
+      $('#fPass1').value = '';
+      $('#fPass2').value = '';
+      $('#passError').classList.remove('is-on');
+      passModal.showModal();
+    });
+  }
+
+  function passFinish(value) {
+    if (!passResolve) return;
+    var r = passResolve;
+    passResolve = null;
+    passModal.close();
+    r(value);
+  }
+
+  $('#btnPassCancel').addEventListener('click', function () { passFinish(null); });
+  passModal.addEventListener('cancel', function () { passFinish(null); });
+
+  $('#passForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var p1 = $('#fPass1').value, p2 = $('#fPass2').value;
+    var isExport = !$('#passConfirmField').hidden;
+    var err = $('#passError');
+    if (p1.length < 4) { err.textContent = '암호는 4자 이상으로 정해 주세요.'; err.classList.add('is-on'); return; }
+    if (isExport && p1 !== p2) { err.textContent = '두 암호가 서로 다릅니다.'; err.classList.add('is-on'); return; }
+    passFinish(p1);
+  });
+
+  $('#btnExport').addEventListener('click', function () {
+    if (!students.length) { toast('내보낼 학생이 없습니다', 'bad'); return; }
+    askPassword('export').then(function (pass) {
+      if (!pass) return;
+      return Store.exportEncrypted(pass).then(function (backup) {
+        var blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'marathon-hub-' + Store.toISO(new Date()) + '.mhbak';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+        toast(students.length + '명을 암호 백업으로 내려받았습니다', 'good');
+      });
+    }).catch(function () { toast('백업을 만들지 못했습니다', 'bad'); });
+  });
+
+  $('#btnRestore').addEventListener('click', function () { $('#restoreFile').click(); });
+
+  $('#restoreFile').addEventListener('change', function (e) {
+    var f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    f.text().then(function (text) {
+      var obj;
+      try { obj = JSON.parse(text); } catch (err) { throw new Error('백업 파일이 아닙니다.'); }
+      return askPassword('import').then(function (pass) {
+        if (pass == null) return null;
+        return Store.importEncrypted(obj, pass);
+      });
+    }).then(function (payload) {
+      if (!payload) return;
+      return confirmAsk('백업 되살리기',
+        '백업에 든 학생 ' + payload.students.length + '명으로 서버 명단을 바꿉니다. ' +
+        '백업에 없는 학생은 서버에서 지워집니다.', '되살리기').then(function (ok) {
+        if (!ok) return;
+        var r = Store.restorePayload(payload);
+        students = Store.getStudents();
+        return Store.flushNow(Store.KEYS.students, students).then(function () {
+          var ids = students.map(function (s) { return s.id; });
+          var list = [];
+          Object.keys(r.links).forEach(function (sid) {
+            if (ids.indexOf(sid) === -1) return;
+            var l = r.links[sid] || {};
+            list.push({ studentId: sid, hubCode: l.hubCode || null, appCode: l.appCode || '' });
+          });
+          return DB.saveLinks(list);
+        }).then(function () {
+          fields = Store.getFieldDefs('student');
+          classFields = Store.getFieldDefs('class');
+          render();
+          toast(r.restored.join(' · ') + ' 되살렸습니다', 'good');
+        });
+      });
+    }).catch(function (err) { toast(err.message || '되살리지 못했습니다', 'bad'); });
+  });
+
+  /* ============================================================
+     이 기기 정리
+     ============================================================ */
+
+  $('#btnClearAll').addEventListener('click', function () {
+    confirmAsk('이 기기에서 로그아웃하고 정리',
+      '이 브라우저에 남아 있는 로그인 상태와 명단 사본을 지우고 로그아웃합니다. 서버의 자료는 그대로 남습니다.',
+      '정리하고 로그아웃').then(function (ok) {
+      if (!ok) return;
+      Store.enableSync(false);
+      Store.clearAll();
+      SB.signOut().then(function () { location.reload(); });
+    });
+  });
+
+  /* ============================================================
+     시작
+     ============================================================ */
+
+  function reloadFromStore() {
+    students = Store.getStudents();
+    fields = Store.getFieldDefs('student');
+    classFields = Store.getFieldDefs('class');
+    render();
+  }
+
+  window.addEventListener('jt:loaded', function () {
+    settings = Store.read(Store.KEYS.settings, {});
+    collapsed = {};
+    students = Store.getStudents();
+    collapseIfCrowded();
+    reloadFromStore();
+  });
+
+  window.addEventListener('jt:roster-changed', reloadFromStore);
+
+  window.UI = {
+    $: $, $$: $$,
+    toast: toast,
+    confirmAsk: confirmAsk,
+    copyText: copyText,
+    selectTab: selectTab,
+    whoami: whoami,
+    issueMissing: issueMissing,
+    getStudents: function () { return students; },
+    activeStudents: function () { return students.filter(function (s) { return !s.archived; }); }
+  };
+
+})();

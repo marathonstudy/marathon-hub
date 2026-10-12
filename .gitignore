@@ -1,0 +1,35 @@
+# ============================================================
+# 공개 저장소에 올리면 안 되는 것
+# 이 저장소는 GitHub Pages 로 공개된다. 올라간 파일은 누구나 볼 수 있다.
+# 학생 이름·연락처·점수·코멘트는 Supabase 에만 둔다.
+# ============================================================
+
+# 학생·학부모 명단, 백업 파일
+*.csv
+*.xlsx
+*.xls
+*.mhbak
+*.jtbak
+*.backup.json
+students*.json
+명단*
+
+# 비밀값 (secret key · service_role key · 깃허브 토큰은 어디에도 적지 않는다)
+.env
+.env.*
+secrets.json
+token.txt
+
+# 확인용 화면 · 작업 메모
+preview/
+tools/
+*.local.md
+
+# OS · 편집기
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+*~

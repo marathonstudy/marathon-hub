@@ -1,0 +1,702 @@
+@charset "utf-8";
+/* ============================================================
+   마라톤국어 주간 학습 레포트 — 공통 스타일
+   보라에서 남색으로 이어지는 차분한 톤.
+   개인 페이지(/me/)의 레포트와 생성기 미리보기가 이 파일을 함께 쓴다.
+   이 파일을 고치면 학부모가 보는 지난 레포트의 디자인도 함께 바뀐다.
+   ============================================================ */
+
+:root {
+  /* 그라데이션 — 보라에서 남색으로 (B안) */
+  --grad-bg:     linear-gradient(135deg, #E8E6F8 0%, #DCE4F4 100%);
+  --grad-strong: linear-gradient(135deg, #8670CC 0%, #36407F 100%);
+  --grad-soft:   linear-gradient(135deg, #F5F4FC, #F0F3FA);
+  --grad-bar:    linear-gradient(90deg, #9480D6, #3D4A8C);
+
+  /* 글자 */
+  --ink:        #3A3F5C;   /* 본문 */
+  --ink-deep:   #2C3566;   /* 수치·강조 */
+  --ink-mid:    #4E5691;   /* 섹션 제목 */
+  --ink-light:  #8A8FB0;   /* 보조 */
+
+  --track:  #E6E8F5;       /* 막대·게이지 바닥 */
+  --muted:  #B4B8CC;       /* 미응시·0값 */
+
+  --card-radius: 22px;
+  --card-shadow: 0 8px 24px rgba(60, 70, 130, .14);
+
+  color-scheme: light;
+}
+
+/* ---------- 리셋 ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body, h1, h2, p, ul, li { margin: 0; padding: 0; }
+ul { list-style: none; }
+svg { display: block; }
+
+body {
+  font-family: 'Pretendard Variable', Pretendard, 'Noto Sans KR',
+               -apple-system, 'Apple SD Gothic Neo', sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--ink);
+  background: var(--grad-bg);
+  background-attachment: fixed;
+  min-height: 100vh;
+  padding: 16px;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  -webkit-font-smoothing: antialiased;
+}
+
+.container { max-width: 500px; margin: 0 auto; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ============================================================
+   헤더 — 책 이모지 · 제목 · 기간
+   ============================================================ */
+.header {
+  text-align: center;
+  padding: 28px 20px 24px;
+  background: var(--grad-strong);
+  border-radius: 28px;
+  margin-bottom: 20px;
+  color: #fff;
+  box-shadow: 0 10px 30px rgba(54, 64, 127, .30);
+}
+.header-emoji { font-size: 38px; line-height: 1.1; margin-bottom: 8px; }
+.header-title {
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+.header-period {
+  display: inline-block;
+  font-size: 14px;
+  font-weight: 500;
+  opacity: .95;
+  background: rgba(255, 255, 255, .22);
+  padding: 6px 14px;
+  border-radius: 20px;
+}
+
+/* ============================================================
+   카드 · 섹션 제목
+   ============================================================ */
+.card {
+  background: #fff;
+  border-radius: var(--card-radius);
+  padding: 22px;
+  margin-bottom: 16px;
+  box-shadow: var(--card-shadow);
+}
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--ink-mid);
+  margin-bottom: 16px;
+}
+.card-note {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-light);
+}
+
+/* ============================================================
+   학생 정보 — 파스텔 그라데이션 칸 셋
+   ============================================================ */
+.student-info {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+}
+.info-item {
+  background: var(--grad-bg);
+  border-radius: 16px;
+  padding: 14px 8px;
+  text-align: center;
+}
+.info-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-light);
+  margin-bottom: 4px;
+}
+.info-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink-deep);
+}
+
+/* ============================================================
+   출결 — 주 1회 수업이므로 횟수가 아니라 상태 하나를 크게 보여준다
+   출석 · 지각 · 결석 · 보강 중 하나 + 선택 메모
+   ============================================================ */
+.att-box {
+  text-align: center;
+  padding: 16px 14px 14px;
+  border-radius: 18px;
+}
+.att-mark {
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 8px;
+}
+.att-mark svg { width: 100%; height: 100%; }
+.att-state {
+  font-size: 19px;
+  font-weight: 900;
+  color: var(--ink-deep);
+  line-height: 1.3;
+}
+.att-note {
+  margin-top: 3px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-mid);
+  line-height: 1.6;
+}
+
+/* 상태별 색 — 전체 보라·남색 톤에서 튀지 않도록 네 가지 모두 채도를 낮춘다.
+   칸 배경보다 도형을 한 단계 진하게 두어 상태가 먼저 눈에 들어오게 한다.
+
+   보강은 원래 연한 라벤더였는데, 화면 전체가 보라·남색이 되면서
+   배경에 묻혀 상태로 읽히지 않았다. 차분한 청록으로 옮겼다.
+   이러면 하늘(출석)·살구(지각)·로즈(결석)·청록(보강) 넷이 모두 따로 보인다. */
+.att-box--attend { background: linear-gradient(135deg, #F0F7FB, #DCEAF5); }  /* 연한 파스텔 하늘 */
+.att-box--attend .att-mark { color: #7CB2D2; }
+
+.att-box--late   { background: linear-gradient(135deg, #FFF4EC, #FBE6D6); }  /* 연한 살구 */
+.att-box--late   .att-mark { color: #D9A177; }
+
+.att-box--absent { background: linear-gradient(135deg, #FBEFF2, #EBDFE3); }  /* 연한 로즈 + 회색 기운 */
+.att-box--absent .att-mark { color: #BE8E99; }
+
+.att-box--makeup { background: linear-gradient(135deg, #EEF7F3, #DBEDE4); }  /* 연한 청록 */
+.att-box--makeup .att-mark { color: #6FAE92; }
+
+.att-box--none   { background: var(--grad-soft); }
+.att-box--none   .att-mark  { color: var(--muted); }
+.att-box--none   .att-state { color: var(--ink-light); }
+
+/* ============================================================
+   이번주 학습 내용
+   ============================================================ */
+.lesson-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--grad-soft);
+  border-radius: 14px;
+  margin-bottom: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink-deep);
+  line-height: 1.65;
+}
+.lesson-item:last-child { margin-bottom: 0; }
+.lesson-check {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  margin-top: 2px;
+  border-radius: 50%;
+  background: var(--grad-strong);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+}
+/* 차시 번호와 내용을 구분한다 */
+.lesson-no {
+  font-weight: 800;
+  color: var(--ink-mid);
+  margin-right: 4px;
+}
+
+/* ============================================================
+   수업 집중도
+   ============================================================ */
+.focus-stars {
+  text-align: center;
+  font-size: 38px;
+  letter-spacing: 4px;
+  line-height: 1.2;
+}
+.focus-star { color: #DDDCF0; }
+.focus-star.active { color: #E9B949; }
+.focus-score-text {
+  text-align: center;
+  margin-top: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-light);
+}
+
+/* ============================================================
+   리뷰테스트 점수
+   ============================================================ */
+.test-item {
+  background: var(--grad-soft);
+  border-radius: 16px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+}
+.test-item:last-child { margin-bottom: 0; }
+.test-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.test-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-deep);
+}
+.test-score-text {
+  flex: 0 0 auto;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--ink-mid);
+}
+.test-score-text small {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-light);
+}
+.progress-bar {
+  height: 10px;
+  background: var(--track);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  width: 0;                     /* JS 가 목표값까지 채운다 */
+  background: var(--grad-bar);
+  border-radius: 10px;
+  transition: width .6s ease;
+}
+/* 미응시(0점) — 회색 처리 */
+.test-item.is-none .test-score-text { color: var(--muted); }
+.test-item.is-none .progress-fill   { background: var(--muted); }
+.test-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink-light);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ============================================================
+   과제 수행 — 요일별 체크
+   ============================================================ */
+.homework-days {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.hw-day { flex: 1; text-align: center; }
+.hw-circle {
+  width: 100%;
+  max-width: 56px;
+  aspect-ratio: 1;
+  margin: 0 auto 6px;
+  border-radius: 50%;
+  background: #E9EBF5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 700;
+  color: #A3AAC6;
+  opacity: .5;
+}
+.hw-circle.done {
+  background: var(--grad-strong);
+  color: #fff;
+  opacity: 1;
+  box-shadow: 0 4px 12px rgba(54, 64, 127, .28);
+}
+.hw-day-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-mid);
+}
+
+/* ============================================================
+   과제 수행 — 필수/선택 항목
+
+   ⚠ 위의 .homework-days / .hw-day / .hw-circle 은 지우지 않는다.
+   이미 학부모님께 보낸 레포트들이 그 모양으로 그려져 있고,
+   그 파일들은 이 css 를 함께 쓴다. 여기에는 새 것만 더한다.
+   ============================================================ */
+.hw-group + .hw-group { margin-top: 14px; }
+
+.hw-group__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.hw-group__title {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--ink-mid);
+}
+.hw-group--optional .hw-group__title { color: var(--ink-light); }
+.hw-group__count {
+  margin-left: auto;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink-light);
+}
+
+.hw-list { display: grid; gap: 7px; }
+
+.hw-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 13px;
+  border-radius: 13px;
+  background: var(--grad-soft);
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--ink-light);
+  line-height: 1.5;
+}
+.hw-item.is-done { color: var(--ink-deep); font-weight: 600; }
+
+.hw-mark {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  background: #E9EBF5;
+  color: #A3AAC6;
+}
+.hw-item.is-done .hw-mark {
+  background: var(--grad-strong);
+  color: #fff;
+}
+.hw-name { flex: 1 1 auto; min-width: 0; }
+
+/* ============================================================
+   과제 수행 — 항목마다 월~금 요일
+
+   한 줄에 이름 + 요일 동그라미 다섯. 요일 글자는 묶음 제목 줄에
+   한 번만 적어서 항목이 많아도 줄마다 되풀이되지 않게 한다.
+   위의 .hw-item 들도 지우지 않는다 (어제 방식 · 발행본이 쓴다).
+   ============================================================ */
+.hwd-group + .hwd-group { margin-top: 16px; }
+
+.hwd-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.hwd-title {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--ink-mid);
+}
+.hwd-group--optional .hwd-title { color: var(--ink-light); }
+.hwd-count {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink-light);
+}
+/* 오른쪽 여백을 .hwd-row 와 맞춰야 글자가 동그라미 바로 위에 온다 */
+.hwd-days-label {
+  margin-left: auto;
+  padding-right: 11px;
+  display: flex;
+  gap: 6px;
+}
+.hwd-days-label span {
+  width: 26px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-mid);
+}
+
+.hwd-list { display: grid; gap: 6px; }
+
+.hwd-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px 9px 13px;
+  border-radius: 13px;
+  background: var(--grad-soft);
+}
+.hwd-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--ink-deep);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.hwd-dots { flex: 0 0 auto; display: flex; gap: 6px; }
+.hwd-dot {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  background: #E9EBF5;
+  color: #A3AAC6;
+  opacity: .6;
+}
+.hwd-dot.done {
+  background: var(--grad-strong);
+  color: #fff;
+  opacity: 1;
+  box-shadow: 0 3px 8px rgba(54, 64, 127, .22);
+}
+
+/* ============================================================
+   과제 제출률 — 원형 게이지
+   ============================================================ */
+.rate-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+/* 한 묶음만 있을 때(선택과제를 안 냈다든지) 가운데 하나만 */
+.rate-grid--one { grid-template-columns: minmax(0, 240px); justify-content: center; }
+.rate-circle-wrapper {
+  background: var(--grad-soft);
+  border-radius: 18px;
+  padding: 18px 10px;
+  text-align: center;
+}
+.rate-circle {
+  position: relative;
+  width: 110px;
+  height: 110px;
+  max-width: 100%;
+  margin: 0 auto 8px;
+}
+.rate-circle svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.rate-circle-bg { stroke: var(--track); }
+.rate-circle-fill {
+  stroke: url(#brandGrad);
+  stroke-linecap: round;
+  transition: stroke-dashoffset .8s ease;
+}
+.rate-circle-wrapper.is-zero .rate-circle-fill { stroke: var(--muted); }
+.rate-num {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--ink-deep);
+}
+.rate-num small {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-light);
+  margin-left: 1px;
+}
+.rate-circle-wrapper.is-zero .rate-num { color: var(--muted); }
+.rate-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-mid);
+}
+
+/* ============================================================
+   종합 코멘트
+   ============================================================ */
+.comment-box {
+  position: relative;
+  background: linear-gradient(135deg, #F5F5FC, #EFF2FA);
+  border-radius: 20px;
+  padding: 30px 22px 26px;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.8;
+  color: var(--ink-deep);
+  white-space: pre-wrap;        /* 줄바꿈 그대로 유지 */
+}
+.comment-quote-open,
+.comment-quote-close {
+  position: absolute;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 60px;
+  line-height: 1;
+  color: #A9A4DC;
+  opacity: .7;
+}
+.comment-quote-open  { top: 6px; left: 12px; }
+.comment-quote-close { bottom: -14px; right: 14px; }
+
+/* ============================================================
+   푸터
+   ============================================================ */
+.footer { text-align: center; padding: 30px 20px 10px; }
+.footer-sign {
+  font-family: 'Nanum Pen Script', 'Gaegu', cursive;
+  font-size: 32px;
+  line-height: 1.4;
+  color: var(--ink-mid);
+}
+.footer-heart { color: #5A63A8; }
+.footer-sub {
+  font-size: 12px;
+  color: var(--ink-light);
+  margin-top: 4px;
+}
+.footer-brand {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(78, 86, 145, .20);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  color: var(--ink-mid);
+}
+.footer-contact {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--ink-light);
+}
+.footer-contact a {
+  color: var(--ink-mid);
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.footer-date {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--ink-light);
+  opacity: .8;
+}
+
+/* ============================================================
+   상태 · 접근성
+   ============================================================ */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.empty {
+  background: #fff;
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
+  text-align: center;
+  padding: 56px 28px;
+  font-size: 15px;
+  line-height: 1.8;
+  color: var(--ink-mid);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress-fill, .rate-circle-fill { transition: none; }
+}
+
+/* 아주 좁은 화면 */
+@media (max-width: 380px) {
+  body { padding: 12px; }
+  .header-title { font-size: 19px; }
+  .card { padding: 18px 16px; }
+  .info-value { font-size: 13px; }
+  .att-mark { width: 40px; height: 40px; }
+  .att-state { font-size: 17px; }
+  .focus-stars { font-size: 32px; }
+  .rate-circle { width: 95px; height: 95px; }
+  .rate-num { font-size: 19px; }
+  /* 작은 폰에서도 과제 이름 칸이 너무 좁아지지 않게 동그라미를 줄인다 */
+  .hwd-row { gap: 8px; padding: 8px 9px 8px 11px; }
+  .hwd-name { font-size: 14px; }
+  .hwd-dots, .hwd-days-label { gap: 4px; }
+  .hwd-days-label { padding-right: 9px; }
+  .hwd-dot, .hwd-days-label span { width: 23px; }
+  .hwd-dot { height: 23px; font-size: 12px; }
+}
+
+/* ============================================================
+   인쇄 — 상담 자료로 출력
+   ============================================================ */
+@media print {
+  @page { size: A4; margin: 12mm; }
+  body {
+    background: #fff;
+    padding: 0;
+    min-height: 0;
+    font-size: 11pt;
+  }
+  .container { max-width: none; }
+  .header {
+    box-shadow: none;
+    background: #fff;
+    color: var(--ink-mid);
+    border: 1.5px solid #C9CEE8;
+    padding: 18px;
+  }
+  .header-period {
+    background: #fff;
+    border: 1px solid #C9CEE8;
+    color: var(--ink-light);
+  }
+  .card {
+    box-shadow: none;
+    border: 1px solid #E4E7F2;
+    padding: 14px 16px;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .hw-circle.done { box-shadow: none; }
+  .progress-fill, .rate-circle-fill { transition: none; }
+  .hwd-dot.done { box-shadow: none; }
+  .att-box, .info-item, .hw-circle.done, .hwd-dot.done, .lesson-check,
+  .progress-fill {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .footer { padding-bottom: 0; }
+}
