@@ -2029,3 +2029,49 @@ dialog.modal.modal--card {
 .ph-admin-item.is-hidden img { opacity: .4; }
 .ph-admin-item figcaption { padding: 8px; display: flex; flex-direction: column; gap: 4px; }
 .ph-admin-acts { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px; }
+
+/* ============================================================
+   오늘 — 총괄 (today.js)
+   ============================================================ */
+.tab__badge {
+  display: inline-grid; place-items: center;
+  min-width: 18px; height: 18px; padding: 0 5px; margin-left: 6px;
+  border-radius: 999px; background: #C4566F; color: #fff;
+  font-size: 11px; font-weight: 800; vertical-align: 1px;
+}
+.td-summary { margin-top: 0; }
+.td-care { display: flex; flex-direction: column; gap: 6px; }
+.td-care__row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 7px 10px; border: 1px solid var(--line); border-radius: 10px; }
+.td-why { font-size: 11.5px; font-weight: 800; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); color: var(--ink-mid); }
+.td-why--absent { background: #FDF2F5; color: #97364E; }
+.td-why--app    { background: #FFF3E3; color: #A86A1E; }
+.td-why--photo  { background: #F1F2FB; color: #4A4E9B; }
+.td-why--follow { background: #FFF0DC; color: #A86A1E; }
+.td-classes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+  align-items: start;
+}
+.td-card { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); overflow: hidden; }
+.td-card.is-open { grid-column: 1 / -1; }
+.td-card__head {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  appearance: none; border: 0; background: var(--surface-2); font: inherit; text-align: left;
+  padding: 10px 14px; cursor: pointer; border-bottom: 1px solid var(--line-soft);
+}
+.td-card__name { font-size: 15px; font-weight: 800; color: var(--ink-deep); }
+.td-card__count { font-size: 12px; font-weight: 700; color: var(--ink-light); }
+.td-card.is-open .class-head__caret { transform: rotate(180deg); }
+.td-card__body { padding: 10px 14px 12px; display: flex; flex-direction: column; gap: 5px; font-size: 13.5px; }
+.td-line { color: var(--ink); }
+.td-bar { display: grid; grid-template-columns: 36px 1fr 52px; align-items: center; gap: 8px; font-size: 12.5px; }
+.td-bar__label { font-weight: 700; color: var(--ink-mid); }
+.td-bar__track { height: 8px; border-radius: 999px; background: var(--line-soft); overflow: hidden; }
+.td-bar__fill { display: block; height: 100%; background: var(--grad-strong); border-radius: 999px; }
+.td-bar__num { text-align: right; color: var(--ink-light); font-weight: 700; }
+.td-students { border-top: 1px solid var(--line-soft); padding: 4px 8px 8px; }
+@media (max-width: 720px) {
+  .td-classes { grid-template-columns: 1fr; }
+}

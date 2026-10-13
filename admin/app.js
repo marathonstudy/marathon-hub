@@ -138,7 +138,8 @@
     { tab: '#tab-send',    panel: '#panel-send'    },
     { tab: '#tab-notice',  panel: '#panel-notice'  },
     { tab: '#tab-book',    panel: '#panel-book'    },
-    { tab: '#tab-photo',   panel: '#panel-photo'   }
+    { tab: '#tab-photo',   panel: '#panel-photo'   },
+    { tab: '#tab-today',   panel: '#panel-today'   }     /* 7 — 화면 맨 앞 · 로그인 첫 화면 */
   ];
 
   function selectTab(idx) {
