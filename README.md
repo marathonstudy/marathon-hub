@@ -35,6 +35,8 @@ admin/        코치룸 (명단 · 작성 · 공개 · 발송 · 반 공지 · �
   sync.js       여러 기기 — 다시 불러오기 · 실시간 반영
   photo.js      ⑦ 필기 노트 — 반·날짜별 올림 현황 · 숨기기 · 완전 삭제 · 저장 공간
   today.js      「오늘」 총괄 (로그인 첫 화면) — 요약 · 챙겨야 할 학생 · 반별 카드
+  staff.js      직원 관리 (「오늘」 [설정] · teacher 만) — 팀 가입 코드 · 사용 중지 · 역할
+  auth.js       로그인 · 조교 가입 · 비밀번호 찾기
 me/           학생·학부모 개인 페이지
 notice/       반 공용 공지 페이지
 assets/
@@ -54,6 +56,7 @@ supabase/
   migration-006-notes-photos.sql  필기 노트 사진 — 비공개 보관함 · 사진 기록 · Edge Function 전용 함수
   functions/note-photo/index.ts   필기 사진 올리기·보기·지우기 Edge Function (개인 링크 코드 확인)
   migration-007-dashboard.sql     「오늘」 총괄 — 계산 함수 coach_today() 하나 + 설정 보호 (새 표 없음)
+  migration-008-staff-join.sql    조교 직접 가입(팀 가입 코드) · 직원 관리(사용 중지 · 역할)
   functions/app-report/index.ts  앱 과제 기록을 대신 받아 오는 Edge Function
 ```
 
@@ -72,14 +75,17 @@ supabase/
 2. `supabase/schema.sql` 파일 내용을 전부 복사해 붙여 넣고 **Run**
 3. 맨 아래 결과에 표들이 `rls_enabled = true` 로 나오면 끝. 여러 번 실행해도 안전하다.
 
-### 2. 아무나 가입하지 못하게
-**Authentication → Sign In / Providers** → *User Signups* 의 **Allow new users to sign up** 끄기 → Save
+### 2. 가입 설정 (조교 직접 가입 — migration-008 을 쓸 때)
+- **Authentication → Sign In / Providers → Email**: **Allow new users to sign up** 켜기, **Confirm email** 끄기 → Save
+  (누구나 계정은 만들 수 있지만 팀 가입 코드가 맞아야 staff 로 등록된다. 등록 안 된 계정은 아무것도 못 본다)
+- **Authentication → URL Configuration**: Site URL 과 Redirect URLs 에 `https://marathonstudy.github.io/marathon-hub/admin/` (비밀번호 찾기 메일의 링크가 여기로 돌아온다)
+- 직접 가입을 쓰지 않을 때만 Allow new users to sign up 을 끈다.
 
 ### 3. 선생님·조교 계정 만들기
 1. **Authentication → Users → Add user → Create new user**
 2. 이메일 · 비밀번호 입력, **Auto Confirm User** 체크 → Create user
 
-### 4. staff 등록 (이걸 해야 코치룸이 열린다)
+### 4. staff 등록 — 처음 선생님 한 명만 (나머지는 코치룸에서 직접 가입)
 SQL Editor 에서 아래를 고쳐서 Run. 이메일은 소문자로.
 
 ```sql
@@ -180,6 +186,15 @@ delete from public.staff where email = '조교이메일@example.com';
 - 개인 페이지에는 "OO 학생 · ○○까지 D-00", 반 공지 페이지에는 "○○까지 D-00" (그 반 기준).
 - 한국 시간 자정마다 하루씩 줄어든다. 당일은 "○○ 당일입니다. 모두 화이팅!". 고정한 시험이 지나면 다음 시험으로 넘어가고,
   다가오는 시험이 하나도 없으면 D-day 줄을 숨긴다.
+
+## 조교 가입 · 직원 관리
+
+- 조교는 로그인 화면 **[처음이신가요? 가입하기]** → 이름 · 이메일 · 비밀번호 · **팀 가입 코드** → 바로 코치룸.
+  코드가 틀리면 계정을 만들지 않는다. 같은 이메일 15분에 5번 · 전체 10분에 30번 틀리면 잠깐 막힌다.
+- 팀 가입 코드는 DB 에만 있다. teacher 가 「오늘」 → **[설정]** → 직원 관리에서 정하고 바꾼다(처음엔 가입이 닫혀 있다).
+- 직원 관리: 이름 · 이메일 · 역할 · 가입일 · 마지막 접속 · [사용 중지]/[다시 사용] · 역할 바꾸기.
+  사용 중지하면 바로 아무것도 못 보고(열려 있던 화면도 곧 로그아웃), 남긴 기록은 그대로다.
+- 비밀번호를 잊으면 로그인 화면 **[비밀번호를 잊으셨나요?]** → 메일의 링크 → 코치룸에서 새 비밀번호.
 
 ## 오늘의 총괄 (코치룸 첫 화면 「오늘」)
 

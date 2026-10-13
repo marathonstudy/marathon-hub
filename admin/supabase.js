@@ -91,6 +91,94 @@
 
   function signOut() { return init().auth.signOut(); }
 
+  /* ---------- 조교 직접 가입 · 비밀번호 찾기 (migration-008) ---------- */
+
+  function missingFn(err) { return /Could not find the function|does not exist|schema cache/i.test((err && err.message) || ''); }
+
+  /* 가입 전에 팀 가입 코드만 확인 (틀리면 계정을 만들지 않는다) */
+  function joinCheck(email, code) {
+    return withTimeout(init().rpc('staff_join_check', { p_email: email, p_code: code }), 15000, '서버 응답이 없습니다.')
+      .then(function (r) {
+        if (r.error) throw missingFn(r.error) ? new Error('가입 기능이 아직 설치되지 않았습니다. 선생님께 문의해 주세요.') : translate(r.error);
+        return r.data || { ok: false };
+      });
+  }
+
+  function signUp(email, password) {
+    email = String(email || '').trim().toLowerCase();
+    return withTimeout(init().auth.signUp({ email: email, password: password }), 20000, '서버 응답이 없습니다.')
+      .then(function (res) {
+        if (res.error) throw translate(res.error);
+        return res.data || {};
+      });
+  }
+
+  /* 방금 가입(로그인)한 본인을 조교로 등록 — 서버가 코드를 다시 확인하고 역할은 항상 조교 */
+  function join(name, code) {
+    return init().rpc('staff_join', { p_name: name, p_code: code }).then(function (r) {
+      if (r.error) throw missingFn(r.error) ? new Error('가입 기능이 아직 설치되지 않았습니다.') : new Error(r.error.message);
+      return r.data || { ok: false };
+    });
+  }
+
+  /* 로그인한 사람의 상태 — 'active' · 'disabled' · 'none'. 008 을 아직 안 돌렸으면 is_staff 로 */
+  function staffStatus() {
+    return withTimeout(init().rpc('staff_status'), 15000, '권한을 확인하지 못했습니다.').then(function (r) {
+      if (!r.error) return r.data || 'none';
+      if (!missingFn(r.error)) throw new Error(r.error.message);
+      return checkStaff().then(function (ok) { return ok ? 'active' : 'none'; });
+    });
+  }
+
+  var lastTouch = 0;
+  function touch() {
+    if (Date.now() - lastTouch < 10 * 60 * 1000) return;
+    lastTouch = Date.now();
+    init().rpc('staff_touch').then(function () {}, function () {});
+  }
+
+  /* 비밀번호 재설정 메일 — 메일의 링크를 누르면 코치룸이 열리고 새 비밀번호 칸이 나온다 */
+  function sendReset(email) {
+    email = String(email || '').trim().toLowerCase();
+    return withTimeout(init().auth.resetPasswordForEmail(email, { redirectTo: global.CONFIG.siteUrl + '/admin/' }),
+      20000, '서버 응답이 없습니다.').then(function (res) { if (res.error) throw translate(res.error); });
+  }
+
+  /* 재설정 메일 링크로 들어왔는가. 맞으면 그 세션으로 로그인해 두고 'recovery'.
+     링크가 만료 등으로 실패했으면 { error } */
+  function recoveryFromUrl() {
+    var hash = String(global.location.hash || '').replace(/^#/, '');
+    var q = {};
+    hash.split('&').forEach(function (kv) {
+      var i = kv.indexOf('=');
+      if (i > 0) q[decodeURIComponent(kv.slice(0, i))] = decodeURIComponent(kv.slice(i + 1).replace(/\+/g, ' '));
+    });
+    var search = new URLSearchParams(global.location.search || '');
+    if (q.error || search.get('error')) {
+      return Promise.resolve({ error: q.error_description || search.get('error_description') || '링크를 쓸 수 없습니다.' });
+    }
+    if (q.type === 'recovery' && q.access_token && q.refresh_token) {
+      return init().auth.setSession({ access_token: q.access_token, refresh_token: q.refresh_token })
+        .then(function (r) { if (r.error) return { error: r.error.message }; return 'recovery'; });
+    }
+    if (search.get('code') && search.get('type') !== 'signup') {
+      return init().auth.exchangeCodeForSession(search.get('code'))
+        .then(function (r) { if (r.error) return { error: r.error.message }; return 'recovery'; });
+    }
+    return Promise.resolve(null);
+  }
+
+  function clearUrl() {
+    try { global.history.replaceState(null, '', global.location.pathname); } catch (e) {}
+  }
+
+  function updatePassword(password) {
+    return init().auth.updateUser({ password: password }).then(function (r) {
+      if (r.error) throw translate(r.error);
+      return r.data;
+    });
+  }
+
   function getSession() {
     return withTimeout(init().auth.getSession(), 15000, '로그인 상태를 확인하지 못했습니다.')
       .then(function (r) { return r.data ? r.data.session : null; });
@@ -110,6 +198,10 @@
     if (/Invalid login credentials/i.test(m)) return new Error('이메일 또는 비밀번호가 맞지 않습니다.');
     if (/Email not confirmed/i.test(m)) return new Error('이메일 확인이 안 된 계정입니다. Supabase 에서 계정을 만들 때 Auto Confirm 을 켜 주세요.');
     if (/rate limit|too many/i.test(m)) return new Error('시도가 너무 잦습니다. 잠시 뒤에 다시 해 주세요.');
+    if (/already registered|already been registered|user already exists/i.test(m)) return new Error('이미 가입된 이메일입니다. 로그인하거나 비밀번호 찾기를 써 주세요.');
+    if (/password should be|weak password|at least/i.test(m)) return new Error('비밀번호가 너무 짧거나 쉽습니다. 8자 이상으로 정해 주세요.');
+    if (/signups not allowed|signup is disabled/i.test(m)) return new Error('지금은 가입을 받지 않도록 설정되어 있습니다. 선생님께 문의해 주세요.');
+    if (/same.*password|different from the old/i.test(m)) return new Error('예전과 다른 비밀번호로 정해 주세요.');
     if (/Failed to fetch|NetworkError/i.test(m)) return new Error('서버에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요.');
     return new Error(m || '로그인에 실패했습니다.');
   }
@@ -122,6 +214,15 @@
     signIn: signIn,
     signOut: signOut,
     checkStaff: checkStaff,
+    joinCheck: joinCheck,
+    signUp: signUp,
+    join: join,
+    staffStatus: staffStatus,
+    touch: touch,
+    sendReset: sendReset,
+    recoveryFromUrl: recoveryFromUrl,
+    clearUrl: clearUrl,
+    updatePassword: updatePassword,
     getSession: getSession,
     onAuthChange: onAuthChange
   };

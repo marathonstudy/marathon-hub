@@ -33,7 +33,7 @@
   /* ---------- 불러오기 ---------- */
 
   function load(force) {
-    if (st.loading) return;
+    if (st.loading || $('#appRoot').hidden) return;            /* 로그아웃된 뒤에는 부르지 않는다 */
     if (!force && Date.now() - st.last < 10000) return;
     st.loading = true;
     st.last = Date.now();
