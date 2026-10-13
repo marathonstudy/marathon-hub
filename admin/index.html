@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" as="style" crossorigin
       href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
-<link rel="stylesheet" href="style.css?v=20261013a">
+<link rel="stylesheet" href="style.css?v=20261013b">
 </head>
 <body class="is-locked">
 
@@ -92,7 +92,7 @@
     <span class="notice__icon" aria-hidden="true">⚠️</span>
     <div class="notice__body">
       <b>공용 PC에서는 사용하지 마세요.</b>
-      로그인 상태와 명단 사본이 이 브라우저에 남습니다.
+      로그인 상태가 이 브라우저에 남습니다.
       남의 컴퓨터에서 열었다면 ① 명단 탭 맨 아래
       <b>[이 기기에서 로그아웃하고 정리]</b>를 꼭 눌러 주세요.
     </div>
@@ -187,9 +187,11 @@
       </div>
       <div class="toolbar" style="margin-bottom:12px">
         <button class="btn btn--danger" id="btnClearAll" type="button">이 기기에서 로그아웃하고 정리</button>
+        <span class="panel__hint">이 브라우저의 로그인과 임시 저장을 지웁니다. 서버의 기록은 지워지지 않습니다.</span>
       </div>
       <p class="panel__hint">
-        이 브라우저에 남아 있는 <b>로그인 상태와 명단 사본</b>을 지우고 로그아웃합니다.
+        이 브라우저에 남아 있는 <b>로그인 상태와 화면 설정</b>을 지우고 로그아웃합니다.
+        학생·작성·교재 자료는 원래 이 브라우저에 저장하지 않고 늘 서버에서 불러옵니다.
         <b>서버의 자료는 지워지지 않습니다.</b> 다시 로그인하면 그대로 보입니다.
       </p>
     </div>
@@ -1366,27 +1368,50 @@
   </form>
 </dialog>
 
+<!-- 동시 수정 -->
+<dialog class="modal" id="conflictModal">
+  <form method="dialog">
+    <div class="modal__head">
+      <h2 class="modal__title">다른 분이 먼저 수정했습니다</h2>
+      <p class="modal__desc" id="conflictDesc"></p>
+    </div>
+    <div class="modal__body">
+      <p class="panel__hint">
+        <b>새로 불러오기</b> — 다른 분이 저장한 내용을 보여 줍니다. 그 칸에 지금 고친 내용은 버려집니다.<br>
+        <b>내 내용으로 덮어쓰기</b> — 다른 분이 저장한 내용 대신 내 내용으로 저장합니다.
+      </p>
+    </div>
+    <div class="modal__foot">
+      <button class="btn btn--ghost" type="button" id="btnConflictMine">내 내용으로 덮어쓰기</button>
+      <div class="spacer"></div>
+      <button class="btn" type="button" id="btnConflictLater">나중에</button>
+      <button class="btn btn--primary" type="button" id="btnConflictReload">새로 불러오기</button>
+    </div>
+  </form>
+</dialog>
+
 <div class="toast-host" id="toastHost" aria-live="polite"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
 <!-- config.js 와 brand.js 가 먼저 와야 한다. 나머지가 이 값을 읽는다. -->
-<script src="../assets/config.js?v=20261013a"></script>
-<script src="../assets/brand.js?v=20261013a"></script>
-<script src="supabase.js?v=20261013a"></script>
-<script src="db.js?v=20261013a"></script>
-<script src="store.js?v=20261013a"></script>
-<script src="report.js?v=20261013a"></script>
-<script src="app.js?v=20261013a"></script>
-<script src="import.js?v=20261013a"></script>
-<script src="write.js?v=20261013a"></script>
-<script src="publish.js?v=20261013a"></script>
-<script src="send.js?v=20261013a"></script>
-<script src="notice.js?v=20261013a"></script>
-<script src="tb.js?v=20261013a"></script>
-<script src="tb-dash.js?v=20261013a"></script>
-<script src="tb-issue.js?v=20261013a"></script>
-<script src="tb-stock.js?v=20261013a"></script>
-<script src="tb-bill.js?v=20261013a"></script>
-<script src="auth.js?v=20261013a"></script>
+<script src="../assets/config.js?v=20261013b"></script>
+<script src="../assets/brand.js?v=20261013b"></script>
+<script src="supabase.js?v=20261013b"></script>
+<script src="db.js?v=20261013b"></script>
+<script src="store.js?v=20261013b"></script>
+<script src="report.js?v=20261013b"></script>
+<script src="app.js?v=20261013b"></script>
+<script src="import.js?v=20261013b"></script>
+<script src="write.js?v=20261013b"></script>
+<script src="publish.js?v=20261013b"></script>
+<script src="send.js?v=20261013b"></script>
+<script src="notice.js?v=20261013b"></script>
+<script src="tb.js?v=20261013b"></script>
+<script src="tb-dash.js?v=20261013b"></script>
+<script src="tb-issue.js?v=20261013b"></script>
+<script src="tb-stock.js?v=20261013b"></script>
+<script src="tb-bill.js?v=20261013b"></script>
+<script src="sync.js?v=20261013b"></script>
+<script src="auth.js?v=20261013b"></script>
 </body>
 </html>

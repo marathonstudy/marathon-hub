@@ -96,24 +96,14 @@
     return d;
   }
 
-  var saveTimer = null;
-  var dirty = false;          /* 이 화면에서 실제로 고친 게 있는가 */
-
-  /* 고친 적이 없으면 저장하지 않는다.
-     탭을 두 개 열어 둔 경우, 손대지 않은 탭이 닫히면서
-     메모리에 있던 옛 내용으로 다른 탭의 작업을 덮어쓸 수 있다. */
-  function flushDraft() {
-    clearTimeout(saveTimer);
-    saveTimer = null;
-    if (!dirty) return;
-    dirty = false;
-    Store.write(Store.KEYS.draft, draft);
+  /* 저장은 store.js 가 '바뀐 항목만' 서버로 보낸다 (학생 한 명 · 항목 하나 단위).
+     고치지 않은 화면은 아무것도 보내지 않으므로, 오래 켜 둔 다른 탭이 남의 작업을 덮지 않는다. */
+  function saveDraft() {
+    if (draft) Store.write(Store.KEYS.draft, draft);
   }
 
-  function saveDraft() {
-    dirty = true;
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(flushDraft, 400);
+  function flushDraft() {
+    return Store.flushNow(Store.KEYS.draft).catch(function () {});
   }
 
   /* 탭을 닫거나 화면을 벗어날 때 마지막 타자까지 확실히 저장한다.
@@ -187,10 +177,7 @@
   function switchWeek(newStart, span) {
     if (!newStart || newStart === draft.weekStart || switching) { renderWeek(); return; }
     switching = true;
-    clearTimeout(saveTimer);
-    var flush = dirty ? Store.flushNow(Store.KEYS.draft, draft) : Promise.resolve();
-    dirty = false;
-    Store.writeLocal(Store.KEYS.draft, draft);
+    var flush = flushDraft();
 
     $('#weekSummary').textContent = '불러오는 중…';
     flush.then(function () {
@@ -801,7 +788,7 @@
       if (!note.hidden) note.value = e.attendNote || '';
       card.classList.toggle('is-written', isWritten(id));
       fillBadge(card, id);
-      afterChange(id);
+      afterChange(id, true);
       return;
     }
 
@@ -812,7 +799,7 @@
         b.classList.toggle('is-on', +b.dataset.v <= e.focusScore);
       });
       card.querySelector('.stars__val').textContent = e.focusScore + ' / 5';
-      afterChange(id);
+      afterChange(id, true);
       return;
     }
 
@@ -837,7 +824,7 @@
       var s2 = students().find(function (x) { return x.id === id; });
       fillHomework(card, s2, e);
       fillBadge(card, id);
-      afterChange(id);
+      afterChange(id, true);
       return;
     }
 
@@ -865,8 +852,10 @@
     }
   });
 
-  function afterChange(id) {
+  /* now = 한 칸씩 누르는 기록(출결·별점·과제 체크) → 누르자마자 그 칸만 저장 */
+  function afterChange(id, now) {
     saveDraft();
+    if (now) flushDraft();
     selectStudent(id, true);
     renderClassPicker();
     updateCounts();
@@ -1263,7 +1252,7 @@
     var t = $('#snipNew').value.trim();
     if (!t) { toast('내용을 입력해 주세요', 'bad'); return; }
     var list = Store.getSnippets();
-    list.push({ id: 'sn_' + Date.now().toString(36), text: t });
+    list.push({ id: Store.newId(), text: t });
     Store.saveSnippets(list);
     $('#snipNew').value = '';
     renderSnipList();
@@ -1274,9 +1263,10 @@
   $('#snipList').addEventListener('click', function (e) {
     var b = e.target.closest('[data-del]');
     if (!b) return;
-    Store.saveSnippets(Store.getSnippets().filter(function (x) { return x.id !== b.dataset.del; }));
-    renderSnipList();
-    renderSnipBar();
+    Store.deleteSnippet(b.dataset.del).then(function () {
+      renderSnipList();
+      renderSnipBar();
+    }).catch(function (err) { toast('지우지 못했습니다 — ' + err.message, 'bad'); });
   });
 
   $('#snipForm').addEventListener('submit', function () { renderSnipBar(); });
@@ -1423,6 +1413,78 @@
   /* 작성 탭이 열릴 때마다 최신 명단으로 다시 그린다 */
   document.addEventListener('jt:tab', function (e) {
     if (e.detail.index === 1) refreshAll();
+  });
+
+  /* ---------- 여러 기기 ----------
+     다른 기기에서 바뀐 내용이 들어오면 그 학생 카드만 다시 그린다.
+     지금 고치는 칸은 건드리지 않는다 (store.js 에 알려 준다). */
+
+  Store.setEditingHook(function (kind, id) {
+    var keys = [];
+    if (commentModal.open) {
+      if (kind === 'entry' && !commentIsClass && commentTargetId === id) keys.push('comment');
+      if (kind === 'common' && id === currentClass) keys.push('comment');
+    }
+    var a = document.activeElement;
+    if (a && a.closest && !$('#panel-write').hidden) {
+      var card = a.closest('.entry');
+      if (kind === 'entry' && card && card.dataset.id === id) {
+        if (a.dataset.act === 'note') keys.push('attend_note');
+        if (a.dataset.act === 'score') keys.push('scores.' + a.dataset.i);
+      }
+      if (kind === 'common' && id === currentClass && a.closest('#commonPanel')) {
+        keys.push('lessons', 'tests', 'homework', 'comment');
+      }
+    }
+    return keys;
+  });
+
+  function currentTests() {
+    return (commonOf(currentClass || '_').tests || []).filter(function (t) { return String(t || '').trim(); });
+  }
+
+  function replaceCard(id) {
+    var old = $('#entryList .entry[data-id="' + id + '"]');
+    if (!old || old.contains(document.activeElement)) return;
+    var s = students().find(function (x) { return x.id === id; });
+    if (!s) return;
+    var tests = currentTests();
+    var wrap = document.createElement('div');
+    wrap.innerHTML = entryCardHtml(s, tests);
+    var card = wrap.firstElementChild;
+    fillEntryCard(card, s, tests);
+    card.className = old.className;
+    card.classList.toggle('is-written', isWritten(id));
+    old.replaceWith(card);
+  }
+
+  window.addEventListener('jt:draft-remote', function (e) {
+    if (!draft || $('#panel-write').hidden) return;
+    var d = e.detail || {};
+    if ((d.common || []).indexOf('_week') !== -1) renderWeek();
+    if ((d.common || []).indexOf(currentClass) !== -1) {
+      if (!$('#commonPanel').contains(document.activeElement)) renderCommon();
+      if (!$('#entryList').contains(document.activeElement)) renderEntries();
+      else (d.entries || []).forEach(replaceCard);
+    } else {
+      (d.entries || []).forEach(replaceCard);
+    }
+    if (commentModal.open) renderCommentMode();
+    renderClassPicker();
+    updateCounts();
+    schedulePreview();
+  });
+
+  /* 명단 등이 서버에서 새로 왔을 때 */
+  window.addEventListener('jt:refreshed', function () {
+    if (!draft || $('#panel-write').hidden) return;
+    if (UI.isBusy($('#panel-write')) || commentModal.open) {
+      if (window.Sync) Sync.markSkipped();
+      renderClassPicker();
+      updateCounts();
+      return;
+    }
+    refreshAll();
   });
 
   /* 서버에서 받아온 뒤에는 그 내용으로 다시 그린다 */

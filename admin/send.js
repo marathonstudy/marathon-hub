@@ -418,12 +418,23 @@
       return;
     }
 
-    state.greeting = text;
     greetModal.close();
 
-    DB.saveSetting('greeting', { sms: text, kakao: text }, whoami())
-      .then(function () { toast('인사말을 저장했습니다. 모든 기기에 반영됩니다', 'good'); })
-      .catch(function (e2) { toast('저장하지 못했습니다 — ' + e2.message, 'bad'); });
+    /* 불러온 뒤 다른 분이 인사말을 고쳤으면 묻는다 */
+    UI.guardedSave('인사말', function (check) {
+      return DB.saveSettingIf('greeting', { sms: text, kakao: text }, whoami(), check ? state.greetingAt : '');
+    }, function (row) {
+      var g = row && row.value;
+      state.greeting = (g && (g.sms || g.kakao)) || state.greeting;
+      state.greetingAt = (row && row.updated_at) || state.greetingAt;
+      renderList();
+    }).then(function (res) {
+      if (!res.ok) return;
+      state.greeting = text;
+      state.greetingAt = res.row.updated_at || '';
+      renderList();
+      toast('인사말을 저장했습니다. 모든 기기에 반영됩니다', 'good');
+    }).catch(function (e2) { toast('저장하지 못했습니다 — ' + e2.message, 'bad'); });
   });
 
   /* ============================================================
@@ -477,11 +488,12 @@
   function refresh() {
     return Promise.all([
       DB.publishedWeeks(),
-      DB.getSetting('greeting')
+      DB.getSettingRow('greeting')
     ]).then(function (res) {
       state.weeks = res[0] || [];
 
-      var g = res[1];
+      var g = res[1] && res[1].value;
+      state.greetingAt = (res[1] && res[1].updated_at) || '';
       state.greeting = (g && (g.sms || g.kakao)) || DEFAULT_GREETING;
 
       if (!state.week || state.weeks.indexOf(state.week) === -1) {
@@ -504,6 +516,13 @@
 
   window.addEventListener('jt:loaded', function () {
     if (!$('#panel-send').hidden) refresh();
+  });
+
+  /* 다른 기기에서 보냄 표시·공개가 바뀌었을 때 */
+  window.addEventListener('jt:refreshed', function () {
+    if ($('#panel-send').hidden) return;
+    if (UI.isBusy($('#panel-send'))) { if (window.Sync) Sync.markSkipped(); return; }
+    refresh();
   });
 
   /* 기기마다 형식이 다른 sms 링크와 문구 조립은 여기서 가장 깨지기 쉽다.

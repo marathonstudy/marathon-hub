@@ -2,6 +2,11 @@
    db.js — Supabase 읽기·쓰기
 
    화면 코드는 되도록 store.js 를 거친다. 저장할 때 여기로 넘어온다.
+
+   여러 기기·여러 조교가 동시에 쓴다. 그래서
+     · 목록 전체를 서버에 덮어쓰지 않는다. 고친 줄(항목)만 보낸다.
+     · 화면 목록에 없다는 이유로 서버 줄을 지우지 않는다. 지우기는 삭제 버튼 → 그 줄 하나.
+     · 고칠 때는 내가 불러온 뒤 다른 분이 고쳤는지(updated_at) 확인한다 (updateIf).
    표 이름과 칸 이름은 supabase/schema.sql 과 맞춘다.
    화면에서는 camelCase, DB 에서는 snake_case 를 쓰므로 여기서 바꿔 준다.
    ============================================================ */
@@ -47,37 +52,51 @@
       extra: r.extra || {},
       archived: !!r.archived,
       sortOrder: r.sort_order || 0,
-      createdAt: r.created_at
+      createdAt: r.created_at,
+      updatedAt: r.updated_at || ''
     };
   }
 
-  /* 명단 전체 맞추기.
-     빈 목록이 넘어오면 지우지 않는다(실수로 비워진 캐시가 서버 명단을 지우는 사고 방지).
-     정말 비울 때만 purge=true. */
-  function syncStudents(list, purge) {
-    var c = sb();
-    var rows = (list || []).map(toDbStudent);
+  /* ---------- 한 줄 저장 · 동시 수정 확인 ----------
+     여러 기기에서 같이 쓴다. 화면 목록 전체를 서버에 덮어쓰지 않는다.
+     고친 줄 하나만, 내가 불러온 뒤 아무도 안 고쳤을 때만(updated_at 이 같을 때만) 저장한다.
 
-    if (!rows.length) {
-      if (!purge) return Promise.resolve({ skipped: true });
-      return lockedStudentIds().then(function (locked) {
-        var q = c.from('students').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-        if (locked.length) q = q.not('id', 'in', '(' + locked.join(',') + ')');
-        return q.then(check);
+     결과: { ok: true, row }            저장됨
+           { conflict: true, row }      다른 분이 먼저 고침 (row = 서버의 지금 줄)
+           { gone: true }               다른 분이 지움
+     base 가 비어 있으면(예전 줄이라 수정 시각을 모를 때) 확인 없이 저장한다. */
+  function updateIf(table, match, patch, base) {
+    var q = sb().from(table).update(patch).match(match);
+    if (base) q = q.eq('updated_at', base);
+    return q.select('*').then(check).then(function (r) {
+      if (r.data && r.data.length) return { ok: true, row: r.data[0] };
+      return sb().from(table).select('*').match(match).maybeSingle().then(check).then(function (c) {
+        return c.data ? { conflict: true, row: c.data } : { gone: true };
       });
+    });
+  }
+
+  /* 그 줄의 지금 수정 시각 (고치기 창에서 저장 직전에 확인) */
+  function currentAt(table, match) {
+    return sb().from(table).select('updated_at').match(match).maybeSingle().then(check)
+      .then(function (r) { return r.data ? (r.data.updated_at || '') : null; });
+  }
+
+  /* 학생 한 명. base === null 이면 새 학생(추가), 아니면 그 줄만 고친다. */
+  function saveStudentRow(s, base) {
+    var row = toDbStudent(s);
+    if (base === null) {
+      return sb().from('students').insert(row).select('*').then(check)
+        .then(function (r) { return { ok: true, row: r.data[0] }; });
     }
+    var patch = Object.assign({}, row);
+    delete patch.id;
+    return updateIf('students', { id: s.id }, patch, base);
+  }
 
-    return c.from('students').upsert(rows, { onConflict: 'id' })
-      .then(check)
-      .then(lockedStudentIds)
-      .then(function (locked) {
-        /* 교재 기록이 있는 학생은 목록에 없어도 지우지 않는다.
-           (지우려 하면 외래키 때문에 명단 저장 전체가 실패한다) */
-        var keep = {};
-        rows.forEach(function (r) { keep[r.id] = true; });
-        locked.forEach(function (id) { keep[id] = true; });
-        return c.from('students').delete().not('id', 'in', '(' + Object.keys(keep).join(',') + ')').then(check);
-      });
+  /* 삭제 버튼을 눌렀을 때만, 그 학생 한 명만 */
+  function deleteStudentRow(id) {
+    return sb().from('students').delete().eq('id', id).then(check);
   }
 
   /* 교재 지급·청구 기록이 있어 지울 수 없는 학생 id.
@@ -146,65 +165,46 @@
     return {
       id: r.id, key: r.key, label: r.label || '', type: r.type || 'text',
       options: r.options || [], showInTable: r.show_in_table !== false,
-      scope: r.scope === 'class' ? 'class' : 'student', sortOrder: r.sort_order || 0
+      scope: r.scope === 'class' ? 'class' : 'student', sortOrder: r.sort_order || 0,
+      updatedAt: r.updated_at || ''
     };
   }
 
-  /* 칸 목록 전체 맞추기. 빈 목록으로 서버를 비우는 것은 칸 관리에서 직접 지웠을 때만. */
-  function syncFieldDefs(list, opts) {
-    var c = sb();
-    opts = opts || {};
-    var rows = (list || []).map(toDbField);
-
-    if (!rows.length) {
-      if (!opts.allowClear) return Promise.resolve({ skipped: true });
-      return c.from('field_defs').delete().neq('id', '00000000-0000-0000-0000-000000000000').then(check);
+  /* 칸 하나. base === null 이면 새 칸 */
+  function saveFieldRow(f, base) {
+    var row = toDbField(f);
+    if (base === null) {
+      return sb().from('field_defs').insert(row).select('*').then(check)
+        .then(function (r) { return { ok: true, row: r.data[0] }; });
     }
+    var patch = Object.assign({}, row);
+    delete patch.id;
+    return updateIf('field_defs', { id: f.id }, patch, base);
+  }
 
-    return c.from('field_defs').upsert(rows, { onConflict: 'id' })
-      .then(check)
-      .then(function () {
-        var ids = rows.map(function (r) { return r.id; });
-        return c.from('field_defs').delete().not('id', 'in', '(' + ids.join(',') + ')').then(check);
-      });
+  function deleteFieldRow(id) {
+    return sb().from('field_defs').delete().eq('id', id).then(check);
   }
 
   /* ---------- 반 현황 (class_info) ---------- */
 
-  function quoteList(names) {
-    return '(' + names.map(function (n) { return '"' + String(n).split('"').join('""') + '"'; }).join(',') + ')';
-  }
-
-  function syncClassInfo(map) {
-    var c = sb();
-    var names = Object.keys(map || {});
-    if (!names.length) return Promise.resolve({ skipped: true });
-
-    var rows = names.map(function (n) {
-      return { class_name: n, extra: map[n] || {}, updated_at: new Date().toISOString() };
-    });
-    return c.from('class_info').upsert(rows, { onConflict: 'class_name' })
-      .then(check)
-      .then(function () {
-        return c.from('class_info').delete().not('class_name', 'in', quoteList(names)).then(check);
-      });
+  /* 반 하나. base === null 이면 처음 적는 반 (그새 다른 분이 먼저 만들었으면 conflict) */
+  function saveClassInfoRow(name, extra, base) {
+    if (base === null) {
+      return sb().from('class_info').insert({ class_name: name, extra: extra || {} }).select('*')
+        .then(function (r) {
+          if (r.error && /duplicate/i.test(r.error.message)) {
+            return sb().from('class_info').select('*').eq('class_name', name).maybeSingle().then(check)
+              .then(function (c) { return { conflict: true, row: c.data }; });
+          }
+          check(r);
+          return { ok: true, row: r.data[0] };
+        });
+    }
+    return updateIf('class_info', { class_name: name }, { extra: extra || {}, updated_at: new Date().toISOString() }, base);
   }
 
   /* ---------- 주간 입력 ---------- */
-
-  function toDbEntry(weekStart, studentId, e) {
-    return {
-      week_start: weekStart,
-      student_id: studentId,
-      attend_status: e.attendStatus || '',
-      attend_note: e.attendNote || '',
-      focus_score: Math.max(0, Math.min(5, Number(e.focusScore) || 0)),
-      scores: e.scores || {},
-      homework: e.homework || {},
-      on_time_rate: Math.max(0, Math.min(100, e.onTimeRate == null ? 100 : Number(e.onTimeRate))),
-      comment: e.comment || ''
-    };
-  }
 
   function fromDbEntry(r) {
     return {
@@ -267,12 +267,13 @@
       var weekEnds = {};
       res[7].data.forEach(function (r) { weekEnds[r.week_start] = r.week_end; });
 
-      var classInfo = {};
-      res[3].data.forEach(function (r) { classInfo[r.class_name] = r.extra || {}; });
+      var classInfo = {}, classInfoAt = {};
+      res[3].data.forEach(function (r) { classInfo[r.class_name] = r.extra || {}; classInfoAt[r.class_name] = r.updated_at || ''; });
 
       return {
         students: res[0].data.map(fromDbStudent),
-        snippets: res[1].data.map(function (r) { return { id: r.id, text: r.text }; }),
+        snippets: res[1].data.map(function (r) { return { id: r.id, text: r.text, updatedAt: r.updated_at || '' }; }),
+        classInfoAt: classInfoAt,
         fieldDefs: res[2].data.map(fromDbField),
         classInfo: classInfo,
         links: links,
@@ -293,12 +294,12 @@
       c.from('week_meta').select('week_end').eq('week_start', weekStart).limit(1)
     ]).then(function (res) {
       res.forEach(function (r) { if (r.error) throw new Error(r.error.message); });
-      var common = {};
-      res[0].data.forEach(function (r) { common[r.class_name] = fromDbCommon(r); });
-      var entries = {};
-      res[1].data.forEach(function (r) { entries[r.student_id] = fromDbEntry(r); });
+      var common = {}, rawCommon = {};
+      res[0].data.forEach(function (r) { common[r.class_name] = fromDbCommon(r); rawCommon[r.class_name] = r; });
+      var entries = {}, rawEntries = {};
+      res[1].data.forEach(function (r) { entries[r.student_id] = fromDbEntry(r); rawEntries[r.student_id] = r; });
       var weekEnd = res[2].data.length ? res[2].data[0].week_end : '';
-      return { common: common, entries: entries, weekEnd: weekEnd };
+      return { common: common, entries: entries, weekEnd: weekEnd, rawCommon: rawCommon, rawEntries: rawEntries };
     });
   }
 
@@ -313,38 +314,29 @@
     }, { onConflict: 'week_start' }).then(check);
   }
 
-  function saveWeekCommon(weekStart, className, c) {
-    if (!weekStart || !className) return Promise.resolve();
-    return sb().from('week_common').upsert({
-      week_start: weekStart,
-      class_name: className,
-      lessons: c.lessons || [],
-      tests: c.tests || [],
-      comment: c.comment || '',
-      homework: c.homework || []
-    }, { onConflict: 'week_start,class_name' }).then(check);
+  /* 주간 입력 — 바뀐 항목만 (SQL entry_patch).
+     set  : {"attend_status":"late", "homework.h1":{…}, "scores.0":95, "comment":"…"}
+     base : 내가 불러왔던 값 (글로 쓰는 항목만). 서버 값이 다르면 그 항목은 저장하지 않고 conflicts 로 돌려준다. */
+  function entryPatch(weekStart, studentId, set, base, force) {
+    return sb().rpc('entry_patch', {
+      p_week: weekStart, p_student: studentId, p_set: set, p_base: base || {}, p_force: !!force
+    }).then(check).then(function (r) { return r.data; });
   }
 
-  function saveEntries(weekStart, entryMap, studentIds) {
-    if (!weekStart) return Promise.resolve();
-    var rows = [];
-    Object.keys(entryMap || {}).forEach(function (sid) {
-      if (studentIds && studentIds.indexOf(sid) === -1) return;   /* 명단에 없는 학생은 보내지 않는다 */
-      rows.push(toDbEntry(weekStart, sid, entryMap[sid]));
-    });
-    if (!rows.length) return Promise.resolve();
-    return sb().from('entries').upsert(rows, { onConflict: 'week_start,student_id' }).then(check);
+  /* 반 공통 — 바뀐 항목만 (SQL common_patch) */
+  function commonPatch(weekStart, className, set, base, force) {
+    return sb().rpc('common_patch', {
+      p_week: weekStart, p_class: className, p_set: set, p_base: base || {}, p_force: !!force
+    }).then(check).then(function (r) { return r.data; });
   }
 
-  function saveSnippets(list) {
-    var c = sb();
-    var rows = (list || []).map(function (s, i) {
-      return { id: s.id, text: s.text, sort_order: i };
-    }).filter(function (r) { return r.text && String(r.text).trim(); });
-
-    return c.from('snippets').delete().neq('id', '00000000-0000-0000-0000-000000000000')
-      .then(check)
-      .then(function () { return rows.length ? c.from('snippets').insert(rows).then(check) : null; });
+  /* 상용구 — 하나씩 넣고 하나씩 지운다 */
+  function insertSnippet(sn, order) {
+    return sb().from('snippets').insert({ id: sn.id, text: sn.text, sort_order: order || 0 }).select('*').then(check)
+      .then(function (r) { return r.data[0]; });
+  }
+  function deleteSnippet(id) {
+    return sb().from('snippets').delete().eq('id', id).then(check);
   }
 
   function markSent(weekStart, studentId, via, by) {
@@ -380,6 +372,20 @@
         check(r);
         return (r.data && r.data.length) ? r.data[0].value : null;
       });
+  }
+
+  function getSettingRow(key) {
+    return sb().from('app_settings').select('*').eq('key', key).maybeSingle().then(check)
+      .then(function (r) { return r.data; });
+  }
+
+  /* 설정 한 줄. base(updated_at) 가 있으면 그 사이 아무도 안 고쳤을 때만 저장 */
+  function saveSettingIf(key, value, by, base) {
+    if (!base) {
+      return sb().from('app_settings').upsert({ key: key, value: value, updated_by: by || '' }, { onConflict: 'key' })
+        .select('*').then(check).then(function (r) { return { ok: true, row: r.data[0] }; });
+    }
+    return updateIf('app_settings', { key: key }, { value: value, updated_by: by || '' }, base);
   }
 
   function saveSetting(key, value, by) {
@@ -499,6 +505,20 @@
       .then(check);
   }
 
+  /* 저장 직전 확인용 — 그 주차·그 반들의 지금 공지 */
+  function noticeRowsOf(weekStart, classes, ids) {
+    var c = sb();
+    return Promise.all([
+      c.from('class_notices').select('id,class_name,week_start,bundle_id,updated_at').eq('week_start', weekStart).in('class_name', classes),
+      ids.length ? c.from('class_notices').select('id,class_name,week_start,bundle_id,updated_at').in('id', ids) : Promise.resolve({ data: [] })
+    ]).then(function (res) {
+      res.forEach(check);
+      var m = {};
+      res[0].data.concat(res[1].data).forEach(function (r) { m[r.id] = r; });
+      return Object.keys(m).map(function (k) { return m[k]; });
+    });
+  }
+
   function deleteNotices(ids) {
     if (!ids.length) return Promise.resolve();
     return sb().from('class_notices').delete().in('id', ids).then(check);
@@ -532,15 +552,29 @@
   global.DB = {
     loadAll: loadAll,
     loadWeek: loadWeek,
-    syncStudents: syncStudents,
+    updateIf: updateIf,
+    currentAt: currentAt,
+    toDbStudent: toDbStudent,
+    fromDbStudent: fromDbStudent,
+    toDbField: toDbField,
+    fromDbField: fromDbField,
+    fromDbEntry: fromDbEntry,
+    fromDbCommon: fromDbCommon,
+    saveStudentRow: saveStudentRow,
+    deleteStudentRow: deleteStudentRow,
+    saveFieldRow: saveFieldRow,
+    deleteFieldRow: deleteFieldRow,
+    saveClassInfoRow: saveClassInfoRow,
+    entryPatch: entryPatch,
+    commonPatch: commonPatch,
+    insertSnippet: insertSnippet,
+    deleteSnippet: deleteSnippet,
+    getSettingRow: getSettingRow,
+    saveSettingIf: saveSettingIf,
+    noticeRowsOf: noticeRowsOf,
     saveLink: saveLink,
     saveLinks: saveLinks,
-    syncFieldDefs: syncFieldDefs,
-    syncClassInfo: syncClassInfo,
     saveWeekMeta: saveWeekMeta,
-    saveWeekCommon: saveWeekCommon,
-    saveEntries: saveEntries,
-    saveSnippets: saveSnippets,
     markSent: markSent,
     unmarkSent: unmarkSent,
     lastCommonOf: lastCommonOf,

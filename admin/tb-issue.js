@@ -266,6 +266,7 @@
     }).catch(function (e) { st.busy = false; toast('저장하지 못했습니다 — ' + e.message, 'bad'); });
   }
 
-  TB.register('issue', { show: show });
+  /* 다른 기기에서 지급 칸을 누르면 (실시간) 이 표를 새로 받는다. 옆으로 넘긴 위치는 그대로. */
+  TB.register('issue', { show: show, refresh: function () { if (st.ready && st.cls && !st.busy) reload(); } });
 
 })();

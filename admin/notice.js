@@ -310,7 +310,30 @@
     var go = warn.length ? UI.confirmAsk('확인해 주세요', warn.join(' '), '그대로 저장') : Promise.resolve(true);
 
     go.then(function (ok) {
-      if (!ok) return;
+      if (!ok) return null;
+      /* 불러온 뒤 다른 분이 이 반·주차 공지를 고치거나 새로 올렸는지 본다 */
+      return DB.noticeRowsOf(week, classes, mine.map(function (n) { return n.id; })).then(function (srv) {
+        /* 고치는 공지는 고치기 시작한 순간의 시각과, 나머지는 지금 목록과 비교한다 */
+        var known = {};
+        state.notices.forEach(function (n) { known[n.id] = n.updatedAt || ''; });
+        mine.forEach(function (n) { known[n.id] = n.updatedAt || ''; });
+        var changed = srv.filter(function (r) {
+          return !(r.id in known) || known[r.id] !== (r.updated_at || '');
+        });
+        if (!changed.length) return 'go';
+        return UI.conflictAsk(changed.map(function (r) { return r.class_name; }).join(', ') + ' 반 ' +
+                              Store.shortDate(week) + ' 주차 공지');
+      });
+    }).then(function (choice) {
+      if (!choice || choice === 'cancel') return;
+      if (choice === 'reload') {
+        var bid = state.editing && state.editing.bundleId;
+        load().then(function () {
+          if (bid && state.notices.some(function (n) { return n.bundleId === bid; })) startEdit(bid);
+          toast('다른 분이 저장한 공지를 불러왔습니다');
+        });
+        return;
+      }
       var btn = $('#btnNtSave');
       btn.disabled = true;
 
@@ -333,7 +356,7 @@
           btn.disabled = false;
           showError('저장하지 못했습니다 — ' + e.message);
         });
-    });
+    }).catch(function (e) { showError('확인하지 못했습니다 — ' + e.message); });
   });
 
   /* ============================================================
@@ -578,6 +601,16 @@
   window.addEventListener('jt:loaded', function () {
     state.loaded = false;
     if (!$('#panel-notice').hidden) load();
+  });
+
+  /* 다른 기기에서 공지가 바뀌면 목록만 새로 받는다 (쓰고 있는 칸은 그대로) */
+  function remoteReload() {
+    if ($('#panel-notice').hidden || document.querySelector('dialog[open]')) return;
+    load();
+  }
+  window.addEventListener('jt:remote', function (e) {
+    var t = e.detail && e.detail.table;
+    if (t === 'class_notices' || t === '*') remoteReload();
   });
 
 })();

@@ -86,7 +86,9 @@
     classAcademy: {},     /* 반이름 → 학원 id */
     classBooks: {},       /* 반이름 → [교재 id] */
     bank: { bank: '', account: '', holder: '' },
+    bankAt: '',
     template: '',
+    templateAt: '',
     sub: 'dash'
   };
 
@@ -107,7 +109,7 @@
       c.from('tb_books').select('*').order('sort_order').order('name'),
       c.from('tb_class_academy').select('*'),
       c.from('tb_class_books').select('*'),
-      c.from('app_settings').select('key,value').in('key', ['textbook_bank', 'textbook_notice'])
+      c.from('app_settings').select('key,value,updated_at').in('key', ['textbook_bank', 'textbook_notice'])
     ]).then(function (res) {
       res.forEach(check);
       state.academies = res[0].data;
@@ -119,10 +121,15 @@
         (state.classBooks[r.class_name] = state.classBooks[r.class_name] || []).push(r.book_id);
       });
       state.bank = { bank: '', account: '', holder: '' };
+      state.bankAt = '';
       state.template = DEFAULT_TEMPLATE;
+      state.templateAt = '';
       res[4].data.forEach(function (r) {
-        if (r.key === 'textbook_bank') state.bank = Object.assign(state.bank, r.value || {});
-        if (r.key === 'textbook_notice' && r.value && r.value.text) state.template = r.value.text;
+        if (r.key === 'textbook_bank') { state.bank = Object.assign(state.bank, r.value || {}); state.bankAt = r.updated_at || ''; }
+        if (r.key === 'textbook_notice') {
+          if (r.value && r.value.text) state.template = r.value.text;
+          state.templateAt = r.updated_at || '';
+        }
       });
       state.loaded = true;
       state.missing = false;
@@ -234,6 +241,26 @@
     if (!$('#panel-book').hidden) showSub(state.sub);
   });
 
+  /* 다른 기기에서 바뀐 내용 — 지금 보는 화면만 새로 받는다.
+     입력 중이거나 창이 열려 있으면 다 끝난 뒤에 (Sync 가 다시 알려 준다). */
+  var remoteTimer = null;
+  function remoteRefresh() {
+    if ($('#panel-book').hidden || !state.loaded) return;
+    clearTimeout(remoteTimer);
+    remoteTimer = setTimeout(function () {
+      if (UI.isBusy()) { if (window.Sync) Sync.markSkipped(); return; }
+      load(true).then(function () {
+        var m = modules[state.sub];
+        if (m) (m.refresh || m.show)();
+      }).catch(function () {});
+    }, 300);
+  }
+  window.addEventListener('jt:remote', function (e) {
+    var t = (e.detail && e.detail.table) || '';
+    if (t === '*' || t.indexOf('tb_') === 0) remoteRefresh();
+  });
+  window.addEventListener('jt:refreshed', remoteRefresh);
+
   /* ============================================================
      설정 — 학원 · 반 연결 · 교재 · 계좌
      ============================================================ */
@@ -281,8 +308,10 @@
     if (btn.dataset.act === 'ren') {
       var name = (window.prompt('학원 이름', a.name) || '').trim();
       if (!name || name === a.name) return;
-      sb().from('tb_academies').update({ name: name }).eq('id', id).then(check)
-        .then(function () { return load(true); }).then(renderSetup)
+      UI.guardedSave('학원 ' + a.name, function (chk) {
+        return DB.updateIf('tb_academies', { id: id }, { name: name }, chk ? a.updated_at : '');
+      }, function () { load(true).then(renderSetup); })
+        .then(function (res) { if (res.ok) return load(true).then(renderSetup); })
         .catch(function (err) { toast('바꾸지 못했습니다 — ' + err.message, 'bad'); });
       return;
     }
@@ -408,8 +437,12 @@
     else v = el.value.trim();
     if (k === 'name' && !v) { el.value = b.name; toast('교재명은 비울 수 없습니다', 'bad'); return; }
     var patch = {}; patch[k] = v;
-    sb().from('tb_books').update(patch).eq('id', id).then(check).then(function () {
-      b[k] = v;
+    /* 불러온 뒤 다른 분이 이 교재를 고쳤으면 묻는다 */
+    UI.guardedSave(b.name, function (chk) {
+      return DB.updateIf('tb_books', { id: id }, patch, chk ? b.updated_at : '');
+    }, function () { load(true).then(renderSetup); }).then(function (res) {
+      if (!res.ok) return;
+      Object.assign(b, res.row);
       if (k === 'active') { el.closest('tr').classList.toggle('is-archived', !v); renderClassLinks(); }
       toast(k === 'price' ? '판매가를 바꿨습니다. 이미 지급한 교재는 지급 당시 가격 그대로입니다' : '저장했습니다', 'good');
     }).catch(function (err) { toast('저장하지 못했습니다 — ' + err.message, 'bad'); });
@@ -433,16 +466,26 @@
 
   $('#tbBankSave').addEventListener('click', function () {
     var v = { bank: $('#tbBank').value.trim(), account: $('#tbAccount').value.trim(), holder: $('#tbHolder').value.trim() };
-    DB.saveSetting('textbook_bank', v, UI.whoami())
-      .then(function () { state.bank = v; toast('계좌 안내를 저장했습니다', 'good'); })
-      .catch(function (e) { toast('저장하지 못했습니다 — ' + e.message, 'bad'); });
+    UI.guardedSave('계좌 안내', function (chk) {
+      return DB.saveSettingIf('textbook_bank', v, UI.whoami(), chk ? state.bankAt : '');
+    }, function () { load(true).then(renderSetup); }).then(function (res) {
+      if (!res.ok) return;
+      state.bank = v;
+      state.bankAt = res.row.updated_at || '';
+      toast('계좌 안내를 저장했습니다', 'good');
+    }).catch(function (e) { toast('저장하지 못했습니다 — ' + e.message, 'bad'); });
   });
 
   $('#tbTemplateSave').addEventListener('click', function () {
     var t = $('#tbTemplate').value.trim() || DEFAULT_TEMPLATE;
-    DB.saveSetting('textbook_notice', { text: t }, UI.whoami())
-      .then(function () { state.template = t; toast('납부 안내 문구를 저장했습니다', 'good'); })
-      .catch(function (e) { toast('저장하지 못했습니다 — ' + e.message, 'bad'); });
+    UI.guardedSave('납부 안내 문구', function (chk) {
+      return DB.saveSettingIf('textbook_notice', { text: t }, UI.whoami(), chk ? state.templateAt : '');
+    }, function () { load(true).then(renderSetup); }).then(function (res) {
+      if (!res.ok) return;
+      state.template = t;
+      state.templateAt = res.row.updated_at || '';
+      toast('납부 안내 문구를 저장했습니다', 'good');
+    }).catch(function (e) { toast('저장하지 못했습니다 — ' + e.message, 'bad'); });
   });
 
   $('#tbTemplateReset').addEventListener('click', function () { $('#tbTemplate').value = DEFAULT_TEMPLATE; });
@@ -585,7 +628,8 @@
   });
 
   register('schedule', {
-    show: function () { initSchedule(); renderSchedulePicker(); renderScheduleList(); }
+    show: function () { initSchedule(); renderSchedulePicker(); renderScheduleList(); },
+    refresh: function () { if (sched.ready) renderScheduleList(); }
   });
 
   /* ============================================================

@@ -252,4 +252,11 @@
     if (!$('#panel-publish').hidden) load();
   });
 
+  /* 다른 기기에서 공개·작성 내용이 바뀌었을 때 */
+  window.addEventListener('jt:refreshed', function () {
+    if ($('#panel-publish').hidden) return;
+    if (UI.isBusy($('#panel-publish'))) { if (window.Sync) Sync.markSkipped(); return; }
+    load();
+  });
+
 })();

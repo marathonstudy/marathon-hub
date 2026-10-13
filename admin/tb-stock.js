@@ -20,6 +20,7 @@
     stockMap: {},
     lines: [],          /* 주문 편집 중인 줄 */
     editing: null,      /* 고치는 중인 임시 주문 id */
+    editingAt: '',      /* 그 주문을 불러온 시각 (updated_at) — 다른 분이 고쳤는지 확인 */
     orders: []
   };
 
@@ -241,9 +242,14 @@
       var head = { status: status, memo: $('#tbOrderMemo').value.trim() };
       if (status === 'confirmed') head.confirmed_at = new Date().toISOString();
       var p = st.editing
-        ? c.from('tb_orders').update(head).eq('id', st.editing).select('id').single()
-        : c.from('tb_orders').insert(Object.assign({ created_by: UI.whoami() }, head)).select('id').single();
-      return p.then(check).then(function (r) {
+        ? UI.guardedSave('임시 저장한 주문', function (chk) {
+            return DB.updateIf('tb_orders', { id: st.editing }, head, chk ? st.editingAt : '');
+          }, function () { st.editing = null; show(); }).then(function (res) {
+            if (!res.ok) throw { quiet: true };
+            return { data: res.row };
+          })
+        : c.from('tb_orders').insert(Object.assign({ created_by: UI.whoami() }, head)).select('id').single().then(check);
+      return p.then(function (r) {
         var id = r.data.id;
         return c.from('tb_order_lines').delete().eq('order_id', id).then(check).then(function () {
           return c.from('tb_order_lines').insert(lines.map(function (l) {
@@ -257,7 +263,7 @@
         $('#tbOrderMemo').value = '';
         show();
       });
-    }).catch(function (e) { toast('저장하지 못했습니다 — ' + e.message, 'bad'); });
+    }).catch(function (e) { if (e && e.quiet) return; toast('저장하지 못했습니다 — ' + e.message, 'bad'); });
   }
 
   /* ============================================================
@@ -322,6 +328,7 @@
 
     if (act === 'edit' || act === 'confirm') {
       st.editing = o.id;
+      st.editingAt = o.updated_at || '';
       $('#tbOrderMemo').value = o.memo || '';
       $('#tbOrderTitle').textContent = '임시 저장한 주문 고치기';
       st.lines = (o.tb_order_lines || []).map(function (l) {
@@ -347,7 +354,9 @@
     if (act === 'cancel') {
       UI.confirmAsk('주문 취소', '확정한 주문을 취소합니다. 입고 예정에서 빠집니다.', '주문 취소').then(function (ok) {
         if (!ok) return;
-        return c.from('tb_orders').update({ status: 'canceled' }).eq('id', o.id).then(check).then(show);
+        return UI.guardedSave('확정한 주문', function (chk) {
+          return DB.updateIf('tb_orders', { id: o.id }, { status: 'canceled' }, chk ? o.updated_at : '');
+        }, show).then(function (res) { if (res.ok) show(); });
       }).catch(function (x) { toast('취소하지 못했습니다 — ' + x.message, 'bad'); });
       return;
     }
@@ -455,6 +464,15 @@
     }).catch(function (e) { toast(e.message, 'bad'); });
   }
 
-  TB.register('stock', { show: show });
+  /* 다른 기기에서 바뀌었을 때 — 고치던 주문 칸은 그대로 두고 재고·목록만 */
+  TB.register('stock', {
+    show: show,
+    refresh: function () {
+      if (!st.ready) return;
+      loadStock().then(function () { if (st.lines.length) renderOrderSummary(); });
+      loadOrders();
+      loadMoves();
+    }
+  });
 
 })();

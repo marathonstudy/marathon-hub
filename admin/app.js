@@ -72,6 +72,63 @@
     }
   }
 
+  /* 다른 분이 먼저 고친 줄을 저장하려 할 때.
+     돌려주는 값: 'reload' 새로 불러오기 · 'overwrite' 내 내용으로 덮어쓰기 · 'cancel' 나중에
+     여러 개가 한꺼번에 오면 하나씩 차례로 묻는다. */
+  var conflictChain = Promise.resolve();
+  function conflictAsk(what) {
+    var p = conflictChain.then(function () {
+      return new Promise(function (resolve) {
+        var modal = $('#conflictModal');
+        $('#conflictDesc').textContent = (what ? '‘' + what + '’ — ' : '') + '다른 분이 먼저 수정했습니다. 새로 불러올까요?';
+        function done(v) {
+          ['#btnConflictReload', '#btnConflictMine', '#btnConflictLater'].forEach(function (id) { $(id).onclick = null; });
+          modal.removeEventListener('cancel', onCancel);
+          if (modal.open) modal.close();
+          resolve(v);
+        }
+        function onCancel(e) { e.preventDefault(); done('cancel'); }
+        $('#btnConflictReload').onclick = function () { done('reload'); };
+        $('#btnConflictMine').onclick = function () { done('overwrite'); };
+        $('#btnConflictLater').onclick = function () { done('cancel'); };
+        modal.addEventListener('cancel', onCancel);
+        modal.showModal();
+      });
+    });
+    conflictChain = p.catch(function () {});
+    return p;
+  }
+
+  /* 고친 줄 하나를 저장한다 (updated_at 확인). 다른 분이 먼저 고쳤으면 묻는다.
+     attempt(checkBase) → DB.updateIf 결과. onReload() 는 '새로 불러오기' 를 골랐을 때. */
+  function guardedSave(what, attempt, onReload) {
+    return attempt(true).then(function (res) {
+      if (res.ok) return res;
+      if (res.gone) {
+        toast('‘' + what + '’ 은(는) 다른 분이 지웠습니다', 'warn');
+        if (onReload) onReload();
+        return res;
+      }
+      return conflictAsk(what).then(function (choice) {
+        if (choice === 'overwrite') return attempt(false);
+        if (choice === 'reload' && onReload) onReload(res.row);
+        return res;
+      });
+    });
+  }
+
+  /* 입력 중이거나 창이 열려 있으면 화면을 통째로 다시 그리지 않는다 */
+  function isBusy(root) {
+    if (document.querySelector('dialog[open]')) return true;
+    var a = document.activeElement;
+    if (!a || a === document.body) return false;
+    if (root && !root.contains(a)) return false;
+    /* 닫힌 창이나 숨긴 탭 안에 포커스가 남아 있는 것은 입력 중이 아니다 */
+    if (a.closest('dialog:not([open]), [hidden]') || a.disabled) return false;
+    return a.tagName === 'TEXTAREA' || a.tagName === 'SELECT' || a.isContentEditable ||
+           (a.tagName === 'INPUT' && !/^(checkbox|radio|button|submit|reset|file)$/i.test(a.type));
+  }
+
   function whoami() { return ($('#whoami') && $('#whoami').textContent) || ''; }
 
   var TABS = [
@@ -566,8 +623,34 @@
     $('#linkBoxNew').hidden = !isNew;
   }
 
+  /* 창을 연 순간의 서버 시각. 창이 열려 있는 동안 다른 분이 저장했으면 저장 때 묻는다. */
+  var editingAt = '';
+
+  /* 고치기 창을 연 뒤 다른 분이 같은 줄을 저장했는가 → 물어보고, 계속하면 true */
+  var STALE_TABLE = {
+    students:  function (id) { return ['students', { id: id }]; },
+    classInfo: function (id) { return ['class_info', { class_name: id }]; },
+    fields:    function (id) { return ['field_defs', { id: id }]; }
+  };
+
+  /* 저장 직전에 서버에서 그 줄의 지금 시각을 본다 (실시간 연결이 없어도 알아챈다) */
+  function staleCheck(kind, id, openedAt, what, onReload) {
+    if (!id || !openedAt) return Promise.resolve(true);
+    var t = STALE_TABLE[kind](id);
+    return DB.currentAt(t[0], t[1]).catch(function () { return Store.baseAt(kind, id); }).then(function (nowAt) {
+      if (nowAt === null) return true;               /* 다른 분이 지웠다 — 저장하면 store 가 알려 준다 */
+      if (nowAt === openedAt) return true;
+      return conflictAsk(what).then(function (c) {
+        if (c === 'overwrite') { Store.setBaseAt(kind, id, nowAt); return true; }
+        if (c === 'reload') Store.refreshAll().then(onReload, onReload);
+        return false;
+      });
+    });
+  }
+
   function openStudentModal(s) {
     editingId = s ? s.id : null;
+    editingAt = s ? Store.baseAt('students', s.id) : '';
 
     $('#studentModalTitle').textContent = s ? '학생 수정' : '학생 추가';
     $('#fName').value   = s ? (s.name || '') : '';
@@ -642,16 +725,25 @@
       .then(function (ok) {
         if (!ok) return;
         studentModal.close();
-        Store.deleteStudent(s.id);
-        students = Store.getStudents();
-        render();
-        toast(s.name + ' 학생을 지웠습니다');
+        return Store.deleteStudent(s.id).then(function () {
+          students = Store.getStudents();
+          render();
+          toast(s.name + ' 학생을 지웠습니다');
+        });
       })
       .catch(function (e) { showStudentError('확인하지 못했습니다 — ' + e.message); });
   });
 
   $('#studentForm').addEventListener('submit', function (e) {
     e.preventDefault();
+    var sid = editingId;
+    staleCheck('students', sid, editingAt, ($('#fName').value.trim() || '이 학생') + ' 학생 정보', function () {
+      var fresh = Store.getStudents().find(function (x) { return x.id === sid; });
+      if (fresh) { openStudentModal(fresh); toast('다른 분이 저장한 내용을 불러왔습니다'); }
+    }).then(function (go) { if (go) saveStudentForm(); });
+  });
+
+  function saveStudentForm() {
 
     var name   = $('#fName').value.trim();
     var phone  = Store.phoneDigits($('#fPhone').value);
@@ -734,7 +826,7 @@
         render();
         toast('학생은 저장했지만 링크를 저장하지 못했습니다 — ' + err.message, 'bad');
       });
-  });
+  }
 
   /* ============================================================
      반 현황
@@ -796,8 +888,11 @@
     host.appendChild(frag);
   }
 
+  var editingClassAt = '';
+
   function openClassInfoModal(name) {
     editingClass = name;
+    editingClassAt = Store.baseAt('classInfo', name);
     $('#classInfoTitle').textContent = name + ' 반 현황';
     $('#classInfoDesc').textContent = '여기에 적은 내용은 ' + name + ' 반 학생 전체에 쓰입니다';
     var host = $('#classInfoFields');
@@ -829,6 +924,14 @@
   $('#classInfoForm').addEventListener('submit', function (e) {
     e.preventDefault();
     if (!editingClass) { classInfoModal.close(); return; }
+    var cls = editingClass;
+    staleCheck('classInfo', cls, editingClassAt, cls + ' 반 현황', function () {
+      openClassInfoModal(cls);
+      toast('다른 분이 저장한 내용을 불러왔습니다');
+    }).then(function (go) { if (go) saveClassInfoForm(); });
+  });
+
+  function saveClassInfoForm() {
     var out = {};
     var known = {};
     classFields.forEach(function (f) { known[f.key] = true; });
@@ -846,7 +949,7 @@
     classInfoModal.close();
     renderClassInfo();
     toast(editingClass + ' 반 현황을 저장했습니다', 'good');
-  });
+  }
 
   /* ============================================================
      칸 관리
@@ -936,8 +1039,11 @@
   }
   $('#fdType').addEventListener('change', syncTypeUi);
 
+  var editingFieldAt = '';
+
   function openFieldEdit(f) {
     editingFieldId = f ? f.id : null;
+    editingFieldAt = f ? Store.baseAt('fields', f.id) : '';
     $('#fieldEditTitle').textContent = scopeName() + (f ? ' 수정' : ' 추가');
     $('#fdLabel').value = f ? (f.label || '') : '';
     $('#fdType').value = f ? (f.type || 'text') : 'text';
@@ -988,14 +1094,27 @@
         n ? n + usedUnit(f) + '이 적어 둔 내용이 화면에서 사라집니다.' : '아직 아무 데도 적지 않은 칸입니다.',
         '지우기').then(function (ok) {
           if (!ok) return;
-          next.splice(i, 1);
-          saveFields(next);
-        });
+          return Store.deleteFieldDef(f.id).then(function () {
+            fields = Store.getFieldDefs('student');
+            classFields = Store.getFieldDefs('class');
+            renderFieldList();
+            render();
+            window.dispatchEvent(new CustomEvent('jt:fields'));
+          });
+        }).catch(function (err) { toast('지우지 못했습니다 — ' + err.message, 'bad'); });
     }
   });
 
   $('#fieldEditForm').addEventListener('submit', function (e) {
     e.preventDefault();
+    var fid = editingFieldId;
+    staleCheck('fields', fid, editingFieldAt, '칸 ‘' + ($('#fdLabel').value.trim() || '') + '’', function () {
+      var fresh = scopeList().find(function (x) { return x.id === fid; });
+      if (fresh) { openFieldEdit(fresh); toast('다른 분이 저장한 내용을 불러왔습니다'); }
+    }).then(function (go) { if (go) saveFieldForm(); });
+  });
+
+  function saveFieldForm() {
     var label = $('#fdLabel').value.trim();
     var type = $('#fdType').value;
     var opts = $('#fdOptions').value.split('\n')
@@ -1024,7 +1143,7 @@
     fieldEditModal.close();
     if (studentModal.open) renderExtraFields(students.find(function (x) { return x.id === editingId; }));
     if (classInfoModal.open && editingClass) openClassInfoModal(editingClass);
-  });
+  }
 
   /* ============================================================
      암호 백업
@@ -1105,8 +1224,8 @@
     }).then(function (payload) {
       if (!payload) return;
       return confirmAsk('백업 되살리기',
-        '백업에 든 학생 ' + payload.students.length + '명으로 서버 명단을 바꿉니다. ' +
-        '백업에 없는 학생은 서버에서 지워집니다.', '되살리기').then(function (ok) {
+        '백업에 든 학생 ' + payload.students.length + '명을 서버 명단에 더하거나 백업 내용으로 고칩니다. ' +
+        '백업에 없는 학생은 지우지 않습니다.', '되살리기').then(function (ok) {
         if (!ok) return;
         var r = Store.restorePayload(payload);
         students = Store.getStudents();
@@ -1135,7 +1254,7 @@
 
   $('#btnClearAll').addEventListener('click', function () {
     confirmAsk('이 기기에서 로그아웃하고 정리',
-      '이 브라우저에 남아 있는 로그인 상태와 명단 사본을 지우고 로그아웃합니다. 서버의 자료는 그대로 남습니다.',
+      '이 브라우저에 남아 있는 로그인과 임시 저장을 지우고 로그아웃합니다. 서버의 기록은 지워지지 않습니다.',
       '정리하고 로그아웃').then(function (ok) {
       if (!ok) return;
       Store.enableSync(false);
@@ -1164,11 +1283,20 @@
   });
 
   window.addEventListener('jt:roster-changed', reloadFromStore);
+  window.addEventListener('jt:fields', reloadFromStore);
+  /* 서버에서 새로 받아 온 뒤 (탭 열기 · 창으로 돌아오기 · 실시간 반영) */
+  window.addEventListener('jt:refreshed', function () {
+    if (!$('#panel-roster').hidden && isBusy($('#panel-roster'))) { if (window.Sync) Sync.markSkipped(); return; }
+    reloadFromStore();
+  });
 
   window.UI = {
     $: $, $$: $$,
     toast: toast,
     confirmAsk: confirmAsk,
+    conflictAsk: conflictAsk,
+    guardedSave: guardedSave,
+    isBusy: isBusy,
     copyText: copyText,
     selectTab: selectTab,
     whoami: whoami,

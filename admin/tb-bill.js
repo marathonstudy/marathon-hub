@@ -364,20 +364,32 @@
     else if (act === 'refund') openRefund(b, null);
     else if (act === 'waive') {
       UI.confirmAsk('교재비 면제', b._name + ' 학생 ' + TB.monthLabel(b.month) + ' 교재비 ' + won(b.total) + '을 면제합니다. 합계에서 빠집니다.', '면제')
-        .then(function (ok) { if (ok) return c.from('tb_bills').update({ status: 'waived' }).eq('id', b.id).then(check).then(reload); })
+        .then(function (ok) { if (ok) return saveBill(b, { status: 'waived' }); })
         .catch(function (x) { toast('바꾸지 못했습니다 — ' + x.message, 'bad'); });
     } else if (act === 'unpay') {
       if (refundActive(b).length) { toast('환불 기록이 있어 되돌릴 수 없습니다. 환불을 먼저 취소하세요', 'bad'); return; }
       if (b.diff_action) { toast('선불 차액을 이미 처리했습니다. 아래 차액 정리에서 먼저 [되돌리기]를 하세요', 'bad'); return; }
       UI.confirmAsk('미납으로 되돌리기', b._name + ' 학생 청구서를 미납으로 바꿉니다. 납부 일시·방법·캡처 연결이 지워집니다.', '되돌리기')
         .then(function (ok) {
-          if (ok) return c.from('tb_bills').update({ status: 'unpaid', receipt_path: '' }).eq('id', b.id).then(check).then(reload);
+          if (ok) return saveBill(b, { status: 'unpaid', receipt_path: '' });
         }).catch(function (x) { toast('바꾸지 못했습니다 — ' + x.message, 'bad'); });
     } else if (act === 'del') {
       UI.confirmAsk('청구서 지우기', b._name + ' 학생 ' + TB.monthLabel(b.month) + ' 청구서를 지웁니다. 발송 기록도 같이 지워집니다.', '지우기')
         .then(function (ok) { if (ok) return c.rpc('tb_bill_remove', { p_bill: b.id }).then(check).then(reload); })
         .catch(function (x) { toast('지우지 못했습니다 — ' + x.message, 'bad'); });
     }
+  }
+
+  /* 청구서 한 장 고치기 — 불러온 뒤 다른 분이 고쳤으면 묻는다 (납부 완료·면제·조정 모두) */
+  /* at = 고치기 창을 연 순간의 updated_at (창이 열려 있는 동안 목록이 새로 와도 그 시각으로 확인) */
+  function saveBill(b, patch, at) {
+    var openedAt = at != null ? at : b.updated_at;
+    return UI.guardedSave(b._name + ' ' + TB.monthLabel(b.month) + ' 청구서', function (chk) {
+      return DB.updateIf('tb_bills', { id: b.id }, patch, chk ? openedAt : '');
+    }, reload).then(function (res) {
+      if (res.ok) reload();
+      return res;
+    });
   }
 
   /* ---------- 납부 완료 ---------- */
@@ -389,6 +401,7 @@
 
   function openPay(b) {
     $('#tbPayForm').dataset.id = b.id;
+    $('#tbPayForm').dataset.at = b.updated_at || '';
     $('#tbPayTitle').textContent = b._name + ' · ' + TB.monthLabel(b.month) + ' 납부';
     $('#tbPayDesc').textContent = '청구 금액 ' + won(b.total);
     $('#tbPayAt').value = localDT(b.paid_at ? new Date(b.paid_at) : new Date());
@@ -422,19 +435,19 @@
         .then(function (r) { if (r.error) throw new Error('캡처를 올리지 못했습니다 — ' + r.error.message); return path; });
     }
     up.then(function (path) {
-      return sb().from('tb_bills').update({
+      $('#tbPayModal').close();
+      return saveBill(b, {
         status: 'paid',
         paid_at: new Date(at).toISOString(),
         pay_method: $('#tbPayMethod').value,
         pay_memo: $('#tbPayMemo').value.trim(),
         receipt_path: path
-      }).eq('id', id).then(check);
-    }).then(function () {
+      }, $('#tbPayForm').dataset.at);
+    }).then(function (res) {
       btn.disabled = false;
-      $('#tbPayModal').close();
-      toast(b._name + ' 납부 완료로 저장했습니다', 'good');
-      reload();
+      if (res && res.ok) toast(b._name + ' 납부 완료로 저장했습니다', 'good');
     }).catch(function (x) {
+      if (!$('#tbPayModal').open) $('#tbPayModal').showModal();
       btn.disabled = false;
       err.textContent = x.message;
       err.classList.add('is-on');
@@ -452,6 +465,7 @@
 
   function openAdj(b) {
     $('#tbBillAdjForm').dataset.id = b.id;
+    $('#tbBillAdjForm').dataset.at = b.updated_at || '';
     $('#tbBillAdjDesc').textContent = b._name + ' · 품목 ' + won(b.items_total) +
       (b.carry_in ? ' · 지난 차액 ' + TB.signedWon(b.carry_in) : '') + ' · 지금 조정 ' + TB.signedWon(b.adjust);
     $('#tbBillAdjAmount').value = b.adjust || '';
@@ -467,9 +481,16 @@
     var reason = $('#tbBillAdjReason').value.trim();
     var err = $('#tbBillAdjError');
     if (amt && !reason) { err.textContent = '사유를 적어 주세요. (예: 10/14 입반 — 2회분 제외)'; err.classList.add('is-on'); return; }
-    sb().from('tb_bills').update({ adjust: amt, adjust_reason: amt ? reason : '' }).eq('id', id).eq('status', 'unpaid')
-      .then(check).then(function () { $('#tbBillAdjModal').close(); toast('조정했습니다', 'good'); reload(); })
-      .catch(function (x) { err.textContent = '저장하지 못했습니다 — ' + x.message; err.classList.add('is-on'); });
+    var b = st.bills.find(function (x) { return x.id === id; });
+    var adjPatch = { adjust: amt, adjust_reason: amt ? reason : '' };
+    UI.guardedSave(b._name + ' ' + TB.monthLabel(b.month) + ' 청구서', function (chk) {
+      return DB.updateIf('tb_bills', { id: id }, adjPatch, chk ? $('#tbBillAdjForm').dataset.at : '');
+    }, function () { $('#tbBillAdjModal').close(); reload(); }).then(function (res) {
+      if (!res.ok) return;
+      $('#tbBillAdjModal').close();
+      toast('조정했습니다', 'good');
+      reload();
+    }).catch(function (x) { err.textContent = '저장하지 못했습니다 — ' + x.message; err.classList.add('is-on'); });
   }
 
   /* ============================================================
@@ -642,6 +663,7 @@
     var f = $('#tbRefundForm');
     f.dataset.bill = b ? b.id : r.bill_id;
     f.dataset.id = r ? r.id : '';
+    f.dataset.at = r ? (r.updated_at || '') : '';
     var room = b ? refundRoom(b) : null;
     $('#tbRefundTitle').textContent = r ? '환불 고치기' : '환불 등록';
     $('#tbRefundDesc').textContent = b
@@ -670,16 +692,29 @@
       memo: $('#tbRefundMemo').value.trim()
     };
     var q = f.dataset.id
-      ? sb().from('tb_refunds').update(row).eq('id', f.dataset.id)
-      : sb().from('tb_refunds').insert(Object.assign({ created_by: UI.whoami() }, row));
-    q.then(check).then(function () {
+      ? UI.guardedSave('환불', function (chk) {
+          return DB.updateIf('tb_refunds', { id: f.dataset.id }, row, chk ? f.dataset.at : '');
+        }, loadRefunds).then(function (res) { if (!res.ok) throw { quiet: true }; })
+      : sb().from('tb_refunds').insert(Object.assign({ created_by: UI.whoami() }, row)).then(check);
+    q.then(function () {
       $('#tbRefundModal').close();
       toast('환불을 저장했습니다', 'good');
       if (TB.state.sub === 'refund') loadRefunds(); else reload();
-    }).catch(function (x) { err.textContent = x.message; err.classList.add('is-on'); });
+    }).catch(function (x) {
+      if (x && x.quiet) { $('#tbRefundModal').close(); return; }
+      err.textContent = x.message; err.classList.add('is-on');
+    });
   }
 
-  TB.register('bill', { show: show });
+  /* 다른 기기에서 바뀌었을 때 — 만들기 칸(미리보기)은 그대로 두고 목록·요약만 */
+  function refreshLists() {
+    if (!st.ready) return;
+    loadSummary();
+    loadBills();
+    loadDiff();
+  }
+
+  TB.register('bill', { show: show, refresh: refreshLists });
 
   /* ============================================================
      환불 화면
@@ -763,7 +798,9 @@
         .then(function (ok) { return ok ? sb().rpc('tb_diff_reset', { p_bill: r.bill_id }) : null; });
     } else {
       var next = { done: 'done', cancel: 'canceled', undo: 'requested' }[act];
-      p = sb().from('tb_refunds').update({ status: next }).eq('id', r.id);
+      p = UI.guardedSave('환불 ' + r._name, function (chk) {
+        return DB.updateIf('tb_refunds', { id: r.id }, { status: next }, chk ? r.updated_at : '');
+      }, loadRefunds).then(function (res) { return res.ok ? { data: res.row } : null; });
     }
     p.then(function (res) {
       if (!res) return;
@@ -773,6 +810,6 @@
     }).catch(function (x) { toast(x.message, 'bad'); });
   }
 
-  TB.register('refund', { show: showRefunds });
+  TB.register('refund', { show: showRefunds, refresh: function () { if (rf.ready) loadRefunds(); } });
 
 })();
