@@ -396,7 +396,89 @@
   text-decoration: none;
 }
 
+/* ---------- 교재비 ---------- */
+.hub-tabs--4 { grid-template-columns: repeat(4, 1fr); }
+.hub-tabs--4 .hub-tab { font-size: 14px; padding: 11px 2px; }
+
+.bk-due__amount {
+  font-size: 30px;
+  font-weight: 900;
+  color: var(--ink-deep);
+  letter-spacing: -0.5px;
+  margin: 2px 0 12px;
+}
+.bk-bank {
+  background: var(--grad-soft);
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+.bk-bank__row { display: flex; gap: 12px; font-size: 15px; font-weight: 700; color: var(--ink-deep); padding: 3px 0; }
+.bk-bank__label { flex: 0 0 64px; font-size: 13px; font-weight: 600; color: var(--ink-light); padding-top: 1px; }
+.bk-copy { display: flex; gap: 8px; margin-top: 12px; }
+.bk-btn {
+  flex: 1 1 0;
+  appearance: none;
+  border: 0;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  text-align: center;
+}
+.bk-btn--ghost { background: #fff; color: var(--ink-deep); box-shadow: inset 0 0 0 1.5px #C9CDE6; }
+.bk-done__msg { font-size: 15px; font-weight: 600; color: var(--ink); }
+
+.bk-status {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--track);
+  color: var(--ink-mid);
+}
+.bk-status--unpaid { background: #FFF0DC; color: #A86A1E; }
+.bk-status--paid   { background: #E2F4EB; color: #35806A; }
+.bk-items { margin-top: 4px; }
+.bk-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--track);
+  font-size: 15px;
+}
+.bk-item__name { color: var(--ink-deep); font-weight: 700; }
+.bk-item__qty { display: block; font-size: 12.5px; font-weight: 500; color: var(--ink-light); }
+.bk-item__amt { flex: 0 0 auto; font-weight: 700; color: var(--ink-deep); }
+.bk-item--sub .bk-item__name { font-weight: 600; color: var(--ink-mid); font-size: 14px; }
+.bk-total {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 10px;
+  font-size: 17px;
+  font-weight: 900;
+  color: var(--ink-deep);
+}
+.bk-paid, .bk-refund { margin-top: 6px; font-size: 13px; color: var(--ink-light); text-align: right; }
+.bk-refund { color: #97364E; }
+.bk-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  background: rgba(44, 53, 102, .92);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 10px 18px;
+  border-radius: 999px;
+  z-index: 50;
+}
+
 @media (max-width: 380px) {
+  .hub-tabs--4 .hub-tab { font-size: 13px; }
+  .bk-due__amount { font-size: 26px; }
   .hub-head__name { font-size: 20px; }
   .hub-tab { font-size: 14px; }
   .rate-grid--three .rate-circle { width: 72px; height: 72px; }

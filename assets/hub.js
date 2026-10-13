@@ -5,6 +5,7 @@
    함수가 돌려준 것만 그린다. 표를 직접 읽지 않는다.
      /me/#개인링크코드          → hub_get · hub_report · Edge Function(app-report)
      /me/#개인링크코드/report   → 내 레포트 탭의 최신 레포트를 바로 연다
+     /me/#개인링크코드/book     → 교재비 탭 (hub_textbook — 그 학생 청구서만)
      /notice/#반코드            → class_notice_get
 
    # 뒤의 값은 서버 로그에도, 다른 사이트로 넘어가는 주소(referrer)에도
@@ -210,7 +211,8 @@
       root.innerHTML =
         '<section class="hub-panel" id="panelNotice" role="tabpanel"></section>' +
         '<section class="hub-panel" id="panelReport" role="tabpanel" hidden></section>' +
-        '<section class="hub-panel" id="panelApp" role="tabpanel" hidden></section>';
+        '<section class="hub-panel" id="panelApp" role="tabpanel" hidden></section>' +
+        '<section class="hub-panel" id="panelBook" role="tabpanel" hidden></section>';
 
       /* 반 공지 */
       var pn = $('#panelNotice');
@@ -233,7 +235,8 @@
       function select(which) {
         [['notice', '#tabNotice', '#panelNotice'],
          ['report', '#tabReport', '#panelReport'],
-         ['app',    '#tabApp',    '#panelApp']].forEach(function (t) {
+         ['app',    '#tabApp',    '#panelApp'],
+         ['book',   '#tabBook',   '#panelBook']].forEach(function (t) {
           var on = t[0] === which;
           $(t[1]).setAttribute('aria-selected', on ? 'true' : 'false');
           $(t[2]).hidden = !on;
@@ -245,6 +248,7 @@
       $('#tabNotice').onclick = function () { select('notice'); };
       $('#tabReport').onclick = function () { select('report'); showReportList(); };
       $('#tabApp').onclick    = function () { select('app'); };
+      $('#tabBook').onclick   = function () { select('book'); };
 
       if (h.view === 'report') {
         select('report');
@@ -254,7 +258,137 @@
       } else {
         select('notice');
       }
+
+      /* 교재비 — 청구서가 있는 학생에게만 탭이 보인다.
+         2단계 SQL 을 아직 안 돌렸거나 실패해도 다른 탭은 그대로 쓴다. */
+      rpc('hub_textbook', { p_code: h.code }).then(function (tb) {
+        if (!tb || !tb.ok || !(tb.bills || []).length) return;
+        renderBook(tb);
+        $('#tabBook').hidden = false;
+        tabs.classList.add('hub-tabs--4');
+        if (tb.unpaid_total > 0) $('#tabBook').classList.add('has-new');
+        if (h.view === 'book') select('book');
+      }).catch(function () {});
     }).catch(function () { stopScreen(root, 'network'); });
+  }
+
+  /* ---------- 교재비 ---------- */
+
+  var BK_STATUS = { unpaid: '미납', paid: '납부 완료', waived: '면제' };
+  var BK_METHOD = { transfer: '계좌이체', card: '현장 카드', payssam: '결제선생' };
+
+  function won(n) { return (Math.round(Number(n) || 0)).toLocaleString('ko-KR') + '원'; }
+  function signedWon(n) {
+    n = Math.round(Number(n) || 0);
+    return (n < 0 ? '− ' : '+ ') + Math.abs(n).toLocaleString('ko-KR') + '원';
+  }
+  function monthLabel(m) {
+    var x = /^(\d{4})-(\d{2})/.exec(m || '');
+    return x ? x[1] + '년 ' + (+x[2]) + '월' : '';
+  }
+  function shortDT(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    return (d.getMonth() + 1) + '/' + d.getDate();
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text).catch(fallback);
+    }
+    return fallback();
+    function fallback() {
+      return new Promise(function (resolve, reject) {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.cssText = 'position:fixed;top:-1000px;opacity:0';
+        document.body.appendChild(ta);
+        ta.select();
+        var ok = false;
+        try { ok = document.execCommand('copy'); } catch (e) {}
+        ta.remove();
+        ok ? resolve() : reject(new Error('copy'));
+      });
+    }
+  }
+
+  function flash(msg) {
+    var el = document.createElement('div');
+    el.className = 'bk-toast';
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(function () { el.remove(); }, 1800);
+  }
+
+  function renderBook(tb) {
+    var host = $('#panelBook');
+    var bank = tb.bank || null;
+    var unpaid = tb.unpaid_total || 0;
+    var html = '';
+
+    if (unpaid > 0) {
+      html += '<div class="card bk-due">' +
+        '<h2 class="card-title">💳 납부하실 교재비</h2>' +
+        '<div class="bk-due__amount num">' + won(unpaid) + '</div>';
+      if (bank && bank.account) {
+        html += '<div class="bk-bank">' +
+            '<div class="bk-bank__row"><span class="bk-bank__label">은행</span><span>' + esc(bank.bank) + '</span></div>' +
+            '<div class="bk-bank__row"><span class="bk-bank__label">계좌번호</span><span class="num">' + esc(bank.account) + '</span></div>' +
+            (bank.holder ? '<div class="bk-bank__row"><span class="bk-bank__label">예금주</span><span>' + esc(bank.holder) + '</span></div>' : '') +
+          '</div>' +
+          '<div class="bk-copy">' +
+            '<button type="button" class="hub-btn bk-btn" data-copy="' + esc(String(bank.account).replace(/[^\d-]/g, '')) + '" data-msg="계좌번호를 복사했습니다">계좌번호 복사</button>' +
+            '<button type="button" class="hub-btn bk-btn bk-btn--ghost" data-copy="' + unpaid + '" data-msg="금액을 복사했습니다">금액 복사</button>' +
+          '</div>';
+      } else {
+        html += '<p class="hub-muted">납부 방법은 선생님 안내를 확인해 주세요.</p>';
+      }
+      html += '</div>';
+    } else {
+      html += '<div class="card bk-done"><h2 class="card-title">💳 교재비</h2>' +
+              '<p class="bk-done__msg">모든 교재비 납부가 완료되었습니다. 감사합니다 😊</p></div>';
+    }
+
+    html += (tb.bills || []).map(function (b) {
+      var items = (b.items || []).map(function (it) {
+        return '<li class="bk-item"><span class="bk-item__name">' + esc(it.name) +
+                 ' <span class="bk-item__qty num">' + it.qty + (it.kind === 'single' ? '권' : '회') + ' × ' + won(it.unit_price) + '</span></span>' +
+               '<span class="bk-item__amt num">' + won(it.amount) + '</span></li>';
+      }).join('');
+      if (b.carry_in) {
+        items += '<li class="bk-item bk-item--sub"><span class="bk-item__name">지난 선불 차액</span>' +
+                 '<span class="bk-item__amt num">' + signedWon(b.carry_in) + '</span></li>';
+      }
+      if (b.adjust) {
+        items += '<li class="bk-item bk-item--sub"><span class="bk-item__name">조정' +
+                 (b.adjust_reason ? ' · ' + esc(b.adjust_reason) : '') + '</span>' +
+                 '<span class="bk-item__amt num">' + signedWon(b.adjust) + '</span></li>';
+      }
+      var refunds = (b.refunds || []).map(function (r) {
+        return '<div class="bk-refund">환불 ' + won(r.amount) + ' · ' +
+               (r.status === 'done' ? '완료' + (r.done_at ? ' (' + shortDT(r.done_at) + ')' : '') : '진행 중') + '</div>';
+      }).join('');
+      return '<div class="card bk-bill">' +
+        '<h2 class="card-title">' + esc(monthLabel(b.month)) + ' 교재비' +
+          (b.status === 'unpaid' && !b.total
+            ? '<span class="bk-status">납부할 금액 없음</span>'
+            : '<span class="bk-status bk-status--' + esc(b.status) + '">' + (BK_STATUS[b.status] || '') + '</span>') + '</h2>' +
+        '<ul class="bk-items">' + (items || '<li class="bk-item"><span class="hub-muted">내역 없음</span></li>') + '</ul>' +
+        '<div class="bk-total"><span>합계</span><span class="num">' + won(b.total) + '</span></div>' +
+        (b.status === 'paid'
+          ? '<div class="bk-paid">' + shortDT(b.paid_at) + ' · ' + (BK_METHOD[b.pay_method] || '') + ' 납부</div>' : '') +
+        refunds +
+      '</div>';
+    }).join('');
+
+    host.innerHTML = html;
+    host.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-copy]');
+      if (!btn) return;
+      copyText(btn.dataset.copy).then(function () { flash(btn.dataset.msg); })
+        .catch(function () { flash('복사하지 못했습니다. 길게 눌러 복사해 주세요'); });
+    });
   }
 
   /* ---------- 내 레포트 ---------- */

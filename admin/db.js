@@ -60,15 +60,37 @@
 
     if (!rows.length) {
       if (!purge) return Promise.resolve({ skipped: true });
-      return c.from('students').delete().neq('id', '00000000-0000-0000-0000-000000000000').then(check);
+      return lockedStudentIds().then(function (locked) {
+        var q = c.from('students').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        if (locked.length) q = q.not('id', 'in', '(' + locked.join(',') + ')');
+        return q.then(check);
+      });
     }
 
     return c.from('students').upsert(rows, { onConflict: 'id' })
       .then(check)
-      .then(function () {
-        var ids = rows.map(function (r) { return r.id; });
-        return c.from('students').delete().not('id', 'in', '(' + ids.join(',') + ')').then(check);
+      .then(lockedStudentIds)
+      .then(function (locked) {
+        /* 교재 기록이 있는 학생은 목록에 없어도 지우지 않는다.
+           (지우려 하면 외래키 때문에 명단 저장 전체가 실패한다) */
+        var keep = {};
+        rows.forEach(function (r) { keep[r.id] = true; });
+        locked.forEach(function (id) { keep[id] = true; });
+        return c.from('students').delete().not('id', 'in', '(' + Object.keys(keep).join(',') + ')').then(check);
       });
+  }
+
+  /* 교재 지급·청구 기록이 있어 지울 수 없는 학생 id.
+     2단계 SQL(migration-002-textbook.sql)을 아직 안 돌렸으면 빈 목록 → 1단계 그대로 동작한다. */
+  function lockedStudentIds() {
+    return sb().rpc('tb_locked_students').then(function (r) {
+      if (r.error) {
+        if (/Could not find the function|does not exist|schema cache/i.test(r.error.message)) return [];
+        throw new Error(r.error.message);
+      }
+      return (r.data || []).map(function (x) { return typeof x === 'string' ? x : x.tb_locked_students; })
+        .filter(Boolean);
+    });
   }
 
   /* ---------- 개인 링크 · 앱 공유 코드 ----------
@@ -535,7 +557,8 @@
     updateNotice: updateNotice,
     updateBundleVisible: updateBundleVisible,
     listClassCodes: listClassCodes,
-    saveClassCode: saveClassCode
+    saveClassCode: saveClassCode,
+    lockedStudentIds: lockedStudentIds
   };
 
 })(window);

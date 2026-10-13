@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" as="style" crossorigin
       href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
-<link rel="stylesheet" href="style.css?v=20261012a">
+<link rel="stylesheet" href="style.css?v=20261013a">
 </head>
 <body class="is-locked">
 
@@ -78,6 +78,9 @@
       </button>
       <button class="tab" role="tab" id="tab-notice"  aria-controls="panel-notice"  aria-selected="false">
         <span class="tab__num">5</span>반 공지
+      </button>
+      <button class="tab" role="tab" id="tab-book"    aria-controls="panel-book"    aria-selected="false">
+        <span class="tab__num">6</span>교재
       </button>
     </nav>
   </div>
@@ -511,6 +514,314 @@
     </div>
   </section>
 
+  <!-- ============================================================
+       ⑥ 교재 — 하위 화면은 tb*.js 가 그린다
+       ============================================================ -->
+  <section id="panel-book" role="tabpanel" aria-labelledby="tab-book" hidden>
+
+    <nav class="tb-subtabs" id="tbSubtabs" role="tablist" aria-label="교재 화면">
+      <button class="tb-subtab" type="button" data-sub="dash"     aria-selected="true">대시보드</button>
+      <button class="tb-subtab" type="button" data-sub="issue"    aria-selected="false">지급</button>
+      <button class="tb-subtab" type="button" data-sub="schedule" aria-selected="false">일정</button>
+      <button class="tb-subtab" type="button" data-sub="stock"    aria-selected="false">재고·주문</button>
+      <button class="tb-subtab" type="button" data-sub="bill"     aria-selected="false">청구·수납</button>
+      <button class="tb-subtab" type="button" data-sub="refund"   aria-selected="false">환불</button>
+      <button class="tb-subtab" type="button" data-sub="setup"    aria-selected="false">설정</button>
+    </nav>
+
+    <div class="notice notice--warn" id="tbNeedSql" hidden>
+      <span class="notice__icon" aria-hidden="true">🛠️</span>
+      <div class="notice__body">
+        <b>교재 관리용 표가 아직 없습니다.</b>
+        Supabase → SQL Editor 에서 <code>supabase/migration-002-textbook.sql</code> 을 한 번 실행한 뒤 새로고침하세요.
+        1단계 기능(명단·작성·공개·발송·반 공지)은 그대로 쓸 수 있습니다.
+      </div>
+    </div>
+
+    <!-- 대시보드 -->
+    <div class="tb-sub" data-sub="dash">
+      <div class="panel">
+        <div class="panel__head">
+          <h2 class="panel__title">교재 대시보드</h2>
+          <div class="spacer"></div>
+          <select class="select" id="tbDbMonth" aria-label="월"></select>
+          <button class="btn btn--sm" id="tbDbRefresh" type="button">새로고침</button>
+        </div>
+        <div id="tbDbBody"></div>
+      </div>
+    </div>
+
+    <!-- 지급 -->
+    <div class="tb-sub" data-sub="issue" hidden>
+      <div class="panel">
+        <div class="panel__head">
+          <h2 class="panel__title">교재 지급</h2>
+          <p class="panel__hint">칸을 누르면 바로 저장됩니다. 머리칸을 누르면 반 전체 일괄 지급(다 받았으면 일괄 취소)</p>
+        </div>
+        <div class="toolbar">
+          <select class="select" id="tbIsClass" aria-label="반"></select>
+          <select class="select" id="tbIsMonth" aria-label="월"></select>
+          <div class="search">
+            <span class="search__icon" aria-hidden="true">🔍</span>
+            <input class="input" id="tbIsSearch" type="search" placeholder="학생 검색" autocomplete="off" aria-label="학생 검색">
+          </div>
+        </div>
+        <p class="panel__hint" id="tbIsPrice" style="margin-top:10px"></p>
+      </div>
+      <div class="panel">
+        <div class="panel__head">
+          <h2 class="panel__title">회차형</h2>
+          <p class="panel__hint">수업 날짜 × 학생</p>
+        </div>
+        <div id="tbIsSession"></div>
+      </div>
+      <div class="panel">
+        <div class="panel__head">
+          <h2 class="panel__title">단권</h2>
+          <p class="panel__hint">학생마다 한 권</p>
+        </div>
+        <div id="tbIsSingle"></div>
+      </div>
+    </div>
+
+    <!-- 일정 -->
+    <div class="tb-sub" data-sub="schedule" hidden>
+      <div class="panel">
+        <div class="panel__head">
+          <h2 class="panel__title">수업 일정</h2>
+          <p class="panel__hint">같은 반에 같은 날짜는 한 번만 들어갑니다</p>
+        </div>
+        <div class="sub">
+          <div class="sub__head"><span class="sub__title">대상 반</span><span class="sub__hint">여러 반을 같이 고를 수 있습니다</span></div>
+          <div class="chips" id="tbSchClasses"></div>
+        </div>
+        <div class="sub">
+          <div class="sub__head"><span class="sub__title">방법 A. 요일로 자동 생성</span></div>
+          <div class="toolbar">
+            <select class="select" id="tbSchYear" aria-label="연도"></select>
+            <select class="select" id="tbSchMonth" aria-label="월"></select>
+            <div class="chips tb-chips-sm" id="tbSchDows"></div>
+            <button class="btn btn--primary" id="tbSchGen" type="button">생성</button>
+          </div>
+          <p class="panel__hint" id="tbSchPreview" style="margin-top:8px"></p>
+        </div>
+        <div class="sub">
+          <div class="sub__head"><span class="sub__title">방법 B. 날짜 직접 추가</span></div>
+          <div class="toolbar">
+            <input class="input" id="tbSchDate" type="date" aria-label="날짜">
+            <button class="btn" id="tbSchAdd" type="button">추가</button>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel__head">
+          <h2 class="panel__title">등록된 날짜</h2>
+          <p class="panel__hint">위에서 반을 고르면 그 반만 보입니다</p>
+          <div class="spacer"></div>
+          <select class="select" id="tbSchListMonth" aria-label="월"></select>
+        </div>
+        <div id="tbSchList"></div>
+      </div>
+    </div>
+
+    <!-- 재고·주문 -->
+    <div class="tb-sub" data-sub="stock" hidden>
+      <div class="panel">
+        <div class="panel__head">
+          <h2 class="panel__title">현재 재고</h2>
+          <p class="panel__hint">현재 재고 = 입고 − 지급 ± 반품·조정</p>
+          <div class="spacer"></div>
+          <button class="btn btn--sm" id="tbStockRefresh" type="button">새로고침</button>
+        </div>
+        <div id="tbStockList"></div>
+        <details class="tb-details">
+          <summary>최근 입고·반품·조정 기록</summary>
+          <div id="tbMoveList"></div>
+        </details>
+      </div>
+      <div class="panel">
+        <div class="panel__head">
+          <h2 class="panel__title" id="tbOrderTitle">주문 만들기</h2>
+          <p class="panel__hint">반마다 다음 수업 날짜 기준. 권장 부수를 보고 <b>주문 부수</b>를 반마다 고쳐서 확정하세요</p>
+          <div class="spacer"></div>
+          <button class="btn btn--sm" id="tbOrderRefill" type="button">권장대로 새로 계산</button>
+        </div>
+        <div id="tbOrderEdit"></div>
+        <div class="queue-bar">
+          <input class="input tb-memo" id="tbOrderMemo" type="text" maxlength="80" placeholder="메모 (선택) 예) 11월 1주차분">
+          <span class="queue-bar__info" id="tbOrderSum"></span>
+          <div class="spacer"></div>
+          <button class="btn" id="tbOrderDraft" type="button">임시 저장</button>
+          <button class="btn btn--primary" id="tbOrderConfirm" type="button">주문 확정</button>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel__head">
+          <h2 class="panel__title">주문 목록</h2>
+          <p class="panel__hint">확정한 주문은 공급처별 주문표(엑셀)를 내려받고, 들어오면 [입고 처리]</p>
+        </div>
+        <div id="tbOrderList"></div>
+      </div>
+    </div>
+
+    <!-- 청구·수납 -->
+    <div class="tb-sub" data-sub="bill" hidden>
+      <div class="panel">
+        <div class="panel__head">
+          <h2 class="panel__title">청구·수납</h2>
+          <div class="spacer"></div>
+          <button class="btn btn--sm" id="tbBlRefresh" type="button">새로고침</button>
+        </div>
+        <div class="toolbar">
+          <select class="select" id="tbBlMonth" aria-label="월"></select>
+          <select class="select" id="tbBlClass" aria-label="반"></select>
+          <select class="select" id="tbBlStatus" aria-label="상태">
+            <option value="">전체 상태</option>
+            <option value="unpaid">미납</option>
+            <option value="paid">완료</option>
+            <option value="waived">면제</option>
+          </select>
+          <div class="search">
+            <span class="search__icon" aria-hidden="true">🔍</span>
+            <input class="input" id="tbBlSearch" type="search" placeholder="학생 검색" autocomplete="off" aria-label="학생 검색">
+          </div>
+        </div>
+        <div class="tb-cards" id="tbBlSummary"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel__head">
+          <h2 class="panel__title">청구 만들기</h2>
+          <p class="panel__hint" id="tbBlMakeHint"></p>
+        </div>
+        <div id="tbBlMakeBody" hidden>
+          <div class="toolbar" id="tbBlModes">
+            <label class="chk-inline"><input type="radio" name="tbBlMode" value="post" checked> 후불 — 그 달 실제 지급 기준</label>
+            <label class="chk-inline"><input type="radio" name="tbBlMode" value="pre"> 선불 — 그 달 예정 수업 기준</label>
+          </div>
+          <div class="sub" id="tbBlSinglesWrap" hidden>
+            <div class="sub__head"><span class="sub__title">이 달 예정 단권</span><span class="sub__hint">선불에 넣을 단권을 고르세요. 이미 받은 학생은 빠집니다</span></div>
+            <div class="chips tb-chips-sm" id="tbBlSingles"></div>
+          </div>
+          <p class="panel__hint" id="tbBlMakeInfo" style="margin-top:10px"></p>
+          <div class="toolbar" style="margin-top:10px">
+            <button class="btn" id="tbBlPreviewBtn" type="button">학생별 미리보기</button>
+          </div>
+          <div id="tbBlPreview"></div>
+          <div class="queue-bar">
+            <span class="queue-bar__info">완료·면제된 청구서는 다시 만들어도 바뀌지 않습니다</span>
+            <button class="btn btn--primary" id="tbBlCreate" type="button" disabled>청구서 만들기</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel__head">
+          <h2 class="panel__title">학생별 청구서</h2>
+          <p class="panel__hint">[안내]에서 문구·링크를 복사하거나 문자 앱을 열면 N차 발송 기록이 남습니다</p>
+        </div>
+        <div id="tbBlList"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel__head">
+          <h2 class="panel__title">선불 차액 정리</h2>
+          <p class="panel__hint">선불로 받은 달의 실제 지급과 비교합니다. 다음 달 청구에서 차감하거나 환불하세요</p>
+        </div>
+        <div id="tbBlDiff"></div>
+      </div>
+    </div>
+
+    <!-- 환불 -->
+    <div class="tb-sub" data-sub="refund" hidden>
+      <div class="panel">
+        <div class="panel__head">
+          <h2 class="panel__title">환불</h2>
+          <p class="panel__hint">등록은 청구·수납의 완료된 청구서에서 [환불]. 완료된 환불은 정산·실수납에서 자동으로 빠집니다</p>
+          <div class="spacer"></div>
+          <select class="select" id="tbRfStatus" aria-label="상태">
+            <option value="requested">요청 (진행 중)</option>
+            <option value="done">완료</option>
+            <option value="canceled">취소</option>
+            <option value="">전체</option>
+          </select>
+        </div>
+        <div class="tb-cards" id="tbRfSummary"></div>
+        <div id="tbRfList"></div>
+      </div>
+    </div>
+
+    <!-- 설정 -->
+    <div class="tb-sub" data-sub="setup" hidden>
+      <div class="panel">
+        <div class="panel__head">
+          <h2 class="panel__title">학원</h2>
+          <p class="panel__hint">반마다 어느 학원 소속인지 아래 표에서 고릅니다</p>
+        </div>
+        <div class="toolbar" style="margin-bottom:12px">
+          <input class="input" id="tbAcademyName" type="text" maxlength="40" placeholder="새 학원 이름 (예: 목동 PGA)">
+          <button class="btn" id="tbAcademyAdd" type="button">+ 학원 추가</button>
+        </div>
+        <div id="tbAcademyList"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel__head">
+          <h2 class="panel__title">반 — 학원 · 쓰는 교재</h2>
+          <p class="panel__hint">반 이름은 ① 명단의 반 그대로입니다. 바꾸면 바로 저장됩니다</p>
+        </div>
+        <div id="tbClassLinks"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel__head">
+          <h2 class="panel__title">교재 목록</h2>
+          <p class="panel__hint">칸을 벗어나면 바로 저장됩니다. 판매가를 바꿔도 이미 지급한 교재는 지급 당시 가격 그대로입니다</p>
+        </div>
+        <div class="toolbar tb-newbook">
+          <input class="input" id="tbNewBookName" type="text" maxlength="60" placeholder="교재명 (예: 한수 모의고사)">
+          <select class="select" id="tbNewBookKind" aria-label="종류">
+            <option value="session">회차형 (수업마다)</option>
+            <option value="single">단권 (학생당 1권)</option>
+          </select>
+          <input class="input tb-money-in" id="tbNewBookPrice" type="text" inputmode="numeric" placeholder="판매가">
+          <input class="input" id="tbNewBookSupplier" type="text" maxlength="40" placeholder="공급처">
+          <input class="input tb-money-in" id="tbNewBookCost" type="text" inputmode="numeric" placeholder="공급가">
+          <button class="btn btn--primary" id="tbBookAdd" type="button">+ 교재 추가</button>
+        </div>
+        <div id="tbBookList" style="margin-top:12px"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel__head">
+          <h2 class="panel__title">계좌이체 안내</h2>
+          <p class="panel__hint">서버(Supabase)에만 저장됩니다. 학부모 화면에는 미납이 있을 때만 보입니다</p>
+        </div>
+        <div class="grid2">
+          <label class="field"><span class="field__label">은행</span><input class="input" id="tbBank" type="text" maxlength="30" autocomplete="off"></label>
+          <label class="field"><span class="field__label">예금주</span><input class="input" id="tbHolder" type="text" maxlength="30" autocomplete="off"></label>
+          <label class="field grid2__full"><span class="field__label">계좌번호</span><input class="input" id="tbAccount" type="text" maxlength="40" autocomplete="off" inputmode="numeric"></label>
+        </div>
+        <div class="toolbar" style="margin-top:12px">
+          <button class="btn btn--primary" id="tbBankSave" type="button">계좌 저장</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel__head">
+          <h2 class="panel__title">납부 안내 문구</h2>
+          <p class="panel__hint">청구·수납 → [안내]에서 학생마다 채워집니다</p>
+        </div>
+        <textarea class="textarea" id="tbTemplate" rows="5"></textarea>
+        <p class="field__hint"><b>{호칭}</b> 어머님·아버님 · <b>{이름}</b> 학생 이름 · <b>{월}</b> 2026년 11월 · <b>{금액}</b> 청구 금액 · <b>{계좌}</b> 은행 계좌 예금주 · <b>{링크}</b> 개인 페이지 교재비 탭</p>
+        <div class="toolbar" style="margin-top:10px">
+          <button class="btn btn--primary" id="tbTemplateSave" type="button">문구 저장</button>
+          <button class="btn btn--ghost" id="tbTemplateReset" type="button">기본 문구로</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
 </main>
 
 <!-- ============================================================
@@ -863,22 +1174,219 @@
   </form>
 </dialog>
 
+<!-- ============================================================
+     ⑥ 교재 — 모달
+     ============================================================ -->
+<dialog class="modal" id="tbPayModal">
+  <form method="dialog" id="tbPayForm">
+    <div class="modal__head">
+      <h2 class="modal__title" id="tbPayTitle">납부 완료</h2>
+      <p class="modal__desc" id="tbPayDesc"></p>
+    </div>
+    <div class="modal__body">
+      <div class="grid2">
+        <label class="field">
+          <span class="field__label">납부 일시</span>
+          <input class="input" id="tbPayAt" type="datetime-local" required>
+        </label>
+        <label class="field">
+          <span class="field__label">방법</span>
+          <select class="select" id="tbPayMethod">
+            <option value="transfer">계좌이체</option>
+            <option value="card">현장 카드</option>
+            <option value="payssam">결제선생</option>
+          </select>
+        </label>
+        <label class="field grid2__full">
+          <span class="field__label">입금·결제 캡처 <span class="field__opt">선택 · 이미지 5MB 까지</span></span>
+          <input class="input" id="tbPayFile" type="file" accept="image/*">
+          <span class="field__hint" id="tbPayReceipt"></span>
+        </label>
+        <label class="field grid2__full">
+          <span class="field__label">메모 <span class="field__opt">선택</span></span>
+          <textarea class="textarea" id="tbPayMemo" rows="2" placeholder="예) 아버님 명의로 입금"></textarea>
+        </label>
+      </div>
+      <div class="modal__error" id="tbPayError"></div>
+    </div>
+    <div class="modal__foot">
+      <div class="spacer"></div>
+      <button class="btn" type="button" id="btnTbPayCancel">취소</button>
+      <button class="btn btn--primary" type="submit" id="btnTbPaySave">납부 완료로 저장</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="modal" id="tbBillAdjModal">
+  <form method="dialog" id="tbBillAdjForm">
+    <div class="modal__head">
+      <h2 class="modal__title">청구 금액 조정</h2>
+      <p class="modal__desc" id="tbBillAdjDesc"></p>
+    </div>
+    <div class="modal__body">
+      <label class="field">
+        <span class="field__label">조정 금액 (원) <span class="field__opt">빼려면 앞에 − 를 붙입니다. 0 이면 조정 없음</span></span>
+        <input class="input" id="tbBillAdjAmount" type="text" inputmode="numeric" placeholder="예) -12000">
+      </label>
+      <label class="field" style="margin-top:12px">
+        <span class="field__label">사유</span>
+        <input class="input" id="tbBillAdjReason" type="text" maxlength="80" placeholder="예) 11/10 입반 — 1회분 제외">
+      </label>
+      <div class="modal__error" id="tbBillAdjError"></div>
+    </div>
+    <div class="modal__foot">
+      <div class="spacer"></div>
+      <button class="btn" type="button" id="btnTbBillAdjCancel">취소</button>
+      <button class="btn btn--primary" type="submit">저장</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="modal modal--wide" id="tbNoticeModal">
+  <form method="dialog">
+    <div class="modal__head">
+      <h2 class="modal__title" id="tbNoticeTitle">납부 안내</h2>
+      <p class="modal__desc">자동으로 보내지 않습니다. 버튼을 누를 때마다 N차 안내로 기록됩니다</p>
+    </div>
+    <div class="modal__body">
+      <div class="notice notice--warn" id="tbNoticeWarn" style="margin-top:0" hidden>
+        <span class="notice__icon" aria-hidden="true">🔗</span>
+        <div class="notice__body">이 학생은 개인 링크가 없습니다. ① 명단에서 먼저 발급하세요.</div>
+      </div>
+      <textarea class="textarea" id="tbNoticeText" rows="6"></textarea>
+      <div class="toolbar" id="tbNoticeActs" style="margin-top:10px"></div>
+      <div class="extra-head" style="margin-top:16px"><span class="extra-head__title">발송 기록</span></div>
+      <div id="tbNoticeHistory"></div>
+    </div>
+    <div class="modal__foot">
+      <div class="spacer"></div>
+      <button class="btn btn--primary" type="button" id="btnTbNoticeClose">닫기</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="modal" id="tbRefundModal">
+  <form method="dialog" id="tbRefundForm">
+    <div class="modal__head">
+      <h2 class="modal__title" id="tbRefundTitle">환불 등록</h2>
+      <p class="modal__desc" id="tbRefundDesc"></p>
+    </div>
+    <div class="modal__body">
+      <div class="grid2">
+        <label class="field">
+          <span class="field__label">환불 금액 (원)</span>
+          <input class="input" id="tbRefundAmount" type="text" inputmode="numeric" required>
+        </label>
+        <label class="field">
+          <span class="field__label">방법</span>
+          <select class="select" id="tbRefundMethod">
+            <option value="transfer">계좌이체</option>
+            <option value="card">카드 취소</option>
+            <option value="cash">현금</option>
+            <option value="payssam">결제선생 취소</option>
+          </select>
+        </label>
+        <label class="field grid2__full">
+          <span class="field__label">사유</span>
+          <input class="input" id="tbRefundReason" type="text" maxlength="80" placeholder="예) 11월 중도 퇴원 — 2회분">
+        </label>
+        <label class="field">
+          <span class="field__label">상태</span>
+          <select class="select" id="tbRefundStatus">
+            <option value="requested">요청 (아직 돌려주지 않음)</option>
+            <option value="done">완료 (돌려줌)</option>
+          </select>
+        </label>
+        <label class="field">
+          <span class="field__label">메모 <span class="field__opt">선택</span></span>
+          <input class="input" id="tbRefundMemo" type="text" maxlength="120">
+        </label>
+      </div>
+      <div class="modal__error" id="tbRefundError"></div>
+    </div>
+    <div class="modal__foot">
+      <div class="spacer"></div>
+      <button class="btn" type="button" id="btnTbRefundCancel">취소</button>
+      <button class="btn btn--primary" type="submit">저장</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="modal" id="tbAdjustModal">
+  <form method="dialog" id="tbAdjustForm">
+    <div class="modal__head">
+      <h2 class="modal__title" id="tbAdjustTitle">재고 조정</h2>
+      <p class="modal__desc" id="tbAdjustDesc"></p>
+    </div>
+    <div class="modal__body">
+      <input type="hidden" id="tbAdjustBook">
+      <div class="grid2">
+        <label class="field">
+          <span class="field__label">구분</span>
+          <select class="select" id="tbAdjustKind">
+            <option value="minus">줄이기 (분실·파손·실사 부족)</option>
+            <option value="plus">늘리기 (실사 남음·기증)</option>
+            <option value="return">공급처 반품</option>
+          </select>
+        </label>
+        <label class="field">
+          <span class="field__label">수량 (부)</span>
+          <input class="input" id="tbAdjustQty" type="text" inputmode="numeric" placeholder="예) 2">
+        </label>
+        <label class="field grid2__full">
+          <span class="field__label">사유</span>
+          <input class="input" id="tbAdjustReason" type="text" maxlength="80" placeholder="예) 11/3 수업 중 1부 파손">
+        </label>
+      </div>
+      <div class="modal__error" id="tbAdjustError"></div>
+    </div>
+    <div class="modal__foot">
+      <div class="spacer"></div>
+      <button class="btn" type="button" id="btnTbAdjustCancel">취소</button>
+      <button class="btn btn--primary" type="submit">저장</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="modal" id="tbReceiveModal">
+  <form method="dialog" id="tbReceiveForm">
+    <div class="modal__head">
+      <h2 class="modal__title">입고 처리</h2>
+      <p class="modal__desc">실제로 들어온 부수를 확인하고 저장하면 재고에 더해집니다</p>
+    </div>
+    <div class="modal__body">
+      <div id="tbReceiveList"></div>
+      <div class="modal__error" id="tbReceiveError"></div>
+    </div>
+    <div class="modal__foot">
+      <div class="spacer"></div>
+      <button class="btn" type="button" id="btnTbReceiveCancel">취소</button>
+      <button class="btn btn--primary" type="submit">입고 저장</button>
+    </div>
+  </form>
+</dialog>
+
 <div class="toast-host" id="toastHost" aria-live="polite"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
 <!-- config.js 와 brand.js 가 먼저 와야 한다. 나머지가 이 값을 읽는다. -->
-<script src="../assets/config.js?v=20261012a"></script>
-<script src="../assets/brand.js?v=20261012a"></script>
-<script src="supabase.js?v=20261012a"></script>
-<script src="db.js?v=20261012a"></script>
-<script src="store.js?v=20261012a"></script>
-<script src="report.js?v=20261012a"></script>
-<script src="app.js?v=20261012a"></script>
-<script src="import.js?v=20261012a"></script>
-<script src="write.js?v=20261012a"></script>
-<script src="publish.js?v=20261012a"></script>
-<script src="send.js?v=20261012a"></script>
-<script src="notice.js?v=20261012a"></script>
-<script src="auth.js?v=20261012a"></script>
+<script src="../assets/config.js?v=20261013a"></script>
+<script src="../assets/brand.js?v=20261013a"></script>
+<script src="supabase.js?v=20261013a"></script>
+<script src="db.js?v=20261013a"></script>
+<script src="store.js?v=20261013a"></script>
+<script src="report.js?v=20261013a"></script>
+<script src="app.js?v=20261013a"></script>
+<script src="import.js?v=20261013a"></script>
+<script src="write.js?v=20261013a"></script>
+<script src="publish.js?v=20261013a"></script>
+<script src="send.js?v=20261013a"></script>
+<script src="notice.js?v=20261013a"></script>
+<script src="tb.js?v=20261013a"></script>
+<script src="tb-dash.js?v=20261013a"></script>
+<script src="tb-issue.js?v=20261013a"></script>
+<script src="tb-stock.js?v=20261013a"></script>
+<script src="tb-bill.js?v=20261013a"></script>
+<script src="auth.js?v=20261013a"></script>
 </body>
 </html>

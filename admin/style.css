@@ -1693,3 +1693,186 @@ dialog.modal--wide { width: min(680px, calc(100vw - 24px)); }
 @media (max-width: 640px) {
   .nt-link-row__name, .nt-link-row__url { flex-basis: 100% !important; }
 }
+
+/* ============================================================
+   ⑥ 교재 — 하위 화면
+   ============================================================ */
+.tb-subtabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+.tb-subtab {
+  appearance: none;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  padding: 8px 14px;
+  min-height: 38px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-mid);
+  cursor: pointer;
+}
+.tb-subtab:hover { background: var(--surface-2); }
+.tb-subtab[aria-selected="true"] { background: var(--grad-strong); border-color: transparent; color: #fff; }
+.tb-subtab:focus-visible { outline: 2px solid var(--indigo); outline-offset: 2px; }
+
+/* 요약 카드 */
+.tb-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+.tb-cards:empty { display: none; }
+#tbDbBody > .tb-cards { margin-top: 0; }
+.tb-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: var(--surface-2);
+}
+.tb-card__label { font-size: 12px; font-weight: 700; color: var(--ink-light); }
+.tb-card__val   { font-size: 19px; font-weight: 800; color: var(--ink-deep); letter-spacing: -0.02em; margin-top: 2px; }
+.tb-card__sub   { font-size: 11.5px; color: var(--ink-light); margin-top: 1px; }
+
+/* 표 */
+.tb-table td, .tb-table th { vertical-align: middle; }
+.tb-table .input, .tb-table .select { min-height: 36px; padding: 6px 9px; font-size: 13.5px; }
+.tb-r { text-align: right !important; }
+.tb-th-hint { font-weight: 500; color: #B4B9CC; margin-left: 4px; }
+.tb-items { font-size: 13px; line-height: 1.55; }
+.tb-neg  { color: var(--danger); }
+.tb-warn { color: #B07A2A; }
+.tb-small { font-size: 11.5px; font-weight: 700; }
+.tb-acts { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; margin-top: 4px; }
+.tb-acts .btn { margin-left: 0 !important; }
+.tb-money-in { width: 100px !important; text-align: right; }
+.tb-book-table .input[data-k="name"] { min-width: 160px; }
+.tb-book-table .input[data-k="supplier"] { min-width: 110px; }
+.tb-memo { flex: 1 1 220px; width: auto; max-width: 360px; }
+.tb-link { font-size: 12.5px; font-weight: 700; color: var(--indigo); text-decoration: none; }
+.tb-link:hover { text-decoration: underline; }
+
+/* 상태 표시 */
+.tb-badge {
+  display: inline-block;
+  font-size: 11.5px;
+  font-weight: 800;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--ink-mid);
+  white-space: nowrap;
+}
+.tb-badge--unpaid    { background: #FFF3E3; color: #A86A1E; }
+.tb-badge--paid      { background: #E6F5EE; color: #35806A; }
+.tb-badge--waived    { background: #EEF0F7; color: var(--ink-light); }
+.tb-badge--refund    { background: #FDF2F5; color: #97364E; margin-top: 3px; }
+.tb-badge--warn      { background: #FFF3E3; color: #A86A1E; }
+.tb-badge--draft     { background: #EEF0F7; color: var(--ink-mid); }
+.tb-badge--confirmed { background: #F1F2FB; color: #4A4E9B; }
+.tb-badge--received  { background: #E6F5EE; color: #35806A; }
+.tb-badge--canceled  { background: #EEF0F7; color: var(--ink-light); text-decoration: line-through; }
+.tb-badge--rf-requested { background: #FFF3E3; color: #A86A1E; }
+.tb-badge--rf-done      { background: #E6F5EE; color: #35806A; }
+.tb-badge--rf-canceled  { background: #EEF0F7; color: var(--ink-light); }
+
+/* 칩 안의 작은 버튼 */
+.chip.tb-chip-static { cursor: default; padding-right: 8px; }
+.chip.tb-chip-static:hover { background: var(--surface); }
+.tb-x {
+  appearance: none; border: 0; background: none; font: inherit;
+  color: var(--ink-light); cursor: pointer;
+  padding: 0 3px; border-radius: 6px; line-height: 1.2; font-size: 13px;
+}
+.tb-x:hover { color: var(--danger); background: #FDF2F5; }
+.tb-chips-sm { gap: 6px; }
+.tb-chips-sm .chip { min-height: 32px; padding: 5px 11px; font-size: 12.5px; }
+
+/* 지급 표 */
+.tb-grid th, .tb-grid td { padding: 6px 4px; }
+.tb-grid .tb-stu {
+  position: sticky; left: 0; z-index: 1;
+  background: var(--surface);
+  min-width: 96px;
+  padding-left: 8px;
+}
+.tb-grid tr:hover td.tb-stu { background: var(--surface-2); }
+.tb-grid .tb-date { text-align: center; border-left: 1px solid var(--line-soft); white-space: nowrap; color: var(--ink-mid); }
+.tb-grid .tb-bk,
+.tb-grid .tb-c { text-align: center; border-left: 1px solid var(--line-soft); }
+.tb-bulk { min-height: 24px !important; padding: 2px 7px !important; font-size: 11px !important; }
+.tb-bk-btn {
+  appearance: none; font: inherit; cursor: pointer;
+  border: 1px dashed var(--line); background: var(--surface);
+  border-radius: 8px; padding: 3px 7px;
+  font-size: 11.5px; font-weight: 700; color: var(--ink-mid);
+  display: inline-flex; flex-direction: column; align-items: center; line-height: 1.3;
+  max-width: 120px;
+}
+.tb-bk-btn:hover { border-style: solid; border-color: var(--indigo); }
+.tb-bk-n { font-size: 10.5px; font-weight: 600; color: var(--ink-light); font-variant-numeric: tabular-nums; }
+.tb-cell {
+  appearance: none; font: inherit; cursor: pointer;
+  width: 34px; height: 34px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: #fff; font-weight: 900; font-size: 15px;
+}
+.tb-cell:hover { border-color: var(--indigo); }
+.tb-cell.is-on { background: var(--grad-strong); border-color: transparent; }
+.tb-cell[disabled] { opacity: .5; cursor: progress; }
+.tb-cell:focus-visible { outline: 2px solid var(--indigo); outline-offset: 1px; }
+
+/* 일정 */
+.tb-sch-row { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--line-soft); }
+.tb-sch-row:last-child { border-bottom: 0; }
+.tb-sch-cls { flex: 0 0 120px; font-weight: 800; color: var(--ink-deep); font-size: 13.5px; padding-top: 5px; }
+
+/* 재고·주문 */
+.tb-details { margin-top: 12px; }
+.tb-details summary { cursor: pointer; font-size: 13px; font-weight: 700; color: var(--ink-mid); padding: 6px 0; }
+.tb-order {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 11px 13px;
+  margin-bottom: 8px;
+}
+.tb-order__top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tb-order__date { font-weight: 700; color: var(--ink-deep); font-size: 13.5px; }
+.tb-order__memo { font-size: 13px; color: var(--ink-mid); }
+.tb-order__books { margin-top: 5px; font-size: 13px; color: var(--ink); }
+.tb-order__acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 9px; }
+.tb-order__acts:empty { display: none; }
+.tb-recv-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line-soft); }
+.tb-recv-name { flex: 1 1 auto; font-weight: 700; color: var(--ink-deep); font-size: 14px; }
+
+/* 발송 기록 · 대시보드 목록 */
+.tb-hist li { padding: 6px 0; border-bottom: 1px solid var(--line-soft); font-size: 13.5px; }
+.tb-hist li:last-child { border-bottom: 0; }
+.tb-mini li {
+  display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  padding: 7px 0; border-bottom: 1px solid var(--line-soft); font-size: 13.5px;
+}
+.tb-mini li:last-child { border-bottom: 0; }
+.tb-dash-grid { margin-top: 4px; align-items: start; }
+.tb-newbook .input:first-child { flex: 1 1 200px; }
+
+/* 좁은 화면 — 교재 표는 카드로 바꾸지 않고 옆으로 넘긴다 */
+@media (max-width: 720px) {
+  .roster.tb-table { display: table; width: auto; min-width: 100%; }
+  .roster.tb-table thead { display: table-header-group; }
+  .roster.tb-table tbody { display: table-row-group; width: auto; }
+  .roster.tb-table tr { display: table-row; width: auto; border: 0; padding: 0; margin: 0; border-radius: 0; }
+  .roster.tb-table td { display: table-cell; width: auto; padding: 8px 6px; border-bottom: 1px solid var(--line-soft); }
+  .roster.tb-table td::before { content: none; }
+  .roster.tb-table td.roster__actions { display: table-cell; }
+  .tb-sch-row { flex-direction: column; gap: 4px; }
+  .tb-sch-cls { flex: none; }
+  .tb-memo { max-width: none; }
+}

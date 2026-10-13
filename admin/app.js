@@ -79,7 +79,8 @@
     { tab: '#tab-write',   panel: '#panel-write'   },
     { tab: '#tab-publish', panel: '#panel-publish' },
     { tab: '#tab-send',    panel: '#panel-send'    },
-    { tab: '#tab-notice',  panel: '#panel-notice'  }
+    { tab: '#tab-notice',  panel: '#panel-notice'  },
+    { tab: '#tab-book',    panel: '#panel-book'    }
   ];
 
   function selectTab(idx) {
@@ -627,9 +628,17 @@
   $('#btnStudentDelete').addEventListener('click', function () {
     var s = students.find(function (x) { return x.id === editingId; });
     if (!s) return;
-    confirmAsk('학생 삭제',
-      '‘' + s.name + '’ 학생과 그 학생의 작성 내용·공개한 레포트·개인 링크를 모두 지웁니다. 되돌릴 수 없습니다. ' +
-      '다니지 않게 된 학생은 지우지 말고 [퇴원]에 체크하세요.', '삭제')
+    /* 교재 지급·청구 기록이 있는 학생은 지우지 않는다 (기록이 학생에 묶여 있다) */
+    DB.lockedStudentIds().then(function (locked) {
+      if (locked.indexOf(s.id) !== -1) {
+        showStudentError('교재 지급·청구 기록이 있는 학생이라 지울 수 없습니다. 퇴원 처리하세요 — ' +
+                         '[퇴원]에 체크하고 저장하면 개인 링크는 막히고 교재 기록은 그대로 남습니다.');
+        return false;
+      }
+      return confirmAsk('학생 삭제',
+        '‘' + s.name + '’ 학생과 그 학생의 작성 내용·공개한 레포트·개인 링크를 모두 지웁니다. 되돌릴 수 없습니다. ' +
+        '다니지 않게 된 학생은 지우지 말고 [퇴원]에 체크하세요.', '삭제');
+    })
       .then(function (ok) {
         if (!ok) return;
         studentModal.close();
@@ -637,7 +646,8 @@
         students = Store.getStudents();
         render();
         toast(s.name + ' 학생을 지웠습니다');
-      });
+      })
+      .catch(function (e) { showStudentError('확인하지 못했습니다 — ' + e.message); });
   });
 
   $('#studentForm').addEventListener('submit', function (e) {
