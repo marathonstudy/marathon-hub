@@ -6,7 +6,7 @@
 
 :root {
   --grad-bg:     linear-gradient(135deg, #F6F5FC 0%, #EEF1FA 100%);
-  --grad-strong: linear-gradient(135deg, #8670CC 0%, #36407F 100%);
+  --grad-strong: linear-gradient(135deg, #7858E8 0%, #4A34B8 100%);   /* 마라톤국어 보라 */
 
   --ink:       #333A57;
   --ink-deep:  #2C3566;
@@ -18,7 +18,7 @@
   --surface:   #FFFFFF;
   --surface-2: #F8F9FD;
 
-  --indigo: #6F67BE;   /* 포커스·선택 테두리 */
+  --indigo: #7858E8;   /* 포커스·선택 테두리 — 마라톤국어 보라 */
   --mint:   #6FAE92;   /* 보강 */
   --sky:    #7CB2D2;   /* 출석 */
   --apricot:#D9A177;   /* 지각 */
@@ -2005,3 +2005,27 @@ dialog.modal.modal--card {
   .cn-compose .toolbar .input, .cn-filter .toolbar .input, .cn-filter .toolbar .select { width: auto; flex: 1 1 140px; }
   .ex-row .ex-date { flex: 1 1 140px; }
 }
+
+/* ============================================================
+   ⑦ 필기 노트 (photo.js)
+   ============================================================ */
+.ph-usage { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--surface-2); }
+.ph-usage__text { font-size: 13px; color: var(--ink); margin-bottom: 6px; }
+.ph-usage__fill.is-warn { background: linear-gradient(90deg, #E2A04A, #C4566F); }
+.ph-none { font-size: 11.5px; font-weight: 700; color: #B9BED2; }
+.ph-count {
+  appearance: none; font: inherit; cursor: pointer;
+  font-size: 12.5px; font-weight: 800; color: var(--ink-deep);
+  padding: 5px 9px; border-radius: 8px; border: 1px solid #D9D2F7; background: #F3F0FD;
+}
+.ph-count:hover { border-color: var(--indigo); }
+.ph-hidden-tag {
+  display: inline-block; font-size: 10.5px; font-weight: 800; padding: 1px 6px; border-radius: 999px;
+  background: #EEF0F7; color: var(--ink-light); margin-left: 4px;
+}
+.ph-admin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.ph-admin-item { margin: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--surface); }
+.ph-admin-item img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; display: block; background: var(--surface-2); }
+.ph-admin-item.is-hidden img { opacity: .4; }
+.ph-admin-item figcaption { padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+.ph-admin-acts { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px; }

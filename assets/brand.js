@@ -3,7 +3,7 @@
 
    여기 한 곳만 고치면 아래가 전부 같이 바뀐다.
      · 개인 페이지 · 반 공지 페이지 · 레포트의 제목과 맨 아래 문의처
-     · 생성기 화면 제목
+     · 마라톤 코치룸(관리 페이지) 제목 · 러닝노트(개인 페이지) 이름
    ============================================================ */
 
 (function (global) {
@@ -25,7 +25,11 @@
 
   BRAND.reportBrand  = BRAND.brandName;                        /* 마라톤국어 */
   BRAND.reportTitle  = BRAND.brandName + ' 주간 학습 레포트';
-  BRAND.adminTitle   = BRAND.brandName + ' 관리 시스템';
+  BRAND.adminTitle   = '마라톤 코치룸';                          /* 관리 페이지 */
+  BRAND.noteTitle    = BRAND.brandName + ' 러닝노트';             /* 학생·학부모 개인 페이지 */
+  BRAND.noticeTitle  = BRAND.brandName + ' 반 공지';              /* 반 공용 공지 페이지 */
+  BRAND.tagline      = '1일 1지문 1코칭';
+  BRAND.motto        = '루틴이 점수를 만든다 · ' + BRAND.brandName;
   BRAND.commentTitle = BRAND.teacherName + ' 종합 코멘트';
   BRAND.signName     = BRAND.teacherName + ' 드림';
 

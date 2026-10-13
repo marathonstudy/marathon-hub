@@ -7,11 +7,11 @@
    ============================================================ */
 
 :root {
-  /* 그라데이션 — 보라에서 남색으로 (B안) */
+  /* 그라데이션 — 마라톤국어 보라 #7858E8 에서 진한 보라로 */
   --grad-bg:     linear-gradient(135deg, #E8E6F8 0%, #DCE4F4 100%);
-  --grad-strong: linear-gradient(135deg, #8670CC 0%, #36407F 100%);
+  --grad-strong: linear-gradient(135deg, #7858E8 0%, #4A34B8 100%);
   --grad-soft:   linear-gradient(135deg, #F5F4FC, #F0F3FA);
-  --grad-bar:    linear-gradient(90deg, #9480D6, #3D4A8C);
+  --grad-bar:    linear-gradient(90deg, #9A82F0, #5B42D6);
 
   /* 글자 */
   --ink:        #3A3F5C;   /* 본문 */

@@ -1,5 +1,6 @@
-# 마라톤국어 허브
+# 마라톤 코치룸 · 마라톤국어 러닝노트
 
+**마라톤 코치룸**(선생님·조교 관리 페이지)과 **마라톤국어 러닝노트**(학생·학부모 개인 페이지).
 학생·학부모에게 **개인 링크 하나**로 반 공지 · 주간 레포트 · 앱 과제 기록을 보여 주는 정적 사이트.
 서버 없이 GitHub Pages + Supabase 로 돌아간다.
 
@@ -16,14 +17,14 @@
 - 엑셀·CSV 명단, 백업 파일(`.mhbak`)은 `.gitignore` 로 막아 두었다. 그래도 폴더에 두지 않는다.
 - Supabase **secret key · service_role key**, 데이터베이스 비밀번호는 어디에도 적지 않는다.
   `assets/config.js` 에는 publishable key 만 있다. 모든 표에 RLS 가 켜져 있어 공개돼도 된다.
-- **교재비 계좌번호·금액·납부 캡처도 저장소에 없다.** 계좌는 생성기 ⑥ 교재 → 설정에서 입력하면
+- **교재비 계좌번호·금액·납부 캡처도 저장소에 없다.** 계좌는 코치룸 ⑥ 교재 → 설정에서 입력하면
   Supabase(`app_settings`)에만 저장되고, 캡처는 비공개 보관함(`tb-receipts`)에만 올라간다.
   공급처 주문표 엑셀은 내 컴퓨터로만 내려받는다(`*.xlsx` 는 `.gitignore` 로 막혀 있다).
 
 ## 폴더
 
 ```
-admin/        생성기 (명단 · 작성 · 공개 · 발송 · 반 공지 · 교재)
+admin/        코치룸 (명단 · 작성 · 공개 · 발송 · 반 공지 · 교재)
   tb.js         ⑥ 교재 — 뼈대 · 설정 · 일정
   tb-dash.js    ⑥ 교재 — 대시보드
   tb-issue.js   ⑥ 교재 — 지급
@@ -32,21 +33,25 @@ admin/        생성기 (명단 · 작성 · 공개 · 발송 · 반 공지 · �
   card.js       학생 상담 카드 (기본 정보 · 내신 · 모의고사 · 상담·관찰 기록)
   exams.js      첫 화면 D-day 띠 · [시험 관리]
   sync.js       여러 기기 — 다시 불러오기 · 실시간 반영
+  photo.js      ⑦ 필기 노트 — 반·날짜별 올림 현황 · 숨기기 · 완전 삭제 · 저장 공간
 me/           학생·학부모 개인 페이지
 notice/       반 공용 공지 페이지
 assets/
   config.js     ← 배포 주소 · Supabase 주소와 publishable key · 버전
   brand.js      ← 선생님 표기 · 학원명 · 문의처 (김종현 T / 마라톤국어)
   report.css    레포트 디자인
-  report-view.js 레포트 그리기 (개인 페이지와 생성기 미리보기가 같이 쓴다)
+  report-view.js 레포트 그리기 (개인 페이지와 코치룸 미리보기가 같이 쓴다)
   hub.css · hub.js 개인 페이지 · 반 공지 페이지
-  dday.js       주요 시험 D-day 계산 (한국 시간 · 생성기와 학생 화면이 같이 쓴다)
+  dday.js       주요 시험 D-day 계산 (한국 시간 · 코치룸과 학생 화면이 같이 쓴다)
+  photos.js     러닝노트 「필기 노트」 — 사진 줄이기 · 올리기 · 날짜별 앨범
 supabase/
   schema.sql                  표 · RLS · 공개 함수 전부 (SQL Editor 에서 한 번 실행)
   migration-002-textbook.sql  2단계 교재 관리 표 · 계산 함수 · 학부모용 hub_textbook (schema.sql 다음에 한 번)
   migration-003-sync.sql      여러 기기 동시 사용 — 수정 시각 · 항목별 저장 함수 · 실시간 반영 (002 다음에 한 번)
   migration-004-notes.sql     상담 카드 · 성적 · 상담·관찰 기록 (staff 만, 공개 함수에 안 나감)
   migration-005-exams.sql     주요 시험 D-day — 개인·반 공지 페이지 함수에 시험 이름·날짜만 더함
+  migration-006-notes-photos.sql  필기 노트 사진 — 비공개 보관함 · 사진 기록 · Edge Function 전용 함수
+  functions/note-photo/index.ts   필기 사진 올리기·보기·지우기 Edge Function (개인 링크 코드 확인)
   functions/app-report/index.ts  앱 과제 기록을 대신 받아 오는 Edge Function
 ```
 
@@ -72,7 +77,7 @@ supabase/
 1. **Authentication → Users → Add user → Create new user**
 2. 이메일 · 비밀번호 입력, **Auto Confirm User** 체크 → Create user
 
-### 4. staff 등록 (이걸 해야 생성기가 열린다)
+### 4. staff 등록 (이걸 해야 코치룸이 열린다)
 SQL Editor 에서 아래를 고쳐서 Run. 이메일은 소문자로.
 
 ```sql
@@ -108,12 +113,20 @@ delete from public.staff where email = '조교이메일@example.com';
 ### 5-3. 여러 기기 동시 사용 (migration-003)
 1. SQL Editor → **New query** → `supabase/migration-003-sync.sql` 전체 붙여 넣기 → **Run**
 2. 맨 아래 결과에 실시간 반영 표 이름이 14개 안팎 나오면 끝. 여러 번 실행해도 안전하다.
-3. 실시간 반영이 안 되는 환경이면 생성기가 30초마다 새로 불러온다(따로 할 일 없음).
+3. 실시간 반영이 안 되는 환경이면 코치룸이 30초마다 새로 불러온다(따로 할 일 없음).
 
 ### 5-4. 상담 카드 · 주요 시험 (migration-004 → 005)
 1. SQL Editor → **New query** → `supabase/migration-004-notes.sql` 전체 → **Run** → 표 3개가 `rls_enabled = true`
 2. 다시 **New query** → `supabase/migration-005-exams.sql` 전체 → **Run** → `exam_for_all` 이 null 이면 정상(아직 시험 없음)
 3. 둘 다 여러 번 실행해도 안전하다. 반드시 004 다음에 005.
+
+### 5-5. 필기 노트 사진 (migration-006 + Edge Function note-photo)
+1. SQL Editor → **New query** → `supabase/migration-006-notes-photos.sql` 전체 → **Run**
+   (보관함 `note-photos` 까지 만든다. 결과에 `note_photos = true`, `bucket public = false`)
+2. **Edge Functions → Deploy a new function → Via Editor** → 이름 `note-photo`
+   → `supabase/functions/note-photo/index.ts` 전체 붙여 넣기 → **Deploy function**
+3. 배포된 함수 → **Details** → **Verify JWT with legacy secret** 끄기 → Save (학생은 로그인이 없다. 함수가 개인 링크 코드를 직접 검사한다)
+4. **Storage** → `note-photos` 가 **Private** 인지만 확인 (Public 으로 바꾸지 않는다)
 
 결제선생은 지금 수납 방법 값으로만 쓴다. 나중에 파트너 API 계약을 하면 콜백용 Edge Function 이
 `tb_bills.provider_ref` 로 청구서를 찾아 `status='paid'`, `pay_method='payssam'`, `paid_at`, `provider_raw` 를
@@ -161,10 +174,19 @@ delete from public.staff where email = '조교이메일@example.com';
 
 ## 주요 시험 D-day
 
-- 생성기 맨 위 띠 → **[시험 관리]**: 시험 이름·날짜·메모, 전체 기본(가장 가까운 시험 자동 / 특정 시험 고정), 반별 시험.
+- 코치룸 맨 위 띠 → **[시험 관리]**: 시험 이름·날짜·메모, 전체 기본(가장 가까운 시험 자동 / 특정 시험 고정), 반별 시험.
 - 개인 페이지에는 "OO 학생 · ○○까지 D-00", 반 공지 페이지에는 "○○까지 D-00" (그 반 기준).
 - 한국 시간 자정마다 하루씩 줄어든다. 당일은 "○○ 당일입니다. 모두 화이팅!". 고정한 시험이 지나면 다음 시험으로 넘어가고,
   다가오는 시험이 하나도 없으면 D-day 줄을 숨긴다.
+
+## 필기 노트 (러닝노트 「필기 노트」 · 코치룸 ⑦)
+
+- 학생이 러닝노트 「필기 노트」 탭에서 카메라로 찍거나 앨범에서 여러 장 올린다. 수업 날짜는 기본 오늘, 지난 날짜도 고를 수 있다.
+- 올리기 전에 휴대폰에서 긴 변 1600px · JPEG · 장당 0.3MB 안팎으로 줄인다. 서버는 JPEG · 600KB · 하루 10장(올린 날 기준)만 받는다.
+- 학부모: 러닝노트 첫 화면 맨 위와 「내 레포트」 아래에 그 주 필기가 "○월 ○일 수업 필기입니다" 로 보인다.
+- 학생은 자기 사진을 언제든 지울 수 있다(파일까지). 코치룸 ⑦ 에서 staff 는 숨기기, teacher 만 완전 삭제.
+- 사진 보관함은 비공개다. 사진 주소는 10분만 유효한 서명 주소이고, 퇴원 학생은 올리기·보기 모두 막힌다.
+- 코치룸 ⑦ 위쪽에 저장 공간 사용량(무료 1GB 기준)이 보인다. 80% 를 넘으면 막대가 주황색이 된다.
 
 ## 교재 (⑥ 교재 탭)
 

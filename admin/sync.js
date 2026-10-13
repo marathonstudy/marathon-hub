@@ -16,7 +16,7 @@
   var TABLES = [
     'students', 'student_links', 'entries', 'week_common', 'class_notices', 'published', 'sent',
     'tb_issues', 'tb_bills', 'tb_bill_notices', 'tb_refunds', 'tb_class_dates', 'tb_stock_moves', 'tb_orders',
-    'student_cards', 'student_grades', 'student_notes'
+    'student_cards', 'student_grades', 'student_notes', 'note_photos'
   ];
   var POLL_MS = 30000;
   var THROTTLE_MS = 3000;

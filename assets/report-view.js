@@ -305,7 +305,7 @@
     holder.innerHTML =
       '<svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">' +
         '<defs><linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="0%">' +
-          '<stop offset="0%" stop-color="#9480D6"/><stop offset="100%" stop-color="#3D4A8C"/>' +
+          '<stop offset="0%" stop-color="#9A82F0"/><stop offset="100%" stop-color="#5B42D6"/>' +
         '</linearGradient></defs>' +
       '</svg>';
     document.body.appendChild(holder.firstChild);

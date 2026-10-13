@@ -137,7 +137,8 @@
     { tab: '#tab-publish', panel: '#panel-publish' },
     { tab: '#tab-send',    panel: '#panel-send'    },
     { tab: '#tab-notice',  panel: '#panel-notice'  },
-    { tab: '#tab-book',    panel: '#panel-book'    }
+    { tab: '#tab-book',    panel: '#panel-book'    },
+    { tab: '#tab-photo',   panel: '#panel-photo'   }
   ];
 
   function selectTab(idx) {

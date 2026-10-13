@@ -6,6 +6,7 @@
      /me/#개인링크코드          → hub_get · hub_report · Edge Function(app-report)
      /me/#개인링크코드/report   → 내 레포트 탭의 최신 레포트를 바로 연다
      /me/#개인링크코드/book     → 교재비 탭 (hub_textbook — 그 학생 청구서만)
+     /me/#개인링크코드/photo    → 필기 노트 탭 (Edge Function note-photo — 그 학생 사진만)
      /notice/#반코드            → class_notice_get
 
    # 뒤의 값은 서버 로그에도, 다른 사이트로 넘어가는 주소(referrer)에도
@@ -216,23 +217,26 @@
       if (!d || !d.ok) { stopScreen(root, (d && d.reason) || 'notfound'); return; }
 
       var st = d.student || {};
-      $('#hubName').textContent = (st.name || '') + ' 학생';
+      $('#hubName').textContent = (st.name || '') + ' 학생의 러닝노트';
       $('#hubMeta').textContent = [st.class_name, st.school, st.grade].filter(Boolean).join(' · ');
       renderDday(d.exam, (st.name || '') + ' 학생');
       head.hidden = false;
       tabs.hidden = false;
-      setTitle((st.name || '') + ' · ' + (global.BRAND ? BRAND.brandName : '마라톤국어'));
+      setTitle(global.BRAND ? BRAND.noteTitle : '마라톤국어 러닝노트');
 
       root.innerHTML =
         '<section class="hub-panel" id="panelNotice" role="tabpanel"></section>' +
         '<section class="hub-panel" id="panelReport" role="tabpanel" hidden></section>' +
         '<section class="hub-panel" id="panelApp" role="tabpanel" hidden></section>' +
-        '<section class="hub-panel" id="panelBook" role="tabpanel" hidden></section>';
+        '<section class="hub-panel" id="panelBook" role="tabpanel" hidden></section>' +
+        '<section class="hub-panel" id="panelPhoto" role="tabpanel" hidden></section>';
 
       /* 반 공지 */
       var pn = $('#panelNotice');
-      pn.innerHTML = noticesHtml(d.notices || []);
+      pn.innerHTML = '<div id="weekPhotos"></div>' + noticesHtml(d.notices || []);
       bindArchive(pn, d.notices || []);
+      /* 첫 화면 맨 위 — 이번 주 필기 ("○월 ○일 수업 필기입니다") */
+      if (global.Photos) { var wk = Photos.thisWeek(); Photos.weekCard($('#weekPhotos'), h.code, wk.from, wk.to); }
 
       /* 내 레포트 */
       var reports = d.reports || [];
@@ -247,16 +251,33 @@
         renderApp(h.code, d.app || {});
       }
 
+      var photoOpened = false;
+      function openPhoto() {
+        if (photoOpened || !global.Photos) return;
+        photoOpened = true;
+        Photos.renderTab($('#panelPhoto'), h.code);
+      }
+
+      /* 탭 수에 맞춰 칸을 나눈다 (교재비 탭은 청구서가 있을 때만) */
+      function layoutTabs() {
+        var n = Array.prototype.filter.call(tabs.querySelectorAll('.hub-tab'), function (b) { return !b.hidden; }).length;
+        tabs.style.gridTemplateColumns = 'repeat(' + n + ', 1fr)';
+        tabs.classList.toggle('hub-tabs--many', n >= 5);
+      }
+      layoutTabs();
+
       function select(which) {
         [['notice', '#tabNotice', '#panelNotice'],
          ['report', '#tabReport', '#panelReport'],
          ['app',    '#tabApp',    '#panelApp'],
+         ['photo',  '#tabPhoto',  '#panelPhoto'],
          ['book',   '#tabBook',   '#panelBook']].forEach(function (t) {
           var on = t[0] === which;
           $(t[1]).setAttribute('aria-selected', on ? 'true' : 'false');
           $(t[2]).hidden = !on;
         });
         if (which === 'app') openApp();
+        if (which === 'photo') openPhoto();
         if (which === 'report') $('#tabReport').classList.remove('has-new');
       }
 
@@ -264,12 +285,15 @@
       $('#tabReport').onclick = function () { select('report'); showReportList(); };
       $('#tabApp').onclick    = function () { select('app'); };
       $('#tabBook').onclick   = function () { select('book'); };
+      $('#tabPhoto').onclick  = function () { select('photo'); };
 
       if (h.view === 'report') {
         select('report');
         if (reports.length) openReport(h.code, reports[0]);
       } else if (h.view === 'app') {
         select('app');
+      } else if (h.view === 'photo') {
+        select('photo');
       } else {
         select('notice');
       }
@@ -280,7 +304,7 @@
         if (!tb || !tb.ok || !(tb.bills || []).length) return;
         renderBook(tb);
         $('#tabBook').hidden = false;
-        tabs.classList.add('hub-tabs--4');
+        layoutTabs();
         if (tb.unpaid_total > 0) $('#tabBook').classList.add('has-new');
         if (h.view === 'book') select('book');
       }).catch(function () {});
@@ -454,6 +478,14 @@
     rpc('hub_report', { p_code: code, p_week: r.week_start }).then(function (data) {
       if (!data) { body.innerHTML = '<div class="empty">이 레포트는 지금 볼 수 없습니다.</div>'; return; }
       ReportView.render(body, data);
+      /* 그 주차(시작일 ~ 종료일) 필기를 레포트 아래에 함께 */
+      if (global.Photos) {
+        var box = document.createElement('div');
+        box.className = 'report-photos';
+        body.appendChild(box);
+        var end = r.week_end || data.endDate || Photos.addDays(r.week_start, 6);
+        Photos.weekCard(box, code, r.week_start, end);
+      }
     }).catch(function () {
       body.innerHTML = '<div class="empty">불러오지 못했습니다. 새로고침해 주세요.</div>';
     });
@@ -632,7 +664,7 @@
       $('#hubName').textContent = d.class_name + ' 반 공지';
       renderDday(d.exam, '');
       $('#hubHead').hidden = false;
-      setTitle(d.class_name + ' 반 공지 · ' + (global.BRAND ? BRAND.brandName : '마라톤국어'));
+      setTitle(global.BRAND ? BRAND.noticeTitle : '마라톤국어 반 공지');
       root.innerHTML = noticesHtml(d.notices || []);
       bindArchive(root, d.notices || []);
     }).catch(function () { stopScreen(root, 'network'); });
