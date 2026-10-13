@@ -70,6 +70,20 @@
 
   function setTitle(t) { document.title = t; }
 
+  /* 주요 시험 D-day — hub_get · class_notice_get 이 돌려준 그 반 시험 하나 (이름 · 날짜).
+     한국 날짜 기준, 자정마다 다시 센다. 지났거나 없으면 줄을 숨긴다. */
+  function renderDday(exam, who) {
+    var el = $('#hubDday');
+    if (!el || !global.DDay) return;
+    function draw() {
+      var text = exam ? DDay.sentence(exam, DDay.today()) : '';
+      el.hidden = !text;
+      el.textContent = text ? (who ? who + ' · ' : '') + text : '';
+    }
+    draw();
+    DDay.everyMidnight(draw);
+  }
+
   /* ============================================================
      반 공지 그리기 (두 화면이 같이 쓴다)
      ============================================================ */
@@ -204,6 +218,7 @@
       var st = d.student || {};
       $('#hubName').textContent = (st.name || '') + ' 학생';
       $('#hubMeta').textContent = [st.class_name, st.school, st.grade].filter(Boolean).join(' · ');
+      renderDday(d.exam, (st.name || '') + ' 학생');
       head.hidden = false;
       tabs.hidden = false;
       setTitle((st.name || '') + ' · ' + (global.BRAND ? BRAND.brandName : '마라톤국어'));
@@ -615,6 +630,7 @@
     rpc('class_notice_get', { p_code: code }).then(function (d) {
       if (!d || !d.ok) { stopScreen(root, 'notfound'); return; }
       $('#hubName').textContent = d.class_name + ' 반 공지';
+      renderDday(d.exam, '');
       $('#hubHead').hidden = false;
       setTitle(d.class_name + ' 반 공지 · ' + (global.BRAND ? BRAND.brandName : '마라톤국어'));
       root.innerHTML = noticesHtml(d.notices || []);

@@ -28,10 +28,32 @@
     parentTitle:  ['학부모호칭', '호칭', '보호자호칭'],
     parentPhone:  ['학부모연락처', '학부모번호', '학부모전화', '보호자연락처', '부모님연락처', '어머님연락처', '학부모'],
     studentPhone: ['학생연락처', '학생번호', '학생전화', '본인연락처'],
-    appCode:      ['앱공유링크', '앱링크', '앱공유코드', '앱코드', '마라톤앱', '공유링크']
+    appCode:      ['앱공유링크', '앱링크', '앱공유코드', '앱코드', '마라톤앱', '공유링크'],
+    startDate:    ['수강시작일', '수강 시작일', '시작일', '등록일', '수강일']
   };
 
-  var TEMPLATE_HEAD = ['이름', '학교', '학년', '반', '학부모호칭', '학부모연락처', '학생연락처', '앱공유링크'];
+  var TEMPLATE_HEAD = ['이름', '학교', '학년', '반', '학부모호칭', '학부모연락처', '학생연락처', '앱공유링크', '수강시작일'];
+
+  /* 2026-03-02 · 2026.3.2 · 2026/3/2 · 3/2/26(엑셀 표시) · 46083(엑셀 날짜 숫자) → 'YYYY-MM-DD'.
+     비었으면 '', 알아볼 수 없으면 null */
+  function parseDate(v) {
+    var t = String(v == null ? '' : v).trim();
+    if (!t) return '';
+    var p = function (n) { return String(n).padStart(2, '0'); };
+    var ok = function (y, m, d) {
+      var dt = new Date(Date.UTC(y, m - 1, d));
+      return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d ? y + '-' + p(m) + '-' + p(d) : null;
+    };
+    var m = /^(\d{4})[-./년\s]+(\d{1,2})[-./월\s]+(\d{1,2})일?$/.exec(t);
+    if (m) return ok(+m[1], +m[2], +m[3]);
+    m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/.exec(t);
+    if (m) return ok(m[3].length === 2 ? 2000 + +m[3] : +m[3], +m[1], +m[2]);
+    if (/^\d{5}$/.test(t)) {
+      var dt = new Date(Date.UTC(1899, 11, 30) + (+t) * 86400000);
+      return ok(dt.getUTCFullYear(), dt.getUTCMonth() + 1, dt.getUTCDate());
+    }
+    return null;
+  }
 
   function norm(h) { return String(h == null ? '' : h).replace(/\s+/g, '').toLowerCase(); }
 
@@ -143,7 +165,7 @@
       byNameClass[s.name + '|' + (s.className || '')] = byNameClass[s.name + '|' + (s.className || '')] || s;
     });
 
-    var out = { adds: [], updates: [], same: 0, errors: [], appCodes: {}, map: map };
+    var out = { adds: [], updates: [], same: 0, errors: [], appCodes: {}, startDates: {}, map: map };
     var seen = {};
 
     rows.slice(headIdx + 1).forEach(function (row, n) {
@@ -160,6 +182,8 @@
       var appRaw = cellOf(row, map, 'appCode');
       var appCode = appRaw ? Store.extractAppCode(appRaw) : '';
       if (appCode === null) { out.errors.push({ line: line, msg: name + ' — 앱 공유 링크를 알아볼 수 없습니다' }); return; }
+      var startDate = parseDate(cellOf(row, map, 'startDate'));
+      if (startDate === null) { out.errors.push({ line: line, msg: name + ' — 수강 시작일을 알아볼 수 없습니다 (예: 2026-03-02)' }); return; }
 
       var vals = {
         name: name,
@@ -193,6 +217,7 @@
         if (hit.archived) { next.archived = false; changes.push({ key: 'archived', from: '퇴원', to: '다님' }); }
         var appChanged = appCode && appCode !== (Store.linkOf(hit.id).appCode || '');
         if (appChanged) out.appCodes[hit.id] = appCode;
+        if (startDate) out.startDates[hit.id] = startDate;
         if (changes.length || appChanged) {
           out.updates.push({ line: line, student: next, changes: changes, app: appChanged });
         } else {
@@ -206,6 +231,7 @@
           archived: false, extra: {}, sortOrder: 0, createdAt: new Date().toISOString()
         };
         if (appCode) out.appCodes[rec.id] = appCode;
+        if (startDate) out.startDates[rec.id] = startDate;
         out.adds.push({ line: line, student: rec });
       }
     });
@@ -231,7 +257,8 @@
       '<span class="imp-pill imp-pill--add">새 학생 ' + plan.adds.length + '명</span>' +
       '<span class="imp-pill imp-pill--upd">고칠 학생 ' + plan.updates.length + '명</span>' +
       '<span class="imp-pill">바뀐 것 없음 ' + plan.same + '명</span>' +
-      (plan.errors.length ? '<span class="imp-pill imp-pill--err">건너뜀 ' + plan.errors.length + '줄</span>' : '');
+      (plan.errors.length ? '<span class="imp-pill imp-pill--err">건너뜀 ' + plan.errors.length + '줄</span>' : '') +
+      (Object.keys(plan.startDates).length ? '<span class="imp-pill">수강 시작일 ' + Object.keys(plan.startDates).length + '명</span>' : '');
     host.appendChild(sum);
 
     function section(title, items, fn) {
@@ -274,7 +301,7 @@
       return e.line + '번째 줄: ' + e.msg;
     });
 
-    $('#btnImportApply').disabled = !(plan.adds.length || plan.updates.length);
+    $('#btnImportApply').disabled = !(plan.adds.length || plan.updates.length || Object.keys(plan.startDates).length);
   }
 
   function showError(msg) {
@@ -331,6 +358,14 @@
         });
       })
       .then(function () {
+        /* 수강 시작일은 상담 카드(student_cards)에 — 그 칸만 고친다 */
+        var rows = Object.keys(p.startDates).map(function (sid) { return { student_id: sid, start_date: p.startDates[sid] }; });
+        if (!rows.length) return null;
+        return SB.client.from('student_cards').upsert(rows, { onConflict: 'student_id' }).then(function (r) {
+          if (r.error) toast('수강 시작일은 저장하지 못했습니다 (SQL 004 를 먼저 실행하세요) — ' + r.error.message, 'warn');
+        });
+      })
+      .then(function () {
         if (!issue) return 0;
         var ids = p.adds.map(function (a) { return a.student.id; })
           .filter(function (id) { return !Store.linkOf(id).hubCode; });
@@ -357,7 +392,7 @@
   function downloadTemplate() {
     var rows = [
       TEMPLATE_HEAD,
-      ['김하늘', 'OO고', '고1', '목동1', '어머님', '010-1234-5678', '010-9876-5432', 'https://marathonstudy.com/share/report/코드']
+      ['김하늘', 'OO고', '고1', '목동1', '어머님', '010-1234-5678', '010-9876-5432', 'https://marathonstudy.com/share/report/코드', '2026-03-02']
     ];
     var csv = rows.map(function (r) {
       return r.map(function (c) { return /[",\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c; }).join(',');

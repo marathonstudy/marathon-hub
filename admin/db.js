@@ -330,6 +330,19 @@
     }).then(check).then(function (r) { return r.data; });
   }
 
+  /* 성적 칸 — 바뀐 칸만 (SQL grade_patch). base 와 서버 값이 다르면 conflicts 로 돌려준다 */
+  function gradePatch(studentId, kind, level, term, set, base, force) {
+    return sb().rpc('grade_patch', {
+      p_student: studentId, p_kind: kind, p_level: level, p_term: term,
+      p_set: set, p_base: base || {}, p_force: !!force
+    }).then(check).then(function (r) { return r.data; });
+  }
+
+  /* 내 이름 · 역할 (teacher 만 숨긴 기록 보기 · 되살리기). 004 를 아직 안 돌렸으면 null */
+  function myStaff() {
+    return sb().rpc('my_staff').then(function (r) { return r.error ? null : r.data; });
+  }
+
   /* 상용구 — 하나씩 넣고 하나씩 지운다 */
   function insertSnippet(sn, order) {
     return sb().from('snippets').insert({ id: sn.id, text: sn.text, sort_order: order || 0 }).select('*').then(check)
@@ -566,6 +579,8 @@
     deleteFieldRow: deleteFieldRow,
     saveClassInfoRow: saveClassInfoRow,
     entryPatch: entryPatch,
+    gradePatch: gradePatch,
+    myStaff: myStaff,
     commonPatch: commonPatch,
     insertSnippet: insertSnippet,
     deleteSnippet: deleteSnippet,

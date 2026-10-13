@@ -234,7 +234,8 @@
       return '<td class="roster__extra"><span class="roster__extraval"></span></td>';
     }).join('');
     return '' +
-      '<td data-label="이름"><span class="roster__name"></span></td>' +
+      '<td data-label="이름"><button type="button" class="roster__name roster__name-btn" data-act="card" title="상담 카드 열기"></button>' +
+        '<span class="note-badge" hidden></span></td>' +
       '<td data-label="학교"></td>' +
       '<td data-label="학년"></td>' +
       '<td data-label="연락처"><span class="phone-lines"></span></td>' +
@@ -253,6 +254,11 @@
     tr.classList.toggle('is-archived', !!s.archived);
     var tds = tr.children;
     tds[0].querySelector('.roster__name').textContent = s.name || '';
+    var nf = window.Card ? Card.followCount(s.id) : 0;
+    var nb = tds[0].querySelector('.note-badge');
+    nb.hidden = !nf;
+    nb.textContent = '확인 ' + nf;
+    nb.title = '다음 상담 때 확인할 기록 ' + nf + '개';
     tds[1].textContent = s.school || '-';
     tds[2].textContent = s.grade || '-';
 
@@ -460,6 +466,7 @@
     if (!s) return;
 
     if (btn.dataset.act === 'edit') openStudentModal(s);
+    if (btn.dataset.act === 'card' && window.Card) Card.open(s.id);
 
     if (btn.dataset.act === 'copylink') {
       copyText(Store.hubUrl(Store.linkOf(s.id).hubCode))
@@ -714,8 +721,8 @@
     /* 교재 지급·청구 기록이 있는 학생은 지우지 않는다 (기록이 학생에 묶여 있다) */
     DB.lockedStudentIds().then(function (locked) {
       if (locked.indexOf(s.id) !== -1) {
-        showStudentError('교재 지급·청구 기록이 있는 학생이라 지울 수 없습니다. 퇴원 처리하세요 — ' +
-                         '[퇴원]에 체크하고 저장하면 개인 링크는 막히고 교재 기록은 그대로 남습니다.');
+        showStudentError('교재·상담·성적 기록이 있는 학생이라 지울 수 없습니다. 퇴원 처리하세요 — ' +
+                         '[퇴원]에 체크하고 저장하면 개인 링크는 막히고 기록은 그대로 남습니다.');
         return false;
       }
       return confirmAsk('학생 삭제',
@@ -1296,6 +1303,7 @@
     confirmAsk: confirmAsk,
     conflictAsk: conflictAsk,
     guardedSave: guardedSave,
+    staleCheck: staleCheck,
     isBusy: isBusy,
     copyText: copyText,
     selectTab: selectTab,

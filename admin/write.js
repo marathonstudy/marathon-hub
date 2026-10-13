@@ -896,6 +896,7 @@
   var previewTimer = null;
 
   function selectStudent(id, keepScroll) {
+    if (selectedId !== id) window.dispatchEvent(new CustomEvent('jt:student-selected', { detail: { id: id } }));
     selectedId = id;
     $$('.entry', $('#entryList')).forEach(function (c) {
       c.classList.toggle('is-selected', c.dataset.id === id);
@@ -1408,6 +1409,8 @@
       if (first) selectedId = first.id;
     }
     schedulePreview();
+    /* 오른쪽 '최근 상담·관찰 기록' 상자도 지금 고른 학생으로 (card.js) */
+    if (selectedId) window.dispatchEvent(new CustomEvent('jt:student-selected', { detail: { id: selectedId } }));
   }
 
   /* 작성 탭이 열릴 때마다 최신 명단으로 다시 그린다 */

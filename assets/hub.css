@@ -489,3 +489,14 @@
 @media print {
   .hub-tabs, .hub-back, .hub-actions { display: none !important; }
 }
+
+/* ---------- 주요 시험 D-day ---------- */
+.hub-head__dday {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 14px;
+  font-weight: 800;
+  background: rgba(255, 255, 255, .2);
+  padding: 5px 12px;
+  border-radius: 999px;
+}

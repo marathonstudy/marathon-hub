@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" as="style" crossorigin
       href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
-<link rel="stylesheet" href="style.css?v=20261013b">
+<link rel="stylesheet" href="style.css?v=20261013c">
 </head>
 <body class="is-locked">
 
@@ -87,6 +87,16 @@
 </header>
 
 <main class="wrap" id="appRoot" hidden>
+
+  <!-- 주요 시험 D-day — 맨 위 -->
+  <section class="dday" id="ddayBar" aria-label="주요 시험">
+    <div class="dday__text">
+      <div class="dday__hello">안녕하세요 마라톤 국어팀!</div>
+      <div class="dday__main" id="ddayMain" hidden></div>
+      <div class="dday__next" id="ddayNext" hidden></div>
+    </div>
+    <button class="btn btn--sm" id="btnExams" type="button">시험 관리</button>
+  </section>
 
   <div class="notice notice--warn" id="publicPcNotice" hidden>
     <span class="notice__icon" aria-hidden="true">⚠️</span>
@@ -314,6 +324,16 @@
           <div class="queue-bar__info" id="queueInfo"></div>
           <button class="btn btn--primary" id="btnEnqueue" type="button">③ 공개 탭으로</button>
         </div>
+      </div>
+
+      <div class="panel" id="notesSidePanel">
+        <div class="panel__head">
+          <h2 class="panel__title" id="notesSideWho">상담·관찰 기록</h2>
+          <div class="spacer"></div>
+          <button class="btn btn--sm" id="btnNotesSideAdd" type="button">기록 추가</button>
+          <button class="btn btn--sm" id="btnNotesSideCard" type="button">상담 카드 열기</button>
+        </div>
+        <div id="notesSide"><p class="panel__hint">학생 카드를 누르면 그 학생의 확인 필요 기록과 최근 기록 5개가 보입니다.</p></div>
       </div>
 
       <div class="panel" id="previewPanel">
@@ -925,7 +945,7 @@
       <div class="notice notice--info" style="margin-top:0">
         <span class="notice__icon" aria-hidden="true">📄</span>
         <div class="notice__body">
-          열 이름: <b>이름</b>(필수) · 학교 · 학년 · 반 · 학부모호칭 · 학부모연락처 · 학생연락처 · 앱공유링크<br>
+          열 이름: <b>이름</b>(필수) · 학교 · 학년 · 반 · 학부모호칭 · 학부모연락처 · 학생연락처 · 앱공유링크 · 수강시작일(선택, 예: 2026-03-02)<br>
           <b>같은 학생 판단</b> — 이름 + 학부모 연락처가 같으면 기존 학생을 고칩니다(반을 옮겨도 새로 생기지 않습니다).
           학부모 연락처가 비어 있으면 이름 + 반으로 찾습니다. 빈 칸은 기존 값을 지우지 않습니다.
           <div style="margin-top:8px">
@@ -1368,6 +1388,49 @@
   </form>
 </dialog>
 
+<!-- 학생 상담 카드 (card.js) -->
+<dialog class="modal modal--card" id="cardModal">
+  <div class="modal__head cd-head">
+    <div class="cd-head__text">
+      <h2 class="modal__title" id="cardTitle">상담 카드</h2>
+      <p class="modal__desc" id="cardDesc"></p>
+    </div>
+    <button class="btn btn--sm" type="button" id="btnCardClose">닫기</button>
+  </div>
+  <div class="modal__body cd-body" id="cardBody"></div>
+</dialog>
+
+<!-- 주요 시험 (exams.js) -->
+<dialog class="modal modal--wide" id="examModal">
+  <form method="dialog" id="examForm">
+    <div class="modal__head">
+      <h2 class="modal__title">주요 시험</h2>
+      <p class="modal__desc">학생·학부모 개인 페이지와 반 공지 페이지 위에 그 반 기준 D-day 가 보입니다. 지난 시험은 저절로 숨겨집니다</p>
+    </div>
+    <div class="modal__body">
+      <div class="sub__head"><span class="sub__title">시험 목록</span><button class="btn btn--sm" type="button" id="btnExamAdd">+ 시험 추가</button></div>
+      <div id="exList"></div>
+
+      <div class="extra-head" style="margin-top:16px"><span class="extra-head__title">전체 기본</span></div>
+      <div class="toolbar" id="exMode">
+        <label class="chk-inline"><input type="radio" name="exMode" value="auto"> 가장 가까운 시험 자동</label>
+        <label class="chk-inline"><input type="radio" name="exMode" value="fixed"> 특정 시험 고정</label>
+        <select class="select" id="exFixed" aria-label="고정할 시험"></select>
+      </div>
+      <p class="field__hint">고정한 시험이 지나면 다음으로 가까운 시험으로 저절로 넘어갑니다.</p>
+
+      <div class="extra-head" style="margin-top:16px"><span class="extra-head__title">반별로 띄울 시험</span></div>
+      <div class="ex-classes" id="exByClass"></div>
+      <div class="modal__error" id="exError"></div>
+    </div>
+    <div class="modal__foot">
+      <div class="spacer"></div>
+      <button class="btn" type="button" id="btnExamCancel">취소</button>
+      <button class="btn btn--primary" type="submit">저장</button>
+    </div>
+  </form>
+</dialog>
+
 <!-- 동시 수정 -->
 <dialog class="modal" id="conflictModal">
   <form method="dialog">
@@ -1394,24 +1457,27 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
 <!-- config.js 와 brand.js 가 먼저 와야 한다. 나머지가 이 값을 읽는다. -->
-<script src="../assets/config.js?v=20261013b"></script>
-<script src="../assets/brand.js?v=20261013b"></script>
-<script src="supabase.js?v=20261013b"></script>
-<script src="db.js?v=20261013b"></script>
-<script src="store.js?v=20261013b"></script>
-<script src="report.js?v=20261013b"></script>
-<script src="app.js?v=20261013b"></script>
-<script src="import.js?v=20261013b"></script>
-<script src="write.js?v=20261013b"></script>
-<script src="publish.js?v=20261013b"></script>
-<script src="send.js?v=20261013b"></script>
-<script src="notice.js?v=20261013b"></script>
-<script src="tb.js?v=20261013b"></script>
-<script src="tb-dash.js?v=20261013b"></script>
-<script src="tb-issue.js?v=20261013b"></script>
-<script src="tb-stock.js?v=20261013b"></script>
-<script src="tb-bill.js?v=20261013b"></script>
-<script src="sync.js?v=20261013b"></script>
-<script src="auth.js?v=20261013b"></script>
+<script src="../assets/config.js?v=20261013c"></script>
+<script src="../assets/brand.js?v=20261013c"></script>
+<script src="supabase.js?v=20261013c"></script>
+<script src="db.js?v=20261013c"></script>
+<script src="store.js?v=20261013c"></script>
+<script src="report.js?v=20261013c"></script>
+<script src="app.js?v=20261013c"></script>
+<script src="import.js?v=20261013c"></script>
+<script src="write.js?v=20261013c"></script>
+<script src="publish.js?v=20261013c"></script>
+<script src="send.js?v=20261013c"></script>
+<script src="notice.js?v=20261013c"></script>
+<script src="tb.js?v=20261013c"></script>
+<script src="tb-dash.js?v=20261013c"></script>
+<script src="tb-issue.js?v=20261013c"></script>
+<script src="tb-stock.js?v=20261013c"></script>
+<script src="tb-bill.js?v=20261013c"></script>
+<script src="../assets/dday.js?v=20261013c"></script>
+<script src="card.js?v=20261013c"></script>
+<script src="exams.js?v=20261013c"></script>
+<script src="sync.js?v=20261013c"></script>
+<script src="auth.js?v=20261013c"></script>
 </body>
 </html>
