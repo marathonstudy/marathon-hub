@@ -238,7 +238,7 @@
     host.textContent = '';
 
     if (!classes.length) {
-      host.innerHTML = '<p class="panel__hint">명단에 반이 지정된 학생이 없습니다. ① 명단 탭에서 반을 넣어 주세요.</p>';
+      host.innerHTML = '<p class="panel__hint">아직 반이 없습니다. ① 명단 → 학생 추가 → 반 고르기의 [+ 새 반 만들기]로 만들 수 있습니다.</p>';
       currentClass = '';
       return;
     }

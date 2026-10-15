@@ -2091,3 +2091,11 @@ dialog.modal.modal--card {
 .sa-code__val { font-size: 16px; font-weight: 800; letter-spacing: .08em; padding: 3px 10px; border-radius: 8px; background: #fff; border: 1px solid var(--line); }
 .sa-code .toolbar .input { flex: 1 1 200px; }
 .sa-email { font-size: 12.5px; color: var(--ink-mid); word-break: break-all; }
+
+/* ============================================================
+   학생 창 — 반 고르기의 [+ 새 반 만들기] · 「오늘」의 학생 0명 반
+   ============================================================ */
+.cls-new { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
+.cls-new .input { flex: 1 1 auto; min-width: 0; }
+.td-card--empty { opacity: .75; }
+.td-card--empty .td-card__head { cursor: default; }

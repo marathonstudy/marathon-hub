@@ -146,6 +146,10 @@
       if (!(k in idx)) { idx[k] = classes.length; classes.push({ name: k, academy: s.academy, rows: [] }); }
       classes[idx[k]].rows.push(s);
     });
+    /* 학생이 아직 0명인 반도 보인다 (반 목록은 Store.getClasses() 하나) */
+    Store.getClasses().forEach(function (c) {
+      if (!(c.name in idx)) { idx[c.name] = classes.length; classes.push({ name: c.name, academy: '', rows: [] }); }
+    });
     classes.sort(function (a, b) {
       return (a.academy || '힣').localeCompare(b.academy || '힣', 'ko') || a.name.localeCompare(b.name, 'ko');
     });
@@ -192,6 +196,12 @@
       '<div class="td-classes">' + classes.map(function (c) {
         var rows = c.rows;
         var n = rows.length;
+        if (!n) {
+          return '<div class="td-card td-card--empty" data-cls="' + esc(c.name) + '"><div class="td-card__head">' +
+            '<span class="td-card__name">' + esc(c.name) + '</span><span class="spacer"></span>' +
+            '<span class="td-card__count">0명</span></div>' +
+            '<div class="td-card__body"><div class="td-line muted-note">아직 학생이 없습니다. ① 명단 → 학생 추가에서 이 반을 고르세요.</div></div></div>';
+        }
         var cnt = { attend: 0, late: 0, absent: 0 };
         rows.forEach(function (s) {
           if (s.attend === 'attend') cnt.attend++;
@@ -308,5 +318,7 @@
   }
   window.addEventListener('jt:remote', function (e) { if (TABLES[(e.detail && e.detail.table) || '']) remote(); });
   window.addEventListener('jt:refreshed', function (e) { if (!(e.detail && e.detail.local)) remote(); });
+  /* 반이 새로 생기면 (학생 0명 반 카드) 바로 다시 그린다 */
+  window.addEventListener('jt:roster-changed', function () { if (st.data && !$('#appRoot').hidden) render(); });
 
 })();

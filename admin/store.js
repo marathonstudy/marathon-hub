@@ -30,6 +30,7 @@
     settings:  P + 'settings',   /* 이 기기만의 화면 설정 — 이것만 브라우저에 남는다 */
     fieldDefs: P + 'fielddefs',
     classInfo: P + 'classinfo',
+    classes:   P + 'classes',    /* 반 목록 (classes 표 · migration-009). 표가 없으면 null */
     weekEnds:  P + 'weekends'
   };
 
@@ -756,15 +757,46 @@
     });
   }
 
-  /* 반 목록 — 다니는 학생 기준. 퇴원생만 남은 반은 나오지 않는다. */
+  /* 반 목록 — 모든 화면이 이것 하나를 쓴다.
+     classes 표(반 기준 · 학생 0명인 반 포함) + 다니는 학생의 반. count = 다니는 학생 수.
+     퇴원생만 남은 반은 classes 표에 없으면 나오지 않는다. */
+  var localClasses = [];   /* classes 표가 아직 없을 때 이 창에서 만든 반 (학생을 저장하면 학생의 반으로 남는다) */
   function getClasses() {
     var seen = {};
+    (read(KEYS.classes, null) || []).concat(localClasses).forEach(function (n) { seen[n] = 0; });
     activeStudents().forEach(function (s) {
       var c = (s.className || '').trim();
       if (c) seen[c] = (seen[c] || 0) + 1;
     });
     return Object.keys(seen).sort(function (a, b) { return a.localeCompare(b, 'ko'); })
       .map(function (name) { return { name: name, count: seen[name] }; });
+  }
+
+  /* 비교용 — 띄어쓰기 · 끝의 '반' · 대소문자를 뺀 이름 (SQL 의 '비슷한_이름' 과 같은 규칙) */
+  function classKey(n) { return String(n || '').replace(/\s+/g, '').replace(/반$/, '').toLowerCase(); }
+
+  /* 이름이 비슷한 다른 반 — 합치지 않고 알려 주기만 한다 */
+  function similarClasses(name) {
+    var k = classKey(name);
+    return getClasses().map(function (c) { return c.name; })
+      .filter(function (n) { return n !== name && classKey(n) === k; });
+  }
+
+  /* 새 반 만들기 — 서버의 classes 표에 한 줄. 이미 있으면 그대로 둔다. */
+  function addClass(name) {
+    name = String(name || '').trim();
+    if (!name) return Promise.reject(new Error('반 이름을 적어 주세요'));
+    return track('classes-add', global.DB.addClassRow(name)).then(function (r) {
+      if (r.missing) {
+        if (localClasses.indexOf(name) === -1) localClasses.push(name);
+      } else {
+        var list = (read(KEYS.classes, null) || []).slice();
+        if (list.indexOf(name) === -1) list.push(name);
+        writeLocal(KEYS.classes, list);
+      }
+      emit('jt:roster-changed');
+      return name;
+    });
   }
 
   /* ---------- 내가 만든 칸 ---------- */
@@ -1092,6 +1124,7 @@
       writeLocal(KEYS.snippets, d.snippets);
       writeLocal(KEYS.fieldDefs, d.fieldDefs);
       writeLocal(KEYS.classInfo, d.classInfo);
+      writeLocal(KEYS.classes, d.classes);
       writeLocal(KEYS.sent, d.sent);
       writeLocal(KEYS.published, d.published);
       writeLocal(KEYS.weekEnds, d.weekEnds);
@@ -1154,6 +1187,7 @@
       if (!syncTimers[KEYS.students]) mergeRows(KEYS.students, 'students', d.students, sigStudent);
       if (!syncTimers[KEYS.fieldDefs]) mergeRows(KEYS.fieldDefs, 'fields', d.fieldDefs, sigField);
       writeLocal(KEYS.links, d.links);
+      writeLocal(KEYS.classes, d.classes);
       writeLocal(KEYS.sent, d.sent);
       writeLocal(KEYS.published, d.published);
       writeLocal(KEYS.weekEnds, d.weekEnds);
@@ -1213,6 +1247,7 @@
   function clearAll() {
     Object.keys(KEYS).forEach(function (k) { remove(KEYS[k]); });
     mem = {};
+    localClasses = [];
     base = { students: {}, fields: {}, classInfo: {}, snippets: {}, week: null };
   }
 
@@ -1246,6 +1281,8 @@
     upsertStudent: upsertStudent,
     deleteStudent: deleteStudent,
     getClasses: getClasses,
+    similarClasses: similarClasses,
+    addClass: addClass,
 
     phoneDigits: phoneDigits,
     phoneFormat: phoneFormat,

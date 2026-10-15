@@ -204,6 +204,19 @@
     return updateIf('class_info', { class_name: name }, { extra: extra || {}, updated_at: new Date().toISOString() }, base);
   }
 
+  /* ---------- 반 목록 (classes · migration-009) ---------- */
+
+  /* 새 반 하나. 그새 다른 분이 같은 이름으로 만들었으면 그대로 성공으로 본다.
+     { ok } / { missing: true } (표가 아직 없음) */
+  function addClassRow(name) {
+    return sb().from('classes').insert({ name: name }).then(function (r) {
+      if (!r.error) return { ok: true };
+      if (r.error.code === '23505' || /duplicate/i.test(r.error.message)) return { ok: true };
+      if (r.error.code === '42P01' || /does not exist|schema cache|Could not find/i.test(r.error.message)) return { missing: true };
+      throw new Error(r.error.message);
+    });
+  }
+
   /* ---------- 주간 입력 ---------- */
 
   function fromDbEntry(r) {
@@ -243,7 +256,11 @@
       c.from('sent').select('*'),
       c.from('week_meta').select('*'),
       /* 마지막으로 손댄 주차. 로그인하면 이 주차를 연다. */
-      c.from('entries').select('week_start,updated_at').order('updated_at', { ascending: false }).limit(1)
+      c.from('entries').select('week_start,updated_at').order('updated_at', { ascending: false }).limit(1),
+      /* 반 기준 표 (migration-009). 아직 없으면 null — 예전처럼 학생의 반으로만 목록을 만든다 */
+      c.from('classes').select('name,created_at').order('name').then(function (r) {
+        return r.error ? { data: null } : r;
+      })
     ]).then(function (res) {
       res.forEach(function (r) {
         if (r.error) throw new Error('불러오기 실패: ' + r.error.message);
@@ -280,7 +297,8 @@
         published: published,
         sent: sent,
         weekEnds: weekEnds,
-        latestWeek: (res[8].data[0] && res[8].data[0].week_start) || ''
+        latestWeek: (res[8].data[0] && res[8].data[0].week_start) || '',
+        classes: res[9].data ? res[9].data.map(function (r) { return r.name; }) : null
       };
     });
   }
@@ -564,6 +582,7 @@
 
   global.DB = {
     loadAll: loadAll,
+    addClassRow: addClassRow,
     loadWeek: loadWeek,
     updateIf: updateIf,
     currentAt: currentAt,

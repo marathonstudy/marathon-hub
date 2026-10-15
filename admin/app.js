@@ -441,15 +441,94 @@
       sel.appendChild(o);
     });
     sel.value = classes.some(function (c) { return c.name === keep; }) ? keep : '';
+  }
 
-    var dl = $('#classOptions');
-    dl.textContent = '';
-    classes.forEach(function (c) {
+  /* ---------- 학생 창의 반 고르기 — 목록 + 맨 아래 [+ 새 반 만들기] ---------- */
+
+  var NEW_CLASS = '__new__';
+  var classConfirm = '';   /* 비슷한 이름 경고를 본 뒤 한 번 더 누르면 만든다 */
+
+  function fillStudentClass(value, keepUnknown) {
+    var sel = $('#fClass');
+    var classes = Store.getClasses();
+    sel.textContent = '';
+    function add(v, t) {
       var o = document.createElement('option');
-      o.value = c.name;
-      dl.appendChild(o);
+      o.value = v; o.textContent = t;
+      sel.appendChild(o);
+      return o;
+    }
+    add('', '반 없음');
+    classes.forEach(function (c) { add(c.name, c.name + ' (' + c.count + '명)'); });
+    var known = !value || classes.some(function (c) { return c.name === value; });
+    if (!known && keepUnknown) add(value, value);
+    add(NEW_CLASS, '+ 새 반 만들기');
+    sel.value = known || keepUnknown ? value : '';
+    sel.dataset.prev = sel.value;
+    showNewClass(false);
+  }
+
+  function classHint(msg, bad) {
+    var h = $('#fClassHint');
+    h.hidden = !msg;
+    h.textContent = msg || '';
+    h.classList.toggle('tb-warn', !!bad);
+  }
+
+  function showNewClass(on) {
+    $('#fClassNew').hidden = !on;
+    classConfirm = '';
+    classHint(on ? '만들면 이 학생의 반으로 바로 골라지고, 모든 탭의 반 목록에 나옵니다.' : '');
+    if (on) { $('#fClassNewName').value = ''; setTimeout(function () { $('#fClassNewName').focus(); }, 0); }
+  }
+
+  $('#fClass').addEventListener('change', function () {
+    var sel = $('#fClass');
+    if (sel.value === NEW_CLASS) { showNewClass(true); return; }
+    sel.dataset.prev = sel.value;
+    showNewClass(false);
+  });
+
+  $('#btnClassNewCancel').addEventListener('click', function () {
+    var sel = $('#fClass');
+    sel.value = sel.dataset.prev || '';
+    showNewClass(false);
+  });
+
+  function createClass() {
+    var name = $('#fClassNewName').value.replace(/\s+/g, ' ').trim();
+    if (!name) { classHint('새 반 이름을 적어 주세요.', true); return; }
+    if (name.length > 30) { classHint('반 이름은 30자까지 적을 수 있습니다.', true); return; }
+    var same = Store.getClasses().some(function (c) { return c.name === name; });
+    if (same) {
+      fillStudentClass(name);
+      toast('이미 있는 반이라 그 반으로 골랐습니다');
+      return;
+    }
+    var like = Store.similarClasses(name);
+    if (like.length && classConfirm !== name) {
+      classConfirm = name;
+      classHint('이름이 비슷한 반이 있습니다: ' + like.join(', ') + '. 같은 반이면 목록에서 고르세요. ' +
+                '다른 반이 맞으면 [만들기]를 한 번 더 누르세요.', true);
+      return;
+    }
+    var btn = $('#btnClassNewOk');
+    btn.disabled = true;
+    Store.addClass(name).then(function () {
+      btn.disabled = false;
+      fillStudentClass(name, true);
+      toast('새 반 ‘' + name + '’을 만들었습니다', 'good');
+    }).catch(function (e) {
+      btn.disabled = false;
+      classHint('반을 만들지 못했습니다 — ' + e.message, true);
     });
   }
+
+  $('#btnClassNewOk').addEventListener('click', createClass);
+  $('#fClassNewName').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); createClass(); }
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); $('#btnClassNewCancel').click(); }
+  });
 
   rosterList.addEventListener('click', function (e) {
     var btn = e.target.closest('[data-act]');
@@ -665,7 +744,7 @@
     $('#fName').value   = s ? (s.name || '') : '';
     $('#fSchool').value = s ? (s.school || '') : (settings.lastSchool || '');
     $('#fGrade').value  = s ? (s.grade || '') : (settings.lastGrade || '');
-    $('#fClass').value  = s ? (s.className || '') : (settings.lastClass || '');
+    fillStudentClass(s ? (s.className || '') : (settings.lastClass || ''), !!s);
     $('#fParentTitle').value = s ? (s.parentTitle || '') : (settings.lastParentTitle || '');
     $('#fPhone').value  = s && s.parentPhone ? Store.phoneFormat(s.parentPhone) : '';
     $('#fPhone2').value = s && s.studentPhone ? Store.phoneFormat(s.studentPhone) : '';
@@ -760,6 +839,7 @@
     var appCode = Store.extractAppCode($('#fAppCode').value);
 
     if (!name) { showStudentError('이름을 입력해 주세요.'); return; }
+    if ($('#fClass').value === NEW_CLASS) { showStudentError('새 반 이름을 적고 [만들기]를 누르거나, 목록에서 반을 골라 주세요.'); return; }
     if (!Store.phoneValid(phone))  { showStudentError('학부모 연락처의 자릿수를 확인해 주세요.'); return; }
     if (!Store.phoneValid(phone2)) { showStudentError('학생 연락처의 자릿수를 확인해 주세요.'); return; }
     if (appCode === null) {
@@ -850,7 +930,7 @@
     host.textContent = '';
 
     if (!classes.length) {
-      host.innerHTML = '<div class="empty-state">아직 반이 없습니다.<br>학생을 추가하면서 반 이름을 적으면 여기에 나옵니다.</div>';
+      host.innerHTML = '<div class="empty-state">아직 반이 없습니다.<br>학생 추가 창의 반 고르기에서 <b>+ 새 반 만들기</b>로 만들 수 있습니다.</div>';
       return;
     }
     if (!classFields.length) {

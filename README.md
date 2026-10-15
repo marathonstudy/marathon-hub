@@ -57,6 +57,8 @@ supabase/
   functions/note-photo/index.ts   필기 사진 올리기·보기·지우기 Edge Function (개인 링크 코드 확인)
   migration-007-dashboard.sql     「오늘」 총괄 — 계산 함수 coach_today() 하나 + 설정 보호 (새 표 없음)
   migration-008-staff-join.sql    조교 직접 가입(팀 가입 코드) · 직원 관리(사용 중지 · 역할)
+  migration-009-classes.sql       반 목록 한 곳(classes 표) — 학생 0명인 반도 모든 탭에 보이게
+  check-classes.sql               반 이름 점검 (읽기 전용 — 어느 표에 어떤 반이 있는지 · 비슷한 이름)
   functions/app-report/index.ts  앱 과제 기록을 대신 받아 오는 Edge Function
 ```
 
@@ -139,6 +141,12 @@ delete from public.staff where email = '조교이메일@example.com';
 결제선생은 지금 수납 방법 값으로만 쓴다. 나중에 파트너 API 계약을 하면 콜백용 Edge Function 이
 `tb_bills.provider_ref` 로 청구서를 찾아 `status='paid'`, `pay_method='payssam'`, `paid_at`, `provider_raw` 를
 채우게 붙이면 된다(칸은 이미 만들어 두었다).
+
+### 5-6. 반 목록 (migration-009)
+1. SQL Editor → **New query** → `supabase/migration-009-classes.sql` 전체 → **Run**
+2. 결과 표에 지금 쓰는 반이 모두 나오면 끝. **비슷한_이름** 칸에 값이 있으면 이름만 다른 같은 반일 수 있다
+   (합치지 않는다. 필요하면 학생 [수정]에서 반을 하나로 골라 옮긴다)
+3. 언제든 `supabase/check-classes.sql` 을 실행하면 반마다 어느 표에 몇 줄 있는지 볼 수 있다 (아무것도 바꾸지 않는다)
 
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
@@ -233,6 +241,10 @@ delete from public.staff where email = '조교이메일@example.com';
 
 ## 자주 하는 일
 
+- **새 반 만들기**: ① 명단 → [학생 추가] (또는 학생 [수정]) → **반** 고르기 맨 아래 **+ 새 반 만들기** → 이름 적고 [만들기].
+  학생이 아직 0명이어도 명단 · 작성 · 반 공지 · 시험 · 교재 · 필기 노트 · 「오늘」 반 목록에 바로 나온다.
+  이름이 비슷한 반(예: 목동반 · 목동 반)이 있으면 한 번 알려 준다 — 같은 반이면 목록에서 고르고, 다른 반이면 [만들기]를 한 번 더.
+  반을 지우거나 이름을 바꾸는 버튼은 없다 (기록을 지키기 위해서)
 - **앱 공유 코드 갱신(월마다)**: ① 명단 → 학생 [수정] → 마라톤 앱 공유 링크 칸에 새 링크 붙여 넣기 → 저장
 - **퇴원**: 학생 [수정] → [퇴원] 체크. 개인 링크가 바로 막힌다. 다시 다니면 체크를 풀면 된다
 - **링크가 새어 나갔을 때**: 학생 [수정] → [재발급]. 예전 링크는 바로 막힌다

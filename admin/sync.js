@@ -16,7 +16,7 @@
   var TABLES = [
     'students', 'student_links', 'entries', 'week_common', 'class_notices', 'published', 'sent',
     'tb_issues', 'tb_bills', 'tb_bill_notices', 'tb_refunds', 'tb_class_dates', 'tb_stock_moves', 'tb_orders',
-    'student_cards', 'student_grades', 'student_notes', 'note_photos'
+    'student_cards', 'student_grades', 'student_notes', 'note_photos', 'classes'
   ];
   var POLL_MS = 30000;
   var THROTTLE_MS = 3000;
@@ -58,7 +58,7 @@
       if (Store.mergeRemoteCommon(row)) emit('jt:draft-remote', { common: [row.class_name] });
       return;
     }
-    if (t === 'students' || t === 'student_links' || t === 'published' || t === 'sent') {
+    if (t === 'students' || t === 'student_links' || t === 'published' || t === 'sent' || t === 'classes') {
       debounce('core', 700, function () { refresh(true); });
       return;
     }
