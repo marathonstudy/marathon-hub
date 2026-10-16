@@ -150,6 +150,8 @@
     Store.getClasses().forEach(function (c) {
       if (!(c.name in idx)) { idx[c.name] = classes.length; classes.push({ name: c.name, academy: '', rows: [] }); }
     });
+    /* 보관한 반은 카드만 숨긴다 — 그 반 학생은 위 '챙겨야 할 학생' 에 그대로 나온다 */
+    classes = classes.filter(function (c) { return !Store.isArchivedClass(c.name); });
     classes.sort(function (a, b) {
       return (a.academy || '힣').localeCompare(b.academy || '힣', 'ko') || a.name.localeCompare(b.name, 'ko');
     });

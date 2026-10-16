@@ -62,7 +62,7 @@
   function classNames() {
     var set = {};
     Store.getClasses().forEach(function (c) { set[c.name] = true; });
-    Object.keys(draft.byClass).forEach(function (n) { set[n] = true; });
+    Object.keys(draft.byClass).forEach(function (n) { if (!Store.isArchivedClass(n)) set[n] = true; });
     return Object.keys(set).sort(function (a, b) { return a.localeCompare(b, 'ko'); });
   }
 

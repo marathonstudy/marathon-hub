@@ -362,6 +362,13 @@
                        '<span class="class-head__count">' + g.rows.length + '명</span>' +
                        '<span class="class-head__caret" aria-hidden="true">▾</span>';
       head.querySelector('.class-head__name').textContent = g.name;
+      if (g.name !== ARCHIVE_GROUP && Store.isArchivedClass(g.name)) {
+        var tag = document.createElement('span');
+        tag.className = 'class-head__tag';
+        tag.textContent = '보관됨';
+        tag.title = '반 관리에서 보관한 반 — 작성 · 「오늘」 등 반 목록에는 나오지 않습니다';
+        head.querySelector('.class-head__name').after(tag);
+      }
       wrap.appendChild(head);
 
       var table = document.createElement('table');
@@ -440,7 +447,19 @@
       o.textContent = c.name + ' (' + c.count + ')';
       sel.appendChild(o);
     });
-    sel.value = classes.some(function (c) { return c.name === keep; }) ? keep : '';
+    /* 보관한 반이라도 재원생이 남아 있으면 명단에서는 걸러 볼 수 있게 */
+    var off = {};
+    Store.activeStudents().forEach(function (s) {
+      var n = (s.className || '').trim();
+      if (n && Store.isArchivedClass(n)) off[n] = (off[n] || 0) + 1;
+    });
+    Object.keys(off).sort(function (a, b) { return a.localeCompare(b, 'ko'); }).forEach(function (n) {
+      var o = document.createElement('option');
+      o.value = n;
+      o.textContent = n + ' (' + off[n] + ') · 보관됨';
+      sel.appendChild(o);
+    });
+    sel.value = Array.prototype.some.call(sel.options, function (o) { return o.value === keep; }) ? keep : '';
   }
 
   /* ---------- 학생 창의 반 고르기 — 목록 + 맨 아래 [+ 새 반 만들기] ---------- */
@@ -461,7 +480,7 @@
     add('', '반 없음');
     classes.forEach(function (c) { add(c.name, c.name + ' (' + c.count + '명)'); });
     var known = !value || classes.some(function (c) { return c.name === value; });
-    if (!known && keepUnknown) add(value, value);
+    if (!known && keepUnknown) add(value, value + (Store.isArchivedClass(value) ? ' (보관됨)' : ''));
     add(NEW_CLASS, '+ 새 반 만들기');
     sel.value = known || keepUnknown ? value : '';
     sel.dataset.prev = sel.value;
@@ -499,6 +518,10 @@
     var name = $('#fClassNewName').value.replace(/\s+/g, ' ').trim();
     if (!name) { classHint('새 반 이름을 적어 주세요.', true); return; }
     if (name.length > 30) { classHint('반 이름은 30자까지 적을 수 있습니다.', true); return; }
+    if (Store.isArchivedClass(name)) {
+      classHint('‘' + name + '’ 은 보관된 반입니다. 선생님이 ① 명단 → [반 관리] → 보관된 반 보기에서 되살릴 수 있습니다.', true);
+      return;
+    }
     var same = Store.getClasses().some(function (c) { return c.name === name; });
     if (same) {
       fillStudentClass(name);

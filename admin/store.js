@@ -31,6 +31,7 @@
     fieldDefs: P + 'fielddefs',
     classInfo: P + 'classinfo',
     classes:   P + 'classes',    /* 반 목록 (classes 표 · migration-009). 표가 없으면 null */
+    classesOff: P + 'classesoff', /* 보관한 반 (migration-010) */
     weekEnds:  P + 'weekends'
   };
 
@@ -759,7 +760,8 @@
 
   /* 반 목록 — 모든 화면이 이것 하나를 쓴다.
      classes 표(반 기준 · 학생 0명인 반 포함) + 다니는 학생의 반. count = 다니는 학생 수.
-     퇴원생만 남은 반은 classes 표에 없으면 나오지 않는다. */
+     퇴원생만 남은 반은 classes 표에 없으면 나오지 않는다.
+     보관한 반(반 관리)은 재원생이 있어도 나오지 않는다 — 학생은 명단 · 「오늘」 챙길 학생에 그대로 남는다. */
   var localClasses = [];   /* classes 표가 아직 없을 때 이 창에서 만든 반 (학생을 저장하면 학생의 반으로 남는다) */
   function getClasses() {
     var seen = {};
@@ -768,9 +770,14 @@
       var c = (s.className || '').trim();
       if (c) seen[c] = (seen[c] || 0) + 1;
     });
-    return Object.keys(seen).sort(function (a, b) { return a.localeCompare(b, 'ko'); })
+    return Object.keys(seen).filter(function (n) { return !isArchivedClass(n); })
+      .sort(function (a, b) { return a.localeCompare(b, 'ko'); })
       .map(function (name) { return { name: name, count: seen[name] }; });
   }
+
+  /* 보관한 반 이름들 (migration-010) */
+  function archivedClasses() { return (read(KEYS.classesOff, null) || []).slice(); }
+  function isArchivedClass(n) { return archivedClasses().indexOf(String(n || '').trim()) !== -1; }
 
   /* 비교용 — 띄어쓰기 · 끝의 '반' · 대소문자를 뺀 이름 (SQL 의 '비슷한_이름' 과 같은 규칙) */
   function classKey(n) { return String(n || '').replace(/\s+/g, '').replace(/반$/, '').toLowerCase(); }
@@ -778,7 +785,7 @@
   /* 이름이 비슷한 다른 반 — 합치지 않고 알려 주기만 한다 */
   function similarClasses(name) {
     var k = classKey(name);
-    return getClasses().map(function (c) { return c.name; })
+    return getClasses().map(function (c) { return c.name; }).concat(archivedClasses())
       .filter(function (n) { return n !== name && classKey(n) === k; });
   }
 
@@ -1125,6 +1132,7 @@
       writeLocal(KEYS.fieldDefs, d.fieldDefs);
       writeLocal(KEYS.classInfo, d.classInfo);
       writeLocal(KEYS.classes, d.classes);
+      writeLocal(KEYS.classesOff, d.classesOff);
       writeLocal(KEYS.sent, d.sent);
       writeLocal(KEYS.published, d.published);
       writeLocal(KEYS.weekEnds, d.weekEnds);
@@ -1188,6 +1196,7 @@
       if (!syncTimers[KEYS.fieldDefs]) mergeRows(KEYS.fieldDefs, 'fields', d.fieldDefs, sigField);
       writeLocal(KEYS.links, d.links);
       writeLocal(KEYS.classes, d.classes);
+      writeLocal(KEYS.classesOff, d.classesOff);
       writeLocal(KEYS.sent, d.sent);
       writeLocal(KEYS.published, d.published);
       writeLocal(KEYS.weekEnds, d.weekEnds);
@@ -1282,6 +1291,8 @@
     deleteStudent: deleteStudent,
     getClasses: getClasses,
     similarClasses: similarClasses,
+    archivedClasses: archivedClasses,
+    isArchivedClass: isArchivedClass,
     addClass: addClass,
 
     phoneDigits: phoneDigits,

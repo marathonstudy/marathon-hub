@@ -2099,3 +2099,12 @@ dialog.modal.modal--card {
 .cls-new .input { flex: 1 1 auto; min-width: 0; }
 .td-card--empty { opacity: .75; }
 .td-card--empty .td-card__head { cursor: default; }
+
+/* ============================================================
+   반 관리 (classes.js) · 명단의 '보관됨' 표시
+   ============================================================ */
+.class-head__tag { font-size: 11.5px; font-weight: 700; color: var(--ink-mid); background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; margin-left: 6px; }
+.ca-rename { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.ca-rename .input { flex: 1 1 160px; min-width: 0; }
+.ca-like { display: inline-block; font-size: 11.5px; font-weight: 700; color: #9A6A12; background: #FFF4DC; border-radius: 999px; padding: 1px 8px; }
+.ca-log { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.8; color: var(--ink-deep); }

@@ -258,7 +258,7 @@
       /* 마지막으로 손댄 주차. 로그인하면 이 주차를 연다. */
       c.from('entries').select('week_start,updated_at').order('updated_at', { ascending: false }).limit(1),
       /* 반 기준 표 (migration-009). 아직 없으면 null — 예전처럼 학생의 반으로만 목록을 만든다 */
-      c.from('classes').select('name,created_at').order('name').then(function (r) {
+      c.from('classes').select('*').order('name').then(function (r) {
         return r.error ? { data: null } : r;
       })
     ]).then(function (res) {
@@ -298,7 +298,9 @@
         sent: sent,
         weekEnds: weekEnds,
         latestWeek: (res[8].data[0] && res[8].data[0].week_start) || '',
-        classes: res[9].data ? res[9].data.map(function (r) { return r.name; }) : null
+        classes: res[9].data ? res[9].data.filter(function (r) { return !r.archived; }).map(function (r) { return r.name; }) : null,
+        /* 보관한 반 (migration-010) — 모든 반 목록에서 숨긴다 */
+        classesOff: res[9].data ? res[9].data.filter(function (r) { return r.archived; }).map(function (r) { return r.name; }) : []
       };
     });
   }

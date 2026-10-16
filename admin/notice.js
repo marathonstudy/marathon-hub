@@ -63,7 +63,9 @@
   function allClasses() {
     var names = Store.getClasses().map(function (c) { return c.name; });
     /* 지금은 학생이 없어도 예전에 공지를 올린 반은 고를 수 있게 둔다 */
-    state.notices.forEach(function (n) { if (names.indexOf(n.className) === -1) names.push(n.className); });
+    state.notices.forEach(function (n) {
+      if (names.indexOf(n.className) === -1 && !Store.isArchivedClass(n.className)) names.push(n.className);
+    });
     return names.sort(function (a, b) { return a.localeCompare(b, 'ko'); });
   }
 

@@ -168,7 +168,8 @@
     Object.keys(state.classBooks).concat(Object.keys(state.classAcademy)).forEach(function (n) {
       if (!(n in seen)) seen[n] = 0;
     });
-    return Object.keys(seen).sort(function (a, b) { return a.localeCompare(b, 'ko'); })
+    return Object.keys(seen).filter(function (n) { return !Store.isArchivedClass(n); })
+      .sort(function (a, b) { return a.localeCompare(b, 'ko'); })
       .map(function (n) { return { name: n, count: seen[n] }; });
   }
 

@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" as="style" crossorigin
       href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
-<link rel="stylesheet" href="style.css?v=20261015a">
+<link rel="stylesheet" href="style.css?v=20261015b">
 </head>
 <body class="is-locked">
 
@@ -205,6 +205,7 @@
         <div class="spacer"></div>
         <button class="btn" id="btnImport" type="button">엑셀·CSV로 넣기</button>
         <button class="btn" id="btnManageFields" type="button">학생 칸 관리</button>
+        <button class="btn" id="btnClassAdmin" type="button" hidden>반 관리</button>
         <button class="btn btn--primary" id="btnAddStudent" type="button">+ 학생 추가</button>
       </div>
 
@@ -1513,6 +1514,22 @@
   <div class="modal__body cd-body" id="cardBody"></div>
 </dialog>
 
+<!-- 반 관리 (classes.js) — 선생님만 -->
+<dialog class="modal modal--wide" id="classAdminModal">
+  <div class="modal__head">
+    <h2 class="modal__title">반 관리</h2>
+    <p class="modal__desc">이름 바꾸기 · 보관 · 삭제 — 선생님만 할 수 있습니다. 이름을 바꾸면 그 반의 학생 · 레포트 · 반 현황 · 공용 링크 · 반 공지 · 시험 · 교재 · 필기 기록이 모두 새 이름을 따라갑니다.</p>
+  </div>
+  <div class="modal__body" id="caBody">
+    <p class="panel__hint">불러오는 중…</p>
+  </div>
+  <div class="modal__foot">
+    <label class="chk-inline"><input type="checkbox" id="caShowArchived"> 보관된 반 보기</label>
+    <div class="spacer"></div>
+    <button class="btn" type="button" id="btnClassAdminClose">닫기</button>
+  </div>
+</dialog>
+
 <!-- 주요 시험 (exams.js) -->
 <dialog class="modal modal--wide" id="examModal">
   <form method="dialog" id="examForm">
@@ -1613,30 +1630,31 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
 <!-- config.js 와 brand.js 가 먼저 와야 한다. 나머지가 이 값을 읽는다. -->
-<script src="../assets/config.js?v=20261015a"></script>
-<script src="../assets/brand.js?v=20261015a"></script>
-<script src="supabase.js?v=20261015a"></script>
-<script src="db.js?v=20261015a"></script>
-<script src="store.js?v=20261015a"></script>
-<script src="report.js?v=20261015a"></script>
-<script src="app.js?v=20261015a"></script>
-<script src="import.js?v=20261015a"></script>
-<script src="write.js?v=20261015a"></script>
-<script src="publish.js?v=20261015a"></script>
-<script src="send.js?v=20261015a"></script>
-<script src="notice.js?v=20261015a"></script>
-<script src="tb.js?v=20261015a"></script>
-<script src="tb-dash.js?v=20261015a"></script>
-<script src="tb-issue.js?v=20261015a"></script>
-<script src="tb-stock.js?v=20261015a"></script>
-<script src="tb-bill.js?v=20261015a"></script>
-<script src="../assets/dday.js?v=20261015a"></script>
-<script src="card.js?v=20261015a"></script>
-<script src="exams.js?v=20261015a"></script>
-<script src="photo.js?v=20261015a"></script>
-<script src="today.js?v=20261015a"></script>
-<script src="staff.js?v=20261015a"></script>
-<script src="sync.js?v=20261015a"></script>
-<script src="auth.js?v=20261015a"></script>
+<script src="../assets/config.js?v=20261015b"></script>
+<script src="../assets/brand.js?v=20261015b"></script>
+<script src="supabase.js?v=20261015b"></script>
+<script src="db.js?v=20261015b"></script>
+<script src="store.js?v=20261015b"></script>
+<script src="report.js?v=20261015b"></script>
+<script src="app.js?v=20261015b"></script>
+<script src="import.js?v=20261015b"></script>
+<script src="write.js?v=20261015b"></script>
+<script src="publish.js?v=20261015b"></script>
+<script src="send.js?v=20261015b"></script>
+<script src="notice.js?v=20261015b"></script>
+<script src="tb.js?v=20261015b"></script>
+<script src="tb-dash.js?v=20261015b"></script>
+<script src="tb-issue.js?v=20261015b"></script>
+<script src="tb-stock.js?v=20261015b"></script>
+<script src="tb-bill.js?v=20261015b"></script>
+<script src="../assets/dday.js?v=20261015b"></script>
+<script src="card.js?v=20261015b"></script>
+<script src="exams.js?v=20261015b"></script>
+<script src="photo.js?v=20261015b"></script>
+<script src="today.js?v=20261015b"></script>
+<script src="staff.js?v=20261015b"></script>
+<script src="classes.js?v=20261015b"></script>
+<script src="sync.js?v=20261015b"></script>
+<script src="auth.js?v=20261015b"></script>
 </body>
 </html>
