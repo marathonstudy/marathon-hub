@@ -66,6 +66,18 @@ body {
   box-shadow: 0 10px 30px rgba(54, 64, 127, .30);
 }
 .header-emoji { font-size: 38px; line-height: 1.1; margin-bottom: 8px; }
+/* 로고 — 보라 바탕 위에서도 잘 보이게 흰 둥근 판 위에 (assets/brand.js 의 logo) */
+.header-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border-radius: 18px;
+  padding: 8px 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 4px 14px rgba(32, 20, 96, .18);
+}
+.header-logo img { display: block; width: 84px; height: auto; }
 .header-title {
   font-size: 22px;
   font-weight: 900;

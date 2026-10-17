@@ -27,7 +27,11 @@
       })
       .filter(Boolean);
 
-    return {
+    /* 수업일 · 과제 기간 (반 수업 요일을 정했을 때만 · migration-011). 예전 레포트에는 없다 */
+    var lesson = (global.Store && global.Store.lessonOf && global.Lesson)
+      ? global.Lesson.reportFields(global.Store.lessonOf(student.className || '', week.start)) : {};
+
+    return Object.assign({
       school: student.school || '',
       grade: student.grade || '',
       studentName: student.name || '',
@@ -45,7 +49,7 @@
       requiredRate: rateOf(common, entry.homework, 'required'),
       optionalRate: rateOf(common, entry.homework, 'optional'),
       comment: commentFor(common, entry)
-    };
+    }, lesson);
   }
 
   /* 학생 코멘트에 글이 있으면 그것, 비어 있으면 반 공통 코멘트 */

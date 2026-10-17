@@ -240,6 +240,15 @@
     };
   }
 
+  function schedOf(rows) {
+    var out = {};
+    rows.forEach(function (r) {
+      if (r.lesson_dow === null || r.lesson_dow === undefined) return;
+      out[r.name] = { dow: r.lesson_dow, extra: r.extra_dows || [], first: r.first_lesson || '' };
+    });
+    return out;
+  }
+
   /* ============================================================
      전체 읽기 — 로그인 직후 한 번
      ============================================================ */
@@ -260,6 +269,10 @@
       /* 반 기준 표 (migration-009). 아직 없으면 null — 예전처럼 학생의 반으로만 목록을 만든다 */
       c.from('classes').select('*').order('name').then(function (r) {
         return r.error ? { data: null } : r;
+      }),
+      /* 그 주만 바꾼 수업일 · 휴강 (migration-011). 아직 없으면 빈 목록 */
+      c.from('class_weeks').select('*').then(function (r) {
+        return r.error ? { data: [] } : r;
       })
     ]).then(function (res) {
       res.forEach(function (r) {
@@ -300,7 +313,10 @@
         latestWeek: (res[8].data[0] && res[8].data[0].week_start) || '',
         classes: res[9].data ? res[9].data.filter(function (r) { return !r.archived; }).map(function (r) { return r.name; }) : null,
         /* 보관한 반 (migration-010) — 모든 반 목록에서 숨긴다 */
-        classesOff: res[9].data ? res[9].data.filter(function (r) { return r.archived; }).map(function (r) { return r.name; }) : []
+        classesOff: res[9].data ? res[9].data.filter(function (r) { return r.archived; }).map(function (r) { return r.name; }) : [],
+        /* 수업 요일 · 첫 수업일 (migration-011) — { 반: {dow, extra, first} } */
+        classSched: schedOf(res[9].data || []),
+        classWeeks: res[10].data || []
       };
     });
   }

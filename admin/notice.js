@@ -183,8 +183,12 @@
   function fillForm(src, opts) {
     opts = opts || {};
     TEXT_FIELDS.forEach(function (f) { $(f[1]).value = (src && src[f[0]]) || ''; });
-    state.files = ((src && src.materials) || []).map(function (m) { return { name: m.name || '', url: m.url || '' }; });
-    state.videos = ((src && src.videos) || []).map(function (v) { return { title: v.title || '', url: v.url || '' }; });
+    state.files = ((!opts.noLinks && src && src.materials) || []).map(function (m) { return { name: m.name || '', url: m.url || '' }; });
+    state.videos = ((!opts.noLinks && src && src.videos) || []).map(function (v) { return { title: v.title || '', url: v.url || '' }; });
+    /* 예전 「자료 · 다시보기」 링크 칸 — 이미 링크를 넣어 올린 공지를 고칠 때만 보인다.
+       새 공지의 영상 · 자료 파일은 ② 작성 → 반 공통 (weekly.js) */
+    $('#ntFileSub').hidden = !state.files.length;
+    $('#ntVideoSub').hidden = !state.videos.length;
     $('#ntVisible').checked = !src || src.visible !== false;
     $('#ntWeek').value = opts.week || defaultWeek();
     state.classes = {};
@@ -235,7 +239,7 @@
     var rows = state.notices.filter(function (n) { return n.bundleId === bundleId; });
     if (!rows.length) return;
     setModeNew();
-    fillForm(rows[0], { week: defaultWeek(), classes: rows.map(function (r) { return r.className; }) });
+    fillForm(rows[0], { week: defaultWeek(), classes: rows.map(function (r) { return r.className; }), noLinks: true });
     $('#ntWeek').focus();
     $('#noticeFormPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
     toast('내용을 불러왔습니다. 주차를 확인하고 올려 주세요');

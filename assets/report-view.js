@@ -15,6 +15,8 @@
      homework {h1: {"월":true, …}}
      requiredRate · optionalRate (-1 이면 그 묶음 없음)
      comment
+     lessonDate · lessonDays[] · hwFrom · hwTo  (반 수업 요일을 정한 뒤 공개한 레포트만 · migration-011)
+       있으면 머리에 "수업일 10/15(목) · 과제 기간 10/8~10/14", 없으면(예전 레포트) 예전처럼 기간
    ============================================================ */
 
 (function (global) {
@@ -53,6 +55,21 @@
     return m ? Number(m[2]) + '/' + Number(m[3]) : '';
   }
 
+  var DOW = ['일', '월', '화', '수', '목', '금', '토'];
+  function dowDate(d) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d || '').trim());
+    if (!m) return '';
+    return Number(m[2]) + '/' + Number(m[3]) + '(' + DOW[new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getUTCDay()] + ')';
+  }
+
+  /* "수업일 10/15(목) · 과제 기간 10/8~10/14" — 수업일이 없는 예전 레포트는 '' */
+  function lessonLine(d) {
+    if (!d || !shortDate(d.lessonDate)) return '';
+    var days = (d.lessonDays && d.lessonDays.length ? d.lessonDays : [d.lessonDate]).map(dowDate).filter(Boolean);
+    return '수업일 ' + days.join(' · ') +
+      (shortDate(d.hwFrom) && shortDate(d.hwTo) ? ' · 과제 기간 ' + shortDate(d.hwFrom) + '~' + shortDate(d.hwTo) : '');
+  }
+
   function shortPeriod(start, end) {
     var s = shortDate(start), e = shortDate(end);
     if (s && e) return s + '~' + e;
@@ -77,13 +94,20 @@
 
   /* ---------- 헤더 · 학생 정보 ---------- */
 
+  /* 머리의 로고 (assets/brand.js 의 logo). 브랜드 파일이 없으면 예전 책 그림 */
+  function logoHtml() {
+    var url = B().logoUrl;
+    if (!url) return '<div class="header-emoji">📘</div>';
+    return '<div class="header-logo"><img src="' + esc(url) + '" alt="' + esc(B().reportBrand) + '" width="105" height="60"></div>';
+  }
+
   function headerHtml(d) {
-    var period = formatPeriod(d.startDate, d.endDate);
+    var line = lessonLine(d) || formatPeriod(d.startDate, d.endDate);
     return '' +
       '<div class="header">' +
-        '<div class="header-emoji">📘</div>' +
+        logoHtml() +
         '<div class="header-title">' + esc(B().reportBrand) + '<br>주간 학습 레포트</div>' +
-        (period ? '<div class="header-period num">📅 ' + esc(period) + '</div>' : '') +
+        (line ? '<div class="header-period num">📅 ' + esc(line) + '</div>' : '') +
       '</div>';
   }
 
@@ -336,6 +360,8 @@
     esc: esc,
     shortPeriod: shortPeriod,
     shortDate: shortDate,
+    dowDate: dowDate,
+    lessonLine: lessonLine,
     formatPeriod: formatPeriod,
     DAYS: DAYS
   };

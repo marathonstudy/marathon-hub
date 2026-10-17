@@ -2108,3 +2108,58 @@ dialog.modal.modal--card {
 .ca-rename .input { flex: 1 1 160px; min-width: 0; }
 .ca-like { display: inline-block; font-size: 11.5px; font-weight: 700; color: #9A6A12; background: #FFF4DC; border-radius: 999px; padding: 1px 8px; }
 .ca-log { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.8; color: var(--ink-deep); }
+
+/* ============================================================
+   ② 작성 반 공통 — 수업일 · 수업 영상 · 자료 파일 (weekly.js · migration-011)
+   ============================================================ */
+.wk-line { margin: 4px 0 0; font-size: 14px; font-weight: 700; color: var(--ink-deep); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.wk-line--none { font-weight: 500; color: var(--ink-light); font-size: 13px; }
+.wk-line--off { color: var(--danger); }
+.wk-tag { display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--indigo); background: #F0ECFD; border-radius: 999px; padding: 2px 8px; }
+.wk-edit { margin-top: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); display: grid; gap: 10px; }
+.wk-edit__btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.wk-dows { display: flex; flex-wrap: wrap; gap: 4px 12px; padding-top: 4px; }
+.wk-ovdate { max-width: 200px; }
+
+.wk-video { border: 1px solid var(--line-soft); border-radius: 12px; padding: 8px; margin-bottom: 8px; background: var(--surface); }
+.wk-btns { margin-left: auto; display: flex; gap: 6px; }
+.wk-btns .btn { margin-left: 0; }
+.wk-video__row { display: grid; grid-template-columns: 92px minmax(0, 1fr) minmax(0, 1.4fr) 76px 34px; gap: 6px; align-items: center; }
+.wk-who { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); }
+.wk-who__list { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; }
+.wk-err { font-size: 12.5px; color: var(--danger); margin-top: 4px; }
+.wk-err:empty { display: none; }
+.wk-done { font-size: 13px; color: var(--ok); font-weight: 600; margin: 8px 0; }
+.wk-warn { font-size: 12.5px; color: var(--danger); font-weight: 600; margin: 8px 0 0; }
+.wk-usage { margin-bottom: 10px; }
+
+.wk-drop { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 18px 12px; border: 2px dashed #CFC6F5; border-radius: 14px;
+  background: #FBFAFF; color: var(--ink-mid); text-align: center; cursor: pointer; transition: background .15s, border-color .15s; }
+.wk-drop:hover, .wk-drop.is-over { background: #F0ECFD; border-color: var(--indigo); }
+.wk-drop__icon { font-size: 22px; }
+.wk-drop__text { font-size: 14px; font-weight: 600; }
+.wk-drop__hint { font-size: 12px; color: var(--ink-light); }
+
+.wk-file { display: grid; grid-template-columns: 52px minmax(0, 1fr) 112px 56px 48px 48px; gap: 4px 6px; align-items: center;
+  padding: 6px 8px; border-radius: 10px; border: 1px solid var(--line-soft); margin-top: 6px; background: var(--surface); }
+.wk-file.is-fresh { border-color: #CFC6F5; background: #FBFAFF; }
+.wk-file__ext { font-size: 11px; font-weight: 800; color: var(--ink-mid); background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; text-align: center; padding: 3px 0; }
+.wk-file__size { font-size: 12px; color: var(--ink-light); text-align: right; }
+.wk-kind--required { color: #B2455F; font-weight: 700; }
+.wk-kind--optional { color: #3C7FA6; font-weight: 700; }
+.wk-file .wk-tag { grid-column: 2 / -1; grid-row: 2; justify-self: start; white-space: nowrap; }
+
+.wk-clean { display: grid; gap: 6px; margin-top: 10px; }
+.wk-clean__row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; font-size: 14px; }
+.wk-cleanlog { margin-top: 14px; }
+.wk-cleanlog summary { cursor: pointer; font-size: 13px; color: var(--ink-mid); }
+.nt-legacy-note { margin: 12px 0 4px; }
+
+@media (max-width: 720px) {
+  .wk-video__row { grid-template-columns: 92px minmax(0, 1fr) 76px 34px; }
+  .wk-video__url { grid-column: 1 / -1; grid-row: 2; }
+  .wk-file { grid-template-columns: 44px minmax(0, 1fr) 48px 48px; }
+  .wk-file__kind { grid-column: 2; grid-row: 2; }
+  .wk-file__size { grid-column: 1; grid-row: 2; }
+  .wk-file .wk-tag { grid-row: 3; }
+}

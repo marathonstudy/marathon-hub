@@ -30,6 +30,17 @@
   opacity: .92;
   letter-spacing: .02em;
 }
+/* 로고 + 이름 — 보라 바탕 위에서 보이게 흰 판 위에 (assets/brand.js 의 logo) */
+.hub-head__id { display: inline-flex; align-items: center; gap: 8px; }
+.hub-head__logo {
+  display: block;
+  height: 30px;
+  width: auto;
+  background: #fff;
+  border-radius: 10px;
+  padding: 4px 8px;
+  box-sizing: content-box;
+}
 .hub-head__brand {
   display: inline-block;
   font-size: 12.5px;
@@ -210,6 +221,36 @@
   padding-left: 2px;
 }
 .nt-video__title { flex: 1 1 auto; min-width: 0; line-height: 1.5; }
+
+/* ---------- 이번 주 수업 — 수업일 · 영상 · 자료 (migration-011) ---------- */
+.nt-lesson {
+  margin: 2px 0 10px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: var(--grad-soft);
+  color: var(--ink-deep);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.5;
+}
+.nt-lesson--off { color: #B2455F; }
+.wk-card .nt-lesson { margin-top: 0; }
+button.nt-file {
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+}
+.nt-file.is-busy { opacity: .55; }
+.wk-file__meta { display: inline-block; font-size: 12px; font-weight: 600; color: var(--ink-light); }
+.wk-part {
+  display: block;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--ink-mid);
+  margin-bottom: 1px;
+}
+.wk-part--makeup { color: #3F9C7F; }
 
 .nt-archive { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .nt-rows, .nt-files, .nt-videos { grid-template-columns: minmax(0, 1fr); }

@@ -32,6 +32,8 @@
     classInfo: P + 'classinfo',
     classes:   P + 'classes',    /* 반 목록 (classes 표 · migration-009). 표가 없으면 null */
     classesOff: P + 'classesoff', /* 보관한 반 (migration-010) */
+    classSched: P + 'classsched', /* 수업 요일 · 첫 수업일 (migration-011) */
+    classWeeks: P + 'classweeks', /* 그 주만 바꾼 수업일 · 휴강 (migration-011) */
     weekEnds:  P + 'weekends'
   };
 
@@ -1032,12 +1034,10 @@
     return x;
   }
 
-  var DEFAULT_SPAN = 5;
+  /* 주차 = 시작일 ~ 시작일+6일 (수업일 기준 한 주). 종료일은 손으로 바꿀 수 있다. */
+  var DEFAULT_SPAN = 7;
 
-  function weekSpan() {
-    var n = Number(read(KEYS.settings, {}).weekSpan);
-    return (n >= 1 && n <= 31) ? Math.round(n) : DEFAULT_SPAN;
-  }
+  function weekSpan() { return DEFAULT_SPAN; }
 
   function setWeekSpan(days) {
     var n = Math.round(Number(days) || 0);
@@ -1055,7 +1055,7 @@
     return toISO(d);
   }
 
-  /* 시작일만 고른 상태에서 자동으로 채울 종료일 — 지난번과 같은 기간 길이.
+  /* 시작일만 고른 상태에서 자동으로 채울 종료일 — 시작일 + 6일.
      어떤 요일로 시작해도 종료일이 시작일보다 빠를 수 없다. */
   function autoEnd(startISO, span) {
     var e = endFromSpan(startISO, span || weekSpan());
@@ -1093,6 +1093,60 @@
     var m = read(KEYS.weekEnds, {}) || {};
     m[weekStart] = weekEnd;
     writeLocal(KEYS.weekEnds, m);
+  }
+
+  /* ---------- 수업일 (migration-011 · 계산은 assets/lesson.js) ---------- */
+
+  /* 그 반의 일정 { dow, extra, first, weeks:{주차: {lesson_date, canceled, note}} } — 요일을 안 정했으면 null */
+  function schedOf(cls) {
+    cls = String(cls || '').trim();
+    var s = (read(KEYS.classSched, {}) || {})[cls];
+    if (!s) return null;
+    var weeks = {};
+    (read(KEYS.classWeeks, []) || []).forEach(function (w) { if (w.class_name === cls) weeks[w.week_start] = w; });
+    return { dow: s.dow, extra: s.extra || [], first: s.first || '', weeks: weeks };
+  }
+
+  function lessonOf(cls, weekStart) {
+    if (!global.Lesson) return null;
+    var s = schedOf(cls);
+    return s ? global.Lesson.of(s, weekStart) : null;
+  }
+
+  function classWeekOf(cls, weekStart) {
+    return (read(KEYS.classWeeks, []) || []).find(function (w) { return w.class_name === cls && w.week_start === weekStart; }) || null;
+  }
+
+  /* 수업 요일 정하기 — 서버 함수(class_schedule_set)가 저장한다 */
+  function setSchedule(cls, dow, extra, first) {
+    return track('class-schedule', global.SB.client.rpc('class_schedule_set', {
+      p_name: cls, p_dow: dow, p_extra: extra || [], p_first: first || null
+    })).then(function (r) {
+      if (r.error) throw new Error(/Could not find the function|schema cache/i.test(r.error.message)
+        ? 'migration-011 SQL 을 먼저 실행해 주세요.' : r.error.message);
+      var m = Object.assign({}, read(KEYS.classSched, {}) || {});
+      if (dow === null || dow === undefined) delete m[cls];
+      else m[cls] = { dow: dow, extra: (r.data && r.data.extra_dows) || extra || [], first: first || '' };
+      writeLocal(KEYS.classSched, m);
+      emit('jt:schedule-changed', { cls: cls });
+    });
+  }
+
+  /* 그 주만 수업일 바꾸기 / 휴강 — row 가 null 이면 원래대로 */
+  function setClassWeek(cls, weekStart, row) {
+    var c = global.SB.client;
+    var p = row
+      ? c.from('class_weeks').upsert({ class_name: cls, week_start: weekStart, lesson_date: row.canceled ? null : row.lesson_date,
+                                       canceled: !!row.canceled, note: row.note || '' }).select()
+      : c.from('class_weeks').delete().eq('class_name', cls).eq('week_start', weekStart);
+    return track('class-week', p).then(function (r) {
+      if (r.error) throw new Error(/does not exist|schema cache/i.test(r.error.message)
+        ? 'migration-011 SQL 을 먼저 실행해 주세요.' : r.error.message);
+      var list = (read(KEYS.classWeeks, []) || []).filter(function (w) { return !(w.class_name === cls && w.week_start === weekStart); });
+      if (row) list.push((r.data && r.data[0]) || { class_name: cls, week_start: weekStart, lesson_date: row.lesson_date || null, canceled: !!row.canceled, note: row.note || '' });
+      writeLocal(KEYS.classWeeks, list);
+      emit('jt:schedule-changed', { cls: cls });
+    });
   }
 
   /* ---------- 상용구 ---------- */
@@ -1133,6 +1187,8 @@
       writeLocal(KEYS.classInfo, d.classInfo);
       writeLocal(KEYS.classes, d.classes);
       writeLocal(KEYS.classesOff, d.classesOff);
+      writeLocal(KEYS.classSched, d.classSched || {});
+      writeLocal(KEYS.classWeeks, d.classWeeks || []);
       writeLocal(KEYS.sent, d.sent);
       writeLocal(KEYS.published, d.published);
       writeLocal(KEYS.weekEnds, d.weekEnds);
@@ -1197,6 +1253,8 @@
       writeLocal(KEYS.links, d.links);
       writeLocal(KEYS.classes, d.classes);
       writeLocal(KEYS.classesOff, d.classesOff);
+      writeLocal(KEYS.classSched, d.classSched || {});
+      writeLocal(KEYS.classWeeks, d.classWeeks || []);
       writeLocal(KEYS.sent, d.sent);
       writeLocal(KEYS.published, d.published);
       writeLocal(KEYS.weekEnds, d.weekEnds);
@@ -1290,6 +1348,11 @@
     upsertStudent: upsertStudent,
     deleteStudent: deleteStudent,
     getClasses: getClasses,
+    schedOf: schedOf,
+    lessonOf: lessonOf,
+    classWeekOf: classWeekOf,
+    setSchedule: setSchedule,
+    setClassWeek: setClassWeek,
     similarClasses: similarClasses,
     archivedClasses: archivedClasses,
     isArchivedClass: isArchivedClass,

@@ -8,6 +8,7 @@
      /me/#개인링크코드/book     → 교재비 탭 (hub_textbook — 그 학생 청구서만)
      /me/#개인링크코드/photo    → 필기 노트 탭 (Edge Function note-photo — 그 학생 사진만)
      /notice/#반코드            → class_notice_get
+     자료 파일 내려받기          → Edge Function(class-file) — 링크 코드 · 파일의 반을 확인하고 2분짜리 주소
 
    # 뒤의 값은 서버 로그에도, 다른 사이트로 넘어가는 주소(referrer)에도
    남지 않는다. 그래서 코드를 ?code= 가 아니라 # 뒤에 둔다.
@@ -151,6 +152,7 @@
         '<h2 class="card-title">📢 ' + esc(weekLabel(latest)) + ' 공지' +
           '<span class="card-note">최신</span></h2>' +
         (String(latest.title || '').trim() ? '<p class="nt-title">' + esc(latest.title) + '</p>' : '') +
+        lessonLineHtml(latest.week_start) +
         noticeBodyHtml(latest) +
       '</div>';
 
@@ -172,14 +174,171 @@
   function bindArchive(root, list) {
     root.addEventListener('toggle', function (e) {
       var d = e.target;
-      if (!d.classList || !d.classList.contains('nt-past') || !d.open) return;
+      if (!d.classList || !d.classList.contains('nt-past') || d.classList.contains('wk-past') || !d.open) return;
       var body = d.querySelector('.nt-past__body');
       if (body && !body.dataset.done) {
-        body.innerHTML = noticeBodyHtml(list[+d.dataset.i]);
+        body.innerHTML = lessonLineHtml(list[+d.dataset.i].week_start) + noticeBodyHtml(list[+d.dataset.i]);
         body.dataset.done = '1';
       }
     }, true);
   }
+
+  /* ============================================================
+     이번 주 수업 — 수업일 · 과제 기간 · 수업 영상 · 배부 자료/과제 파일 (migration-011)
+     hub_get · class_notice_get 의 weekly 만 쓴다. 파일 보관 위치는 받지 않는다.
+     ============================================================ */
+
+  var WEEKLY = null;
+  var KIND_ROWS = [['material', '📄 배부 자료'], ['required', '✏️ 필수 과제'], ['optional', '➕ 선택 과제']];
+  var PART_NAME = { '1': '1차시', '2': '2차시', makeup: '보강' };
+  var EXT_ICON = { pdf: '📕', hwp: '📘', hwpx: '📘', doc: '📘', docx: '📘', ppt: '📙', pptx: '📙', xlsx: '📗', jpg: '🖼️', jpeg: '🖼️', png: '🖼️' };
+
+  function plusDays(iso, n) {
+    var d = new Date(iso + 'T00:00:00Z');
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  }
+
+  function lessonOf(weekStart) {
+    if (!WEEKLY || !WEEKLY.schedule || !global.Lesson || !weekStart) return null;
+    return Lesson.of(WEEKLY.schedule, String(weekStart).slice(0, 10));
+  }
+
+  /* 공지 · 자료 카드 위의 "수업일 10/15(목) · 과제 기간 10/8~10/14" */
+  function lessonLineHtml(weekStart) {
+    var L = lessonOf(weekStart);
+    if (!L) return '';
+    return '<p class="nt-lesson' + (L.canceled ? ' nt-lesson--off' : '') + '">' + (L.canceled ? '🔕 ' : '🗓️ ') + esc(Lesson.line(L)) + '</p>';
+  }
+
+  /* 레포트 목록 — 수업일이 있는 레포트는 "10/15(목) 수업", 예전 레포트는 기간 */
+  function reportLabel(r) {
+    if (r.lesson_date && ReportView.dowDate) return ReportView.dowDate(r.lesson_date) + ' 수업';
+    return ReportView.shortPeriod(r.week_start, r.week_end) || ReportView.shortDate(r.week_start);
+  }
+
+  function weekName(weekStart) {
+    var L = lessonOf(weekStart);
+    if (L && L.date) return Lesson.md(L.date) + ' 수업';
+    return ReportView.shortPeriod(weekStart, plusDays(weekStart, 6));
+  }
+
+  function sizeText(b) {
+    b = Number(b) || 0;
+    return b >= 1048576 ? (b / 1048576).toFixed(1) + 'MB' : Math.max(1, Math.round(b / 1024)) + 'KB';
+  }
+
+  function weekBodyHtml(w) {
+    var html = '';
+    var vids = (w.videos || []).filter(function (v) { return v && safeUrl(v.url); });
+    if (vids.length) {
+      html += '<div class="nt-sub">▶️ 수업 영상</div><div class="nt-videos">' + vids.map(function (v) {
+        var id = youtubeId(v.url);
+        var part = PART_NAME[v.part] || '';
+        return '<a class="nt-video" href="' + esc(safeUrl(v.url)) + '" target="_blank" rel="noopener">' +
+                 (id
+                   ? '<span class="nt-video__thumb" style="background-image:url(https://i.ytimg.com/vi/' + id + '/mqdefault.jpg)">' +
+                       '<span class="nt-video__play" aria-hidden="true">▶</span></span>'
+                   : '<span class="nt-video__thumb nt-video__thumb--none"><span class="nt-video__play" aria-hidden="true">▶</span></span>') +
+                 '<span class="nt-video__title">' +
+                   '<span class="wk-part wk-part--' + esc(v.part) + '">' + esc(part) + (v.personal ? ' · 나만 보는 영상' : '') + '</span>' +
+                   esc(v.title || (part + ' 영상')) +
+                 '</span>' +
+               '</a>';
+      }).join('') + '</div>';
+    }
+    var files = w.files || [];
+    KIND_ROWS.forEach(function (k) {
+      var list = files.filter(function (f) { return f.kind === k[0]; });
+      if (!list.length) return;
+      html += '<div class="nt-sub">' + k[1] + '</div><div class="nt-files">' + list.map(function (f) {
+        return '<button type="button" class="nt-file wk-file" data-file="' + esc(f.id) + '">' +
+                 '<span class="nt-file__icon" aria-hidden="true">' + (EXT_ICON[f.ext] || '📄') + '</span>' +
+                 '<span class="nt-file__name">' + esc(f.name) +
+                   ' <span class="wk-file__meta">' + esc(String(f.ext || '').toUpperCase()) + ' · ' + sizeText(f.bytes) + '</span></span>' +
+                 '<span class="nt-file__go" aria-hidden="true">⬇</span>' +
+               '</button>';
+      }).join('') + '</div>';
+    });
+    return html || '<p class="hub-muted">이 주에는 영상 · 자료가 없습니다.</p>';
+  }
+
+  function weeklyHtml(weekly) {
+    if (!weekly) return '';
+    var weeks = weekly.weeks || [];
+    if (!weeks.length) {
+      /* 영상 · 자료는 아직 없지만 수업 요일은 있을 때 — 이번 주 수업일만 */
+      var t = (global.DDay && DDay.today) ? DDay.today() : new Date().toISOString().slice(0, 10);
+      var mon = plusDays(t, -((new Date(t + 'T00:00:00Z').getUTCDay() + 6) % 7));
+      var line = lessonLineHtml(mon);
+      return line ? '<div class="card wk-card"><h2 class="card-title">🏃 이번 주 수업</h2>' + line + '</div>' : '';
+    }
+    var latest = weeks[0];
+    var html =
+      '<div class="card wk-card">' +
+        '<h2 class="card-title">🏃 ' + esc(weekName(latest.week_start)) + ' 영상 · 자료' +
+          '<span class="card-note">최신</span></h2>' +
+        lessonLineHtml(latest.week_start) +
+        weekBodyHtml(latest) +
+      '</div>';
+    if (weeks.length > 1) {
+      html += '<div class="card"><h2 class="card-title">🗂️ 지난 수업 영상 · 자료<span class="card-note">' +
+              (weeks.length - 1) + '주</span></h2><div class="nt-archive">' +
+              weeks.slice(1).map(function (w, i) {
+                return '<details class="nt-past wk-past" data-w="' + (i + 1) + '">' +
+                         '<summary><span class="nt-past__week num">' + esc(weekName(w.week_start)) + '</span>' +
+                         '<span class="nt-past__title">' + esc(weekCount(w)) + '</span></summary>' +
+                         '<div class="nt-past__body"></div>' +
+                       '</details>';
+              }).join('') + '</div></div>';
+    }
+    return html;
+  }
+
+  function weekCount(w) {
+    var parts = [];
+    if ((w.videos || []).length) parts.push('영상 ' + w.videos.length);
+    if ((w.files || []).length) parts.push('자료 ' + w.files.length);
+    return parts.join(' · ');
+  }
+
+  /* 지난 주 펼치기 · 파일 내려받기 */
+  function bindWeekly(root, code) {
+    root.addEventListener('toggle', function (e) {
+      var d = e.target;
+      if (!d.classList || !d.classList.contains('wk-past') || !d.open) return;
+      var body = d.querySelector('.nt-past__body');
+      if (body && !body.dataset.done && WEEKLY) {
+        var w = (WEEKLY.weeks || [])[+d.dataset.w];
+        if (w) body.innerHTML = lessonLineHtml(w.week_start) + weekBodyHtml(w);
+        body.dataset.done = '1';
+      }
+    }, true);
+
+    root.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-file]');
+      if (!b || b.disabled) return;
+      b.disabled = true;
+      b.classList.add('is-busy');
+      fileUrl(code, b.dataset.file).then(function (res) {
+        if (res && res.ok && res.url) { location.href = res.url; return; }
+        flash((res && res.message) || '내려받지 못했습니다. 잠시 뒤 다시 눌러 주세요');
+      }).catch(function () {
+        flash('내려받지 못했습니다. 인터넷 연결을 확인해 주세요');
+      }).then(function () {
+        setTimeout(function () { b.disabled = false; b.classList.remove('is-busy'); }, 1200);
+      });
+    });
+  }
+
+  function fileUrl(code, id) {
+    return fetch(CFG.supabase.url + '/functions/v1/' + (CFG.fileFunction || 'class-file'), {
+      method: 'POST',
+      headers: { 'apikey': CFG.supabase.key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'url', code: code, id: id })
+    }).then(function (r) { return r.json().catch(function () { return { ok: false }; }); });
+  }
+
 
   /* ============================================================
      막혔을 때 보여 줄 화면
@@ -231,10 +390,12 @@
         '<section class="hub-panel" id="panelBook" role="tabpanel" hidden></section>' +
         '<section class="hub-panel" id="panelPhoto" role="tabpanel" hidden></section>';
 
-      /* 반 공지 */
+      /* 반 공지 — 맨 위에 이번 주 수업(수업일 · 영상 · 자료), 그 아래 공지 */
+      WEEKLY = d.weekly || null;
       var pn = $('#panelNotice');
-      pn.innerHTML = '<div id="weekPhotos"></div>' + noticesHtml(d.notices || []);
+      pn.innerHTML = '<div id="weekPhotos"></div>' + weeklyHtml(WEEKLY) + noticesHtml(d.notices || []);
       bindArchive(pn, d.notices || []);
+      bindWeekly(pn, h.code);
       /* 첫 화면 맨 위 — 이번 주 필기 ("○월 ○일 수업 필기입니다") */
       if (global.Photos) { var wk = Photos.thisWeek(); Photos.weekCard($('#weekPhotos'), h.code, wk.from, wk.to); }
 
@@ -443,7 +604,7 @@
         '<h2 class="card-title">🗓️ 주간 레포트<span class="card-note">' + reports.length + '편</span></h2>' +
         '<ul class="rp-list">' + reports.map(function (r, i) {
           return '<li><button type="button" class="rp-item" data-i="' + i + '">' +
-                   '<span class="rp-item__week num">' + esc(ReportView.shortPeriod(r.week_start, r.week_end) || ReportView.shortDate(r.week_start)) + '</span>' +
+                   '<span class="rp-item__week num">' + esc(reportLabel(r)) + '</span>' +
                    '<span class="rp-item__label">주간 학습 레포트</span>' +
                    (i === 0 ? '<span class="rp-item__new">NEW</span>' : '') +
                    '<span class="rp-item__go" aria-hidden="true">›</span>' +
@@ -665,8 +826,10 @@
       renderDday(d.exam, '');
       $('#hubHead').hidden = false;
       setTitle(global.BRAND ? BRAND.noticeTitle : '마라톤국어 반 공지');
-      root.innerHTML = noticesHtml(d.notices || []);
+      WEEKLY = d.weekly || null;
+      root.innerHTML = weeklyHtml(WEEKLY) + noticesHtml(d.notices || []);
       bindArchive(root, d.notices || []);
+      bindWeekly(root, code);
     }).catch(function () { stopScreen(root, 'network'); });
   }
 

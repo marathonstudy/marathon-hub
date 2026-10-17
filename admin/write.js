@@ -184,12 +184,8 @@
       return Store.loadWeekIntoDraft(newStart);
     }).then(function (d) {
       draft = d;
-      /* 서버에 그 주차 종료일이 없으면 지금 쓰던 기간 길이를 그대로 쓴다 */
-      if (!d.weekEndTouched && span > 0) {
-        draft.weekEnd = Store.autoEnd(newStart, span) || draft.weekEnd;
-        draft.weekEndTouched = true;
-        saveDraft();
-      }
+      /* 서버에 그 주차 종료일이 없으면 시작일 + 6일 (Store.autoEnd) */
+      if (!d.weekEndTouched && !draft.weekEnd) draft.weekEnd = Store.autoEnd(newStart);
       switching = false;
       selectedId = '';
       collapsedEntries = {};
@@ -203,10 +199,9 @@
     });
   }
 
+  /* 시작일을 고르면 종료일은 시작일 + 6일로 채워진다 (그 주차를 서버에 저장해 둔 종료일이 있으면 그것) */
   $('#weekStart').addEventListener('change', function (e) {
-    var span = (draft.weekEndTouched && draft.weekStart && draft.weekEnd)
-                 ? Store.daysBetween(draft.weekStart, draft.weekEnd) : 0;
-    switchWeek(e.target.value, span);
+    switchWeek(e.target.value, 0);
   });
 
   $('#weekEnd').addEventListener('change', function (e) {
@@ -217,9 +212,7 @@
       return;
     }
     draft.weekEnd = v;
-    draft.weekEndTouched = true;           /* 사람이 고른 값이다 */
-    /* 이 길이를 기억해 두고 다음 주차에도 같은 길이를 쓴다 */
-    Store.setWeekSpan(Store.daysBetween(draft.weekStart, v));
+    draft.weekEndTouched = true;           /* 사람이 고른 값이다 (이 주차만) */
     renderWeek();
     saveDraft();
   });
@@ -351,6 +344,9 @@
       row.querySelector('input').value = text || '';
       lessons.appendChild(row);
     });
+
+    /* 수업일 · 수업 영상 · 자료 파일 (weekly.js) */
+    if (window.Weekly) Weekly.render(currentClass, draft.weekStart);
 
     renderHomeworkList('required', 'hwReqList', '필수', '예) 문학 주간지');
     renderHomeworkList('optional', 'hwOptList', '선택', '예) 기출 추가문제');
@@ -1511,7 +1507,9 @@
   /* ③ 공개 탭이 목록을 만들기 전에 마지막 입력까지 저장해 둔다 */
   window.Writer = {
     flush: flushDraft,
-    current: function () { return draft; }
+    current: function () { return draft; },
+    currentClass: function () { return currentClass; },
+    preview: schedulePreview
   };
 
   draft = loadDraft();

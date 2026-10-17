@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" as="style" crossorigin
       href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
-<link rel="stylesheet" href="style.css?v=20261015b">
+<link rel="stylesheet" href="style.css?v=20261016a">
 </head>
 <body class="is-locked">
 
@@ -342,6 +342,20 @@
           <button class="btn btn--sm" id="btnLoadLast" type="button">지난주 불러오기</button>
         </div>
 
+        <div class="sub wk-sub" id="wkLessonSub">
+          <div class="sub__head">
+            <span class="sub__title">수업일</span>
+            <span class="sub__hint">반마다 한 번 정하면 주차마다 저절로 계산합니다</span>
+            <div class="wk-btns">
+              <button class="btn btn--sm" id="btnWkSched" type="button">수업 요일 정하기</button>
+              <button class="btn btn--sm" id="btnWkWeek" type="button" hidden>이 주만 바꾸기</button>
+            </div>
+          </div>
+          <p class="wk-line" id="wkLessonLine"></p>
+          <div id="wkSchedEdit" hidden></div>
+          <div id="wkWeekEdit" hidden></div>
+        </div>
+
         <div class="sub">
           <div class="sub__head">
             <span class="sub__title">수업 내용</span>
@@ -375,6 +389,33 @@
             <button class="btn btn--sm" id="btnAddHwOpt" type="button">+ 선택과제 추가</button>
           </div>
           <div id="hwOptList"></div>
+        </div>
+
+        <div class="sub" id="wkVideoSub">
+          <div class="sub__head">
+            <span class="sub__title">수업 영상</span>
+            <span class="sub__hint">유튜브 링크만 · 러닝노트와 반 공지에 버튼으로 나갑니다</span>
+            <button class="btn btn--sm" id="btnWkAddVideo" type="button">+ 영상 추가</button>
+          </div>
+          <div id="wkVideos"></div>
+        </div>
+
+        <div class="sub" id="wkFileSub">
+          <div class="sub__head">
+            <span class="sub__title">배부 자료 · 과제 파일</span>
+            <span class="sub__hint">파일명에 ‘필수과제’ · ‘선택과제’가 있으면 그 분류로, 아니면 배부 자료로 나눕니다</span>
+            <button class="btn btn--sm btn--ghost" id="btnWkCleanup" type="button" hidden>지난 파일 정리</button>
+          </div>
+          <div id="wkUsage"></div>
+          <label class="wk-drop" id="wkDrop">
+            <input type="file" id="wkFileInput" multiple hidden
+                   accept=".pdf,.hwp,.hwpx,.doc,.docx,.ppt,.pptx,.xlsx,.jpg,.jpeg,.png">
+            <span class="wk-drop__icon" aria-hidden="true">📎</span>
+            <span class="wk-drop__text">파일을 여기에 끌어다 놓거나, 눌러서 고르세요 (여러 개 한 번에)</span>
+            <span class="wk-drop__hint">PDF · HWP · HWPX · DOC · DOCX · PPT · PPTX · XLSX · JPG · PNG · 하나당 20MB까지</span>
+          </label>
+          <div id="wkUploadNote"></div>
+          <div id="wkFiles"></div>
         </div>
 
         <div class="sub">
@@ -573,18 +614,20 @@
         </label>
       </div>
 
-      <div class="sub">
+      <p class="panel__hint nt-legacy-note">📎 수업 영상 · 배부 자료 · 과제 파일은 ② 작성 → 반 공통의 「수업 영상」 「배부 자료 · 과제 파일」에서 넣습니다. 러닝노트와 반 공지에 함께 나갑니다.</p>
+
+      <div class="sub" id="ntFileSub" hidden>
         <div class="sub__head">
-          <span class="sub__title">📎 자료</span>
+          <span class="sub__title">📎 자료 (예전 링크)</span>
           <span class="sub__hint">이름과 링크(구글드라이브·노션 등)</span>
           <button class="btn btn--sm" id="btnNtAddFile" type="button">+ 자료 추가</button>
         </div>
         <div id="ntFiles"></div>
       </div>
 
-      <div class="sub">
+      <div class="sub" id="ntVideoSub" hidden>
         <div class="sub__head">
-          <span class="sub__title">▶️ 수업 다시보기</span>
+          <span class="sub__title">▶️ 수업 다시보기 (예전 링크)</span>
           <span class="sub__hint">유튜브 링크를 넣으면 썸네일이 함께 나옵니다</span>
           <button class="btn btn--sm" id="btnNtAddVideo" type="button">+ 영상 추가</button>
         </div>
@@ -1530,6 +1573,33 @@
   </div>
 </dialog>
 
+<!-- 지난 파일 정리 (weekly.js · 선생님만) -->
+<dialog class="modal modal--wide" id="wkCleanModal">
+  <div class="modal__head">
+    <h2 class="modal__title">지난 파일 정리</h2>
+    <p class="modal__desc">고른 날짜보다 앞선 주차의 배부 자료 · 과제 파일을 지웁니다. 지운 파일은 되살릴 수 없고, 누가 무엇을 지웠는지 기록이 남습니다. 레포트 · 학생 기록은 지우지 않습니다.</p>
+  </div>
+  <div class="modal__body">
+    <div class="toolbar">
+      <label class="field">
+        <span class="field__label">이 날짜보다 앞선 주차</span>
+        <input class="input" type="date" id="wkCleanBefore">
+      </label>
+      <button class="btn" type="button" id="btnWkCleanFind">찾기</button>
+    </div>
+    <div id="wkCleanList"></div>
+    <details class="wk-cleanlog">
+      <summary>최근 지운 기록</summary>
+      <div id="wkCleanLog"></div>
+    </details>
+  </div>
+  <div class="modal__foot">
+    <div class="spacer"></div>
+    <button class="btn" type="button" id="btnWkCleanClose">닫기</button>
+    <button class="btn btn--danger" type="button" id="btnWkCleanGo" disabled>고른 반 파일 지우기</button>
+  </div>
+</dialog>
+
 <!-- 주요 시험 (exams.js) -->
 <dialog class="modal modal--wide" id="examModal">
   <form method="dialog" id="examForm">
@@ -1630,31 +1700,33 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
 <!-- config.js 와 brand.js 가 먼저 와야 한다. 나머지가 이 값을 읽는다. -->
-<script src="../assets/config.js?v=20261015b"></script>
-<script src="../assets/brand.js?v=20261015b"></script>
-<script src="supabase.js?v=20261015b"></script>
-<script src="db.js?v=20261015b"></script>
-<script src="store.js?v=20261015b"></script>
-<script src="report.js?v=20261015b"></script>
-<script src="app.js?v=20261015b"></script>
-<script src="import.js?v=20261015b"></script>
-<script src="write.js?v=20261015b"></script>
-<script src="publish.js?v=20261015b"></script>
-<script src="send.js?v=20261015b"></script>
-<script src="notice.js?v=20261015b"></script>
-<script src="tb.js?v=20261015b"></script>
-<script src="tb-dash.js?v=20261015b"></script>
-<script src="tb-issue.js?v=20261015b"></script>
-<script src="tb-stock.js?v=20261015b"></script>
-<script src="tb-bill.js?v=20261015b"></script>
-<script src="../assets/dday.js?v=20261015b"></script>
-<script src="card.js?v=20261015b"></script>
-<script src="exams.js?v=20261015b"></script>
-<script src="photo.js?v=20261015b"></script>
-<script src="today.js?v=20261015b"></script>
-<script src="staff.js?v=20261015b"></script>
-<script src="classes.js?v=20261015b"></script>
-<script src="sync.js?v=20261015b"></script>
-<script src="auth.js?v=20261015b"></script>
+<script src="../assets/config.js?v=20261016a"></script>
+<script src="../assets/brand.js?v=20261016a"></script>
+<script src="../assets/lesson.js?v=20261016a"></script>
+<script src="supabase.js?v=20261016a"></script>
+<script src="db.js?v=20261016a"></script>
+<script src="store.js?v=20261016a"></script>
+<script src="report.js?v=20261016a"></script>
+<script src="app.js?v=20261016a"></script>
+<script src="import.js?v=20261016a"></script>
+<script src="write.js?v=20261016a"></script>
+<script src="publish.js?v=20261016a"></script>
+<script src="send.js?v=20261016a"></script>
+<script src="notice.js?v=20261016a"></script>
+<script src="tb.js?v=20261016a"></script>
+<script src="tb-dash.js?v=20261016a"></script>
+<script src="tb-issue.js?v=20261016a"></script>
+<script src="tb-stock.js?v=20261016a"></script>
+<script src="tb-bill.js?v=20261016a"></script>
+<script src="../assets/dday.js?v=20261016a"></script>
+<script src="card.js?v=20261016a"></script>
+<script src="exams.js?v=20261016a"></script>
+<script src="photo.js?v=20261016a"></script>
+<script src="today.js?v=20261016a"></script>
+<script src="staff.js?v=20261016a"></script>
+<script src="classes.js?v=20261016a"></script>
+<script src="weekly.js?v=20261016a"></script>
+<script src="sync.js?v=20261016a"></script>
+<script src="auth.js?v=20261016a"></script>
 </body>
 </html>
