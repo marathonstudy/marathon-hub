@@ -36,8 +36,10 @@
   };
   var KINDS = [['material', '배부 자료'], ['required', '필수 과제'], ['optional', '선택 과제']];
   var KIND_LABEL = { material: '배부 자료', required: '필수 과제', optional: '선택 과제' };
-  var PARTS = [['1', '1차시'], ['2', '2차시'], ['makeup', '보강']];
-  var PART_LABEL = { '1': '1차시', '2': '2차시', makeup: '보강' };
+  /* 기본은 「수업 영상(전체)」 하나 (1 · 2차시가 한 영상). 차시별 영상이 따로 있는 주는 1 · 2차시 칸 (migration-012) */
+  var PARTS = [['full', '수업 영상(전체)'], ['1', '1차시'], ['2', '2차시'], ['makeup', '보강']];
+  var PART_LABEL = { full: '수업 영상(전체)', '1': '1차시', '2': '2차시', makeup: '보강' };
+  function defaultTitle(part) { return part === 'full' ? '수업 영상' : (PART_LABEL[part] || '') + ' 영상'; }
 
   var st = {
     cls: '', week: '', key: '', loading: null, missing: false,
@@ -105,6 +107,8 @@
       renderVideos(); renderFiles();
       load();
     }
+    /* AI 수업 요약 (summary.js · migration-012) */
+    if (window.Summary) Summary.render(st.cls, st.week);
   }
 
   function load() {
@@ -265,7 +269,7 @@
           '<select class="input wk-video__part" data-wk="part" aria-label="차시">' + PARTS.map(function (p) {
             return '<option value="' + p[0] + '"' + (v.part === p[0] ? ' selected' : '') + '>' + p[1] + '</option>';
           }).join('') + '</select>' +
-          '<input class="input wk-video__title" data-wk="title" maxlength="100" placeholder="제목 (비우면 \'' + PART_LABEL[v.part] + ' 영상\')" value="' + esc(v.title || '') + '">' +
+          '<input class="input wk-video__title" data-wk="title" maxlength="100" placeholder="제목 (비우면 \'' + defaultTitle(v.part) + '\')" value="' + esc(v.title || '') + '">' +
           '<input class="input wk-video__url" data-wk="url" inputmode="url" placeholder="https://youtu.be/…" value="' + esc(v.url || '') + '">' +
           (v.part === 'makeup' ? '<button class="btn btn--sm" type="button" data-wk-act="who">' + whoText + '</button>' : '<span></span>') +
           '<button class="btn btn--sm btn--ghost" type="button" data-wk-act="vdel" aria-label="영상 지우기">×</button>' +
@@ -293,7 +297,9 @@
     if (!st.cls) return;
     if (st.missing) { toast(NEED_SQL, 'bad'); return; }
     var parts = st.videos.map(function (v) { return v.part; });
-    var part = parts.indexOf('1') === -1 ? '1' : parts.indexOf('2') === -1 ? '2' : 'makeup';
+    var part = !parts.length ? 'full'
+      : parts.indexOf('full') !== -1 ? 'makeup'
+      : parts.indexOf('1') !== -1 && parts.indexOf('2') === -1 ? '2' : 'makeup';
     st.videos.push({ tmp: 't' + (++st.tmp), part: part, title: '', url: '', student_ids: [] });
     renderVideos();
     var rows = document.querySelectorAll('#wkVideos .wk-video__url');
@@ -717,6 +723,7 @@
 
   bind();
 
-  window.Weekly = { render: render, classify: classify, normalizeYoutube: normalizeYoutube, reload: load };
+  window.Weekly = { render: render, classify: classify, normalizeYoutube: normalizeYoutube, reload: load,
+                    videos: function () { return st.videos.slice(); } };
 
 })();

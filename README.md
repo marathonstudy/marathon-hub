@@ -38,6 +38,7 @@ admin/        코치룸 (명단 · 작성 · 공개 · 발송 · 반 공지 · �
   staff.js      직원 관리 (「오늘」 [설정] · teacher 만) — 팀 가입 코드 · 사용 중지 · 역할
   auth.js       로그인 · 조교 가입 · 비밀번호 찾기
   weekly.js     ② 작성 반 공통 — 수업일 · 수업 영상 · 배부 자료/과제 파일 · 지난 파일 정리
+  summary.js    ② 작성 반 공통 — 자막으로 AI 수업 요약 (초안 → 확정)
 me/           학생·학부모 개인 페이지
 notice/       반 공용 공지 페이지
 assets/
@@ -65,6 +66,8 @@ supabase/
   migration-010-class-admin.sql   반 관리(선생님만) — 이름 바꾸기 · 보관/되살리기 · 빈 반 삭제 · 변경 기록
   migration-011-weekly.sql        수업일(요일 · 첫 수업일 · 이 주만 바꾸기) · 수업 영상 · 자료 파일(비공개 보관함 class-files)
   functions/class-file/index.ts   자료 파일 내려받기 Edge Function (링크 코드 · 파일의 반 확인 → 2분짜리 주소)
+  migration-012-lesson-summary.sql  AI 수업 요약 — 초안 · 확정본 · 사용 기록 · 월 상한 · 「수업 영상(전체)」 칸
+  functions/lesson-summary/index.ts 자막 → Claude(Opus 5.5) 요약 Edge Function (직원만 · 키는 Secrets 에만)
   check-classes.sql               반 이름 점검 (읽기 전용 — 어느 표에 어떤 반이 있는지 · 비슷한 이름)
   functions/app-report/index.ts  앱 과제 기록을 대신 받아 오는 Edge Function
 ```
@@ -166,6 +169,21 @@ delete from public.staff where email = '조교이메일@example.com';
    → `supabase/functions/class-file/index.ts` 전체 붙여 넣기 → **Deploy function**
 3. 배포된 함수 → **Details** → **Verify JWT with legacy secret** 끄기 → Save (학부모는 로그인이 없다. 함수가 링크 코드를 직접 검사한다)
 4. **Storage** → `class-files` 가 **Private** 인지만 확인 (Public 으로 바꾸지 않는다)
+
+### 5-9. AI 수업 요약 (migration-012 + Edge Function lesson-summary + Claude 키)
+1. SQL Editor → **New query** → `supabase/migration-012-lesson-summary.sql` 전체 → **Run**
+   (결과에 `ai_usage` · `lesson_summaries` 가 `true`, `monthly_cap` 이 `80`)
+2. **Edge Functions → Deploy a new function → Via Editor** → 이름 `lesson-summary`
+   → `supabase/functions/lesson-summary/index.ts` 전체 붙여 넣기 → **Deploy function**
+3. 배포된 함수 → **Details** → **Verify JWT with legacy secret** 끄기 → Save
+   (끄더라도 아무나 못 쓴다 — 함수가 부른 사람의 로그인 토큰으로 DB 에 직원인지 · 월 상한이 남았는지 직접 묻는다)
+4. **Claude 키 넣기** — 키는 이 저장소 · 코드 · 카톡 · 대화창에 절대 붙이지 않는다
+   1. console.anthropic.com 로그인 → **Settings → Billing**: 결제 수단 · 크레딧 충전(5~10달러) · **Auto-reload 끄기**
+   2. **Settings → Limits**: 월 사용 한도(Spend limit) — 예) 10달러
+   3. (선택) **Workspaces** → `marathon-hub` 작업 공간 + 그 공간의 월 한도
+   4. **API Keys → Create Key** → 이름 `marathon-lesson-summary` → 키가 한 번만 보인다. 복사만 하고 바로 다음 단계로
+   5. Supabase → **Edge Functions → Secrets → Add new secret** → Name `ANTHROPIC_API_KEY`, Value 붙여 넣기 → Save
+   6. 키가 새어 나간 것 같으면 Console → API Keys 에서 그 키를 **Delete** 하고 새로 만들어 5번만 다시 한다
 
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
@@ -274,6 +292,22 @@ delete from public.staff where email = '조교이메일@example.com';
   필기 사진도 학기에 0.7GB 안팎 쌓이므로 둘을 합치면 1GB가 빠듯하다.
 - 반 공통 「배부 자료 · 과제 파일」 위에 사용량 막대가 있다. 80% 를 넘으면 주황색 + 경고 → 선생님이 [지난 파일 정리].
   그래도 모자라면 Pro 요금제(월 25달러 · 저장 100GB)로 올린다.
+
+**AI 수업 요약 (자막 → "1차시: … / 2차시: …")**
+- 수업 영상 칸 옆 **[자막으로 AI 요약]** → 자막 파일(.srt · .vtt · .txt)을 끌어다 놓거나 스크립트를 붙여 넣는다.
+  기본은 **영상 하나(1 · 2차시 함께)** — 한 영상을 차시 수(기본 2)만큼 나눠 요약한다. 차시마다 영상이 따로면 「차시마다 영상 따로」.
+- 자막 파일 받는 법(유튜브 스튜디오 → 자막 → 그 영상 → 한국어(자동) ⋮ → 다운로드 → .srt)은 그 창 안 안내에 있다.
+  조교 계정으로 받으려면 선생님이 스튜디오 **설정 → 권한**에서 조교를 초대해 둔다.
+- 서버(Edge Function `lesson-summary`)가 Claude(Opus 5.5)로 요약해 **초안**을 만든다. 초안은 학부모에게 안 보인다.
+  직원(조교 포함)이 읽고 고친 뒤 **[확정]** → 러닝노트 · 반 공지 「이번 주 수업」에 보이고, 「수업 내용」 칸에 들어가 레포트를 공개할 때 함께 나간다.
+  누가 · 언제 확정했는지 남는다. 「수업 내용」 칸에 다른 글이 있으면 바꾸기 전에 묻는다.
+- 자막 원문은 저장하지 않는다(요약에 쓸 때만 Anthropic 으로 보낸다). 저장되는 것은 요약 · 글자 수 · 토큰 수 · 대략 비용뿐.
+- **비용 · 상한**: 3시간 수업 자막(약 6만 자) 한 번에 대략 0.2~0.3달러(300~400원). 한 달 상한 기본 80회(실패는 안 셈) —
+  선생님이 [상한 바꾸기]로 바꾼다. 이번 달 횟수와 대략 비용이 「AI 수업 요약」 옆에 보인다.
+  Anthropic 쪽에도 충전액 · 월 한도(Spend limit)를 걸어 두어 이중으로 막는다.
+- 유튜브 자막 자동 가져오기는 시험해 보니 Supabase 서버에서 유튜브가 "로봇 확인"으로 막아서 지금은 쓰지 않는다
+  (나중에 선생님 채널 공식 연결 — YouTube Data API — 로 따로 붙일 수 있다).
+- 자동 자막은 작품명 · 용어를 틀리게 받아 적을 때가 많다(예: "국어 강사" → "구어왕사"). AI 가 확실하지 않은 것은 「AI 확인 메모」에 적는다. 확정 전에 꼭 읽는다.
 
 **로고 · 카톡 미리보기**
 - 레포트 머리 · 러닝노트 · 반 공지 위에 로고(`assets/logo.png`, 보라)가 보인다. 짙은 회색으로 바꾸려면 `assets/brand.js` 의

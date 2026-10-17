@@ -2124,7 +2124,7 @@ dialog.modal.modal--card {
 .wk-video { border: 1px solid var(--line-soft); border-radius: 12px; padding: 8px; margin-bottom: 8px; background: var(--surface); }
 .wk-btns { margin-left: auto; display: flex; gap: 6px; }
 .wk-btns .btn { margin-left: 0; }
-.wk-video__row { display: grid; grid-template-columns: 92px minmax(0, 1fr) minmax(0, 1.4fr) 76px 34px; gap: 6px; align-items: center; }
+.wk-video__row { display: grid; grid-template-columns: 136px minmax(0, 1fr) minmax(0, 1.4fr) 76px 34px; gap: 6px; align-items: center; }
 .wk-who { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); }
 .wk-who__list { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; }
 .wk-err { font-size: 12.5px; color: var(--danger); margin-top: 4px; }
@@ -2156,10 +2156,32 @@ dialog.modal.modal--card {
 .nt-legacy-note { margin: 12px 0 4px; }
 
 @media (max-width: 720px) {
-  .wk-video__row { grid-template-columns: 92px minmax(0, 1fr) 76px 34px; }
+  .wk-video__row { grid-template-columns: 136px minmax(0, 1fr) 76px 34px; }
   .wk-video__url { grid-column: 1 / -1; grid-row: 2; }
   .wk-file { grid-template-columns: 44px minmax(0, 1fr) 48px 48px; }
   .wk-file__kind { grid-column: 2; grid-row: 2; }
   .wk-file__size { grid-column: 1; grid-row: 2; }
   .wk-file .wk-tag { grid-row: 3; }
 }
+
+/* ============================================================
+   ② 작성 반 공통 — AI 수업 요약 (summary.js · migration-012)
+   ============================================================ */
+.ai-opts { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; }
+.ai-n { width: 64px; display: inline-block; margin-left: 4px; }
+.ai-area { border: 2px dashed #CFC6F5; border-radius: 12px; padding: 8px; background: #FBFAFF; transition: background .15s, border-color .15s; }
+.ai-area.is-over { background: #F0ECFD; border-color: var(--indigo); }
+.ai-area__head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+.ai-area__head .btn { margin-left: auto; }
+.ai-text { min-height: 84px; font-size: 13px; }
+.ai-guide { font-size: 13px; color: var(--ink-deep); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+.ai-guide summary { cursor: pointer; font-weight: 700; color: var(--ink-mid); }
+.ai-guide ol { margin: 8px 0; padding-left: 20px; line-height: 1.8; }
+.ai-result { border: 1px solid #E7C9A0; background: #FFFBF4; border-radius: 12px; padding: 10px; display: grid; gap: 8px; }
+.ai-result.is-ok { border-color: #BFE0D2; background: #F5FBF8; }
+.ai-result__head { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.ai-badge { display: inline-block; font-size: 12px; font-weight: 800; color: #9A5B12; background: #FCEBD3; border-radius: 999px; padding: 3px 10px; }
+.ai-result.is-ok .ai-badge, .ai-badge--ok { color: #2F7D63; background: #DDF1E8; }
+.ai-note { margin: 0; font-size: 12.5px; color: #9A5B12; }
+.ai-lines { display: grid; gap: 6px; }
+.ai-line { margin: 0; }

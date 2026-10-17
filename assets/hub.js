@@ -190,7 +190,7 @@
 
   var WEEKLY = null;
   var KIND_ROWS = [['material', '📄 배부 자료'], ['required', '✏️ 필수 과제'], ['optional', '➕ 선택 과제']];
-  var PART_NAME = { '1': '1차시', '2': '2차시', makeup: '보강' };
+  var PART_NAME = { full: '수업 전체', '1': '1차시', '2': '2차시', makeup: '보강' };
   var EXT_ICON = { pdf: '📕', hwp: '📘', hwpx: '📘', doc: '📘', docx: '📘', ppt: '📙', pptx: '📙', xlsx: '📗', jpg: '🖼️', jpeg: '🖼️', png: '🖼️' };
 
   function plusDays(iso, n) {
@@ -228,8 +228,20 @@
     return b >= 1048576 ? (b / 1048576).toFixed(1) + 'MB' : Math.max(1, Math.round(b / 1024)) + 'KB';
   }
 
+  /* 확정된 수업 내용 (AI 요약을 직원이 [확정]한 것만 · migration-012) — "1차시: …" */
+  function lessonsHtml(lines) {
+    var list = (lines || []).filter(function (t) { return String(t || '').trim(); });
+    if (!list.length) return '';
+    return '<div class="nt-sub">📖 수업 내용</div><ul class="lesson-list wk-lessons">' + list.map(function (t, i) {
+      var m = /^(\d+)\s*차시\s*[:：.\-]?\s*([\s\S]*)$/.exec(String(t).trim());
+      var no = m && m[2].trim() ? m[1] + '차시' : (i + 1) + '차시';
+      var text = m && m[2].trim() ? m[2].trim() : String(t).trim();
+      return '<li class="lesson-item"><span class="lesson-check">✓</span><span><b class="lesson-no">' + esc(no) + '</b>' + esc(text) + '</span></li>';
+    }).join('') + '</ul>';
+  }
+
   function weekBodyHtml(w) {
-    var html = '';
+    var html = lessonsHtml(w.lessons);
     var vids = (w.videos || []).filter(function (v) { return v && safeUrl(v.url); });
     if (vids.length) {
       html += '<div class="nt-sub">▶️ 수업 영상</div><div class="nt-videos">' + vids.map(function (v) {
@@ -242,7 +254,7 @@
                    : '<span class="nt-video__thumb nt-video__thumb--none"><span class="nt-video__play" aria-hidden="true">▶</span></span>') +
                  '<span class="nt-video__title">' +
                    '<span class="wk-part wk-part--' + esc(v.part) + '">' + esc(part) + (v.personal ? ' · 나만 보는 영상' : '') + '</span>' +
-                   esc(v.title || (part + ' 영상')) +
+                   esc(v.title || (v.part === 'full' ? '수업 영상' : part + ' 영상')) +
                  '</span>' +
                '</a>';
       }).join('') + '</div>';
@@ -297,6 +309,7 @@
 
   function weekCount(w) {
     var parts = [];
+    if ((w.lessons || []).length) parts.push('수업 내용');
     if ((w.videos || []).length) parts.push('영상 ' + w.videos.length);
     if ((w.files || []).length) parts.push('자료 ' + w.files.length);
     return parts.join(' · ');

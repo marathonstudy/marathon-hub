@@ -17,7 +17,7 @@
     /* 파일을 고칠 때마다 이 값과 각 index.html 의 ?v= 를 함께 올린다.
        안 올리면 깃허브 페이지스 캐시 때문에 최대 10분간 옛 파일이 나간다.
        생성기 로그인 화면 왼쪽 아래에 보인다. */
-    version: '20261016a',
+    version: '20261017a',
 
     /* 배포 주소. 끝에 / 를 붙이지 않는다. */
     siteUrl: 'https://marathonstudy.github.io/marathon-hub',
@@ -35,6 +35,9 @@
 
     /* 배부 자료 · 과제 파일 내려받기 Edge Function 이름 (migration-011) */
     fileFunction: 'class-file',
+
+    /* 자막으로 AI 수업 요약 Edge Function 이름 (migration-012 · 코치룸 직원만) */
+    summaryFunction: 'lesson-summary',
 
     /* 브라우저 저장 이름 앞에 붙는다. 같은 github.io 주소를 쓰는
        다른 사이트와 겹치지 않게 한다. */

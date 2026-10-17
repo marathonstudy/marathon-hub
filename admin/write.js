@@ -1509,7 +1509,19 @@
     flush: flushDraft,
     current: function () { return draft; },
     currentClass: function () { return currentClass; },
-    preview: schedulePreview
+    preview: schedulePreview,
+    /* AI 요약 [확정] → 그 반 「수업 내용」 칸 (summary.js) */
+    lessonsOf: function (cls) {
+      return ((draft && commonOf(cls || '_').lessons) || []).filter(function (l) { return String(l || '').trim(); });
+    },
+    setLessons: function (cls, lines) {
+      if (!draft) return;
+      commonOf(cls || '_').lessons = lines.length ? lines.slice() : [''];
+      saveDraft();
+      flushDraft();
+      if (cls === currentClass && !$('#panel-write').hidden) renderCommon();
+      schedulePreview();
+    }
   };
 
   draft = loadDraft();
