@@ -194,6 +194,15 @@
     if (!list.length) return '';
     var body = list.map(function (t) {
       var score = pct(t.score);
+      if (t.kind === 'review') {
+        return '<div class="test-item">' +
+                 '<div class="test-header">' +
+                   '<span class="test-name">' + esc(t.name) + '<span class="test-badge test-badge--ok">선생님 확인</span></span>' +
+                   '<span class="test-score-text num">' + (+t.correct) + ' / ' + (+t.total) + ' · ' + score + '<small>점</small></span>' +
+                 '</div>' +
+                 '<div class="progress-bar"><div class="progress-fill" data-width="' + score + '"></div></div>' +
+               '</div>';
+      }
       var none = score === 0;
       return '<div class="test-item' + (none ? ' is-none' : '') + '">' +
                '<div class="test-header">' +

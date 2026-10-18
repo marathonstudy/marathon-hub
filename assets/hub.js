@@ -354,6 +354,28 @@
 
 
   /* ============================================================
+     홈 화면에 추가하는 법 (개인 페이지) · 카톡 안에서 열었을 때 안내
+     ============================================================ */
+
+  function inKakao() { return /KAKAOTALK/i.test(navigator.userAgent || ''); }
+
+  function kakaoNoteHtml() {
+    if (!inKakao()) return '';
+    return '<div class="card a2hs-kakao">💡 카톡 안에서 열었어요. 홈 화면에 추가하려면 오른쪽 아래(또는 위) <b>⋮ · ⋯</b> → <b>다른 브라우저로 열기</b> 를 눌러 주세요.</div>';
+  }
+
+  function homeGuideHtml() {
+    return '<details class="card a2hs">' +
+      '<summary>📲 홈 화면에 추가하는 법 — 다음부터 링크를 찾지 않고 바로 열어요</summary>' +
+      '<p class="a2hs__warn">카톡 안에서는 추가가 안 돼요. 먼저 <b>⋮ · ⋯ → 다른 브라우저로 열기</b> 로 연 다음 아래대로 하세요.</p>' +
+      '<div class="a2hs__os"><b>갤럭시 (삼성 인터넷)</b><ol><li>아래쪽 <b>≡ 메뉴</b></li><li><b>현재 페이지 추가</b> → <b>홈 화면</b></li></ol></div>' +
+      '<div class="a2hs__os"><b>갤럭시 (크롬)</b><ol><li>오른쪽 위 <b>⋮</b></li><li><b>홈 화면에 추가</b> → <b>추가</b></li></ol></div>' +
+      '<div class="a2hs__os"><b>아이폰 (Safari)</b><ol><li>아래쪽 <b>공유 버튼 (□↑)</b></li><li><b>홈 화면에 추가</b> → <b>추가</b></li></ol></div>' +
+      '<p class="hub-muted">홈 화면 아이콘에는 이 학생의 개인 링크가 그대로 담깁니다. 다른 사람과 휴대폰을 같이 쓰면 주의해 주세요.</p>' +
+    '</details>';
+  }
+
+  /* ============================================================
      막혔을 때 보여 줄 화면
      ============================================================ */
 
@@ -406,7 +428,8 @@
       /* 반 공지 — 맨 위에 이번 주 수업(수업일 · 영상 · 자료), 그 아래 공지 */
       WEEKLY = d.weekly || null;
       var pn = $('#panelNotice');
-      pn.innerHTML = '<div id="weekPhotos"></div>' + weeklyHtml(WEEKLY) + noticesHtml(d.notices || []);
+      pn.innerHTML = kakaoNoteHtml() + '<div id="reviewCard"></div><div id="weekPhotos"></div>' +
+                     weeklyHtml(WEEKLY) + noticesHtml(d.notices || []) + homeGuideHtml();
       bindArchive(pn, d.notices || []);
       bindWeekly(pn, h.code);
       /* 첫 화면 맨 위 — 이번 주 필기 ("○월 ○일 수업 필기입니다") */
@@ -416,6 +439,15 @@
       var reports = d.reports || [];
       renderReportList(h.code, reports);
       if (reports.length) $('#tabReport').classList.add('has-new');
+
+      /* 복습테스트 (migration-013) — 수업일 당일 맨 위 기록 카드, 내 레포트 탭 위 점수 그래프 */
+      if (global.ReviewCard) {
+        ReviewCard.history($('#reviewHist'), d.review || [], []);
+        ReviewCard.bind($('#reviewCard'));
+        ReviewCard.mount($('#reviewCard'), h.code, function (rv) {
+          ReviewCard.history($('#reviewHist'), d.review || [], rv ? rv.recent : []);
+        });
+      }
 
       /* 앱 과제 — 처음 열 때 불러온다 */
       var appLoaded = false;
@@ -609,10 +641,11 @@
   function renderReportList(code, reports) {
     var host = $('#panelReport');
     if (!reports.length) {
-      host.innerHTML = '<div class="empty">아직 공개된 주간 레포트가 없습니다.</div>';
+      host.innerHTML = '<div id="reviewHist"></div><div class="empty">아직 공개된 주간 레포트가 없습니다.</div>';
       return;
     }
     host.innerHTML =
+      '<div id="reviewHist"></div>' +
       '<div class="card" id="reportListCard">' +
         '<h2 class="card-title">🗓️ 주간 레포트<span class="card-note">' + reports.length + '편</span></h2>' +
         '<ul class="rp-list">' + reports.map(function (r, i) {

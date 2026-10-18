@@ -39,6 +39,7 @@ admin/        코치룸 (명단 · 작성 · 공개 · 발송 · 반 공지 · �
   auth.js       로그인 · 조교 가입 · 비밀번호 찾기
   weekly.js     ② 작성 반 공통 — 수업일 · 수업 영상 · 배부 자료/과제 파일 · 지난 파일 정리
   summary.js    ② 작성 반 공통 — 자막으로 AI 수업 요약 (초안 → 확정)
+  review.js     ② 작성 반 공통 — 복습테스트 확인 표 · 대신 입력 · 지금 제출 현황 · 자주 틀린 번호
 me/           학생·학부모 개인 페이지
 notice/       반 공용 공지 페이지
 assets/
@@ -47,6 +48,8 @@ assets/
   logo.png · logo-charcoal.png  로고 (보라 · 짙은 회색, 원본에서 줄인 웹용 사본)
   og.png · og-charcoal.png      카톡 미리보기 그림 (1200×630, 불투명)
   lesson.js     수업일 · 과제 기간 계산 (코치룸 · 러닝노트 · 반 공지가 같이 쓴다)
+  review-card.js 러닝노트 「오늘 복습테스트 기록하기」 카드 · 복습테스트 점수 그래프
+  icon-180.png · icon-192.png  홈 화면 아이콘 (로고)
   report.css    레포트 디자인
   report-view.js 레포트 그리기 (개인 페이지와 코치룸 미리보기가 같이 쓴다)
   hub.css · hub.js 개인 페이지 · 반 공지 페이지
@@ -68,6 +71,8 @@ supabase/
   functions/class-file/index.ts   자료 파일 내려받기 Edge Function (링크 코드 · 파일의 반 확인 → 2분짜리 주소)
   migration-012-lesson-summary.sql  AI 수업 요약 — 초안 · 확정본 · 사용 기록 · 월 상한 · 「수업 영상(전체)」 칸
   functions/lesson-summary/index.ts 자막 → Claude(Opus 5.5) 요약 Edge Function (직원만 · 키는 Secrets 에만)
+  migration-013-review-test.sql     복습테스트 — 회차 자동 생성 · 학생 제출 · 조교 확인 · 기록 · 시험지 사진 보관함
+  functions/review-test/index.ts    복습테스트 학생 제출 Edge Function (개인 링크 · 수업일 당일 · 마감 확인)
   check-classes.sql               반 이름 점검 (읽기 전용 — 어느 표에 어떤 반이 있는지 · 비슷한 이름)
   functions/app-report/index.ts  앱 과제 기록을 대신 받아 오는 Edge Function
 ```
@@ -184,6 +189,13 @@ delete from public.staff where email = '조교이메일@example.com';
    4. **API Keys → Create Key** → 이름 `marathon-lesson-summary` → 키가 한 번만 보인다. 복사만 하고 바로 다음 단계로
    5. Supabase → **Edge Functions → Secrets → Add new secret** → Name `ANTHROPIC_API_KEY`, Value 붙여 넣기 → Save
    6. 키가 새어 나간 것 같으면 Console → API Keys 에서 그 키를 **Delete** 하고 새로 만들어 5번만 다시 한다
+
+### 5-10. 복습테스트 학생 직접 기록 (migration-013 + Edge Function review-test)
+1. SQL Editor → **New query** → `supabase/migration-013-review-test.sql` 전체 → **Run**
+   (결과에 새 표 3개 `true`, `bucket review-photos public = false`)
+2. **Edge Functions → Deploy a new function → Via Editor** → 이름 `review-test`
+   → `supabase/functions/review-test/index.ts` 전체 붙여 넣기 → **Deploy function**
+3. 배포된 함수 → **Details** → **Verify JWT with legacy secret** 끄기 → Save (학생은 로그인이 없다. 함수가 개인 링크 코드를 직접 검사한다)
 
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
@@ -308,6 +320,25 @@ delete from public.staff where email = '조교이메일@example.com';
 - 유튜브 자막 자동 가져오기는 시험해 보니 Supabase 서버에서 유튜브가 "로봇 확인"으로 막아서 지금은 쓰지 않는다
   (나중에 선생님 채널 공식 연결 — YouTube Data API — 로 따로 붙일 수 있다).
 - 자동 자막은 작품명 · 용어를 틀리게 받아 적을 때가 많다(예: "국어 강사" → "구어왕사"). AI 가 확실하지 않은 것은 「AI 확인 메모」에 적는다. 확정 전에 꼭 읽는다.
+
+**복습테스트 학생 직접 기록**
+- 수업 시작 때 복습테스트 → 학생이 자기 채점 → 그 자리에서 휴대폰으로 러닝노트(개인 링크)에 기록 → 조교는 확인만.
+- **시험 등록**: 반의 기준 수업일마다 「복습테스트 n회」가 저절로 생긴다. 회차는 첫 수업일부터, 휴강 · [이번 주 없음]은 건너뛴다.
+  반 기본 문항 수는 **[반 관리] → 복습 문항**(처음 20, 선생님만), 그 주만 바꾸기 · 끄기는 ② 작성 → 반 공통 → 복습테스트.
+- **학생 입력(러닝노트)**: 수업일 당일 0시부터 맨 위에 「오늘 복습테스트 기록하기」. 틀린 번호만 누르면 "17 / 20 · 85점"이 바로 나오고,
+  **시험지 사진이 있어야** 제출된다(휴대폰에서 긴 변 1280px · 0.15MB 안팎으로 줄여 비공개 보관함에). 마감은 수업일 **밤 12시**(한국 시간).
+  마감 전 · 조교 확인 전에는 고칠 수 있고, 확인되면 잠긴다.
+- **개인 링크는 학부모도 같이 본다** — 누가 입력했는지는 알 수 없어 「학생 입력」으로만 표시한다. 확인 전 입력(틀린 번호 · 점수 · 사진)도
+  그 학생 링크에서 「확인 전」으로 보이고, **그래프 · 레포트에는 확인된 점수만** 쓴다. 반 공용 링크에는 아무것도 안 나간다.
+- **지금 제출 현황**(② 작성 → 반 공통 → 복습테스트): 교실 화면용. 이름 칸이 제출하면 실시간으로 초록색, **점수는 아예 불러오지 않는다**. [전체 화면] · Esc 로 닫기.
+- **조교 확인**: 표에서 사진을 보고 [확인], 틀린 번호를 고치려면 [고치기](저장하면 확인까지). 휴대폰이 없는 학생은 [대신 입력](사진 선택 · 「조교 입력」).
+  누가 · 언제 확인 · 고쳤는지(고치기 전 값 포함) 서버에 남고 아무도 지울 수 없다.
+- 마감까지 안 낸 학생은 「오늘」 챙겨야 할 학생에 「복습테스트 n회 미제출」(지난 7일).
+- **레포트**: 확인된 점수가 그 주 레포트 리뷰테스트에 「복습테스트 n회 · 17 / 20 · 85점 · 선생님 확인」으로 들어간다(공개할 때 — 이미 공개한 레포트는 그대로).
+  러닝노트 「내 레포트」 위에 회차별 점수 그래프(확인된 것만). 반 단위 **자주 틀린 번호**(최근 4회)는 코치룸에서만.
+- **저장 공간**: 시험지 사진 학기 약 180MB(60명 × 20주 × 0.15MB). 선생님은 [지난 시험지 사진 정리]로 사진만 지울 수 있다(점수는 남는다).
+- **홈 화면에 추가**: 러닝노트 첫 화면 아래 안내(갤럭시 삼성 인터넷 · 크롬, 아이폰 Safari). 카톡 안에서는 안 되므로 「다른 브라우저로 열기」 먼저.
+  아이콘은 로고이고, 개인 링크 주소가 그대로 담긴다(주소를 바꾸는 manifest 는 일부러 넣지 않았다).
 
 **로고 · 카톡 미리보기**
 - 레포트 머리 · 러닝노트 · 반 공지 위에 로고(`assets/logo.png`, 보라)가 보인다. 짙은 회색으로 바꾸려면 `assets/brand.js` 의

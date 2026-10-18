@@ -2185,3 +2185,46 @@ dialog.modal.modal--card {
 .ai-note { margin: 0; font-size: 12.5px; color: #9A5B12; }
 .ai-lines { display: grid; gap: 6px; }
 .ai-line { margin: 0; }
+
+/* ============================================================
+   ② 작성 반 공통 — 복습테스트 (review.js · migration-013)
+   ============================================================ */
+.rv-tools { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.rv-tools:empty { display: none; }
+.rv-table td { vertical-align: middle; }
+.rv-table tr.is-pending td { background: #FFFBF4; }
+.rv-st { display: inline-block; font-size: 12px; font-weight: 800; border-radius: 999px; padding: 2px 9px; }
+.rv-st--none { color: #8A90AC; background: #F1F2F8; }
+.rv-st--sub { color: #9A5B12; background: #FCEBD3; }
+.rv-st--ok { color: #2F7D63; background: #DDF1E8; }
+.rv-editor { display: grid; gap: 8px; padding: 6px 2px; }
+.rv-editor__score { margin-left: 8px; font-weight: 800; color: var(--ink-deep); }
+.rv-ns { display: flex; flex-wrap: wrap; gap: 6px; }
+.rv-n { width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--line); background: #fff; font: inherit; font-weight: 800; color: var(--ink-deep); cursor: pointer; }
+.rv-n.is-wrong { background: #E0607A; border-color: #E0607A; color: #fff; }
+.rv-light { position: fixed; inset: 0; z-index: 1000; background: rgba(20, 24, 60, .82); display: grid; place-items: center; padding: 16px; cursor: zoom-out; }
+.rv-light img { max-width: 100%; max-height: 100%; border-radius: 8px; background: #fff; }
+.rv-light__close { position: absolute; top: 12px; right: 12px; width: 40px; height: 40px; border-radius: 50%; border: 0; background: #fff; font-size: 22px; cursor: pointer; }
+
+/* 지금 제출 현황 — 교실 화면 (이름 · 제출 여부만) */
+.rv-live { position: fixed; inset: 0; z-index: 900; background: #F6F5FC; display: flex; flex-direction: column; padding: 20px; overflow: auto; }
+body.rv-live-open { overflow: hidden; }
+.rv-live__head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 16px; }
+.rv-live__title { font-size: 26px; font-weight: 900; color: var(--ink-deep); }
+.rv-live__count { margin-left: auto; font-size: 26px; font-weight: 900; color: var(--ok); }
+.rv-live__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.rv-live__cell { position: relative; display: flex; align-items: center; justify-content: center; min-height: 86px; border-radius: 16px;
+  background: #fff; border: 2px solid var(--line); font-size: 24px; font-weight: 800; color: var(--ink-mid); transition: background .25s, border-color .25s, color .25s; }
+.rv-live__cell.is-done { background: #3F9C7F; border-color: #3F9C7F; color: #fff; }
+.rv-live__mark { position: absolute; top: 6px; right: 10px; font-size: 18px; }
+.rv-live__msg { font-size: 18px; color: var(--ink-mid); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
+
+/* 자주 틀린 번호 — 가로 막대 한 줄 (막대 끝 둥글게 · 바탕은 같은 색 옅게) */
+.rv-stat { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; }
+.rv-stat__head { font-size: 13.5px; color: var(--ink-mid); margin-bottom: 8px; }
+.rv-bar { display: grid; grid-template-columns: 44px minmax(0, 1fr) 72px; gap: 8px; align-items: center; margin: 5px 0; font-size: 13px; }
+.rv-bar__q { font-weight: 800; color: var(--ink-deep); }
+.rv-bar__track { height: 12px; border-radius: 4px; background: #EEEAFD; overflow: hidden; }
+.rv-bar__fill { display: block; height: 100%; border-radius: 0 4px 4px 0; background: #7858E8; }
+.rv-bar__v { color: var(--ink-mid); text-align: right; }

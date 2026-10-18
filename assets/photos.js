@@ -74,12 +74,15 @@
     return new Promise(function (resolve) { canvas.toBlob(resolve, 'image/jpeg', q); });
   }
 
-  /* 긴 변 1600px, JPEG, 0.3MB 가 될 때까지 화질을 낮추고 그래도 크면 크기를 줄인다 */
-  function shrink(file) {
+  /* 긴 변 1600px, JPEG, 0.3MB 가 될 때까지 화질을 낮추고 그래도 크면 크기를 줄인다.
+     opts 로 바꿀 수 있다 — 복습테스트 시험지는 { maxSide: 1280, target: 150KB } (review-card.js) */
+  function shrink(file, opts) {
+    opts = opts || {};
+    var MAXS = opts.maxSide || MAX_SIDE, TGT = opts.target || TARGET;
     return loadBitmap(file).then(function (img) {
       var w0 = img.width, h0 = img.height;
       if (!w0 || !h0) throw new Error('사진을 열 수 없습니다.');
-      var side = Math.min(MAX_SIDE, Math.max(w0, h0));
+      var side = Math.min(MAXS, Math.max(w0, h0));
       function attempt(maxSide, q) {
         var scale = Math.min(1, maxSide / Math.max(w0, h0));
         var w = Math.max(1, Math.round(w0 * scale)), h = Math.max(1, Math.round(h0 * scale));
@@ -91,7 +94,7 @@
         ctx.drawImage(img, 0, 0, w, h);
         return toBlob(c, q).then(function (b) {
           if (!b) throw new Error('사진을 줄이지 못했습니다.');
-          if (b.size <= TARGET || (q <= 0.5 && b.size <= HARD)) return { blob: b, width: w, height: h };
+          if (b.size <= TGT || (q <= 0.5 && b.size <= HARD)) return { blob: b, width: w, height: h };
           if (q > 0.5) return attempt(maxSide, Math.round((q - 0.08) * 100) / 100);
           if (maxSide > 700) return attempt(Math.round(maxSide * 0.82), 0.72);
           if (b.size <= HARD) return { blob: b, width: w, height: h };

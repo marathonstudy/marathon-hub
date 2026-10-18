@@ -147,7 +147,8 @@
     state.week = d.weekStart;
     state.weekEnd = d.weekEnd;
     $('#pubList').innerHTML = '<p class="panel__hint">불러오는 중…</p>';
-    return DB.publishedOfWeek(d.weekStart).then(function (pub) {
+    return Promise.all([DB.publishedOfWeek(d.weekStart), Store.loadReview ? Store.loadReview(d.weekStart) : null]).then(function (res) {
+      var pub = res[0];
       state.published = pub;
       state.rows = buildRows(d);
       render();

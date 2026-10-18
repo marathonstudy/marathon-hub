@@ -1499,6 +1499,9 @@
      시작
      ============================================================ */
 
+  /* 복습테스트 확인 점수가 오면 미리보기 다시 (migration-013) */
+  window.addEventListener('jt:review-scores', function () { if (!$('#panel-write').hidden) schedulePreview(); });
+
   /* 이름표가 바뀌면(칸 관리) 다시 그린다 */
   window.addEventListener('jt:roster-changed', function () {
     if (!$('#panel-write').hidden) refreshAll();

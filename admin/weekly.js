@@ -109,6 +109,8 @@
     }
     /* AI 수업 요약 (summary.js · migration-012) */
     if (window.Summary) Summary.render(st.cls, st.week);
+    /* 복습테스트 (review.js · migration-013) */
+    if (window.Review) Review.render(st.cls, st.week);
   }
 
   function load() {
@@ -447,7 +449,8 @@
       var gb = function (b) { b = b || 0; return b >= 1073741824 ? (b / 1073741824).toFixed(2) + 'GB' : (b / 1048576).toFixed(1) + 'MB'; };
       host.innerHTML = '<div class="ph-usage wk-usage"><div class="ph-usage__text">저장 공간 <b>' + gb(limit) + ' 중 ' + gb(u.bytes || 0) +
         ' (' + pct + '%)</b> 사용 <span class="muted-note">· 자료 파일 ' + (u.files || 0) + '개 ' + gb(u.file_bytes || 0) +
-        ' · 필기 사진 ' + (u.photos || 0) + '장 ' + gb(u.photo_bytes || 0) + ' · 무료 1GB 기준</span></div>' +
+        ' · 필기 사진 ' + (u.photos || 0) + '장 ' + gb(u.photo_bytes || 0) +
+        (u.review_bytes != null ? ' · 시험지 사진 ' + (u.reviews || 0) + '장 ' + gb(u.review_bytes || 0) : '') + ' · 무료 1GB 기준</span></div>' +
         '<div class="progress__bar"><div class="progress__fill ph-usage__fill' + (pct >= 80 ? ' is-warn' : '') + '" style="width:' + pct + '%"></div></div>' +
         (pct >= 80 ? '<p class="wk-warn">⚠️ 저장 공간이 80%를 넘었습니다. 선생님이 [지난 파일 정리]로 지난 학기 파일을 지워 주세요. 가득 차면 사진 · 파일을 더 올릴 수 없습니다.</p>' : '') +
         '</div>';

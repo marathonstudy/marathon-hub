@@ -1149,6 +1149,30 @@
     });
   }
 
+  /* ---------- 복습테스트 — 그 주 확인된 점수 (migration-013 · 레포트에 넣는다) ---------- */
+
+  var reviewScores = {};     /* 주차(월요일) → { 학생 id: {round_no, correct, q_count, score} } */
+  function mondayISO(iso) {
+    var d = parseISO(iso);
+    return d ? toISO(mondayOf(d)) : '';
+  }
+  function loadReview(week) {
+    var mon = mondayISO(week);
+    if (!mon || !global.SB) return Promise.resolve({});
+    return global.SB.client.rpc('review_week_scores', { p_week: mon }).then(function (r) {
+      if (r.error) return reviewScores[mon] || {};
+      var m = {};
+      (r.data || []).forEach(function (x) { m[x.student_id] = x; });
+      reviewScores[mon] = m;
+      emit('jt:review-scores', { week: mon });
+      return m;
+    }, function () { return reviewScores[mon] || {}; });
+  }
+  function reviewOf(studentId, week) {
+    var m = reviewScores[mondayISO(week)];
+    return (m && m[studentId]) || null;
+  }
+
   /* ---------- 상용구 ---------- */
 
   function getSnippets()      { return read(KEYS.snippets, []); }
@@ -1213,6 +1237,7 @@
       Object.keys(w.rawCommon || {}).forEach(function (cls) { bw.common[cls] = rawCommon(w.rawCommon[cls]); });
       base.week = bw;
       writeLocal(KEYS.draft, draft);
+      loadReview(week);
       var s = read(KEYS.settings, {});
       if (s.lastWeek !== week) { s.lastWeek = week; writeLocal(KEYS.settings, s); }
       return draft;
@@ -1349,6 +1374,8 @@
     deleteStudent: deleteStudent,
     getClasses: getClasses,
     schedOf: schedOf,
+    loadReview: loadReview,
+    reviewOf: reviewOf,
     lessonOf: lessonOf,
     classWeekOf: classWeekOf,
     setSchedule: setSchedule,

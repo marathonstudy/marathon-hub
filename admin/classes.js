@@ -60,6 +60,10 @@
     if (+c.exam)     p.push('시험');
     if (+c.photos)   p.push('필기 ' + c.photos);
     if (+c.info)     p.push('반 현황');
+    if (+c.videos)   p.push('영상 ' + c.videos);
+    if (+c.files)    p.push('자료 ' + c.files);
+    if (+c.summaries) p.push('AI 요약 ' + c.summaries);
+    if (+c.reviews)  p.push('복습테스트 ' + c.reviews);
     return p.length ? p.join(' · ') : '<span class="muted-note">없음</span>';
   }
 
@@ -85,13 +89,15 @@
       '<td class="num">' + (+c.active) + '</td>' +
       '<td class="num">' + (+c.left) + '</td>' +
       '<td>' + records(c) + '</td>' +
+      '<td>' + (c.review_q == null ? '<span class="muted-note">—</span>'
+        : '<input class="input ca-q" type="number" min="1" max="100" inputmode="numeric" data-ca-q value="' + (+c.review_q) + '" aria-label="복습테스트 기본 문항 수">') + '</td>' +
       '<td class="roster__actions tb-acts">' + acts + '</td></tr>';
   }
 
   function table(list, empty) {
     if (!list.length) return '<p class="panel__hint">' + empty + '</p>';
     return '<div class="roster-scroll"><table class="roster tb-table ca-table"><thead><tr>' +
-      '<th>반</th><th>재원</th><th>퇴원</th><th>기록</th><th></th></tr></thead><tbody>' +
+      '<th>반</th><th>재원</th><th>퇴원</th><th>기록</th><th title="복습테스트 기본 문항 수 — 그 주만 바꾸기는 ② 작성 반 공통에서">복습 문항</th><th></th></tr></thead><tbody>' +
       list.map(row).join('') + '</tbody></table></div>';
   }
 
@@ -217,6 +223,20 @@
     if (act === 'archive') doArchive(c);
     if (act === 'restore') doRestore(c);
     if (act === 'delete') doDelete(c);
+  });
+
+  /* 복습테스트 기본 문항 수 (migration-013) — 칸에서 나오면 저장. 이미 만들어진 주는 그대로, 앞으로 생기는 주부터 */
+  $('#caBody').addEventListener('change', function (e) {
+    if (e.target.dataset.caQ == null) return;
+    var c = find(e.target.closest('tr').dataset.name);
+    var q = Math.round(Number(e.target.value));
+    if (!c) return;
+    if (!(q >= 1 && q <= 100)) { UI.toast('문항 수는 1 ~ 100 으로 적어 주세요', 'bad'); e.target.value = c.review_q; return; }
+    sb().rpc('class_review_q_set', { p_name: c.name, p_q: q }).then(function (r) {
+      if (r.error) { UI.toast(/Could not find the function|schema cache/i.test(r.error.message) ? 'migration-013 SQL 을 먼저 실행해 주세요' : r.error.message, 'bad'); e.target.value = c.review_q; return; }
+      c.review_q = q;
+      UI.toast('‘' + c.name + '’ 복습테스트 기본 ' + q + '문항 — 앞으로 생기는 주부터', 'good');
+    });
   });
 
   $('#caBody').addEventListener('keydown', function (e) {

@@ -712,3 +712,5 @@ body {
   }
   .footer { padding-bottom: 0; }
 }
+/* 복습테스트 — 선생님이 확인한 점수 (migration-013) */
+.test-badge--ok { background: #DDF1E8; color: #2F7D63; }

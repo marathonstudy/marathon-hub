@@ -44,6 +44,7 @@
       st.data = prepare(r.data);
       render();
       loadApp();
+      loadReviewMissing();
     }).catch(function (e) {
       st.loading = false;
       $('#tdBody').innerHTML = '<div class="empty-state">' + (isMissing(e)
@@ -64,8 +65,20 @@
     return d;
   }
 
+  /* 복습테스트 — 지난 7일 안에 마감이 지났는데 안 낸 학생 (migration-013). 함수가 없으면 조용히 건너뛴다 */
+  var reviewMiss = {};
+  function loadReviewMissing() {
+    sb().rpc('review_missing').then(function (r) {
+      if (r.error) return;
+      reviewMiss = {};
+      (r.data || []).forEach(function (x) { (reviewMiss[x.student_id] = reviewMiss[x.student_id] || []).push(x); });
+      if (Object.keys(reviewMiss).length) render();
+    });
+  }
+
   function reasonsOf(s, set) {
     var out = [];
+    (reviewMiss[s.id] || []).forEach(function (x) { out.push({ k: 'review', t: '복습테스트 ' + x.round_no + '회 미제출' }); });
     if (s.absent_n >= set.absentMin) out.push({ k: 'absent', t: '최근 ' + set.absentWeeks + '주 결석 ' + s.absent_n + '회' });
     var a = app[s.id];
     if (s.app && a && a.ok && a.rate < APP_LOW) out.push({ k: 'app', t: '앱 과제 ' + a.rate + '%' });
