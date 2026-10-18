@@ -139,7 +139,13 @@
   });
 
   $('#btnLogout').addEventListener('click', function () {
-    SB.signOut().then(function () { showLogin(); showError(''); });
+    /* 작성 중이던 글을 먼저 저장하고, 이 기기에 임시 보관한 글은 지운다 */
+    var flush = window.Writer ? Writer.flush() : Promise.resolve();
+    flush.then(function () { return Store.flushAll ? Store.flushAll() : null; }).catch(function () {}).then(function () {
+      Store.setBackupUser('');
+      Store.clearBackups();
+      return SB.signOut();
+    }).then(function () { showLogin(); showError(''); });
   });
 
   $('#goSignup').addEventListener('click', function () {

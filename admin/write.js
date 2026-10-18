@@ -103,11 +103,61 @@
   }
 
   function flushDraft() {
+    applyModalNow();          /* 코멘트 창에 아직 넣지 않은 글이 있으면 먼저 */
     return Store.flushNow(Store.KEYS.draft).catch(function () {});
   }
 
+  /* ============================================================
+     작성 글 지키기 (유실 방지)
+       · 코드로 칸 값을 바꿀 때 — 지금 커서가 있는 칸은 건드리지 않고, 아니면 칸을 새로 만든다.
+         같은 칸의 value 를 코드로 바꾸면 브라우저 실행 취소(Ctrl+Z)가 그 전 글로 되돌아가
+         써 둔 글이 지워질 수 있었다. 새 칸은 실행 취소 기록이 비어 있어 사용자가 직접 친 것만 되돌린다.
+       · 자동 저장: 입력을 멈추고 1.2초 뒤 · 칸을 벗어날 때 · 화면을 떠나거나 탭을 숨길 때
+       · 저장 상태를 칸 옆에 작게 (저장 중 · 저장됨 · 저장 실패)
+     ============================================================ */
+  function setFresh(el, v) {
+    if (!el) return el;
+    v = v == null ? '' : String(v);
+    if (el.value === v || document.activeElement === el) return el;
+    var n = el.cloneNode(true);
+    n.value = v;
+    el.replaceWith(n);
+    return n;
+  }
+
+  /* 상용구 · 정보 넣기 — 실행 취소 한 번에 그 넣은 글만 되돌아가게 */
+  function insertText(ta, text, atEnd) {
+    ta.focus();
+    if (atEnd) { var L = ta.value.length; ta.setSelectionRange(L, L); }
+    var ok = false;
+    try { ok = document.execCommand && document.execCommand('insertText', false, text); } catch (e) { ok = false; }
+    if (!ok) {
+      var a = ta.selectionStart, z = ta.selectionEnd;
+      ta.value = ta.value.slice(0, a) + text + ta.value.slice(z);
+      ta.setSelectionRange(a + text.length, a + text.length);
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  }
+
+  var SAVE_TEXT = { saving: '저장 중…', saved: '저장됨', failed: '저장 실패 — 다시 시도합니다', conflict: '다른 분이 고친 칸 — 위 알림 확인' };
+  var uiState = { entry: {}, common: {} };
+  function showState(kind, id, state) {
+    uiState[kind][id] = state;
+    var text = SAVE_TEXT[state] || '';
+    var cls = 'save-state' + (state ? ' save-state--' + state : '');
+    if (kind === 'common' && id === currentClass) { var c = $('#commonSaveState'); if (c) { c.textContent = text; c.className = cls; } }
+    if (kind === 'entry') {
+      var card = $('#entryList .entry[data-id="' + id + '"] [data-save]');
+      if (card) { card.textContent = text; card.className = 'entry__save ' + cls; }
+    }
+    if (commentModal && commentModal.open && ((kind === 'entry' && !commentIsClass && id === commentTargetId) || (kind === 'common' && commentIsClass && id === currentClass))) {
+      var m = $('#commentSaveState'); if (m) { m.textContent = text; m.className = cls; }
+    }
+  }
+  window.addEventListener('jt:save-state', function (e) { var d = e.detail || {}; showState(d.kind, d.id, d.state); });
+
   /* 탭을 닫거나 화면을 벗어날 때 마지막 타자까지 확실히 저장한다.
-     디바운스만 믿으면 마지막 0.4초가 날아갈 수 있다. */
+     디바운스만 믿으면 마지막 1.2초가 날아갈 수 있다. */
   window.addEventListener('pagehide', flushDraft);
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState === 'hidden') flushDraft();
@@ -175,12 +225,12 @@
   var switching = false;
 
   function switchWeek(newStart, span) {
-    if (!newStart || newStart === draft.weekStart || switching) { renderWeek(); return; }
+    if (!newStart || newStart === draft.weekStart || switching) { renderWeek(); return Promise.resolve(); }
     switching = true;
     var flush = flushDraft();
 
     $('#weekSummary').textContent = '불러오는 중…';
-    flush.then(function () {
+    return flush.then(function () {
       return Store.loadWeekIntoDraft(newStart);
     }).then(function (d) {
       draft = d;
@@ -308,8 +358,7 @@
 
   function renderCommonComment() {
     var c = commonOf(currentClass || '_');
-    var ta = $('#commonComment');
-    if (ta.value !== (c.comment || '')) ta.value = c.comment || '';
+    setFresh($('#commonComment'), c.comment || '');
 
     var n = (c.comment || '').length;
     $('#commonCommentCount').textContent = n + '자';
@@ -377,6 +426,7 @@
 
   $('#commonPanel').addEventListener('input', function (e) {
     var el = e.target;
+    if (el.dataset.kind === 'lesson' || el.dataset.kind === 'test' || el.dataset.kind === 'hw') showState('common', currentClass, 'saving');
     if (el.dataset.kind === 'lesson') {
       commonOf(currentClass).lessons[+el.dataset.i] = el.value;
       saveDraft(); schedulePreview();
@@ -441,13 +491,16 @@
     schedulePreview();
   });
 
-  $('#commonComment').addEventListener('input', function (e) {
+  /* 반 공통 코멘트 — 칸이 새로 만들어질 수 있어 반 공통 칸 묶음(#commonPanel)에서 받는다 */
+  $('#commonPanel').addEventListener('input', function (e) {
+    if (e.target.id !== 'commonComment') return;
     /* 읽는 쪽(renderCommonComment)과 같은 자리를 써야 한다.
        반이 아직 안 골라졌으면 양쪽 다 '_' 를 쓴다. */
     commonOf(currentClass || '_').comment = e.target.value;
     renderCommonComment();
     renderEntries();          /* 공통을 쓰는 학생 카드의 미리보기가 같이 바뀐다 */
     saveDraft();
+    showState('common', currentClass, 'saving');
   });
 
   /* 폰에서 길게 쓰기 — 코멘트 모달을 반 공통 모드로 연다 */
@@ -562,6 +615,7 @@
         '<div class="entry__head" data-act="head">' +
           '<span class="entry__name"></span>' +
           '<span class="entry__badge"></span>' +
+          '<span class="entry__save" data-save aria-live="polite"></span>' +
           '<span class="entry__caret" aria-hidden="true">▾</span>' +
         '</div>' +
         '<div class="entry__body">' +
@@ -700,6 +754,8 @@
   function fillEntryCard(el, s, tests) {
     var e = entryOf(s.id);
     el.querySelector('.entry__name').textContent = s.name || '';
+    var sv = el.querySelector('[data-save]');
+    if (sv && uiState.entry[s.id]) { sv.textContent = SAVE_TEXT[uiState.entry[s.id]] || ''; sv.className = 'entry__save save-state save-state--' + uiState.entry[s.id]; }
     fillBadge(el, s.id);
 
     $$('.score', el).forEach(function (lab, i) {
@@ -846,6 +902,7 @@
       e.attendNote = ev.target.value;
       afterChange(id);
     }
+    showState('entry', id, 'saving');
   });
 
   /* now = 한 칸씩 누르는 기록(출결·별점·과제 체크) → 누르자마자 그 칸만 저장 */
@@ -951,24 +1008,41 @@
      저장할 때 이 값과 글 내용을 같이 본다. */
   var commentOwnMode = false;
 
+  /* 코멘트 창의 글 칸은 열 때마다 새로 만든다 — 앞 학생 글이 실행 취소(Ctrl+Z)로 넘어오지 않게 */
+  function freshCommentText(v) {
+    var el = $('#commentText');
+    var n = el.cloneNode(false);
+    n.value = v == null ? '' : String(v);
+    el.replaceWith(n);
+    return n;
+  }
+
+  var commentOrig = null;     /* 연 때 글 — [취소] 하면 이것으로 되돌린다 */
+  var modalTimer = null;
+
   function openCommentModal(id, opts) {
     opts = opts || {};
+    applyModalNow();
     commentIsClass = !!opts.classComment;
     commentTargetId = commentIsClass ? '' : id;
 
     if (commentIsClass) {
       $('#commentWho').textContent = (currentClass || '') + ' 반 공통 코멘트';
-      $('#commentText').value = commonOf(currentClass || '_').comment || '';
+      commentOrig = { cls: currentClass || '_', value: commonOf(currentClass || '_').comment || '' };
+      freshCommentText(commonOf(currentClass || '_').comment || '');
       $('#commentMode').hidden = true;
     } else {
       var s = students().find(function (x) { return x.id === id; });
       var own = (entryOf(id).comment || '').trim();
       $('#commentWho').textContent = (s ? s.name + ' 학생 ' : '') + '코멘트';
+      commentOrig = { id: id, value: entryOf(id).comment || '' };
       /* 공통을 쓰는 중이면 그 글을 보여 준다. 그대로 저장하면 공통인 채로 남는다. */
       commentOwnMode = !!own;
-      $('#commentText').value = own || (commonOf((s && s.className) || '_').comment || '');
+      freshCommentText(own || (commonOf((s && s.className) || '_').comment || ''));
       renderCommentMode();
     }
+    var ms = $('#commentSaveState');
+    if (ms) { ms.textContent = ''; ms.className = 'save-state'; }
 
     updateCommentCount();
     renderInfoBar();
@@ -1019,10 +1093,11 @@
   $('#btnCommentShared').addEventListener('click', function () {
     var s = students().find(function (x) { return x.id === commentTargetId; });
     commentOwnMode = false;
-    $('#commentText').value = commonOf((s && s.className) || '_').comment || '';
+    freshCommentText(commonOf((s && s.className) || '_').comment || '');
     updateCommentCount();
     renderCommentMode();
-    toast('반 공통으로 되돌립니다 — 저장을 누르세요');
+    scheduleModalSave();
+    toast('반 공통으로 되돌립니다');
   });
 
   function updateCommentCount() {
@@ -1053,16 +1128,83 @@
     }
   }
 
-  $('#commentText').addEventListener('input', updateCommentCount);
+  /* 코멘트 창 글 칸은 새로 만들어지므로 창에서 받는다 */
+  commentModal.addEventListener('input', function (e) {
+    if (e.target.id !== 'commentText') return;
+    updateCommentCount();
+    scheduleModalSave();
+  });
 
-  $('#btnCommentCancel').addEventListener('click', function () { commentModal.close(); });
+  /* 코멘트 창 — 입력을 멈추고 1.2초 뒤 그 칸에 넣고 바로 저장 (저장 단추를 안 눌러도) */
+  function scheduleModalSave() {
+    clearTimeout(modalTimer);
+    showState(commentIsClass ? 'common' : 'entry', commentIsClass ? currentClass : commentTargetId, 'saving');
+    modalTimer = setTimeout(function () { modalTimer = null; applyModal(); flushDraft(); }, 1200);
+  }
+  function applyModalNow() {
+    if (!modalTimer) return;
+    clearTimeout(modalTimer); modalTimer = null;
+    applyModal();
+  }
+
+  /* 창의 글 → 그 칸 (저장 단추와 같은 규칙). 돌려주는 값: 공통으로 돌아갔는지 */
+  function applyModal() {
+    if (!draft) return false;
+    var v = $('#commentText').value;
+    if (commentIsClass) {
+      commonOf(currentClass || '_').comment = v;
+      saveDraft();
+      renderCommonComment();
+      renderEntries();
+      return false;
+    }
+    if (!commentTargetId) return false;
+    var s = students().find(function (x) { return x.id === commentTargetId; });
+    var shared = (commonOf((s && s.className) || '_').comment || '');
+    /* 공통으로 돌아가는 경우
+         · '공통으로 되돌리기' 를 골랐다
+         · 글을 비웠다 (빈 개별 코멘트는 만들 수 없다)
+         · 공통과 글자 하나 다르지 않다 (굳이 따로 둘 이유가 없다) */
+    var backToShared = !commentOwnMode || !v.trim() || v === shared;
+    entryOf(commentTargetId).comment = backToShared ? '' : v;
+    saveDraft();
+    replaceCard(commentTargetId);
+    return backToShared;
+  }
+
+  /* [취소] — 연 때 글로 되돌린다 (그사이 자동 저장한 것도) */
+  $('#btnCommentCancel').addEventListener('click', function () {
+    clearTimeout(modalTimer); modalTimer = null;
+    if (commentOrig && draft) {
+      if (commentOrig.cls != null) {
+        if ((commonOf(commentOrig.cls).comment || '') !== commentOrig.value) { commonOf(commentOrig.cls).comment = commentOrig.value; saveDraft(); flushDraft(); }
+      } else if (commentOrig.id) {
+        if ((entryOf(commentOrig.id).comment || '') !== commentOrig.value) { entryOf(commentOrig.id).comment = commentOrig.value; saveDraft(); flushDraft(); }
+      }
+    }
+    commentOrig = null;
+    commentModal.close();
+    renderCommonComment();
+    renderEntries();
+  });
+
+  /* Esc 로 닫을 때 — 쓴 글은 지키고 닫는다 */
+  commentModal.addEventListener('cancel', function () {
+    if (modalTimer) { applyModalNow(); flushDraft(); }
+    commentOrig = null;
+  });
+  commentModal.addEventListener('close', function () {
+    if (modalTimer) { applyModalNow(); flushDraft(); }
+  });
 
   $('#commentForm').addEventListener('submit', function (e) {
     e.preventDefault();
+    clearTimeout(modalTimer); modalTimer = null;
+    commentOrig = null;
 
     if (commentIsClass) {
-      commonOf(currentClass || '_').comment = $('#commentText').value;
-      saveDraft();
+      applyModal();
+      flushDraft();
       commentModal.close();
       renderCommon();
       renderEntries();
@@ -1072,18 +1214,10 @@
 
     /* 학생 창에서 저장하면 그 학생 것이 된다.
        비우고 저장하면 반 공통으로 돌아간다. */
-    var v = $('#commentText').value;
     var s = students().find(function (x) { return x.id === commentTargetId; });
     var shared = (commonOf((s && s.className) || '_').comment || '');
-
-    /* 공통으로 돌아가는 경우
-         · '공통으로 되돌리기' 를 골랐다
-         · 글을 비웠다 (빈 개별 코멘트는 만들 수 없다)
-         · 공통과 글자 하나 다르지 않다 (굳이 따로 둘 이유가 없다) */
-    var backToShared = !commentOwnMode || !v.trim() || v === shared;
-
-    entryOf(commentTargetId).comment = backToShared ? '' : v;
-    saveDraft();
+    var backToShared = applyModal();
+    flushDraft();
     commentModal.close();
     renderEntries();
     renderCommonComment();
@@ -1123,9 +1257,7 @@
     var text = sn.text.split('OO').join(s ? s.name : 'OO');
 
     var ta = $('#commentText');
-    var cur = ta.value;
-    ta.value = cur ? (cur.replace(/\s*$/, '') + '\n' + text) : text;
-    ta.focus();
+    insertText(ta, ta.value.trim() ? '\n' + text : text, true);
     updateCommentCount();
   });
 
@@ -1210,11 +1342,7 @@
     if (!text) return;
 
     var ta = $('#commentText');
-    var a = ta.selectionStart, z = ta.selectionEnd;
-    ta.value = ta.value.slice(0, a) + text + ta.value.slice(z);
-    var pos = a + text.length;
-    ta.focus();
-    ta.setSelectionRange(pos, pos);
+    insertText(ta, text, false);
     updateCommentCount();
   });
 
@@ -1412,6 +1540,7 @@
   /* 작성 탭이 열릴 때마다 최신 명단으로 다시 그린다 */
   document.addEventListener('jt:tab', function (e) {
     if (e.detail.index === 1) refreshAll();
+    else flushDraft();          /* 다른 화면으로 갈 때 마지막 글까지 저장 */
   });
 
   /* ---------- 여러 기기 ----------
@@ -1463,6 +1592,7 @@
     if ((d.common || []).indexOf('_week') !== -1) renderWeek();
     if ((d.common || []).indexOf(currentClass) !== -1) {
       if (!$('#commonPanel').contains(document.activeElement)) renderCommon();
+      else renderCommonComment();       /* 다른 칸에 커서가 있어도 코멘트 칸은 맞춘다 (커서가 있는 칸은 그대로) */
       if (!$('#entryList').contains(document.activeElement)) renderEntries();
       else (d.entries || []).forEach(replaceCard);
     } else {
@@ -1493,6 +1623,10 @@
     collapsedEntries = {};
     renderWeek();
     if (!$('#panel-write').hidden) refreshAll();
+    SB.getSession().then(function (sess) {
+      Store.setBackupUser(sess && sess.user && sess.user.email);
+      if (window.DraftGuard) DraftGuard.checkRestore();
+    }).catch(function () {});
   });
 
   /* ============================================================
@@ -1510,6 +1644,18 @@
   /* ③ 공개 탭이 목록을 만들기 전에 마지막 입력까지 저장해 둔다 */
   window.Writer = {
     flush: flushDraft,
+    switchWeek: switchWeek,
+    refresh: function () { if (!$('#panel-write').hidden) refreshAll(); },
+    commonOf: function (cls) { return commonOf(cls); },
+    entryOf: function (id) { return entryOf(id); },
+    save: function () { saveDraft(); return flushDraft(); },
+    renderCommon: function () { renderCommon(); renderEntries(); },
+    replaceCard: function (id) { replaceCard(id); },
+    setFresh: setFresh,
+    modal: function () {
+      return commentModal.open ? { isClass: commentIsClass, id: commentTargetId, cls: currentClass } : null;
+    },
+    setModalText: function (v) { freshCommentText(v); updateCommentCount(); applyModal(); return flushDraft(); },
     current: function () { return draft; },
     currentClass: function () { return currentClass; },
     preview: schedulePreview,

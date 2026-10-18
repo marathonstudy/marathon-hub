@@ -40,6 +40,7 @@ admin/        코치룸 (명단 · 작성 · 공개 · 발송 · 반 공지 · �
   weekly.js     ② 작성 반 공통 — 수업일 · 수업 영상 · 배부 자료/과제 파일 · 지난 파일 정리
   summary.js    ② 작성 반 공통 — 자막으로 AI 수업 요약 (초안 → 확정)
   review.js     ② 작성 반 공통 — 복습테스트 확인 표 · 대신 입력 · 지금 제출 현황 · 자주 틀린 번호
+  draftguard.js ② 작성 글 지키기 — 다른 사람이 고친 칸 알림 · 저장 안 된 내용 복구 · 이전 내용 보기
 me/           학생·학부모 개인 페이지
 notice/       반 공용 공지 페이지
 assets/
@@ -73,6 +74,7 @@ supabase/
   functions/lesson-summary/index.ts 자막 → Claude(Opus 5.5) 요약 Edge Function (직원만 · 키는 Secrets 에만)
   migration-013-review-test.sql     복습테스트 — 회차 자동 생성 · 학생 제출 · 조교 확인 · 기록 · 시험지 사진 보관함
   functions/review-test/index.ts    복습테스트 학생 제출 Edge Function (개인 링크 · 수업일 당일 · 마감 확인)
+  migration-014-draft-safety.sql    작성 글 안전장치 — 크게 줄면 · 10분마다 · 다른 글로 바뀔 때 이전 글을 서버에 보관
   check-classes.sql               반 이름 점검 (읽기 전용 — 어느 표에 어떤 반이 있는지 · 비슷한 이름)
   functions/app-report/index.ts  앱 과제 기록을 대신 받아 오는 Edge Function
 ```
@@ -197,6 +199,10 @@ delete from public.staff where email = '조교이메일@example.com';
    → `supabase/functions/review-test/index.ts` 전체 붙여 넣기 → **Deploy function**
 3. 배포된 함수 → **Details** → **Verify JWT with legacy secret** 끄기 → Save (학생은 로그인이 없다. 함수가 개인 링크 코드를 직접 검사한다)
 
+### 5-11. 작성 글 안전장치 (migration-014)
+1. SQL Editor → **New query** → `supabase/migration-014-draft-safety.sql` 전체 → **Run**
+   (결과에 `text_history rls = true`, `triggers = 2`)
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.
@@ -223,6 +229,21 @@ delete from public.staff where email = '조교이메일@example.com';
   [새로 불러오기] = 다른 분 내용 보기 · [내 내용으로 덮어쓰기] · [나중에].
   한 학생이라도 출결과 코멘트처럼 서로 다른 칸이면 둘 다 그대로 저장된다.
 - 브라우저에는 로그인과 화면 설정만 남는다. 학생·작성·교재 자료는 브라우저에 저장하지 않는다.
+  예외 하나 — ② 작성에서 **아직 서버에 저장되지 않은 칸**만 이 기기에 잠깐 보관했다가(인터넷이 끊겼을 때 · 화면이 멈췄을 때 복구용),
+  저장되면 바로 지운다. **로그아웃하면 지운다.** 같이 쓰는 컴퓨터에서는 꼭 로그아웃한다.
+
+### ② 작성 글 지키기 (유실 방지)
+- **자동 저장**: 입력을 멈추고 1.2초 뒤 · 칸을 벗어날 때 · 다른 화면으로 가거나 탭을 숨길 때. 코멘트 창도 [저장]을 안 눌러도 저장된다
+  ([취소]는 연 때 글로 되돌린다 · Esc 로 닫으면 쓴 글을 지킨다). 칸 옆에 「저장 중 · 저장됨 · 저장 실패」가 작게 보인다.
+  저장에 실패하면(인터넷 끊김) 10초마다 다시 보낸다.
+- **덮어쓰지 않는다**: 지금 커서가 있거나 아직 저장 안 된 칸은 실시간 반영 · 다시 불러오기가 바꾸지 않는다.
+  늦게 도착한 옛 알림(내 저장의 옛 알림 포함)은 줄의 수정 시각을 보고 버린다.
+  다른 사람이 같은 칸을 바꾸면 「다른 사람이 이 칸을 수정했습니다 [그 내용 보기]」 → [그 내용으로 바꾸기] / [내 내용 유지].
+  어느 쪽이든 바뀌는 쪽 글은 [이전 내용]에 남는다.
+- **실행 취소(Ctrl+Z)**: 코드가 칸 값을 바꿀 때는 칸을 새로 만든다(코멘트 창은 열 때마다 새 칸). 그래서 Ctrl+Z 는 그 칸에서 직접 친 것만 되돌린다.
+- **임시 보관 · 복구**: 저장 전 내용은 이 기기에 잠깐 보관한다. 화면이 멈췄다 다시 열면 「저장 안 된 내용이 있습니다 [복구]」.
+- **이전 내용 보기**(반 공통 코멘트 · 수업 내용 · 코멘트 창): 글이 한 번에 절반 넘게 줄면 줄기 전 글, 같은 칸을 10분 넘게 고치면 10분마다 이전 글이
+  서버에 남는다(칸마다 최근 30개 · 직원만 · 아무도 못 지움). 골라서 [되살리기].
 - 백업 되살리기·엑셀 넣기는 더하거나 고치기만 하고, 파일에 없는 학생을 지우지 않는다.
 
 ## 상담 카드 · 상담·관찰 기록

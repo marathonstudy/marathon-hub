@@ -2228,3 +2228,29 @@ body.rv-live-open { overflow: hidden; }
 .rv-bar__track { height: 12px; border-radius: 4px; background: #EEEAFD; overflow: hidden; }
 .rv-bar__fill { display: block; height: 100%; border-radius: 0 4px 4px 0; background: #7858E8; }
 .rv-bar__v { color: var(--ink-mid); text-align: right; }
+
+/* ============================================================
+   ② 작성 글 지키기 (write.js · draftguard.js · migration-014)
+   ============================================================ */
+.save-state { font-size: 11.5px; font-weight: 700; color: var(--ink-light); white-space: nowrap; }
+.save-state:empty { display: none; }
+.save-state--saving { color: var(--ink-light); }
+.save-state--saved { color: var(--ok); }
+.save-state--failed, .save-state--conflict { color: var(--danger); }
+.entry__save { margin-left: 6px; }
+.draft-restore { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; padding: 10px 12px;
+  border-radius: 12px; background: #FFF6E8; border: 1px solid #F3D9B0; font-size: 13.5px; color: #7A4A0E; }
+.dr__msg { font-weight: 700; margin-right: auto; }
+.draft-notes:empty { display: none; }
+.draft-notes { display: grid; gap: 6px; margin-bottom: 10px; }
+.dn { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 10px; border-radius: 10px;
+  background: #FDF2F5; border: 1px solid #F0D7DE; font-size: 13px; color: var(--ink-deep); }
+.dn__msg { margin-right: auto; }
+.dnv-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.dnv-text { margin-top: 4px; min-height: 80px; max-height: 260px; overflow: auto; white-space: pre-wrap; font-size: 13.5px; line-height: 1.6;
+  padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
+.th-item { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; }
+.th-item__head { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12.5px; color: var(--ink-mid); }
+.th-item__head .btn { margin-left: auto; }
+.th-item__text { margin-top: 6px; white-space: pre-wrap; font-size: 13px; line-height: 1.6; color: var(--ink-deep); max-height: 140px; overflow: auto; }
+@media (max-width: 720px) { .dnv-cols { grid-template-columns: 1fr; } }

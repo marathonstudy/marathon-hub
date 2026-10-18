@@ -75,6 +75,7 @@
   function write(key, value) {
     writeLocal(key, value);
     try { pushToServer(key); } catch (e) { console.error(e); }
+    if (key === KEYS.draft) scheduleBackup();
     return true;
   }
 
@@ -419,25 +420,63 @@
      내가 보낸 항목(sent)        → base 를 서버 값으로
      다른 분과 겹친 항목(clash)   → 그대로 둔다 (사용자에게 묻는다)
      내가 손대지 않은 항목        → 화면도 서버 값으로
-     아직 저장 안 된 내 입력       → 화면 값을 지킨다 */
+     아직 저장 안 된 내 입력       → 화면 값을 지킨다
+     others = 지금 고치는 중이거나 아직 저장 안 된 칸을 다른 사람이 바꾼 것 — 덮지 않고 알린다 */
   function mergeFlat(local, b, srv, sent, clash, prot) {
-    var nl = {}, nb = {}, changed = false;
+    var nl = {}, nb = {}, changed = false, others = [];
     prot = prot || {};
     keysOf(local, b, srv).forEach(function (k) {
       if (clash[k]) { nl[k] = local[k]; nb[k] = b[k]; return; }
       if (sent[k]) { nl[k] = local[k]; nb[k] = srv[k]; return; }
       /* 지금 그 칸을 고치는 중 — 화면도 base 도 그대로 둔다.
          저장하면 서버가 base 와 달라진 것을 알아채고 '다른 분이 먼저 수정' 으로 묻는다. */
-      if (prot[k]) { nl[k] = local[k]; nb[k] = b[k]; return; }
+      if (prot[k]) { nl[k] = local[k]; nb[k] = b[k]; if (!same(srv[k], b[k]) && !same(srv[k], local[k])) others.push(k); return; }
       if (same(local[k], b[k])) {
         nl[k] = srv[k]; nb[k] = srv[k];
         if (!same(local[k], srv[k])) changed = true;
-      } else { nl[k] = local[k]; nb[k] = b[k]; }
+      } else {
+        nl[k] = local[k]; nb[k] = b[k];
+        if (!same(srv[k], b[k]) && !same(srv[k], local[k])) others.push(k);
+      }
     });
     Object.keys(nl).forEach(function (k) { if (nl[k] === undefined) delete nl[k]; });
     Object.keys(nb).forEach(function (k) { if (nb[k] === undefined) delete nb[k]; });
-    return { local: nl, base: nb, changed: changed };
+    return { local: nl, base: nb, changed: changed, others: others };
   }
+
+  /* 서버 줄의 수정 시각 — 이것보다 옛 줄(늦게 도착한 실시간 알림 · 저장 전에 받아 둔 다시 불러오기)은 합치지 않는다.
+     (예전에는 내 저장의 옛 알림이 나중에 도착하면 화면 글이 그때 글로 되돌아갔다) */
+  function tsOf(x) { var n = Date.parse(x || ''); return isNaN(n) ? 0 : n; }
+  function knownAt(kind, id) {
+    var bw = base.week;
+    return (bw && bw.at && bw.at[kind] && bw.at[kind][id]) || '';
+  }
+  function noteAt(kind, id, row) {
+    var bw = base.week;
+    if (!bw || !row || !row.updated_at) return;
+    bw.at = bw.at || { entry: {}, common: {} };
+    if (tsOf(row.updated_at) >= tsOf(bw.at[kind][id])) bw.at[kind][id] = row.updated_at;
+  }
+  function isStale(kind, id, row) {
+    var known = knownAt(kind, id);
+    if (!row) return !!known;                       /* 서버에 줄이 있는 걸 아는데 '없음' 으로 온 옛 응답 */
+    if (!known || !row.updated_at) return false;
+    return tsOf(row.updated_at) < tsOf(known);
+  }
+
+  var OTHER_KEYS = { entry: { comment: true, attend_note: true }, common: { comment: true, lessons: true, tests: true, homework: true } };
+  function tellOthers(kind, id, keys, row) {
+    var ks = (keys || []).filter(function (k) { return OTHER_KEYS[kind][k]; });
+    if (ks.length) emit('jt:draft-others', { kind: kind, id: id, keys: ks, row: row });
+  }
+
+  /* 저장 상태 — 화면이 칸 옆에 「저장 중 · 저장됨 · 저장 실패」 를 보여 준다 */
+  var saveState = { entry: {}, common: {} };
+  function setSaveState(kind, id, state) {
+    saveState[kind][id] = state;
+    emit('jt:save-state', { kind: kind, id: id, state: state });
+  }
+  function saveStateOf(kind, id) { return saveState[kind][id] || ''; }
 
   function draftNow() { return read(KEYS.draft, null); }
 
@@ -455,20 +494,25 @@
     return { attendStatus: '', attendNote: '', focusScore: 0, scores: {}, homework: {}, onTimeRate: 100, comment: '' };
   }
 
-  function mergeEntry(sid, serverRow, sent, clash) {
+  /* remote = 실시간 알림 · 다시 불러오기에서 온 줄 (내 저장 응답이 아닌 것) */
+  function mergeEntry(sid, serverRow, sent, clash, remote) {
     var d = draftNow(), bw = base.week;
     if (!d || !bw) return false;
+    if (remote && isStale('entry', sid, serverRow)) return false;
     var cur = d.entries[sid] || emptyEntryObj();
     var m = mergeFlat(flatEntry(cur), bw.entries[sid] || flatRaw(null), flatRaw(serverRow), sent || {}, clash || {},
                       protectedKeys('entry', sid));
     bw.entries[sid] = m.base;
     d.entries[sid] = unflat(m.local, cur);
+    noteAt('entry', sid, serverRow);
+    if (remote) tellOthers('entry', sid, m.others, serverRow);
     return m.changed;
   }
 
-  function mergeCommon(cls, serverRow, sent, clash) {
+  function mergeCommon(cls, serverRow, sent, clash, remote) {
     var d = draftNow(), bw = base.week;
     if (!d || !bw) return false;
+    if (remote && isStale('common', cls, serverRow)) return false;
     var cur = d.common[cls] || normCommon(null);
     var braw = bw.common[cls] || rawCommon(null);
     var sraw = rawCommon(serverRow);
@@ -482,9 +526,51 @@
     });
     bw.common[cls] = nraw;
     d.common[cls] = cur;
+    noteAt('common', cls, serverRow);
+    if (remote) tellOthers('common', cls, m.others, serverRow);
     return m.changed;
   }
 
+  /* 알림에서 [그 내용으로 바꾸기] — 그 칸을 서버 값으로 (화면 · base 모두) */
+  function acceptRemote(kind, id, keys, row) {
+    var d = draftNow(), bw = base.week;
+    if (!d || !bw || !row) return;
+    if (kind === 'entry') {
+      var cur = d.entries[id] || emptyEntryObj();
+      var fl = flatEntry(cur), sv = flatRaw(row), b = bw.entries[id] || flatRaw(null);
+      keys.forEach(function (k) { fl[k] = sv[k]; b[k] = sv[k]; if (fl[k] === undefined) delete fl[k]; if (b[k] === undefined) delete b[k]; });
+      bw.entries[id] = b;
+      d.entries[id] = unflat(fl, cur);
+      emit('jt:draft-remote', { entries: [id] });
+    } else {
+      var c = d.common[id] || normCommon(null), braw = bw.common[id] || rawCommon(null), sraw = rawCommon(row), sn = normCommon(sraw);
+      keys.forEach(function (k) { c[k] = sn[k]; braw[k] = sraw[k]; });
+      bw.common[id] = braw;
+      d.common[id] = c;
+      emit('jt:draft-remote', { common: [id] });
+    }
+    noteAt(kind, id, row);
+    scheduleBackup();
+  }
+
+  /* 알림에서 [내 내용 유지] — 다른 사람 글을 이전 내용에 남기고, 내 글로 저장한다 (확인 창 없이) */
+  function keepMine(kind, id, keys, row) {
+    var bw = base.week;
+    if (!bw || !row) return;
+    if (kind === 'entry') {
+      var b = bw.entries[id] || flatRaw(null), sv = flatRaw(row);
+      keys.forEach(function (k) { b[k] = sv[k]; });
+      bw.entries[id] = b;
+    } else {
+      var braw = bw.common[id] || rawCommon(null), sraw = rawCommon(row);
+      keys.forEach(function (k) { braw[k] = sraw[k]; });
+      bw.common[id] = braw;
+    }
+    pushToServer(KEYS.draft);
+  }
+
+  var draftInflight = 0;
+  var retryTimer = null;
   PUSHERS[KEYS.draft] = function () {
     var d = draftNow(), bw = base.week;
     if (!d || !bw || d.weekStart !== bw.weekStart) return Promise.resolve();
@@ -516,6 +602,7 @@
       });
       if (!any) return;
       jobs.push(function () {
+        setSaveState('entry', sid, 'saving');
         return global.DB.entryPatch(week, sid, set, bs, false).then(function (res) {
           if (!base.week || base.week.weekStart !== week) return;
           var clash = {};
@@ -524,7 +611,8 @@
           Object.keys(set).forEach(function (k) { if (!clash[k]) sent[k] = true; });
           if (mergeEntry(sid, res.row, sent, clash)) emit('jt:draft-remote', { entries: [sid] });
           if (res.conflicts && res.conflicts.length) clashes.push({ kind: 'entry', id: sid, keys: res.conflicts, row: res.row });
-        });
+          setSaveState('entry', sid, res.conflicts && res.conflicts.length ? 'conflict' : 'saved');
+        }, function (e) { setSaveState('entry', sid, 'failed'); throw e; });
       });
     });
 
@@ -544,6 +632,7 @@
       });
       if (!any) return;
       jobs.push(function () {
+        setSaveState('common', cls, 'saving');
         return global.DB.commonPatch(week, cls, set, bs, false).then(function (res) {
           if (!base.week || base.week.weekStart !== week) return;
           var clash = {};
@@ -552,90 +641,51 @@
           Object.keys(set).forEach(function (k) { if (!clash[k]) sent[k] = true; });
           if (mergeCommon(cls, res.row, sent, clash)) emit('jt:draft-remote', { common: [cls] });
           if (res.conflicts && res.conflicts.length) clashes.push({ kind: 'common', id: cls, keys: res.conflicts, row: res.row });
-        });
+          setSaveState('common', cls, res.conflicts && res.conflicts.length ? 'conflict' : 'saved');
+        }, function (e) { setSaveState('common', cls, 'failed'); throw e; });
       });
     });
 
-    if (!jobs.length) return Promise.resolve();
-    return each(jobs, 4, function (job) { return job(); }).then(function () {
+    if (!jobs.length) { scheduleBackup(); return Promise.resolve(); }
+    var failed = null;
+    draftInflight++;
+    return each(jobs, 4, function (job) {
+      return job().catch(function (e) { failed = failed || e; });   /* 하나가 실패해도 나머지는 저장 */
+    }).then(function () {
+      draftInflight--;
+      scheduleBackup();
+      if (failed) {
+        /* 인터넷이 끊겼을 때 — 임시 보관은 남기고 10초 뒤 다시 보낸다 */
+        clearTimeout(retryTimer);
+        retryTimer = setTimeout(function () { pushToServer(KEYS.draft); }, 10000);
+        throw failed;
+      }
       if (!clashes.length) return null;
       return resolveDraftClashes(week, clashes);
-    });
+    }, function (e) { draftInflight--; throw e; });
   };
-  DELAY[KEYS.draft] = 400;
+  /* 입력을 멈추고 1.2초 뒤 저장 (칸을 벗어날 때 · 화면을 떠날 때 · 탭을 숨길 때는 바로 — write.js) */
+  DELAY[KEYS.draft] = 1200;
 
   var KEY_LABEL = { comment: '코멘트', attend_note: '출결 메모', lessons: '수업 내용', tests: '리뷰테스트', homework: '과제', };
 
   function resolveDraftClashes(week, clashes) {
-    var names = clashes.map(function (c) {
-      var who = c.kind === 'entry'
-        ? ((getStudents().find(function (s) { return s.id === c.id; }) || {}).name || '학생') + ' 학생'
-        : c.id + ' 반 공통';
-      return who + ' ' + c.keys.map(function (k) { return KEY_LABEL[k] || k; }).join('·');
-    });
-    return askConflict(names.join(', ')).then(function (choice) {
-      if (!base.week || base.week.weekStart !== week) return null;
-      var d = draftNow();
-      if (choice === 'reload') {
-        clashes.forEach(function (c) {
-          var take = {};
-          c.keys.forEach(function (k) { take[k] = true; });
-          if (c.kind === 'entry') {
-            /* 겹친 항목은 서버 값으로 — 화면 값을 base 와 같게 만든 뒤 합친다 */
-            var f = flatEntry(d.entries[c.id]);
-            var b = base.week.entries[c.id] || flatRaw(null);
-            c.keys.forEach(function (k) { if (b[k] === undefined) delete f[k]; else f[k] = b[k]; });
-            unflat(f, d.entries[c.id]);
-            mergeEntry(c.id, c.row, {}, {});
-          } else {
-            var cur = d.common[c.id];
-            var bn = normCommon(base.week.common[c.id]);
-            c.keys.forEach(function (k) { cur[k] = bn[k]; });
-            mergeCommon(c.id, c.row, {}, {});
-          }
-        });
-        emit('jt:draft-remote', {
-          entries: clashes.filter(function (c) { return c.kind === 'entry'; }).map(function (c) { return c.id; }),
-          common: clashes.filter(function (c) { return c.kind === 'common'; }).map(function (c) { return c.id; })
-        });
-        return null;
-      }
-      if (choice === 'overwrite') {
-        return each(clashes, 4, function (c) {
-          if (c.kind === 'entry') {
-            var f = flatEntry(d.entries[c.id]), set = {};
-            c.keys.forEach(function (k) { set[k] = f[k] === undefined ? null : f[k]; });
-            return global.DB.entryPatch(week, c.id, set, {}, true).then(function (res) {
-              var sent = {};
-              c.keys.forEach(function (k) { sent[k] = true; });
-              mergeEntry(c.id, res.row, sent, {});
-            });
-          }
-          var cur = d.common[c.id], setc = {};
-          c.keys.forEach(function (k) { setc[k] = cur[k]; });
-          return global.DB.commonPatch(week, c.id, setc, {}, true).then(function (res) {
-            var sent = {};
-            c.keys.forEach(function (k) { sent[k] = true; });
-            mergeCommon(c.id, res.row, sent, {});
-          });
-        });
-      }
-      return null;
-    });
+    /* 작성 글 칸이 겹치면 덮어쓰지 않고 그 칸 옆에 알린다 — 「다른 사람이 이 칸을 수정했습니다 [그 내용 보기]」 (작성 탭) */
+    clashes.forEach(function (c) { emit('jt:draft-others', { kind: c.kind, id: c.id, keys: c.keys, row: c.row, clash: true }); });
+    return Promise.resolve(null);
   }
 
   /* 다른 기기에서 바뀐 줄 하나 (실시간 반영) */
   function mergeRemoteEntry(row) {
     var d = draftNow();
     if (!row || !d || row.week_start !== d.weekStart) return false;
-    if (syncTimers[KEYS.draft]) return false;     /* 곧 보낼 내 입력이 있으면 보낸 뒤 결과로 합친다 */
-    return mergeEntry(row.student_id, row, {}, {});
+    /* 곧 보낼 내 입력이 있어도 합친다 — 아직 저장 안 된 칸은 mergeFlat 이 지키고, 겹치면 알린다 */
+    return mergeEntry(row.student_id, row, {}, {}, true);
   }
   function mergeRemoteCommon(row) {
     var d = draftNow();
     if (!row || !d || row.week_start !== d.weekStart || !row.class_name) return false;
-    if (syncTimers[KEYS.draft]) return false;
-    return mergeCommon(row.class_name, row, {}, {});
+    return mergeCommon(row.class_name, row, {}, {}, true);
   }
 
   /* ---------- 전화번호 ---------- */
@@ -1173,6 +1223,89 @@
     return (m && m[studentId]) || null;
   }
 
+  /* ---------- 저장 전 내용 임시 보관 (이 기기 브라우저) ----------
+     저장되지 않은 칸만 남긴다. 저장되면 지우고, 로그아웃하면 지운다.
+     화면이 멈췄다 다시 열리면 작성 탭이 「저장 안 된 내용이 있습니다 [복구]」 를 띄운다. */
+  var UNS = P + 'unsaved', UNS_P = P + 'unsaved.pending';
+  var backupUser = '';
+  var backupTimer = null;
+  function lsGet(k) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  function lsDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
+  function setBackupUser(email) { backupUser = String(email || '').toLowerCase(); }
+
+  function computeUnsaved() {
+    var d = draftNow(), bw = base.week;
+    if (!d || !bw || d.weekStart !== bw.weekStart) return null;
+    var out = { week: d.weekStart, user: backupUser, at: new Date().toISOString(), entries: {}, common: {}, n: 0 };
+    Object.keys(d.entries || {}).forEach(function (sid) {
+      var cur = flatEntry(d.entries[sid]), b = bw.entries[sid] || flatRaw(null), diff = null;
+      keysOf(cur, b).forEach(function (k) {
+        if (same(cur[k], b[k])) return;
+        diff = diff || {};
+        diff[k] = cur[k] === undefined ? null : cur[k];
+        out.n++;
+      });
+      if (diff) out.entries[sid] = diff;
+    });
+    Object.keys(d.common || {}).forEach(function (cls) {
+      if (!cls || cls === '_') return;
+      var c = d.common[cls], bn = normCommon(bw.common[cls] || rawCommon(null)), diff = null;
+      COMMON_KEYS.forEach(function (k) {
+        if (same(normCommon(c)[k], bn[k])) return;
+        diff = diff || {};
+        diff[k] = c[k];
+        out.n++;
+      });
+      if (diff) out.common[cls] = diff;
+    });
+    return out;
+  }
+  function backupNow() {
+    backupTimer = null;
+    if (!backupUser) return;
+    var u = computeUnsaved();
+    if (!u) return;
+    if (u.n) lsSet(UNS, u); else lsDel(UNS);
+  }
+  function scheduleBackup() {
+    clearTimeout(backupTimer);
+    backupTimer = setTimeout(backupNow, 250);
+  }
+  /* 다시 열었을 때 — 지난번에 남은 임시 보관을 「복구 대기」 로 옮겨 둔다 (그사이 새로 쓰는 것과 섞이지 않게) */
+  function takePendingBackup() {
+    var live = lsGet(UNS);
+    if (live && live.n && live.user === backupUser) { lsSet(UNS_P, live); lsDel(UNS); }
+    var p = lsGet(UNS_P);
+    if (p && p.user !== backupUser) { lsDel(UNS_P); return null; }
+    return p && p.n ? p : null;
+  }
+  /* [복구] — 그 칸들을 내가 새로 쓴 것처럼 넣고 바로 저장한다 */
+  function applyBackup(p) {
+    var d = draftNow();
+    if (!p || !d || p.week !== d.weekStart) return false;
+    var ids = [], classes = [];
+    Object.keys(p.entries || {}).forEach(function (sid) {
+      var cur = d.entries[sid] || emptyEntryObj();
+      var fl = flatEntry(cur);
+      Object.keys(p.entries[sid]).forEach(function (k) { if (p.entries[sid][k] === null) delete fl[k]; else fl[k] = p.entries[sid][k]; });
+      d.entries[sid] = unflat(fl, cur);
+      ids.push(sid);
+    });
+    Object.keys(p.common || {}).forEach(function (cls) {
+      var c = d.common[cls] || normCommon(null);
+      Object.keys(p.common[cls]).forEach(function (k) { c[k] = p.common[cls][k]; });
+      d.common[cls] = c;
+      classes.push(cls);
+    });
+    lsDel(UNS_P);
+    writeLocal(KEYS.draft, d);
+    emit('jt:draft-remote', { entries: ids, common: classes });
+    return flushNow(KEYS.draft).then(function () { return true; }, function () { scheduleBackup(); return true; });
+  }
+  function discardBackup() { lsDel(UNS_P); }
+  function clearBackups() { clearTimeout(backupTimer); backupTimer = null; lsDel(UNS); lsDel(UNS_P); }
+
   /* ---------- 상용구 ---------- */
 
   function getSnippets()      { return read(KEYS.snippets, []); }
@@ -1232,9 +1365,9 @@
       if (!touched) end = autoEnd(week);
       var draft = { weekStart: week, weekEnd: end, weekEndTouched: touched,
                     common: w.common || {}, entries: w.entries || {} };
-      var bw = { weekStart: week, weekEnd: w.weekEnd || '', entries: {}, common: {} };
-      Object.keys(w.rawEntries || {}).forEach(function (sid) { bw.entries[sid] = flatRaw(w.rawEntries[sid]); });
-      Object.keys(w.rawCommon || {}).forEach(function (cls) { bw.common[cls] = rawCommon(w.rawCommon[cls]); });
+      var bw = { weekStart: week, weekEnd: w.weekEnd || '', entries: {}, common: {}, at: { entry: {}, common: {} } };
+      Object.keys(w.rawEntries || {}).forEach(function (sid) { bw.entries[sid] = flatRaw(w.rawEntries[sid]); bw.at.entry[sid] = w.rawEntries[sid].updated_at || ''; });
+      Object.keys(w.rawCommon || {}).forEach(function (cls) { bw.common[cls] = rawCommon(w.rawCommon[cls]); bw.at.common[cls] = w.rawCommon[cls].updated_at || ''; });
       base.week = bw;
       writeLocal(KEYS.draft, draft);
       loadReview(week);
@@ -1307,18 +1440,19 @@
       writeLocal(KEYS.snippets, sn);
 
       var dr = draftNow();
-      if (!dr || !dr.weekStart || syncTimers[KEYS.draft]) return null;
+      if (!dr || !dr.weekStart || syncTimers[KEYS.draft] || draftInflight) return null;
       var week = dr.weekStart;
       return global.DB.loadWeek(week).then(function (w) {
         var d2 = draftNow();
-        if (!d2 || d2.weekStart !== week || !base.week || base.week.weekStart !== week || syncTimers[KEYS.draft]) return;
+        /* 불러오는 사이 저장이 있었으면 받아 온 줄이 옛것일 수 있다 — 줄마다 수정 시각으로 한 번 더 거른다 */
+        if (!d2 || d2.weekStart !== week || !base.week || base.week.weekStart !== week || syncTimers[KEYS.draft] || draftInflight) return;
         var changedE = [], changedC = [];
         keysOf(w.rawEntries, d2.entries).forEach(function (sid) {
-          if (mergeEntry(sid, w.rawEntries[sid] || null, {}, {})) changedE.push(sid);
+          if (mergeEntry(sid, w.rawEntries[sid] || null, {}, {}, true)) changedE.push(sid);
         });
         keysOf(w.rawCommon, d2.common).forEach(function (cls) {
           if (!cls || cls === '_') return;
-          if (mergeCommon(cls, w.rawCommon[cls] || null, {}, {})) changedC.push(cls);
+          if (mergeCommon(cls, w.rawCommon[cls] || null, {}, {}, true)) changedC.push(cls);
         });
         if (w.weekEnd && d2.weekEnd === base.week.weekEnd && w.weekEnd !== d2.weekEnd) {
           d2.weekEnd = w.weekEnd; d2.weekEndTouched = true; changedC.push('_week');
@@ -1337,6 +1471,7 @@
   }
 
   function clearAll() {
+    clearBackups();
     Object.keys(KEYS).forEach(function (k) { remove(KEYS[k]); });
     mem = {};
     localClasses = [];
@@ -1374,6 +1509,16 @@
     deleteStudent: deleteStudent,
     getClasses: getClasses,
     schedOf: schedOf,
+    acceptRemote: acceptRemote,
+    KEY_LABEL: KEY_LABEL,
+    keepMine: keepMine,
+    saveStateOf: saveStateOf,
+    setBackupUser: setBackupUser,
+    takePendingBackup: takePendingBackup,
+    applyBackup: applyBackup,
+    discardBackup: discardBackup,
+    clearBackups: clearBackups,
+    backupNow: backupNow,
     loadReview: loadReview,
     reviewOf: reviewOf,
     lessonOf: lessonOf,
