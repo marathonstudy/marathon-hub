@@ -861,7 +861,7 @@
       var key = btn.dataset.key;
       if (!e.homework) e.homework = {};
       var cur = e.homework[key];
-      var days = (cur && typeof cur === 'object') ? cur : {};
+      var days = (cur && typeof cur === 'object') ? Object.assign({}, cur) : {};   /* 새 상자 — 저장 비교가 바뀐 것을 알아보게 */
 
       if (act === 'hwday') {
         if (days[btn.dataset.day]) delete days[btn.dataset.day];

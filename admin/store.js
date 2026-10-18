@@ -422,20 +422,25 @@
      내가 손대지 않은 항목        → 화면도 서버 값으로
      아직 저장 안 된 내 입력       → 화면 값을 지킨다
      others = 지금 고치는 중이거나 아직 저장 안 된 칸을 다른 사람이 바꾼 것 — 덮지 않고 알린다 */
+  /* 값 복사 — 과제 요일({월:true}) 같은 묶음 값은 화면 쪽과 '마지막 저장 값' 쪽이 따로 가져야 한다.
+     같은 상자를 같이 쓰면 버튼을 누를 때 둘이 함께 바뀌어 '바뀐 것 없음' 으로 보고 저장하지 않았다
+     (다시 보면 안 눌린 상태로 돌아가던 원인). */
+  function copyVal(v) { return (v && typeof v === 'object') ? JSON.parse(JSON.stringify(v)) : v; }
+
   function mergeFlat(local, b, srv, sent, clash, prot) {
     var nl = {}, nb = {}, changed = false, others = [];
     prot = prot || {};
     keysOf(local, b, srv).forEach(function (k) {
-      if (clash[k]) { nl[k] = local[k]; nb[k] = b[k]; return; }
-      if (sent[k]) { nl[k] = local[k]; nb[k] = srv[k]; return; }
+      if (clash[k]) { nl[k] = local[k]; nb[k] = copyVal(b[k]); return; }
+      if (sent[k]) { nl[k] = local[k]; nb[k] = copyVal(srv[k]); return; }
       /* 지금 그 칸을 고치는 중 — 화면도 base 도 그대로 둔다.
          저장하면 서버가 base 와 달라진 것을 알아채고 '다른 분이 먼저 수정' 으로 묻는다. */
-      if (prot[k]) { nl[k] = local[k]; nb[k] = b[k]; if (!same(srv[k], b[k]) && !same(srv[k], local[k])) others.push(k); return; }
+      if (prot[k]) { nl[k] = local[k]; nb[k] = copyVal(b[k]); if (!same(srv[k], b[k]) && !same(srv[k], local[k])) others.push(k); return; }
       if (same(local[k], b[k])) {
-        nl[k] = srv[k]; nb[k] = srv[k];
+        nl[k] = copyVal(srv[k]); nb[k] = copyVal(srv[k]);
         if (!same(local[k], srv[k])) changed = true;
       } else {
-        nl[k] = local[k]; nb[k] = b[k];
+        nl[k] = local[k]; nb[k] = copyVal(b[k]);
         if (!same(srv[k], b[k]) && !same(srv[k], local[k])) others.push(k);
       }
     });
@@ -538,13 +543,13 @@
     if (kind === 'entry') {
       var cur = d.entries[id] || emptyEntryObj();
       var fl = flatEntry(cur), sv = flatRaw(row), b = bw.entries[id] || flatRaw(null);
-      keys.forEach(function (k) { fl[k] = sv[k]; b[k] = sv[k]; if (fl[k] === undefined) delete fl[k]; if (b[k] === undefined) delete b[k]; });
+      keys.forEach(function (k) { fl[k] = copyVal(sv[k]); b[k] = copyVal(sv[k]); if (fl[k] === undefined) delete fl[k]; if (b[k] === undefined) delete b[k]; });
       bw.entries[id] = b;
       d.entries[id] = unflat(fl, cur);
       emit('jt:draft-remote', { entries: [id] });
     } else {
       var c = d.common[id] || normCommon(null), braw = bw.common[id] || rawCommon(null), sraw = rawCommon(row), sn = normCommon(sraw);
-      keys.forEach(function (k) { c[k] = sn[k]; braw[k] = sraw[k]; });
+      keys.forEach(function (k) { c[k] = copyVal(sn[k]); braw[k] = copyVal(sraw[k]); });
       bw.common[id] = braw;
       d.common[id] = c;
       emit('jt:draft-remote', { common: [id] });

@@ -1022,6 +1022,8 @@ dialog.modal--wide { width: min(680px, calc(100vw - 24px)); }
     display: grid;
     grid-template-columns: minmax(0, 1fr) 420px;
     grid-template-areas:
+      "restore preview"
+      "notes   preview"
       "week    preview"
       "class   preview"
       "common  preview"
@@ -1029,10 +1031,13 @@ dialog.modal--wide { width: min(680px, calc(100vw - 24px)); }
     gap: 0 16px;
     align-items: start;
   }
-  #writeMain > .panel:nth-child(1) { grid-area: week; }
-  #writeMain > .panel:nth-child(2) { grid-area: class; }
-  #writeMain > .panel:nth-child(3) { grid-area: common; }
-  #writeMain > .panel:nth-child(4) { grid-area: entries; }
+  /* 자리는 이름으로 — 위에 알림 줄이 더 들어와도 순서가 밀리지 않게 */
+  #draftRestore { grid-area: restore; }
+  #draftNotes { grid-area: notes; }
+  #weekPanel { grid-area: week; }
+  #classPanel { grid-area: class; }
+  #commonPanel { grid-area: common; }
+  #entryPanel { grid-area: entries; }
   #previewPanel {
     grid-area: preview;
     position: sticky;

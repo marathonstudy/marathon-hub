@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" as="style" crossorigin
       href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
-<link rel="stylesheet" href="style.css?v=20261018b">
+<link rel="stylesheet" href="style.css?v=20261019a">
 </head>
 <body class="is-locked">
 
@@ -309,7 +309,7 @@
       <!-- 작성 글 지키기 (draftguard.js) — 저장 안 된 내용 복구 · 다른 사람이 고친 칸 알림 -->
       <div class="draft-restore" id="draftRestore" hidden></div>
       <div class="draft-notes" id="draftNotes" aria-live="polite"></div>
-      <div class="panel">
+      <div class="panel" id="weekPanel">
         <div class="panel__head">
           <h2 class="panel__title">주차</h2>
           <p class="panel__hint">시작일을 고르면 그 주차의 작성 내용을 서버에서 불러옵니다</p>
@@ -329,7 +329,7 @@
         </div>
       </div>
 
-      <div class="panel">
+      <div class="panel" id="classPanel">
         <div class="panel__head">
           <h2 class="panel__title">반 고르기</h2>
           <p class="panel__hint" id="classPickerHint"></p>
@@ -1788,37 +1788,37 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
 <!-- config.js 와 brand.js 가 먼저 와야 한다. 나머지가 이 값을 읽는다. -->
-<script src="../assets/config.js?v=20261018b"></script>
-<script src="../assets/brand.js?v=20261018b"></script>
-<script src="../assets/lesson.js?v=20261018b"></script>
-<script src="supabase.js?v=20261018b"></script>
-<script src="db.js?v=20261018b"></script>
-<script src="store.js?v=20261018b"></script>
-<script src="report.js?v=20261018b"></script>
-<script src="app.js?v=20261018b"></script>
-<script src="import.js?v=20261018b"></script>
-<script src="write.js?v=20261018b"></script>
-<script src="publish.js?v=20261018b"></script>
-<script src="send.js?v=20261018b"></script>
-<script src="notice.js?v=20261018b"></script>
-<script src="tb.js?v=20261018b"></script>
-<script src="tb-dash.js?v=20261018b"></script>
-<script src="tb-issue.js?v=20261018b"></script>
-<script src="tb-stock.js?v=20261018b"></script>
-<script src="tb-bill.js?v=20261018b"></script>
-<script src="../assets/dday.js?v=20261018b"></script>
-<script src="card.js?v=20261018b"></script>
-<script src="exams.js?v=20261018b"></script>
-<script src="photo.js?v=20261018b"></script>
-<script src="today.js?v=20261018b"></script>
-<script src="staff.js?v=20261018b"></script>
-<script src="classes.js?v=20261018b"></script>
-<script src="weekly.js?v=20261018b"></script>
-<script src="summary.js?v=20261018b"></script>
-<script src="../assets/photos.js?v=20261018b"></script>
-<script src="review.js?v=20261018b"></script>
-<script src="draftguard.js?v=20261018b"></script>
-<script src="sync.js?v=20261018b"></script>
-<script src="auth.js?v=20261018b"></script>
+<script src="../assets/config.js?v=20261019a"></script>
+<script src="../assets/brand.js?v=20261019a"></script>
+<script src="../assets/lesson.js?v=20261019a"></script>
+<script src="supabase.js?v=20261019a"></script>
+<script src="db.js?v=20261019a"></script>
+<script src="store.js?v=20261019a"></script>
+<script src="report.js?v=20261019a"></script>
+<script src="app.js?v=20261019a"></script>
+<script src="import.js?v=20261019a"></script>
+<script src="write.js?v=20261019a"></script>
+<script src="publish.js?v=20261019a"></script>
+<script src="send.js?v=20261019a"></script>
+<script src="notice.js?v=20261019a"></script>
+<script src="tb.js?v=20261019a"></script>
+<script src="tb-dash.js?v=20261019a"></script>
+<script src="tb-issue.js?v=20261019a"></script>
+<script src="tb-stock.js?v=20261019a"></script>
+<script src="tb-bill.js?v=20261019a"></script>
+<script src="../assets/dday.js?v=20261019a"></script>
+<script src="card.js?v=20261019a"></script>
+<script src="exams.js?v=20261019a"></script>
+<script src="photo.js?v=20261019a"></script>
+<script src="today.js?v=20261019a"></script>
+<script src="staff.js?v=20261019a"></script>
+<script src="classes.js?v=20261019a"></script>
+<script src="weekly.js?v=20261019a"></script>
+<script src="summary.js?v=20261019a"></script>
+<script src="../assets/photos.js?v=20261019a"></script>
+<script src="review.js?v=20261019a"></script>
+<script src="draftguard.js?v=20261019a"></script>
+<script src="sync.js?v=20261019a"></script>
+<script src="auth.js?v=20261019a"></script>
 </body>
 </html>
