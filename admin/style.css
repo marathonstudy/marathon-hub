@@ -2285,3 +2285,9 @@ body.pv-open { overflow: hidden; }
 .pv-frame-wrap { flex: 1; display: flex; justify-content: center; min-height: 0; padding: 12px; }
 .pv-frame { width: 100%; max-width: 760px; height: 100%; border: 0; border-radius: 14px; background: #fff; box-shadow: var(--shadow); }
 .pv-frame-wrap.is-phone .pv-frame { max-width: 390px; }
+
+/* 결석이면 집중도 별을 잠근다 (20261021a) */
+.star:disabled { opacity: .35; cursor: not-allowed; }
+
+/* 머리의 「? 사용법」 (20261021a) */
+.help-link { text-decoration: none; display: inline-flex; align-items: center; }

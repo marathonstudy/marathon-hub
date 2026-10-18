@@ -47,7 +47,7 @@
       className: student.className || '',
       startDate: week.start,
       endDate: week.end,
-      attendance: { status: entry.attendStatus || '', note: (entry.attendNote || '').trim() },
+      attendance: { status: entry.attendStatus === 'makeup' ? 'attend' : (entry.attendStatus || ''), note: (entry.attendNote || '').trim() },
       lessons: (common.lessons || []).filter(function (l) { return String(l || '').trim(); }),
       focusScore: Number(entry.focusScore) || 0,
       tests: tests,

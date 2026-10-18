@@ -1378,8 +1378,48 @@
       loadReview(week);
       var s = read(KEYS.settings, {});
       if (s.lastWeek !== week) { s.lastWeek = week; writeLocal(KEYS.settings, s); }
+      setTimeout(function () { ensureDefaults(week); }, 0);
       return draft;
     });
+  }
+
+  /* ============================================================
+     출결 기본값 — 이번 주와 그 뒤 주차에서, 서버에 아직 줄이 없는 학생만 「출석 · 집중도 5」
+       서버 함수(entry_defaults, migration-016)가 줄이 없을 때만 만든다 — 이미 있는 값은 절대 덮지 않는다.
+       받아 온 줄은 다른 기기에서 온 줄처럼 합친다 (내가 아직 저장 안 한 칸은 그대로).
+       지난 주차 · 함수가 아직 없는 서버(016 실행 전)에서는 아무것도 하지 않는다.
+     ============================================================ */
+  var defaultsTried = {};
+  var defaultsOff = false;
+  function ensureDefaults(week) {
+    var d = draftNow(), bw = base.week;
+    if (defaultsOff || !d || !bw || !week || d.weekStart !== week || bw.weekStart !== week) return Promise.resolve(null);
+    var wk = parseISO(week);
+    if (!wk || toISO(mondayOf(wk)) < thisWeek().start) return Promise.resolve(null);     /* 월요일 기준 — 지난 주차는 채우지 않는다 */
+    if (!global.SB || !global.SB.client || !global.SB.client.rpc) return Promise.resolve(null);
+    var ids = activeStudents().filter(function (s) {
+      return !bw.entries[s.id] && !defaultsTried[week + '|' + s.id];
+    }).map(function (s) { return s.id; });
+    if (!ids.length) return Promise.resolve(null);
+    return global.SB.client.rpc('entry_defaults', { p_week: week, p_students: ids }).then(function (res) {
+      if (res.error) {
+        if (/entry_defaults|function|schema cache/i.test(res.error.message || '')) defaultsOff = true;   /* 016 실행 전 */
+        return null;
+      }
+      var d2 = draftNow();
+      if (!d2 || d2.weekStart !== week || !base.week || base.week.weekStart !== week) return null;
+      var changed = [];
+      (res.data || []).forEach(function (row) {
+        if (!row || !row.student_id) return;
+        defaultsTried[week + '|' + row.student_id] = true;
+        if (mergeEntry(row.student_id, row, {}, {}, true)) changed.push(row.student_id);
+        /* 그 사이 결석을 눌렀으면 집중도는 0 그대로 */
+        var e = d2.entries[row.student_id];
+        if (e && e.attendStatus === 'absent' && e.focusScore) { e.focusScore = 0; pushToServer(KEYS.draft); }
+      });
+      if (changed.length) { writeLocal(KEYS.draft, d2); emit('jt:draft-remote', { entries: changed }); }
+      return changed;
+    }, function () { return null; });
   }
 
   /* 목록을 서버 최신으로 — 아직 저장 안 된 내 줄은 지킨다 */
@@ -1464,6 +1504,7 @@
         }
         if (w.weekEnd) base.week.weekEnd = w.weekEnd;
         if (changedE.length || changedC.length) emit('jt:draft-remote', { entries: changedE, common: changedC });
+        return ensureDefaults(week);          /* 새로 들어온 학생도 */
       });
     }).then(function () {
       refreshing = null;
@@ -1491,6 +1532,7 @@
 
     loadAll: loadAll,
     loadWeekIntoDraft: loadWeekIntoDraft,
+    ensureDefaults: ensureDefaults,
     refreshAll: refreshAll,
     baseAt: baseAt,
     setBaseAt: setBaseAt,

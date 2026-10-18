@@ -16,12 +16,13 @@
   var $  = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
 
+  /* 출결 — 출석 · 지각 · 결석. 예전 기록의 '보강(makeup)'은 지우지 않고 「출석」으로 보인다 */
   var STATUSES = [
     { key: 'attend', label: '출석' },
     { key: 'late',   label: '지각' },
-    { key: 'absent', label: '결석' },
-    { key: 'makeup', label: '보강' }
+    { key: 'absent', label: '결석' }
   ];
+  function shownStatus(e) { return e.attendStatus === 'makeup' ? 'attend' : (e.attendStatus || ''); }
 
   /* ============================================================
      상태
@@ -591,14 +592,15 @@
 
     var statusBtns = STATUSES.map(function (st) {
       return '<button type="button" class="att-btn att-btn--' + st.key +
-             (e.attendStatus === st.key ? ' is-on' : '') +
+             (shownStatus(e) === st.key ? ' is-on' : '') +
              '" data-act="status" data-v="' + st.key + '">' + st.label + '</button>';
     }).join('');
 
     var stars = '';
+    var absent = e.attendStatus === 'absent';
     for (var i = 1; i <= 5; i++) {
       stars += '<button type="button" class="star' + (i <= e.focusScore ? ' is-on' : '') +
-               '" data-act="star" data-v="' + i + '" aria-label="' + i + '점">★</button>';
+               '" data-act="star" data-v="' + i + '" aria-label="' + i + '점"' + (absent ? ' disabled' : '') + '>★</button>';
     }
 
     var scoreRow = tests.length
@@ -609,7 +611,7 @@
         }).join('')
       : '<span class="muted-note">반 공통에 테스트 이름을 넣으면 점수 칸이 생깁니다</span>';
 
-    var needNote = e.attendStatus === 'late' || e.attendStatus === 'makeup';
+    var needNote = e.attendStatus === 'late';
 
     return '' +
       '<div class="entry' + (open ? '' : ' is-collapsed') + (isWritten(s.id) ? ' is-written' : '') +
@@ -625,7 +627,7 @@
             '<span class="fieldline__label">출결</span>' +
             '<span class="att-group">' + statusBtns + '</span>' +
             '<input class="input input--note" type="text" data-act="note" ' +
-              'placeholder="예) 10분 지각 · 9/12 보강"' + (needNote ? '' : ' hidden') + '>' +
+              'placeholder="예) 10분 지각"' + (needNote ? '' : ' hidden') + '>' +
           '</div>' +
           '<div class="fieldline">' +
             '<span class="fieldline__label">집중도</span>' +
@@ -837,13 +839,22 @@
     }
 
     if (act === 'status') {
-      e.attendStatus = (e.attendStatus === btn.dataset.v) ? '' : btn.dataset.v;
-      if (e.attendStatus !== 'late' && e.attendStatus !== 'makeup') e.attendNote = '';
+      var was = e.attendStatus;
+      e.attendStatus = (shownStatus(e) === btn.dataset.v) ? '' : btn.dataset.v;
+      if (e.attendStatus !== 'late') e.attendNote = '';
+      /* 결석 → 집중도 0 (별 잠금) · 결석에서 출석/지각으로 → 집중도 5 */
+      if (e.attendStatus === 'absent') e.focusScore = 0;
+      else if (was === 'absent' && (e.attendStatus === 'attend' || e.attendStatus === 'late')) e.focusScore = 5;
       $$('.att-btn', card).forEach(function (b) {
-        b.classList.toggle('is-on', b.dataset.v === e.attendStatus);
+        b.classList.toggle('is-on', b.dataset.v === shownStatus(e));
       });
+      $$('.star', card).forEach(function (b) {
+        b.disabled = e.attendStatus === 'absent';
+        b.classList.toggle('is-on', +b.dataset.v <= e.focusScore);
+      });
+      card.querySelector('.stars__val').textContent = (e.focusScore || 0) + ' / 5';
       var note = card.querySelector('[data-act="note"]');
-      note.hidden = !(e.attendStatus === 'late' || e.attendStatus === 'makeup');
+      note.hidden = e.attendStatus !== 'late';
       if (!note.hidden) note.value = e.attendNote || '';
       card.classList.toggle('is-written', isWritten(id));
       fillBadge(card, id);
@@ -852,6 +863,7 @@
     }
 
     if (act === 'star') {
+      if (e.attendStatus === 'absent') return;
       var v = +btn.dataset.v;
       e.focusScore = (e.focusScore === v) ? 0 : v;
       $$('.star', card).forEach(function (b) {

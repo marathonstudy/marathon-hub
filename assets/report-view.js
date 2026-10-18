@@ -8,7 +8,7 @@
 
    레포트 데이터 (admin/report.js 의 toReportData 가 만든다)
      school · grade · studentName · startDate · endDate
-     attendance {status: attend|late|absent|makeup, note}
+     attendance {status: attend|late|absent (예전 makeup 은 출석으로 보임), note}
      lessons ["1차시 내용", …]  focusScore 0~5
      tests [{name, score}]
      homeworkItems [{key, group: required|optional, name}]
@@ -145,10 +145,16 @@
   };
 
   var LABELS = { attend: '출석', late: '지각', absent: '결석', makeup: '보강 완료', none: '기록 없음' };
+  /* 예전 기록의 보강(makeup)은 「출석」으로 보인다 (저장된 값은 그대로) */
+  function statusOf(d) {
+    var st = (d && d.attendance && d.attendance.status) || '';
+    return st === 'makeup' ? 'attend' : st;
+  }
 
   function attendanceHtml(d) {
     var a = d.attendance || {};
-    var key = MARKS[a.status] && a.status !== 'none' ? a.status : 'none';
+    var st = statusOf(d);
+    var key = MARKS[st] && st !== 'none' ? st : 'none';
     var note = String(a.note == null ? '' : a.note).trim();
     var body = '' +
       '<div class="att-box att-box--' + key + '">' +
@@ -178,7 +184,7 @@
 
   function focusHtml(d) {
     var score = Math.max(0, Math.min(5, Math.round(Number(d.focusScore) || 0)));
-    if (!score && d.attendance && d.attendance.status === 'absent') return '';
+    if (statusOf(d) === 'absent') return '';          /* 결석한 주는 집중도 줄을 숨긴다 */
     var stars = '';
     for (var i = 1; i <= 5; i++) {
       stars += '<span class="focus-star' + (i <= score ? ' active' : '') + '">★</span>';

@@ -160,7 +160,7 @@
     return { n: withApp.length, avg: avg, fail: fail, pending: withApp.length - ok.length - fail };
   }
 
-  var ATT = { attend: '출석', late: '지각', absent: '결석', makeup: '보강' };
+  var ATT = { attend: '출석', late: '지각', absent: '결석', makeup: '출석' };   /* 예전 보강 기록은 출석으로 */
 
   function render() {
     var d = st.data;
@@ -216,7 +216,7 @@
       }).join('') + '</div>' +
 
       '<div class="sub"><div class="sub__head"><span class="sub__title">챙겨야 할 학생 ' + care.length + '명</span>' +
-        '<span class="sub__hint">최근 ' + set.absentWeeks + '주 결석(보강 포함) ' + set.absentMin + '회 이상 · 앱 과제 ' + APP_LOW + '% 미만 · 필기 2주 연속 없음 · 확인 필요 상담</span></div>' +
+        '<span class="sub__hint">최근 ' + set.absentWeeks + '주 결석 ' + set.absentMin + '회 이상 · 앱 과제 ' + APP_LOW + '% 미만 · 필기 2주 연속 없음 · 확인 필요 상담</span></div>' +
         (care.length ? '<div class="td-care">' + care.map(function (x) {
           return '<div class="td-care__row"><button type="button" class="roster__name roster__name-btn" data-card="' + x.s.id + '">' + esc(x.s.name) + '</button>' +
             '<span class="muted-note">' + esc(x.s.class_name) + '</span>' +
@@ -235,9 +235,9 @@
         }
         var cnt = { attend: 0, late: 0, absent: 0 };
         rows.forEach(function (s) {
-          if (s.attend === 'attend') cnt.attend++;
+          if (s.attend === 'attend' || s.attend === 'makeup') cnt.attend++;
           else if (s.attend === 'late') cnt.late++;
-          else if (s.attend === 'absent' || s.attend === 'makeup') cnt.absent++;
+          else if (s.attend === 'absent') cnt.absent++;
         });
         var written = rows.filter(function (s) { return s.written; }).length;
         var pub = rows.filter(function (s) { return s.published; }).length;

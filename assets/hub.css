@@ -682,3 +682,81 @@ label.hub-btn { cursor: pointer; text-align: center; }
 .pv-band { position: sticky; top: 0; z-index: 50; padding: 12px 14px; background: #2C3566; color: #fff; font-size: 15px; font-weight: 900; text-align: center; line-height: 1.5; }
 .pv-draft { margin-bottom: 12px; padding: 10px 12px; border-radius: 12px; background: #FFF6E8; border: 1px solid #F3D9B0; color: #7A4A0E; font-size: 13.5px; font-weight: 800; text-align: center; }
 .rp-item--draft { border: 1.5px dashed #CFC6F5; }
+
+/* ---------- 수업 영상 — 그 자리에서 재생 (20261021a) ---------- */
+.nt-video--yt { display: block; }
+.nt-video__btn {
+  appearance: none; border: 0; background: none; font: inherit; color: inherit; text-align: left;
+  width: 100%; padding: 0; cursor: pointer;
+  display: flex; align-items: center; gap: 12px;
+  font-size: 15px; font-weight: 700; color: var(--ink-deep);
+}
+.nt-video__btn:focus-visible { outline: 2px solid #7858E8; outline-offset: 3px; border-radius: 12px; }
+.yt-player { display: grid; gap: 8px; }
+.yt-frame { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 14px; overflow: hidden; background: #111; }
+.yt-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.yt-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.yt-app, .yt-close {
+  appearance: none; border: 0; font: inherit; cursor: pointer; text-decoration: none;
+  min-height: 44px; padding: 10px 14px; border-radius: 12px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 800;
+}
+.yt-app { flex: 1 1 auto; background: var(--grad-strong); color: #fff; }
+.yt-close { background: var(--grad-soft); color: var(--ink-mid); }
+
+/* ---------- 다시보기 탭 ---------- */
+.hub-more {
+  appearance: none; border: 0; font: inherit; cursor: pointer; width: 100%;
+  min-height: 48px; border-radius: 14px; background: rgba(255, 255, 255, .85);
+  color: var(--ink-mid); font-size: 15px; font-weight: 800; box-shadow: var(--card-shadow);
+}
+.hub-tabs--six .hub-tab { font-size: 12.5px; letter-spacing: -0.05em; }
+
+/* ---------- 내 레포트 — 주차 띠 · ◀ ▶ ---------- */
+.rw-nav:empty { display: none; }
+.rw-nav { margin-bottom: 12px; display: grid; gap: 8px; }
+.rw-arrows { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+.rw-arrow {
+  appearance: none; border: 0; font: inherit; cursor: pointer;
+  min-height: 44px; padding: 8px 12px; border-radius: 12px;
+  background: rgba(255, 255, 255, .9); color: var(--ink-mid);
+  font-size: 14px; font-weight: 800; box-shadow: var(--card-shadow); white-space: nowrap;
+}
+.rw-arrow:disabled { opacity: .38; cursor: default; box-shadow: none; }
+.rw-now { text-align: center; font-size: 15px; font-weight: 900; color: var(--ink-deep); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rw-chips {
+  display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 6px;
+  scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; scrollbar-width: thin;
+}
+.rw-chip {
+  appearance: none; border: 1.5px solid #E2DEF5; font: inherit; cursor: pointer; flex: 0 0 auto;
+  min-height: 40px; min-width: 52px; padding: 6px 12px; border-radius: 999px;
+  background: #fff; color: var(--ink-mid); font-size: 13.5px; font-weight: 800; scroll-snap-align: center;
+}
+.rw-chip.is-on { background: var(--grad-strong); border-color: transparent; color: #fff; }
+.rw-chip--draft { border-style: dashed; }
+.rw-videos { margin-top: 14px; }
+
+/* ---------- 누적 추이 (한 줄 그래프 — #7858E8, 범례 없음) ---------- */
+.tr-sum { margin: -4px 0 12px; font-size: 15px; font-weight: 800; color: var(--ink-deep); line-height: 1.6; }
+.tr-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.tr-chart { padding: 10px 10px 6px; border-radius: 14px; background: var(--grad-soft); min-width: 0; }
+.tr-chart__head { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; margin-bottom: 4px; }
+.tr-chart__name { font-size: 12.5px; font-weight: 800; color: var(--ink-mid); }
+.tr-chart__val { font-size: 15px; font-weight: 900; color: #5B42D6; }
+.tr-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.tr-gridline { stroke: #E4E1F2; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.tr-area { fill: var(--tr-ink, #7858E8); opacity: .1; }
+.tr-line { fill: none; stroke: var(--tr-ink, #7858E8); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.tr-dot { fill: var(--tr-ink, #7858E8); stroke: #fff; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.tr-hit { fill: transparent; }
+.tr-pt { cursor: pointer; outline: none; }
+.tr-pt:focus-visible .tr-dot, .tr-pt:hover .tr-dot { stroke: #2C3566; }
+.tr-hint { margin: 8px 0 0; font-size: 12.5px; color: var(--ink-light); }
+.tr-table { margin-top: 8px; }
+.tr-table summary { cursor: pointer; font-size: 13.5px; font-weight: 800; color: var(--ink-mid); min-height: 36px; display: flex; align-items: center; }
+.tr-table__wrap { overflow-x: auto; }
+.tr-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tr-table th, .tr-table td { padding: 6px 4px; text-align: center; border-bottom: 1px solid #EEECF7; white-space: nowrap; }
+.tr-week { appearance: none; border: 0; background: none; font: inherit; font-weight: 800; color: #5B42D6; cursor: pointer; min-height: 32px; }

@@ -79,6 +79,66 @@
     return m ? m[1] : '';
   }
 
+  /* ============================================================
+     수업 영상 — 눌러서 그 자리에서 재생 (youtube-nocookie · 16:9 · 한 번에 하나만)
+       아래에 [유튜브 앱에서 보기]. 영상 번호를 못 찾는 주소는 예전처럼 링크로 연다.
+     ============================================================ */
+  function videoHtml(url, titleHtml) {
+    var u = safeUrl(url), id = youtubeId(u);
+    var thumb = id
+      ? '<span class="nt-video__thumb" style="background-image:url(https://i.ytimg.com/vi/' + id + '/mqdefault.jpg)">' +
+          '<span class="nt-video__play" aria-hidden="true">▶</span></span>'
+      : '<span class="nt-video__thumb nt-video__thumb--none"><span class="nt-video__play" aria-hidden="true">▶</span></span>';
+    if (!id) {
+      return '<a class="nt-video" href="' + esc(u) + '" target="_blank" rel="noopener">' + thumb +
+               '<span class="nt-video__title">' + titleHtml + '</span></a>';
+    }
+    return '<div class="nt-video nt-video--yt" data-yt="' + id + '" data-url="' + esc(u) + '">' +
+             '<button type="button" class="nt-video__btn" data-yt-play>' + thumb +
+               '<span class="nt-video__title">' + titleHtml + '</span></button>' +
+           '</div>';
+  }
+
+  function closePlayers(except) {
+    Array.prototype.forEach.call(document.querySelectorAll('.nt-video.is-playing'), function (v) {
+      if (v === except) return;
+      var p = v.querySelector('.yt-player');
+      if (p) p.remove();
+      v.classList.remove('is-playing');
+      var b = v.querySelector('[data-yt-play]');
+      if (b) b.hidden = false;
+    });
+  }
+
+  function playVideo(box) {
+    var id = box.dataset.yt;
+    if (!/^[A-Za-z0-9_-]{11}$/.test(id || '')) return;
+    closePlayers(box);
+    if (box.classList.contains('is-playing')) return;
+    var title = (box.querySelector('.nt-video__title') || {}).textContent || '수업 영상';
+    var p = document.createElement('div');
+    p.className = 'yt-player';
+    p.innerHTML =
+      '<div class="yt-frame"><iframe src="https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&playsinline=1&rel=0" ' +
+        'title="' + esc(title) + '" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen ' +
+        'referrerpolicy="strict-origin-when-cross-origin"></iframe></div>' +
+      '<div class="yt-actions">' +
+        '<a class="yt-app" href="' + esc(safeUrl(box.dataset.url) || ('https://youtu.be/' + id)) + '" target="_blank" rel="noopener">유튜브 앱에서 보기</a>' +
+        '<button type="button" class="yt-close" data-yt-close>닫기</button>' +
+      '</div>';
+    box.querySelector('[data-yt-play]').hidden = true;
+    box.appendChild(p);
+    box.classList.add('is-playing');
+  }
+
+  document.addEventListener('click', function (e) {
+    var t = e.target;
+    if (!t || !t.closest) return;
+    var play = t.closest('[data-yt-play]');
+    if (play) { playVideo(play.closest('.nt-video')); return; }
+    if (t.closest('[data-yt-close]')) closePlayers(null);
+  });
+
   function weekLabel(n) {
     var sp = ReportView.shortPeriod(n.week_start, n.week_end);
     return sp || ReportView.shortDate(n.week_start);
@@ -142,14 +202,7 @@
     var vids = (n.videos || []).filter(function (v) { return v && safeUrl(v.url); });
     if (vids.length) {
       html += '<div class="nt-sub">▶️ 수업 다시보기</div><div class="nt-videos">' + vids.map(function (v) {
-        var id = youtubeId(v.url);
-        return '<a class="nt-video" href="' + esc(safeUrl(v.url)) + '" target="_blank" rel="noopener">' +
-                 (id
-                   ? '<span class="nt-video__thumb" style="background-image:url(https://i.ytimg.com/vi/' + id + '/mqdefault.jpg)">' +
-                       '<span class="nt-video__play" aria-hidden="true">▶</span></span>'
-                   : '<span class="nt-video__thumb nt-video__thumb--none"><span class="nt-video__play" aria-hidden="true">▶</span></span>') +
-                 '<span class="nt-video__title">' + esc(v.title || '수업 영상') + '</span>' +
-               '</a>';
+        return videoHtml(v.url, esc(v.title || '수업 영상'));
       }).join('') + '</div>';
     }
 
@@ -205,6 +258,20 @@
   var WEEKLY = null;
   var KIND_ROWS = [['material', '📄 배부 자료'], ['required', '✏️ 필수 과제'], ['optional', '➕ 선택 과제']];
   var PART_NAME = { full: '수업 전체', '1': '1차시', '2': '2차시', makeup: '보강' };
+  var PART_ORDER = { full: 0, '1': 1, '2': 2, makeup: 3 };
+  /* 한 주 안에서 수업 전체 → 1차시 → 2차시 → 보강 */
+  function sortVideos(list) {
+    function o(v) { return PART_ORDER[v.part] == null ? 9 : PART_ORDER[v.part]; }
+    return list.map(function (v, i) { return { v: v, i: i }; })
+      .sort(function (a, b) { return (o(a.v) - o(b.v)) || (a.i - b.i); })
+      .map(function (x) { return x.v; });
+  }
+  function weekVideoHtml(v) {
+    var part = PART_NAME[v.part] || '';
+    return videoHtml(v.url,
+      '<span class="wk-part wk-part--' + esc(v.part) + '">' + esc(part) + (v.personal ? ' · 나만 보는 영상' : '') + '</span>' +
+      esc(v.title || (v.part === 'full' ? '수업 영상' : part + ' 영상')));
+  }
   var EXT_ICON = { pdf: '📕', hwp: '📘', hwpx: '📘', doc: '📘', docx: '📘', ppt: '📙', pptx: '📙', xlsx: '📗', jpg: '🖼️', jpeg: '🖼️', png: '🖼️' };
 
   function plusDays(iso, n) {
@@ -256,22 +323,9 @@
 
   function weekBodyHtml(w) {
     var html = lessonsHtml(w.lessons);
-    var vids = (w.videos || []).filter(function (v) { return v && safeUrl(v.url); });
+    var vids = sortVideos((w.videos || []).filter(function (v) { return v && safeUrl(v.url); }));
     if (vids.length) {
-      html += '<div class="nt-sub">▶️ 수업 영상</div><div class="nt-videos">' + vids.map(function (v) {
-        var id = youtubeId(v.url);
-        var part = PART_NAME[v.part] || '';
-        return '<a class="nt-video" href="' + esc(safeUrl(v.url)) + '" target="_blank" rel="noopener">' +
-                 (id
-                   ? '<span class="nt-video__thumb" style="background-image:url(https://i.ytimg.com/vi/' + id + '/mqdefault.jpg)">' +
-                       '<span class="nt-video__play" aria-hidden="true">▶</span></span>'
-                   : '<span class="nt-video__thumb nt-video__thumb--none"><span class="nt-video__play" aria-hidden="true">▶</span></span>') +
-                 '<span class="nt-video__title">' +
-                   '<span class="wk-part wk-part--' + esc(v.part) + '">' + esc(part) + (v.personal ? ' · 나만 보는 영상' : '') + '</span>' +
-                   esc(v.title || (v.part === 'full' ? '수업 영상' : part + ' 영상')) +
-                 '</span>' +
-               '</a>';
-      }).join('') + '</div>';
+      html += '<div class="nt-sub">▶️ 수업 영상</div><div class="nt-videos">' + vids.map(weekVideoHtml).join('') + '</div>';
     }
     var files = w.files || [];
     KIND_ROWS.forEach(function (k) {
@@ -356,6 +410,36 @@
         setTimeout(function () { b.disabled = false; b.classList.remove('is-busy'); }, 1200);
       });
     });
+  }
+
+  /* ============================================================
+     다시보기 탭 (#코드/videos) — 영상이 있는 주만, 최신 주가 위.
+       최근 4주는 펼쳐 두고, 그 앞 주는 [이전 주 더 보기].
+       보강 영상은 서버가 대상 학생에게만 준다 (그대로 쓴다).
+     ============================================================ */
+  function videoWeeks() {
+    return ((WEEKLY && WEEKLY.weeks) || []).map(function (w) {
+      return { w: w, vids: sortVideos((w.videos || []).filter(function (v) { return v && safeUrl(v.url); })) };
+    }).filter(function (x) { return x.vids.length; });
+  }
+  function videoWeekCard(x) {
+    return '<div class="card vd-week">' +
+             '<h2 class="card-title">▶️ ' + esc(weekName(x.w.week_start)) + '<span class="card-note">' + x.vids.length + '개</span></h2>' +
+             '<div class="nt-videos">' + x.vids.map(weekVideoHtml).join('') + '</div>' +
+           '</div>';
+  }
+  function renderVideos(host) {
+    var list = videoWeeks();
+    if (!list.length) { host.innerHTML = '<div class="empty">아직 올라온 수업 영상이 없습니다.</div>'; return; }
+    host.innerHTML = list.slice(0, 4).map(videoWeekCard).join('') +
+      (list.length > 4
+        ? '<div id="vdMore"><button type="button" class="hub-more" data-vd-more>이전 주 더 보기 <span class="num">(' + (list.length - 4) + '주)</span></button></div>'
+        : '');
+    host.onclick = function (e) {
+      if (!e.target.closest('[data-vd-more]')) return;
+      var box = host.querySelector('#vdMore');
+      if (box) box.outerHTML = list.slice(4).map(videoWeekCard).join('');
+    };
   }
 
   function fileUrl(code, id) {
@@ -449,7 +533,7 @@
     if (!nav.on) return;
     var hh = navHash(v, arg);
     if (location.hash === hh) return;
-    history.pushState({ hub: { v: v, arg: arg || '' } }, '', hh);
+    history.pushState({ hub: { v: v, arg: arg || '' }, p: 1 }, '', hh);     /* p = 이 페이지 안에서 쌓은 기록 */
   }
   function lightboxOpen() { return document.querySelector('.ph-light'); }
 
@@ -480,6 +564,7 @@
       root.innerHTML =
         '<section class="hub-panel" id="panelNotice" role="tabpanel"></section>' +
         '<section class="hub-panel" id="panelReport" role="tabpanel" hidden></section>' +
+        '<section class="hub-panel" id="panelVideo" role="tabpanel" hidden></section>' +
         '<section class="hub-panel" id="panelApp" role="tabpanel" hidden></section>' +
         '<section class="hub-panel" id="panelBook" role="tabpanel" hidden></section>' +
         '<section class="hub-panel" id="panelPhoto" role="tabpanel" hidden></section>';
@@ -498,6 +583,17 @@
       var reports = d.reports || [];
       renderReportList(h.code, reports, d.draft || null);
       if (reports.length) $('#tabReport').classList.add('has-new');
+
+      /* 다시보기 — 영상이 있을 때만 탭이 보인다 */
+      var hasVideos = videoWeeks().length > 0;
+      var tabVideo = $('#tabVideo');
+      if (tabVideo) tabVideo.hidden = !hasVideos;
+      var videoOpened = false;
+      function openVideos() {
+        if (videoOpened) return;
+        videoOpened = true;
+        renderVideos($('#panelVideo'));
+      }
 
       /* 복습테스트 (migration-013) — 수업일 당일 맨 위 기록 카드, 내 레포트 탭 위 점수 그래프.
          기록 카드와 「확인 전」 내 기록은 입력할 수 있는 링크(학생 링크)에서만 */
@@ -531,12 +627,16 @@
         var n = Array.prototype.filter.call(tabs.querySelectorAll('.hub-tab'), function (b) { return !b.hidden; }).length;
         tabs.style.gridTemplateColumns = 'repeat(' + n + ', 1fr)';
         tabs.classList.toggle('hub-tabs--many', n >= 5);
+        tabs.classList.toggle('hub-tabs--six', n >= 6);
       }
       layoutTabs();
 
       function select(which) {
+        if (which === 'video' && !(tabVideo && !tabVideo.hidden)) which = 'notice';
+        closePlayers(null);
         [['notice', '#tabNotice', '#panelNotice'],
          ['report', '#tabReport', '#panelReport'],
+         ['video',  '#tabVideo',  '#panelVideo'],
          ['app',    '#tabApp',    '#panelApp'],
          ['photo',  '#tabPhoto',  '#panelPhoto'],
          ['book',   '#tabBook',   '#panelBook']].forEach(function (t) {
@@ -546,11 +646,21 @@
         });
         if (which === 'app') openApp();
         if (which === 'photo') openPhoto();
+        if (which === 'video') openVideos();
         if (which === 'report') $('#tabReport').classList.remove('has-new');
       }
 
       $('#tabNotice').onclick = function () { select('notice'); navPush('notice'); };
-      $('#tabReport').onclick = function () { select('report'); showReportList(); navPush('reports'); };
+      /* 내 레포트 — 가장 최근 주 레포트를 바로 연다 (위 주차 띠 · ◀ ▶ 로 다른 주) */
+      $('#tabReport').onclick = function () {
+        select('report');
+        var first = RP.list[0];
+        /* 기록: 전체 주차 → 그 주 레포트 (레포트에서 뒤로가기 = 전체 주차 · 누적 추이) */
+        navPush('reports');
+        if (first) { openReport(h.code, first); if (!first.draft) navPush('report', first.week_start); }
+        else showReportList();
+      };
+      if (tabVideo) tabVideo.onclick = function () { select('video'); navPush('videos'); };
       $('#tabApp').onclick    = function () { select('app'); navPush('app'); };
       $('#tabBook').onclick   = function () { select('book'); navPush('book'); };
       $('#tabPhoto').onclick  = function () { select('photo'); navPush('photo'); };
@@ -562,8 +672,11 @@
         if (v === 'report' || v === 'reports') {
           select('report');
           var rr = arg && reports.find(function (x) { return x.week_start === arg; });
-          if (rr) openReport(h.code, rr); else showReportList();
-        } else if (v === 'app' || v === 'photo') select(v);
+          if (rr) openReport(h.code, rr);
+          else if (v === 'report' && !arg && RP.list[0]) openReport(h.code, RP.list[0]);
+          else showReportList();
+        } else if (v === 'videos') select('video');
+        else if (v === 'app' || v === 'photo') select(v);
         else if (v === 'book' && !$('#tabBook').hidden) select('book');
         else select('notice');
       };
@@ -575,7 +688,9 @@
         select('report');
       } else if (h.view === 'report') {
         select('report');
-        if (reports.length) openReport(h.code, reports[0]);
+        if (RP.list.length) openReport(h.code, RP.list[0]);
+      } else if (h.view === 'videos') {
+        select('video');
       } else if (h.view === 'app') {
         select('app');
       } else if (h.view === 'photo') {
@@ -718,15 +833,21 @@
 
   /* ---------- 내 레포트 ---------- */
 
+  /* 지금 보이는 레포트 목록 (최신이 앞. 코치룸 미리보기의 '공개 전' 은 맨 앞) */
+  var RP = { code: '', list: [], cur: -1 };
+
   function renderReportList(code, reports, draft) {
     var host = $('#panelReport');
     if (draft) reports = [{ week_start: draft.week_start, week_end: draft.week_end, lesson_date: draft.lesson_date || '', draft: true }].concat(reports);
+    RP.code = code; RP.list = reports; RP.cur = -1;
     if (!reports.length) {
       host.innerHTML = '<div id="reviewHist"></div><div class="empty">아직 공개된 주간 레포트가 없습니다.</div>';
       return;
     }
     host.innerHTML =
+      '<div id="reportOverview">' +
       '<div id="reviewHist"></div>' +
+      '<div id="trendCard"></div>' +
       '<div class="card" id="reportListCard">' +
         '<h2 class="card-title">🗓️ 주간 레포트<span class="card-note">' + reports.length + '편</span></h2>' +
         '<ul class="rp-list">' + reports.map(function (r, i) {
@@ -738,10 +859,14 @@
                  '</button></li>';
         }).join('') + '</ul>' +
       '</div>' +
+      '</div>' +
       '<div id="reportView" hidden>' +
-        '<button type="button" class="hub-back" id="reportBack">‹ 레포트 목록</button>' +
+        '<button type="button" class="hub-back" id="reportBack">‹ 전체 주차 · 누적 추이</button>' +
+        '<div class="rw-nav" id="reportNav"></div>' +
         '<div id="reportBody"></div>' +
       '</div>';
+
+    loadTrend(code);
 
     host.addEventListener('click', function (e) {
       var b = e.target.closest('.rp-item');
@@ -751,30 +876,99 @@
         if (!rp.draft) navPush('report', rp.week_start);
         return;
       }
+      /* 주차 띠 · ◀ 지난주 · 다음주 ▶ · 추이 그래프의 점 — 같은 화면 안에서 주만 바꾼다 (주소는 바꾸되 기록은 쌓지 않는다) */
+      var w = e.target.closest('[data-rw]');
+      if (w && !w.disabled) {
+        var i = +w.dataset.rw;
+        if (reports[i]) { openReport(code, reports[i]); navReplace(reports[i]); }
+        return;
+      }
+      var tp = e.target.closest('[data-tw]');
+      if (tp) {
+        var k = indexOfWeek(tp.getAttribute('data-tw'));
+        if (k !== -1) { openReport(code, reports[k]); navPush('report', reports[k].week_start); }
+        return;
+      }
       if (e.target.closest('#reportBack')) {
         /* 목록으로 — 뒤로가기 기록이 레포트 한 편이면 뒤로가기와 같게 */
-        if (nav.on && history.state && history.state.hub && history.state.hub.v === 'report') history.back();
-        else showReportList();
+        var hs = nav.on && history.state;
+        if (hs && hs.p && hs.hub && hs.hub.v === 'report') history.back();
+        else { showReportList(); if (nav.on) history.replaceState({ hub: { v: 'reports', arg: '' }, p: hs && hs.p }, '', navHash('reports')); }
       }
     });
   }
 
   function showReportList() {
-    var list = $('#reportListCard'), view = $('#reportView');
+    var list = $('#reportOverview') || $('#reportListCard'), view = $('#reportView');
     if (list) list.hidden = false;
     if (view) view.hidden = true;
+    RP.cur = -1;
+    closePlayers(null);
+  }
+
+  function indexOfWeek(week) {
+    for (var i = 0; i < RP.list.length; i++) if (!RP.list[i].draft && RP.list[i].week_start === week) return i;
+    return -1;
+  }
+  function navReplace(r) {
+    if (!nav.on) return;
+    var hh = r.draft ? navHash('reports') : navHash('report', r.week_start);
+    var p = history.state && history.state.p;
+    history.replaceState({ hub: r.draft ? { v: 'reports', arg: '' } : { v: 'report', arg: r.week_start }, p: p }, '', hh);
+  }
+
+  /* 주차 띠 (가로로 밀기) + ◀ 지난주 · 다음주 ▶ — 목록은 최신이 앞이므로 '지난주' = 다음 칸 */
+  function chipLabel(r) {
+    if (r.draft) return '공개 전';
+    if (r.lesson_date && global.Lesson && Lesson.md) return Lesson.md(r.lesson_date);
+    return ReportView.shortDate(r.week_start);
+  }
+  function reportNavHtml(i) {
+    var L = RP.list, n = L.length;
+    if (n < 2) return '';
+    var chips = L.map(function (r, k) { return k; }).reverse().map(function (k) {
+      var r = L[k];
+      return '<button type="button" class="rw-chip' + (k === i ? ' is-on' : '') + (r.draft ? ' rw-chip--draft' : '') + '" data-rw="' + k + '"' +
+             (k === i ? ' aria-current="true"' : '') + '>' + esc(chipLabel(r)) + '</button>';
+    }).join('');
+    return '<div class="rw-arrows">' +
+             '<button type="button" class="rw-arrow" data-rw="' + (i + 1) + '"' + (i + 1 >= n ? ' disabled' : '') + '>◀ 지난주</button>' +
+             '<span class="rw-now num">' + esc(reportLabel(L[i])) + '</span>' +
+             '<button type="button" class="rw-arrow" data-rw="' + (i - 1) + '"' + (i - 1 < 0 ? ' disabled' : '') + '>다음주 ▶</button>' +
+           '</div>' +
+           '<div class="rw-chips" role="list">' + chips + '</div>';
+  }
+  function drawReportNav(i) {
+    var box = $('#reportNav');
+    if (!box) return;
+    box.innerHTML = reportNavHtml(i);
+    var on = box.querySelector('.rw-chip.is-on');
+    var strip = box.querySelector('.rw-chips');
+    if (on && strip) {
+      /* 고른 칩이 보이게 가로로 */
+      var left = on.offsetLeft - (strip.clientWidth - on.offsetWidth) / 2;
+      strip.scrollLeft = Math.max(0, left);
+    }
   }
 
   function openReport(code, r) {
     var body = $('#reportBody');
-    $('#reportListCard').hidden = true;
+    var ov = $('#reportOverview') || $('#reportListCard');
+    if (ov) ov.hidden = true;
     $('#reportView').hidden = false;
+    closePlayers(null);
+    var idx = RP.list.indexOf(r);
+    if (idx === -1 && !r.draft) idx = indexOfWeek(r.week_start);
+    RP.cur = idx;
+    drawReportNav(idx);
     body.innerHTML = '<div class="empty">레포트를 불러오는 중입니다…</div>';
     window.scrollTo(0, 0);
 
     rpc('hub_report', { p_code: code, p_week: r.draft ? '__draft' : r.week_start }).then(function (data) {
+      if (RP.cur !== idx) return;                       /* 그 사이 다른 주를 눌렀다 */
       if (!data) { body.innerHTML = '<div class="empty">이 레포트는 지금 볼 수 없습니다.</div>'; return; }
       ReportView.render(body, data);
+      reportVideos(body, r);
       if (r.draft) body.insertAdjacentHTML('afterbegin', '<div class="pv-draft">아직 공개 전 — 지금 작성 내용으로 공개하면 이렇게 보입니다</div>');
       /* 그 주차(시작일 ~ 종료일) 필기를 레포트 아래에 함께 */
       if (global.Photos) {
@@ -788,6 +982,158 @@
       body.innerHTML = '<div class="empty">불러오지 못했습니다. 새로고침해 주세요.</div>';
     });
   }
+
+  /* 레포트 아래 — 그 주 수업 영상 (이번 주 수업 · 다시보기와 같은 목록에서) */
+  function reportVideos(body, r) {
+    if (r.draft || !WEEKLY || !r.week_start) return;
+    function monday(iso) {
+      var d = new Date(String(iso).slice(0, 10) + 'T00:00:00Z');
+      return plusDays(String(iso).slice(0, 10), -((d.getUTCDay() + 6) % 7));
+    }
+    var mon = monday(r.week_start);
+    var w = (WEEKLY.weeks || []).filter(function (x) { return x.week_start && monday(x.week_start) === mon; })[0];
+    var vids = w ? sortVideos((w.videos || []).filter(function (v) { return v && safeUrl(v.url); })) : [];
+    if (!vids.length) return;
+    var box = document.createElement('div');
+    box.className = 'card rw-videos';
+    box.innerHTML = '<h2 class="card-title">▶️ 이 주 수업 영상</h2><div class="nt-videos">' + vids.map(weekVideoHtml).join('') + '</div>';
+    body.appendChild(box);
+  }
+
+  /* ============================================================
+     누적 추이 — 출석률 · 집중도 평균 · 복습 점수 · 과제 완료율 (hub_trend · migration-016)
+       공개된 레포트의 출결 · 집중도 · 필수과제율, 선생님이 확인한 복습 점수만. 상담 · 성적 · 금액은 없다.
+       출석률 = (출석 + 지각) / 기록이 있는 주 — 그래프는 그 주까지의 누적
+       집중도 평균은 결석한 주(0)를 뺀다. 과제는 필수과제 완료율.
+       점을 누르면 그 주 레포트가 열린다. 2주가 안 되면 "2주차부터 추이가 보입니다".
+     ============================================================ */
+  var TREND_INK = '#7858E8';
+
+  function loadTrend(code) {
+    var host = $('#trendCard');
+    if (!host) return;
+    rpc('hub_trend', { p_code: code }).then(function (t) {
+      if (!t || !t.ok || !Array.isArray(t.weeks)) { host.innerHTML = ''; return; }
+      host.innerHTML = trendHtml(t.weeks);
+    }).catch(function () { host.innerHTML = ''; });   /* 016 실행 전 — 카드 없이 */
+  }
+
+  function avg(list) {
+    var v = list.filter(function (x) { return x != null && !isNaN(x); });
+    return v.length ? v.reduce(function (a, b) { return a + b; }, 0) / v.length : null;
+  }
+  function round1(x) { return Math.round(x * 10) / 10; }
+
+  function trendSeries(weeks) {
+    var present = 0, counted = 0;
+    var rows = weeks.map(function (w) {
+      var st = w.status === 'makeup' ? 'attend' : w.status;
+      var known = st === 'attend' || st === 'late' || st === 'absent';
+      if (known) { counted++; if (st !== 'absent') present++; }
+      var focus = (st === 'absent' || w.focus == null || !(Number(w.focus) > 0)) ? null : Number(w.focus);
+      return {
+        week: w.week_start, date: w.lesson_date || '',
+        att: counted ? Math.round(present / counted * 100) : null,
+        focus: focus,
+        review: w.review == null ? null : Number(w.review),
+        hw: w.hw == null ? null : Math.round(Number(w.hw))
+      };
+    });
+    return { rows: rows, present: present, counted: counted };
+  }
+
+  function trendHtml(weeks) {
+    var head = '<h2 class="card-title">📈 누적 추이</h2>';
+    if (weeks.length < 2) return '<div class="card tr-card">' + head + '<p class="hub-muted">2주차부터 추이가 보입니다.</p></div>';
+    var S = trendSeries(weeks), rows = S.rows;
+    var fAvg = avg(rows.map(function (x) { return x.focus; }));
+    var rAvg = avg(rows.map(function (x) { return x.review; }));
+    var hAvg = avg(rows.map(function (x) { return x.hw; }));
+    var summary = [];
+    if (S.counted) summary.push('출석 ' + S.present + '/' + S.counted);
+    if (fAvg != null) summary.push('집중도 ' + round1(fAvg).toFixed(1));
+    if (rAvg != null) summary.push('복습 평균 ' + Math.round(rAvg) + '점');
+    if (hAvg != null) summary.push('과제 ' + Math.round(hAvg) + '%');
+
+    var charts = [
+      { key: 'att',    name: '출석률',    max: 100, fmt: function (v) { return v + '%'; } },
+      { key: 'focus',  name: '집중도',    max: 5,   fmt: function (v) { return round1(v).toFixed(1); } },
+      { key: 'review', name: '복습 점수', max: 100, fmt: function (v) { return Math.round(v) + '점'; } },
+      { key: 'hw',     name: '과제 완료', max: 100, fmt: function (v) { return v + '%'; } }
+    ].filter(function (c) { return rows.some(function (x) { return x[c.key] != null; }); });
+
+    return '<div class="card tr-card">' + head +
+      (summary.length ? '<p class="tr-sum num">' + esc(summary.join(' · ')) + '</p>' : '') +
+      '<div class="tr-grid">' + charts.map(function (c) { return miniChart(c, rows); }).join('') + '</div>' +
+      '<p class="tr-hint">점을 누르면 그 주 레포트가 열립니다</p>' +
+      tableHtml(rows, charts) +
+    '</div>';
+  }
+
+  function weekShort(x) {
+    if (x.date && global.Lesson && Lesson.md) return Lesson.md(x.date);
+    return ReportView.shortDate(x.week);
+  }
+
+  /* 작은 꺾은선 — 한 줄짜리라 범례 없이, 마지막 점에만 값. 값이 빈 주는 선을 끊는다 */
+  function miniChart(c, rows) {
+    var W = 160, H = 64, padX = 8, top = 8, bot = 8;
+    var n = rows.length;
+    function X(i) { return n === 1 ? W / 2 : padX + i * (W - padX * 2) / (n - 1); }
+    function Y(v) { return top + (1 - Math.max(0, Math.min(c.max, v)) / c.max) * (H - top - bot); }
+    var segs = [], cur = [], last = null;
+    rows.forEach(function (x, i) {
+      var v = x[c.key];
+      if (v == null) { if (cur.length) segs.push(cur); cur = []; return; }
+      cur.push([X(i), Y(v)]);
+      last = { i: i, v: v };
+    });
+    if (cur.length) segs.push(cur);
+    var grid = [0, .5, 1].map(function (g) {
+      var y = top + g * (H - top - bot);
+      return '<line x1="0" x2="' + W + '" y1="' + y + '" y2="' + y + '" class="tr-gridline"/>';
+    }).join('');
+    var area = segs.filter(function (sg) { return sg.length > 1; }).map(function (sg) {
+      return '<path class="tr-area" d="M' + sg[0][0] + ' ' + (H - bot) + ' L' + sg.map(function (p) { return p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join(' L') +
+             ' L' + sg[sg.length - 1][0].toFixed(1) + ' ' + (H - bot) + ' Z"/>';
+    }).join('');
+    var lines = segs.map(function (sg) {
+      return '<polyline class="tr-line" points="' + sg.map(function (p) { return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' ') + '"/>';
+    }).join('');
+    var dots = rows.map(function (x, i) {
+      var v = x[c.key];
+      if (v == null) return '';
+      var label = weekShort(x) + ' ' + c.name + ' ' + c.fmt(v);
+      return '<g class="tr-pt" data-tw="' + esc(x.week) + '" role="button" tabindex="0" aria-label="' + esc(label + ' — 레포트 열기') + '">' +
+               '<title>' + esc(label) + '</title>' +
+               '<circle class="tr-hit" cx="' + X(i).toFixed(1) + '" cy="' + Y(v).toFixed(1) + '" r="11"/>' +
+               '<circle class="tr-dot" cx="' + X(i).toFixed(1) + '" cy="' + Y(v).toFixed(1) + '" r="4"/>' +
+             '</g>';
+    }).join('');
+    return '<div class="tr-chart">' +
+             '<div class="tr-chart__head"><span class="tr-chart__name">' + c.name + '</span>' +
+               (last ? '<span class="tr-chart__val num">' + esc(c.fmt(last.v)) + '</span>' : '') + '</div>' +
+             '<svg class="tr-svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(c.name + ' 추이') + '"' +
+               ' style="--tr-ink:' + TREND_INK + '">' + grid + area + lines + dots + '</svg>' +
+           '</div>';
+  }
+
+  function tableHtml(rows, charts) {
+    return '<details class="tr-table"><summary>표로 보기</summary><div class="tr-table__wrap"><table>' +
+      '<thead><tr><th>주</th>' + charts.map(function (c) { return '<th>' + c.name + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      rows.slice().reverse().map(function (x) {
+        return '<tr><th><button type="button" class="tr-week" data-tw="' + esc(x.week) + '">' + esc(weekShort(x)) + '</button></th>' +
+          charts.map(function (c) { var v = x[c.key]; return '<td class="num">' + (v == null ? '—' : esc(c.fmt(v))) + '</td>'; }).join('') + '</tr>';
+      }).join('') + '</tbody></table></div></details>';
+  }
+
+  /* 키보드로 점을 고를 때도 */
+  document.addEventListener('keydown', function (e) {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target && e.target.classList && e.target.classList.contains('tr-pt')) {
+      e.preventDefault();
+      e.target.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    }
+  });
 
   /* ---------- 앱 과제 ---------- */
 
@@ -1005,6 +1351,6 @@
     }).observe(document.body, { childList: true });
   }
 
-  global.Hub = { bootMe: bootMe, bootNotice: bootNotice, youtubeId: youtubeId };
+  global.Hub = { bootMe: bootMe, bootNotice: bootNotice, youtubeId: youtubeId, trendSeries: trendSeries };
 
 })(window);
