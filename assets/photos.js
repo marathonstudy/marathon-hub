@@ -44,6 +44,7 @@
   }
 
   function call(body) {
+    if (global.HUB_PREVIEW) return global.HUB_PREVIEW.photo(body);
     return fetch(endpoint(), {
       method: 'POST',
       headers: { 'apikey': CFG.supabase.key, 'Content-Type': 'application/json' },
@@ -106,6 +107,7 @@
   }
 
   function uploadOne(code, lessonDate, file) {
+    if (global.HUB_PREVIEW) return Promise.resolve({ ok: false, message: global.HUB_PREVIEW.blockMsg });
     return global.Photos.shrink(file).then(function (s) {
       var fd = new FormData();
       fd.append('code', code);
@@ -161,7 +163,10 @@
 
   /* ---------- 「필기 노트」 탭 ---------- */
 
-  function renderTab(host, code) {
+  /* opts.readOnly — 학부모 링크: 보기만 (올리기 · 지우기 없음) */
+  function renderTab(host, code, opts) {
+    opts = opts || {};
+    if (opts.readOnly) return renderView(host, code);
     host.innerHTML =
       '<div class="card ph-up">' +
         '<h2 class="card-title">📝 오늘 필기 올리기<span class="card-note" id="phToday"></span></h2>' +
@@ -244,6 +249,26 @@
       }
     });
     refresh();
+  }
+
+  /* 학부모 링크 — 날짜별 앨범 보기만 */
+  function renderView(host, code) {
+    host.innerHTML = '<div class="card ph-up"><h2 class="card-title">📝 필기 노트<span class="card-note">보기 전용</span></h2>' +
+      '<p class="ph-stat" id="phStat">불러오는 중…</p>' +
+      '<p class="ph-guide">필기 사진은 학생이 학생 링크에서 올립니다.</p></div><div id="phAlbum"></div>';
+    list(code).then(function (res) {
+      if (!res || !res.ok) { $('#phStat', host).textContent = '필기 노트를 불러오지 못했습니다.'; return; }
+      $('#phStat', host).textContent = '지금까지 필기 ' + res.total + '장 · ' + res.days + '회 수업';
+      var groups = groupByDate(res.photos || []);
+      $('#phAlbum', host).innerHTML = groups.length ? groups.map(function (g) {
+        return '<div class="card ph-day"><h2 class="card-title">' + esc(dayLabel(g.date)) + ' 수업' +
+               '<span class="card-note">' + g.items.length + '장</span></h2>' + gridHtml(g.items, false) + '</div>';
+      }).join('') : '<div class="empty">아직 올린 필기가 없습니다.</div>';
+    }).catch(function () { $('#phStat', host).textContent = '필기 노트를 불러오지 못했습니다.'; });
+    host.addEventListener('click', function (e) {
+      var t = e.target.closest('.ph-thumb');
+      if (t) lightbox(t.dataset.url);
+    });
   }
 
   /* 학부모 묶음 카드에서도 누르면 크게 */

@@ -7,6 +7,7 @@
 //    3) 그 학생 사진만 10분짜리 서명 주소로 보여 주고
 //    4) 그 학생이 자기 사진을 지우면 파일까지 지운다.
 //  사진 보관함(note-photos)은 비공개다. 공개 주소는 만들지 않는다.
+//  올리기 · 지우기는 학생 링크만 (전환 기간에는 학부모 링크도 — migration-015). 보기는 두 링크 모두.
 //
 //  막는 것
 //    · JPEG 가 아닌 파일, 장당 600KB 넘는 파일 (화면에서 0.3MB 안팎으로 줄여 보낸다)
@@ -90,6 +91,7 @@ const REASON: Record<string, string> = {
   path: "올리지 못했습니다.",
   type: "사진(JPEG)만 올릴 수 있습니다.",
   size: "사진이 너무 큽니다. 다시 골라 주세요.",
+  parent: "학부모 링크에서는 보기만 할 수 있습니다. 사진은 학생 링크에서 올리거나 지울 수 있어요.",
 };
 
 /* ---------- 올리기 (multipart: code, lesson_date, width, height, file) ---------- */
@@ -110,6 +112,7 @@ async function upload(req: Request, cors: Record<string, string>) {
 
   const gate = await rpc("photo_gate", { p_code: code });
   if (!gate?.ok) return json({ ok: false, reason: gate?.reason, message: REASON[gate?.reason] ?? REASON.notfound }, 403, cors);
+  if (gate.can_write === false) return json({ ok: false, reason: "parent", message: REASON.parent }, 403, cors);
   if (gate.today_count >= gate.limit) return json({ ok: false, reason: "limit", message: REASON.limit }, 429, cors);
 
   const path = `${gate.student_id}/${lessonDate}/${crypto.randomUUID()}.jpg`;
@@ -170,6 +173,8 @@ async function list(body: Any, cors: Record<string, string>) {
 /* ---------- 지우기 — 학생 본인 사진만, 파일까지 ---------- */
 async function remove(body: Any, cors: Record<string, string>) {
   if (!validCode(body.code) || typeof body.id !== "string") return json({ ok: false }, 400, cors);
+  const gate = await rpc("photo_gate", { p_code: body.code });
+  if (gate?.ok && gate.can_write === false) return json({ ok: false, reason: "parent", message: REASON.parent }, 403, cors);
   const path = await rpc("photo_owned", { p_code: body.code, p_id: body.id });
   if (!path) return json({ ok: false, reason: "notfound" }, 404, cors);
   const del = await fetch(`${URL_}/storage/v1/object/${BUCKET}`, {

@@ -27,6 +27,7 @@
   function scoreText(correct, q, score) { return correct + ' / ' + q + ' · ' + score + '점'; }
 
   function status(code) {
+    if (global.HUB_PREVIEW) return global.HUB_PREVIEW.review();
     return fetch(endpoint(), {
       method: 'POST',
       headers: { 'apikey': CFG.supabase.key, 'Content-Type': 'application/json' },
@@ -177,6 +178,7 @@
 
   function submit() {
     if (st.busy || !st.data || !st.data.test) return;
+    if (global.HUB_PREVIEW) { alert(global.HUB_PREVIEW.blockMsg); return; }   /* 미리보기 — 아무것도 바꾸지 않는다 */
     var sub = st.data.submission;
     if (!st.blob && !(sub && sub.has_photo)) return;
     st.busy = true; render();

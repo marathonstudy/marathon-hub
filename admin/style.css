@@ -2259,3 +2259,29 @@ body.rv-live-open { overflow: hidden; }
 .th-item__head .btn { margin-left: auto; }
 .th-item__text { margin-top: 6px; white-space: pre-wrap; font-size: 13px; line-height: 1.6; color: var(--ink-deep); max-height: 140px; overflow: auto; }
 @media (max-width: 720px) { .dnv-cols { grid-template-columns: 1fr; } }
+
+/* 「오늘」 — 링크 전환 기간 알림 (migration-015) */
+.td-transition { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; margin-bottom: 12px; padding: 10px 12px;
+  border-radius: 12px; background: #FFF6E8; border: 1px solid #F3D9B0; color: #7A4A0E; font-size: 13.5px; line-height: 1.6; }
+
+/* ============================================================
+   학생 링크 · 학부모 링크 · 미리보기 (app.js · preview.js · migration-015)
+   ============================================================ */
+.btn--parent { color: #5B42D6; border-color: #CFC6F5; background: #F7F5FE; }
+.btn--student { color: #fff; border-color: #3F9C7F; background: #3F9C7F; }
+.btn--student:hover { background: #358A6F; border-color: #358A6F; }
+td .btn--parent + .btn--student { margin-left: 4px; }
+.class-tools { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 6px 10px 8px; }
+.fieldline--pv .btn { margin-right: 4px; }
+.pv-overlay { position: fixed; inset: 0; z-index: 950; background: #EEF0F7; display: flex; flex-direction: column; }
+body.pv-open { overflow: hidden; }
+.pv-bar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 10px 14px; background: #2C3566; color: #fff; }
+.pv-bar__title { font-size: 15px; font-weight: 800; margin-right: auto; }
+.pv-bar .chk-inline { color: #fff; }
+.pv-seg { display: flex; gap: 4px; }
+.pv-tag { display: inline-block; font-size: 12px; font-weight: 800; border-radius: 999px; padding: 2px 9px; background: #fff; }
+.pv-tag--student { color: #2F7D63; }
+.pv-tag--parent { color: #5B42D6; }
+.pv-frame-wrap { flex: 1; display: flex; justify-content: center; min-height: 0; padding: 12px; }
+.pv-frame { width: 100%; max-width: 760px; height: 100%; border: 0; border-radius: 14px; background: #fff; box-shadow: var(--shadow); }
+.pv-frame-wrap.is-phone .pv-frame { max-width: 390px; }

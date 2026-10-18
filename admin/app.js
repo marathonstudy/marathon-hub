@@ -181,6 +181,36 @@
     });
   }
 
+  /* ---------- 학생 링크 (migration-015) ----------
+     학부모 링크(hubCode)와 따로. 처음 복사할 때 만든다. 재발급하면 예전 학생 링크만 막힌다. */
+  function saveStudentCode(studentId, code) {
+    return DB.saveLink(studentId, { studentCode: code }).then(function (link) {
+      var cur = Store.linkOf(studentId);
+      cur.studentCode = link.studentCode || code;
+      cur.studentIssuedAt = link.studentIssuedAt || new Date().toISOString();
+      Store.setLinkLocal(studentId, cur);
+      return cur.studentCode;
+    });
+  }
+  function ensureStudentLink(studentId) {
+    var l = Store.linkOf(studentId);
+    return l.studentCode ? Promise.resolve(l.studentCode) : saveStudentCode(studentId, Store.randomCode(24));
+  }
+  function reissueStudentLink(studentId) { return saveStudentCode(studentId, Store.randomCode(24)); }
+  function ensureStudentLinks(ids) {
+    var list = ids.filter(function (id) { return !Store.linkOf(id).studentCode; })
+      .map(function (id) { return { studentId: id, studentCode: Store.randomCode(24) }; });
+    return DB.saveLinks(list).then(function () {
+      list.forEach(function (p) {
+        var cur = Store.linkOf(p.studentId);
+        cur.studentCode = p.studentCode;
+        cur.studentIssuedAt = new Date().toISOString();
+        Store.setLinkLocal(p.studentId, cur);
+      });
+      return list.length;
+    });
+  }
+
   /* 링크가 없는 학생 여럿에게 한 번에 */
   function issueMissing(ids) {
     var list = ids.map(function (id) { return { studentId: id, hubCode: Store.randomCode(24) }; });
@@ -245,6 +275,8 @@
       '<td data-label="개인 링크" class="roster__link"></td>' +
       '<td data-label="앱 과제" class="roster__app"></td>' +
       '<td class="roster__actions">' +
+        '<button class="btn btn--sm btn--ghost" data-pv="parent" title="학부모 링크로 열었을 때 모습 (미리보기)">학부모 화면</button>' +
+        '<button class="btn btn--sm btn--ghost" data-pv="student" title="학생 링크로 열었을 때 모습 (미리보기)">학생 화면</button>' +
         '<button class="btn btn--sm" data-act="edit">수정</button>' +
       '</td>';
   }
@@ -296,10 +328,11 @@
 
     if (s.archived) {
       linkTd.innerHTML = '<span class="link-tag link-tag--off">퇴원 · 막힘</span>';
-    } else if (link.hubCode) {
-      linkTd.innerHTML = '<button class="btn btn--sm" data-act="copylink">링크 복사</button>';
     } else {
-      linkTd.innerHTML = '<button class="btn btn--sm btn--primary" data-act="issue">발급</button>';
+      linkTd.innerHTML = (link.hubCode
+          ? '<button class="btn btn--sm btn--parent" data-act="copylink" title="학부모 링크 복사 — 레포트 · 안내용 (보기 전용)">학부모 링크</button>'
+          : '<button class="btn btn--sm btn--primary" data-act="issue">학부모 링크 발급</button>') +
+        '<button class="btn btn--sm btn--student" data-act="copystudent" title="학생 링크 복사 — 복습테스트 · 필기 사진 입력용">학생 링크</button>';
     }
     appTd.innerHTML = link.appCode
       ? '<span class="link-tag link-tag--on">연결됨</span>'
@@ -370,12 +403,20 @@
         head.querySelector('.class-head__name').after(tag);
       }
       wrap.appendChild(head);
+      if (g.name !== ARCHIVE_GROUP) {
+        var tools = document.createElement('div');
+        tools.className = 'class-tools';
+        tools.innerHTML = '<button type="button" class="btn btn--sm btn--student" data-act="copyclassstudent">학생 링크 모두 복사</button>' +
+          '<span class="muted-note">이름 + 학생 링크 목록 — 학생 단톡방 첫 안내용 (없는 학생 링크는 만들어서)</span>';
+        tools.querySelector('button').dataset.cls = g.name;
+        wrap.appendChild(tools);
+      }
 
       var table = document.createElement('table');
       table.className = 'roster';
       table.innerHTML = '<thead><tr><th>이름</th><th>학교</th><th>학년</th><th>연락처</th>' +
         tableFields().map(function () { return '<th></th>'; }).join('') +
-        '<th>개인 링크</th><th>앱 과제</th><th></th></tr></thead><tbody></tbody>';
+        '<th>링크 (학부모 · 학생)</th><th>앱 과제</th><th></th></tr></thead><tbody></tbody>';
       var ths = table.querySelectorAll('thead th');
       tableFields().forEach(function (f, i) { ths[4 + i].textContent = f.label; });
 
@@ -565,6 +606,24 @@
       return;
     }
 
+    if (btn.dataset.act === 'copyclassstudent') {
+      var cls = btn.dataset.cls;
+      var list = students.filter(function (x) { return !x.archived && (x.className || '') === cls; })
+        .sort(function (a, b) { return (a.name || '').localeCompare(b.name || '', 'ko'); });
+      if (!list.length) { toast('다니는 학생이 없습니다', 'bad'); return; }
+      btn.disabled = true;
+      ensureStudentLinks(list.map(function (x) { return x.id; })).then(function (made) {
+        var text = cls + ' 학생 링크 (복습테스트 · 필기 사진은 이 링크에서)\n' + list.map(function (x) {
+          return x.name + ' ' + Store.hubUrl(Store.linkOf(x.id).studentCode);
+        }).join('\n');
+        return copyText(text).then(function () {
+          toast(cls + ' ' + list.length + '명 학생 링크를 복사했습니다' + (made ? ' (새로 만든 ' + made + '명)' : ''), 'good');
+        });
+      }).catch(function (err) { toast('복사하지 못했습니다 — ' + err.message, 'bad'); })
+        .then(function () { btn.disabled = false; });
+      return;
+    }
+
     var tr = btn.closest('tr');
     var s = tr && students.find(function (x) { return x.id === tr.dataset.id; });
     if (!s) return;
@@ -574,8 +633,16 @@
 
     if (btn.dataset.act === 'copylink') {
       copyText(Store.hubUrl(Store.linkOf(s.id).hubCode))
-        .then(function () { toast(s.name + ' 개인 링크를 복사했습니다', 'good'); })
+        .then(function () { toast(s.name + ' 학부모 링크를 복사했습니다 (보기 전용)', 'good'); })
         .catch(function (err) { toast(err.message, 'bad'); });
+    }
+
+    if (btn.dataset.act === 'copystudent') {
+      btn.disabled = true;
+      ensureStudentLink(s.id).then(function (code) {
+        return copyText(Store.hubUrl(code)).then(function () { toast(s.name + ' 학생 링크를 복사했습니다 (입력용)', 'good'); });
+      }).catch(function (err) { toast('복사하지 못했습니다 — ' + err.message, 'bad'); })
+        .then(function () { btn.disabled = false; });
     }
 
     if (btn.dataset.act === 'issue') {
@@ -732,6 +799,13 @@
     $('#btnHubOpen').hidden = !url;
     if (url) $('#btnHubOpen').href = url;
     $('#linkBoxNew').hidden = !isNew;
+
+    var surl = isNew ? '' : Store.hubUrl(link.studentCode);
+    $('#fStuUrl').textContent = surl || (isNew ? '저장한 뒤 만들 수 있습니다' : '아직 없음 — [복사]를 누르면 만듭니다');
+    $('#btnStuIssue').hidden = isNew || !link.studentCode;
+    $('#btnStuCopy').hidden = isNew;
+    $('#btnStuOpen').hidden = !surl;
+    if (surl) $('#btnStuOpen').href = surl;
   }
 
   /* 창을 연 순간의 서버 시각. 창이 열려 있는 동안 다른 분이 저장했으면 저장 때 묻는다. */
@@ -801,7 +875,7 @@
     if (!editingId) return;
     var had = !!Store.linkOf(editingId).hubCode;
     var go = had
-      ? confirmAsk('개인 링크 재발급', '새 링크를 만들면 지금까지 보낸 링크는 바로 열리지 않습니다. 새 링크를 다시 보내야 합니다.', '재발급')
+      ? confirmAsk('학부모 링크 재발급', '새 학부모 링크를 만들면 지금까지 보낸 학부모 링크는 바로 열리지 않습니다. 학생 링크는 그대로입니다.', '재발급')
       : Promise.resolve(true);
     go.then(function (ok) {
       if (!ok) return;
@@ -815,8 +889,28 @@
 
   $('#btnHubCopy').addEventListener('click', function () {
     var url = Store.hubUrl(Store.linkOf(editingId).hubCode);
-    copyText(url).then(function () { toast('개인 링크를 복사했습니다', 'good'); })
+    copyText(url).then(function () { toast('학부모 링크를 복사했습니다', 'good'); })
       .catch(function (e) { toast(e.message, 'bad'); });
+  });
+
+  $('#btnStuCopy').addEventListener('click', function () {
+    if (!editingId) return;
+    ensureStudentLink(editingId).then(function (code) {
+      renderLinkBox();
+      return copyText(Store.hubUrl(code)).then(function () { toast('학생 링크를 복사했습니다', 'good'); });
+    }).catch(function (e) { toast(e.message, 'bad'); });
+  });
+
+  $('#btnStuIssue').addEventListener('click', function () {
+    if (!editingId) return;
+    confirmAsk('학생 링크 재발급', '새 학생 링크를 만들면 지금까지 보낸 학생 링크는 바로 열리지 않습니다. 학부모 링크는 그대로입니다.', '재발급').then(function (ok) {
+      if (!ok) return;
+      return reissueStudentLink(editingId).then(function () {
+        renderLinkBox();
+        render();
+        toast('새 학생 링크를 만들었습니다. 예전 학생 링크는 막혔습니다', 'good');
+      });
+    }).catch(function (e) { toast('발급하지 못했습니다 — ' + e.message, 'bad'); });
   });
 
   $('#btnStudentDelete').addEventListener('click', function () {
@@ -1347,7 +1441,7 @@
           Object.keys(r.links).forEach(function (sid) {
             if (ids.indexOf(sid) === -1) return;
             var l = r.links[sid] || {};
-            list.push({ studentId: sid, hubCode: l.hubCode || null, appCode: l.appCode || '' });
+            list.push({ studentId: sid, hubCode: l.hubCode || null, studentCode: l.studentCode || undefined, appCode: l.appCode || '' });
           });
           return DB.saveLinks(list);
         }).then(function () {

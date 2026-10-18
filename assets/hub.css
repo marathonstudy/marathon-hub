@@ -674,3 +674,11 @@ button.nt-file {
 button.hub-btn { border: 0; font-family: inherit; cursor: pointer; }
 button.hub-btn.hub-btn--ghost, label.hub-btn--ghost { border: 1.5px solid #CFC6F5; }
 label.hub-btn { cursor: pointer; text-align: center; }
+
+/* ---------- 학생용 · 학부모용 표시 · 코치룸 미리보기 (migration-015) ---------- */
+.hub-role { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 800; border-radius: 999px; padding: 2px 8px; background: rgba(255, 255, 255, .92); }
+.hub-role--student { color: #2F7D63; }
+.hub-role--parent { color: #5B42D6; }
+.pv-band { position: sticky; top: 0; z-index: 50; padding: 12px 14px; background: #2C3566; color: #fff; font-size: 15px; font-weight: 900; text-align: center; line-height: 1.5; }
+.pv-draft { margin-bottom: 12px; padding: 10px 12px; border-radius: 12px; background: #FFF6E8; border: 1px solid #F3D9B0; color: #7A4A0E; font-size: 13.5px; font-weight: 800; text-align: center; }
+.rp-item--draft { border: 1.5px dashed #CFC6F5; }

@@ -645,6 +645,11 @@
               '<span class="comment-btn__count num"></span>' +
             '</button>' +
           '</div>' +
+          '<div class="fieldline fieldline--pv">' +
+            '<span class="fieldline__label">미리보기</span>' +
+            '<button type="button" class="btn btn--sm btn--ghost" data-pv="parent">학부모 화면 보기</button>' +
+            '<button type="button" class="btn btn--sm btn--ghost" data-pv="student">학생 화면 보기</button>' +
+          '</div>' +
         '</div>' +
       '</div>';
   }

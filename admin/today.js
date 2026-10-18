@@ -26,7 +26,23 @@
   var APP_LOW = 50;                 /* 앱 과제 제출률 이 값 미만이면 챙기기 */
   var APP_TTL = 30 * 60 * 1000;
 
-  var st = { data: null, loading: false, last: 0, open: {}, role: '', settingsAt: '' };
+  var st = { data: null, loading: false, last: 0, open: {}, role: '', settingsAt: '', links: null, linksAt: '' };
+
+  /* 링크 전환 기간 (migration-015) — 학부모 링크로도 입력 허용. 켜져 있는 동안 맨 위에 알림 */
+  function loadLinks() {
+    return DB.getSettingRow('links').then(function (row) {
+      st.links = row ? (row.value || {}) : null;
+      st.linksAt = (row && row.updated_at) || '';
+      if (st.data) render();
+    }, function () { st.links = null; });
+  }
+  function transitionHtml() {
+    if (!st.links || st.links.parentWrite === false) return '';
+    return '<div class="td-transition">🔁 <b>전환 기간</b> — 학부모 링크로도 복습테스트 · 필기 사진 입력이 됩니다. ' +
+      '① 명단에서 반마다 [학생 링크 모두 복사]로 학생 링크를 다 보내면 <b>끄세요</b>.' +
+      (st.role === 'teacher' ? ' <button type="button" class="btn btn--sm" id="tdTransitionOpen">설정에서 끄기</button>' : ' (선생님이 「설정」에서 끕니다)') +
+      '</div>';
+  }
   var app = {};                     /* 학생 id → { rate, ok, at } */
   var appRun = 0;
 
@@ -194,7 +210,7 @@
 
     $('#tdWeek').textContent = '이번 주 ' + Store.dateWithDow(d.week.start) + ' ~ ' + Store.dateWithDow(d.week.end);
 
-    $('#tdBody').innerHTML =
+    $('#tdBody').innerHTML = transitionHtml() +
       '<div class="tb-cards td-summary">' + summary.map(function (c) {
         return '<div class="tb-card"><div class="tb-card__label">' + c[0] + '</div><div class="tb-card__val num">' + esc(c[1]) + '</div></div>';
       }).join('') + '</div>' +
@@ -281,7 +297,8 @@
       render();
     }
   });
-  $('#tdRefresh').addEventListener('click', function () { app = {}; load(true); });
+  $('#tdRefresh').addEventListener('click', function () { app = {}; load(true); loadLinks(); });
+  $('#tdBody').addEventListener('click', function (e) { if (e.target.id === 'tdTransitionOpen') $('#tdSettingsBtn').click(); });
 
   /* ---------- 설정 (teacher 만 바꿀 수 있다) ---------- */
 
@@ -292,8 +309,9 @@
       $('#tdSetMoney').checked = v.assistantSeeMoney !== false;
       $('#tdSetWeeks').value = v.absentWeeks || 4;
       $('#tdSetMin').value = v.absentMin || 2;
+      $('#tdSetParentWrite').checked = !st.links || st.links.parentWrite !== false;
       var teacher = st.role === 'teacher';
-      ['#tdSetMoney', '#tdSetWeeks', '#tdSetMin'].forEach(function (s) { $(s).disabled = !teacher; });
+      ['#tdSetMoney', '#tdSetWeeks', '#tdSetMin', '#tdSetParentWrite'].forEach(function (s) { $(s).disabled = !teacher; });
       $('#tdSetSave').hidden = !teacher;
       $('#tdSetNote').textContent = teacher ? '' : '이 설정은 선생님(teacher) 계정만 바꿀 수 있습니다.';
       $('#tdSettingsModal').showModal();
@@ -307,10 +325,21 @@
       absentWeeks: Math.max(1, Math.min(12, parseInt($('#tdSetWeeks').value, 10) || 4)),
       absentMin: Math.max(1, Math.min(12, parseInt($('#tdSetMin').value, 10) || 2))
     };
+    var pw = $('#tdSetParentWrite').checked;
+    var pwChanged = !st.links || (st.links.parentWrite !== false) !== pw;
     UI.guardedSave('「오늘」 화면 설정', function (chk) {
       return DB.saveSettingIf('dashboard', v, UI.whoami(), chk ? st.settingsAt : '');
     }, function () { $('#tdSettingsModal').close(); }).then(function (res) {
       if (!res.ok) return;
+      if (pwChanged) {
+        return DB.saveSettingIf('links', Object.assign({}, st.links || {}, { parentWrite: pw }), UI.whoami(), '').then(function () {
+          toast(pw ? '전환 기간을 켰습니다 — 학부모 링크로도 입력됩니다' : '전환 기간을 껐습니다 — 이제 입력은 학생 링크에서만 됩니다', 'good');
+          return loadLinks().then(function () { return res; });
+        });
+      }
+      return res;
+    }).then(function (res) {
+      if (!res || !res.ok) return;
       $('#tdSettingsModal').close();
       toast('설정을 저장했습니다', 'good');
       load(true);
@@ -320,8 +349,9 @@
   /* ---------- 언제 다시 계산하나 ---------- */
 
   window.addEventListener('jt:loaded', function () {
-    DB.myStaff().then(function (m) { st.role = (m && m.role) || ''; });
+    DB.myStaff().then(function (m) { st.role = (m && m.role) || ''; if (st.data) render(); });
     load(true);
+    loadLinks();
   });
   document.addEventListener('jt:tab', function (e) { if (e.detail.index === 7) load(false); });
   var TABLES = { '*': 1, entries: 1, published: 1, sent: 1, note_photos: 1, tb_bills: 1, student_notes: 1, students: 1 };

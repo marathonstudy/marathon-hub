@@ -118,17 +118,20 @@
   function fromDbLink(r) {
     return {
       hubCode: r.hub_code || '',
+      studentCode: r.student_code || '',       /* 학생 링크 (migration-015) */
+      studentIssuedAt: r.student_issued_at || '',
       appCode: r.app_share_code || '',
       hubIssuedAt: r.hub_issued_at || '',
       appUpdatedAt: r.app_code_updated_at || ''
     };
   }
 
-  /* patch: { hubCode?, appCode? } — 준 것만 바꾼다 */
+  /* patch: { hubCode?, studentCode?, appCode? } — 준 것만 바꾼다. hubCode = 학부모 링크, studentCode = 학생 링크 */
   function saveLink(studentId, patch) {
     var row = { student_id: studentId };
     var now = new Date().toISOString();
     if (patch.hubCode !== undefined) { row.hub_code = patch.hubCode || null; row.hub_issued_at = now; }
+    if (patch.studentCode !== undefined) { row.student_code = patch.studentCode || null; row.student_issued_at = now; }
     if (patch.appCode !== undefined) { row.app_share_code = patch.appCode || ''; row.app_code_updated_at = now; }
     return sb().from('student_links').upsert(row, { onConflict: 'student_id' })
       .select('*')
@@ -140,15 +143,17 @@
   function saveLinks(list) {
     if (!list.length) return Promise.resolve();
     var now = new Date().toISOString();
-    var withHub = [], withApp = [];
+    var withHub = [], withApp = [], withStu = [];
     list.forEach(function (p) {
       if (p.hubCode !== undefined) withHub.push({ student_id: p.studentId, hub_code: p.hubCode, hub_issued_at: now });
+      if (p.studentCode) withStu.push({ student_id: p.studentId, student_code: p.studentCode, student_issued_at: now });
       if (p.appCode !== undefined) withApp.push({ student_id: p.studentId, app_share_code: p.appCode, app_code_updated_at: now });
     });
     var c = sb();
     return Promise.resolve()
       .then(function () { return withHub.length ? c.from('student_links').upsert(withHub, { onConflict: 'student_id' }).then(check) : null; })
-      .then(function () { return withApp.length ? c.from('student_links').upsert(withApp, { onConflict: 'student_id' }).then(check) : null; });
+      .then(function () { return withApp.length ? c.from('student_links').upsert(withApp, { onConflict: 'student_id' }).then(check) : null; })
+      .then(function () { return withStu.length ? c.from('student_links').upsert(withStu, { onConflict: 'student_id' }).then(check) : null; });
   }
 
   /* ---------- 내가 만든 칸 (field_defs) ---------- */

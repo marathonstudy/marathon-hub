@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" as="style" crossorigin
       href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
-<link rel="stylesheet" href="style.css?v=20261019a">
+<link rel="stylesheet" href="style.css?v=20261019b">
 </head>
 <body class="is-locked">
 
@@ -1094,13 +1094,24 @@
       <div class="link-box" id="linkBox">
         <div class="extra-head"><span class="extra-head__title">개인 링크 · 앱 과제</span></div>
         <div class="link-box__row">
-          <span class="link-box__label">개인 링크</span>
+          <span class="link-box__label">학부모 링크</span>
           <code class="link-box__url" id="fHubUrl">아직 없음</code>
         </div>
+        <p class="field__hint">레포트 · 안내용 — 보기만 됩니다 (지금까지 보낸 개인 링크)</p>
         <div class="toolbar" style="margin:6px 0 12px">
           <button class="btn btn--sm btn--primary" id="btnHubIssue" type="button">발급</button>
-          <button class="btn btn--sm" id="btnHubCopy" type="button">복사</button>
+          <button class="btn btn--sm btn--parent" id="btnHubCopy" type="button">복사</button>
           <a class="btn btn--sm" id="btnHubOpen" target="_blank" rel="noopener">열어 보기</a>
+        </div>
+        <div class="link-box__row">
+          <span class="link-box__label">학생 링크</span>
+          <code class="link-box__url" id="fStuUrl">아직 없음</code>
+        </div>
+        <p class="field__hint">학생용 — 복습테스트 제출 · 필기 사진 올리기가 됩니다</p>
+        <div class="toolbar" style="margin:6px 0 12px">
+          <button class="btn btn--sm btn--student" id="btnStuCopy" type="button">복사</button>
+          <button class="btn btn--sm" id="btnStuIssue" type="button">재발급</button>
+          <a class="btn btn--sm" id="btnStuOpen" target="_blank" rel="noopener">열어 보기</a>
         </div>
         <label class="field">
           <span class="field__label">마라톤 앱 공유 링크 <span class="field__opt">월마다 바뀌면 새로 붙여 넣기</span></span>
@@ -1740,6 +1751,10 @@
     </div>
     <div class="modal__body">
       <label class="check-line">
+        <input type="checkbox" id="tdSetParentWrite">
+        <span>학부모 링크로도 입력 허용 (전환 기간) <span class="field__opt">켜져 있으면 학부모 링크로도 복습테스트 제출 · 필기 사진 올리기가 됩니다. 학생 링크를 다 보낸 뒤 끄세요 · 선생님만</span></span>
+      </label>
+      <label class="check-line">
         <input type="checkbox" id="tdSetMoney">
         <span>조교 계정에도 교재비 금액 보이기 <span class="field__opt">「오늘」 화면에만 적용 · ⑥ 교재 청구·수납은 그대로 보입니다</span></span>
       </label>
@@ -1788,37 +1803,38 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
 <!-- config.js 와 brand.js 가 먼저 와야 한다. 나머지가 이 값을 읽는다. -->
-<script src="../assets/config.js?v=20261019a"></script>
-<script src="../assets/brand.js?v=20261019a"></script>
-<script src="../assets/lesson.js?v=20261019a"></script>
-<script src="supabase.js?v=20261019a"></script>
-<script src="db.js?v=20261019a"></script>
-<script src="store.js?v=20261019a"></script>
-<script src="report.js?v=20261019a"></script>
-<script src="app.js?v=20261019a"></script>
-<script src="import.js?v=20261019a"></script>
-<script src="write.js?v=20261019a"></script>
-<script src="publish.js?v=20261019a"></script>
-<script src="send.js?v=20261019a"></script>
-<script src="notice.js?v=20261019a"></script>
-<script src="tb.js?v=20261019a"></script>
-<script src="tb-dash.js?v=20261019a"></script>
-<script src="tb-issue.js?v=20261019a"></script>
-<script src="tb-stock.js?v=20261019a"></script>
-<script src="tb-bill.js?v=20261019a"></script>
-<script src="../assets/dday.js?v=20261019a"></script>
-<script src="card.js?v=20261019a"></script>
-<script src="exams.js?v=20261019a"></script>
-<script src="photo.js?v=20261019a"></script>
-<script src="today.js?v=20261019a"></script>
-<script src="staff.js?v=20261019a"></script>
-<script src="classes.js?v=20261019a"></script>
-<script src="weekly.js?v=20261019a"></script>
-<script src="summary.js?v=20261019a"></script>
-<script src="../assets/photos.js?v=20261019a"></script>
-<script src="review.js?v=20261019a"></script>
-<script src="draftguard.js?v=20261019a"></script>
-<script src="sync.js?v=20261019a"></script>
-<script src="auth.js?v=20261019a"></script>
+<script src="../assets/config.js?v=20261019b"></script>
+<script src="../assets/brand.js?v=20261019b"></script>
+<script src="../assets/lesson.js?v=20261019b"></script>
+<script src="supabase.js?v=20261019b"></script>
+<script src="db.js?v=20261019b"></script>
+<script src="store.js?v=20261019b"></script>
+<script src="report.js?v=20261019b"></script>
+<script src="app.js?v=20261019b"></script>
+<script src="import.js?v=20261019b"></script>
+<script src="write.js?v=20261019b"></script>
+<script src="publish.js?v=20261019b"></script>
+<script src="send.js?v=20261019b"></script>
+<script src="notice.js?v=20261019b"></script>
+<script src="tb.js?v=20261019b"></script>
+<script src="tb-dash.js?v=20261019b"></script>
+<script src="tb-issue.js?v=20261019b"></script>
+<script src="tb-stock.js?v=20261019b"></script>
+<script src="tb-bill.js?v=20261019b"></script>
+<script src="../assets/dday.js?v=20261019b"></script>
+<script src="card.js?v=20261019b"></script>
+<script src="exams.js?v=20261019b"></script>
+<script src="photo.js?v=20261019b"></script>
+<script src="today.js?v=20261019b"></script>
+<script src="staff.js?v=20261019b"></script>
+<script src="classes.js?v=20261019b"></script>
+<script src="weekly.js?v=20261019b"></script>
+<script src="summary.js?v=20261019b"></script>
+<script src="../assets/photos.js?v=20261019b"></script>
+<script src="review.js?v=20261019b"></script>
+<script src="draftguard.js?v=20261019b"></script>
+<script src="preview.js?v=20261019b"></script>
+<script src="sync.js?v=20261019b"></script>
+<script src="auth.js?v=20261019b"></script>
 </body>
 </html>

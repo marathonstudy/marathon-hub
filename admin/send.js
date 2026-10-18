@@ -140,7 +140,7 @@
           '<span class="send-row__badge">' + (r.sent ? '보냄' : '미발송') + '</span>' +
         '</div>' +
         '<div class="send-row__phone"></div>' +
-        (hasLink ? '' : '<div class="send-row__warn">개인 링크가 없습니다 — ① 명단에서 발급해 주세요</div>') +
+        (hasLink ? '' : '<div class="send-row__warn">학부모 링크가 없습니다 — ① 명단에서 발급해 주세요</div>') +
         '<div class="send-row__acts">' +
           '<button class="btn btn--sm btn--primary" data-act="sms"' + (canSms ? '' : ' disabled') + '>' +
             '문자 보내기</button>' +
@@ -150,6 +150,8 @@
           (navigator.share && hasLink ? '<button class="btn btn--sm" data-act="share">공유</button>' : '') +
           '<button class="btn btn--sm btn--ghost" data-act="undo"' + (r.sent ? '' : ' hidden') + '>' +
             '되돌리기</button>' +
+          '<button class="btn btn--sm btn--ghost" data-pv="parent">학부모 화면 보기</button>' +
+          '<button class="btn btn--sm btn--ghost" data-pv="student">학생 화면 보기</button>' +
         '</div>' +
       '</div>';
   }

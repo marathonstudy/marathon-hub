@@ -20,11 +20,24 @@
   var CFG = global.CONFIG;
   var esc = function (v) { return global.ReportView ? ReportView.esc(v) : String(v == null ? '' : v); };
 
+  /* 코치룸 미리보기 — 코치룸 창 안의 틀(iframe)로 열렸을 때만. 링크 코드 없이, 코치룸이 직원 권한으로 내용을 대신 준다.
+     미리보기에서는 제출 · 사진 올리기 · 지우기가 아무것도 바꾸지 않는다. */
+  var PV = (function () {
+    try {
+      if (/[?&]preview=1\b/.test(global.location.search) && global.parent && global.parent !== global && global.parent.HubPreview) {
+        return global.parent.HubPreview;
+      }
+    } catch (e) {}
+    return null;
+  })();
+  global.HUB_PREVIEW = PV;
+
   /* ============================================================
      서버 부르기
      ============================================================ */
 
   function rpc(name, args) {
+    if (PV) return PV.rpc(name, args || {});
     return fetch(CFG.supabase.url + '/rest/v1/rpc/' + name, {
       method: 'POST',
       headers: { 'apikey': CFG.supabase.key, 'Content-Type': 'application/json' },
@@ -36,6 +49,7 @@
   }
 
   function appReport(code) {
+    if (PV) return PV.app();
     var url = CFG.supabase.url + '/functions/v1/' + CFG.appFunction + '?code=' + encodeURIComponent(code);
     return fetch(url, { headers: { 'apikey': CFG.supabase.key } })
       .then(function (r) { return r.json().catch(function () { return { ok: false, reason: 'http' + r.status }; }); });
@@ -345,6 +359,7 @@
   }
 
   function fileUrl(code, id) {
+    if (PV) return PV.fileUrl(id);
     return fetch(CFG.supabase.url + '/functions/v1/' + (CFG.fileFunction || 'class-file'), {
       method: 'POST',
       headers: { 'apikey': CFG.supabase.key, 'Content-Type': 'application/json' },
@@ -352,6 +367,27 @@
     }).then(function (r) { return r.json().catch(function () { return { ok: false }; }); });
   }
 
+
+  /* 머리 — 「학생용」 / 「학부모용」 작게 */
+  function roleTag(role) {
+    var top = $('.hub-head__top');
+    if (!top || !role) return;
+    var t = document.createElement('span');
+    t.className = 'hub-role hub-role--' + role;
+    t.textContent = role === 'student' ? '학생용' : '학부모용';
+    var id = top.querySelector('.hub-head__id');
+    (id || top).appendChild(t);
+  }
+
+  /* 코치룸 미리보기 띠 */
+  function previewBand() {
+    if (document.getElementById('pvBand')) return;
+    var b = document.createElement('div');
+    b.id = 'pvBand';
+    b.className = 'pv-band';
+    b.textContent = '미리보기 — 조교 화면 · ' + (PV.role === 'student' ? '학생 링크' : '학부모 링크') + '로 열었을 때 모습입니다. 눌러도 아무것도 바뀌지 않습니다';
+    document.body.insertBefore(b, document.body.firstChild);
+  }
 
   /* ============================================================
      홈 화면에 추가하는 법 (개인 페이지) · 카톡 안에서 열었을 때 안내
@@ -405,10 +441,15 @@
     var tabs = $('#hubTabs');
     var h = parseHash();
 
-    if (!/^[A-Za-z0-9]{20,64}$/.test(h.code)) { stopScreen(root, 'nocode'); return; }
+    if (PV) { h = { code: 'preview', view: PV.view || '' }; previewBand(); }
+    else if (!/^[A-Za-z0-9]{20,64}$/.test(h.code)) { stopScreen(root, 'nocode'); return; }
 
     rpc('hub_get', { p_code: h.code }).then(function (d) {
       if (!d || !d.ok) { stopScreen(root, (d && d.reason) || 'notfound'); return; }
+
+      /* 학생 링크 · 학부모 링크 (migration-015). 015 전에는 role 이 없다 — 예전처럼 모두 입력 가능 */
+      var canWrite = d.can_write !== false;
+      roleTag(d.role);
 
       var st = d.student || {};
       $('#hubName').textContent = (st.name || '') + ' 학생의 러닝노트';
@@ -437,16 +478,19 @@
 
       /* 내 레포트 */
       var reports = d.reports || [];
-      renderReportList(h.code, reports);
+      renderReportList(h.code, reports, d.draft || null);
       if (reports.length) $('#tabReport').classList.add('has-new');
 
-      /* 복습테스트 (migration-013) — 수업일 당일 맨 위 기록 카드, 내 레포트 탭 위 점수 그래프 */
+      /* 복습테스트 (migration-013) — 수업일 당일 맨 위 기록 카드, 내 레포트 탭 위 점수 그래프.
+         기록 카드와 「확인 전」 내 기록은 입력할 수 있는 링크(학생 링크)에서만 */
       if (global.ReviewCard) {
         ReviewCard.history($('#reviewHist'), d.review || [], []);
-        ReviewCard.bind($('#reviewCard'));
-        ReviewCard.mount($('#reviewCard'), h.code, function (rv) {
-          ReviewCard.history($('#reviewHist'), d.review || [], rv ? rv.recent : []);
-        });
+        if (canWrite) {
+          ReviewCard.bind($('#reviewCard'));
+          ReviewCard.mount($('#reviewCard'), h.code, function (rv) {
+            ReviewCard.history($('#reviewHist'), d.review || [], rv ? rv.recent : []);
+          });
+        }
       }
 
       /* 앱 과제 — 처음 열 때 불러온다 */
@@ -461,7 +505,7 @@
       function openPhoto() {
         if (photoOpened || !global.Photos) return;
         photoOpened = true;
-        Photos.renderTab($('#panelPhoto'), h.code);
+        Photos.renderTab($('#panelPhoto'), h.code, { readOnly: !canWrite });
       }
 
       /* 탭 수에 맞춰 칸을 나눈다 (교재비 탭은 청구서가 있을 때만) */
@@ -638,8 +682,9 @@
 
   /* ---------- 내 레포트 ---------- */
 
-  function renderReportList(code, reports) {
+  function renderReportList(code, reports, draft) {
     var host = $('#panelReport');
+    if (draft) reports = [{ week_start: draft.week_start, week_end: draft.week_end, lesson_date: draft.lesson_date || '', draft: true }].concat(reports);
     if (!reports.length) {
       host.innerHTML = '<div id="reviewHist"></div><div class="empty">아직 공개된 주간 레포트가 없습니다.</div>';
       return;
@@ -649,10 +694,10 @@
       '<div class="card" id="reportListCard">' +
         '<h2 class="card-title">🗓️ 주간 레포트<span class="card-note">' + reports.length + '편</span></h2>' +
         '<ul class="rp-list">' + reports.map(function (r, i) {
-          return '<li><button type="button" class="rp-item" data-i="' + i + '">' +
+          return '<li><button type="button" class="rp-item' + (r.draft ? ' rp-item--draft' : '') + '" data-i="' + i + '">' +
                    '<span class="rp-item__week num">' + esc(reportLabel(r)) + '</span>' +
-                   '<span class="rp-item__label">주간 학습 레포트</span>' +
-                   (i === 0 ? '<span class="rp-item__new">NEW</span>' : '') +
+                   '<span class="rp-item__label">' + (r.draft ? '공개하면 이렇게 보입니다 (미리보기)' : '주간 학습 레포트') + '</span>' +
+                   (i === 0 && !r.draft ? '<span class="rp-item__new">NEW</span>' : '') +
                    '<span class="rp-item__go" aria-hidden="true">›</span>' +
                  '</button></li>';
         }).join('') + '</ul>' +
@@ -682,9 +727,10 @@
     body.innerHTML = '<div class="empty">레포트를 불러오는 중입니다…</div>';
     window.scrollTo(0, 0);
 
-    rpc('hub_report', { p_code: code, p_week: r.week_start }).then(function (data) {
+    rpc('hub_report', { p_code: code, p_week: r.draft ? '__draft' : r.week_start }).then(function (data) {
       if (!data) { body.innerHTML = '<div class="empty">이 레포트는 지금 볼 수 없습니다.</div>'; return; }
       ReportView.render(body, data);
+      if (r.draft) body.insertAdjacentHTML('afterbegin', '<div class="pv-draft">아직 공개 전 — 지금 작성 내용으로 공개하면 이렇게 보입니다</div>');
       /* 그 주차(시작일 ~ 종료일) 필기를 레포트 아래에 함께 */
       if (global.Photos) {
         var box = document.createElement('div');
