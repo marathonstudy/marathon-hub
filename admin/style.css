@@ -2291,3 +2291,19 @@ body.pv-open { overflow: hidden; }
 
 /* 머리의 「? 사용법」 (20261021a) */
 .help-link { text-decoration: none; display: inline-flex; align-items: center; }
+
+/* ---- 휴대폰 폭 (360 · 390) 점검에서 고친 것 (20261021a) ---- */
+/* 머리 — 이름 · 로그아웃 · 사용법이 한 줄에 안 들어가면 다음 줄로 */
+.brand { flex-wrap: wrap; row-gap: 6px; }
+/* 학생 이름 단추 — 손가락으로 누르기 쉽게 */
+.roster__name-btn { min-height: 32px; min-width: 32px; text-align: left; }
+@media (max-width: 720px) {
+  /* 복습테스트 · 교재 표는 카드로 쌓이지 않으므로 표 안에서 옆으로 밀기 */
+  #rvTable .roster-scroll, .tb-sub .roster-scroll { overflow-x: auto; }
+}
+@media (max-width: 480px) {
+  /* 수업 영상 줄 — 차시 · 단추가 한 줄, 제목 · 링크는 아래 줄마다 */
+  .wk-video__row { grid-template-columns: minmax(0, 1fr) 76px 34px; }
+  .wk-video__title { grid-column: 1 / -1; grid-row: 2; }
+  .wk-video__url { grid-column: 1 / -1; grid-row: 3; }
+}

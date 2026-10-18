@@ -1106,7 +1106,7 @@
       var label = weekShort(x) + ' ' + c.name + ' ' + c.fmt(v);
       return '<g class="tr-pt" data-tw="' + esc(x.week) + '" role="button" tabindex="0" aria-label="' + esc(label + ' — 레포트 열기') + '">' +
                '<title>' + esc(label) + '</title>' +
-               '<circle class="tr-hit" cx="' + X(i).toFixed(1) + '" cy="' + Y(v).toFixed(1) + '" r="11"/>' +
+               '<circle class="tr-hit" cx="' + X(i).toFixed(1) + '" cy="' + Y(v).toFixed(1) + '" r="15"/>' +
                '<circle class="tr-dot" cx="' + X(i).toFixed(1) + '" cy="' + Y(v).toFixed(1) + '" r="4"/>' +
              '</g>';
     }).join('');
