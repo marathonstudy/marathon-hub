@@ -241,6 +241,7 @@
       collapsedEntries = {};
       renderWeek();
       refreshAll();
+      window.dispatchEvent(new CustomEvent('jt:write-nav'));   /* 뒤로가기 기록 (nav.js) */
       toast(Store.shortDate(newStart) + ' 주차를 열었습니다');
     }).catch(function (e) {
       switching = false;
@@ -318,6 +319,7 @@
     currentClass = chip.dataset.cls;
     selectedId = '';
     refreshAll();
+    window.dispatchEvent(new CustomEvent('jt:write-nav'));     /* 뒤로가기 기록 (nav.js) */
   });
 
   /* ============================================================
@@ -1663,6 +1665,16 @@
     setModalText: function (v) { freshCommentText(v); updateCommentCount(); applyModal(); return flushDraft(); },
     current: function () { return draft; },
     currentClass: function () { return currentClass; },
+    /* 뒤로가기 · 새로고침으로 반을 되돌릴 때 (nav.js) */
+    selectClass: function (cls) {
+      if (!cls || cls === currentClass) return;
+      if (!Store.getClasses().some(function (c) { return c.name === cls; })) return;
+      currentClass = cls;
+      selectedId = '';
+      if (!$('#panel-write').hidden) refreshAll();
+    },
+    /* 코멘트 창에 아직 넣지 않은 글이 있는가 (떠나기 전 확인) */
+    pending: function () { return !!modalTimer; },
     preview: schedulePreview,
     /* AI 요약 [확정] → 그 반 「수업 내용」 칸 (summary.js) */
     lessonsOf: function (cls) {

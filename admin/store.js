@@ -1524,6 +1524,12 @@
     discardBackup: discardBackup,
     clearBackups: clearBackups,
     backupNow: backupNow,
+    /* 아직 서버에 저장되지 않은 것이 있는가 — 떠나기 전 확인 (nav.js) */
+    hasUnsaved: function () {
+      if (pendingCount() > 0) return true;
+      var u = computeUnsaved();
+      return !!(u && u.n);
+    },
     loadReview: loadReview,
     reviewOf: reviewOf,
     lessonOf: lessonOf,

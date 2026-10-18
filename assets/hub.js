@@ -432,8 +432,26 @@
   function parseHash() {
     var h = decodeURIComponent(String(location.hash || '').replace(/^#/, ''));
     var parts = h.split('/');
-    return { code: parts[0] || '', view: parts[1] || '' };
+    return { code: parts[0] || '', view: parts[1] || '', arg: parts[2] || '' };
   }
+
+  /* ============================================================
+     뒤로가기 (개인 페이지) — 탭 · 레포트 한 편 · 크게 보기 사진마다 기록
+       주소: #코드 · #코드/reports · #코드/report/주차 · #코드/app · #코드/photo · #코드/book
+       # 바로 뒤의 개인 링크 코드는 절대 바꾸지 않는다 (뒤에 /보기 만 붙였다 뗐다 한다)
+       코치룸 미리보기(틀 안)에서는 기록하지 않는다 — 코치룸 뒤로가기를 흐트러뜨리지 않게
+     ============================================================ */
+  var nav = { on: false, code: '', ignore: 0, apply: null };
+  function navHash(v, arg) {
+    return '#' + nav.code + (v && v !== 'notice' ? '/' + v + (arg ? '/' + arg : '') : '');
+  }
+  function navPush(v, arg) {
+    if (!nav.on) return;
+    var hh = navHash(v, arg);
+    if (location.hash === hh) return;
+    history.pushState({ hub: { v: v, arg: arg || '' } }, '', hh);
+  }
+  function lightboxOpen() { return document.querySelector('.ph-light'); }
 
   function bootMe() {
     var root = $('#hubRoot');
@@ -531,13 +549,31 @@
         if (which === 'report') $('#tabReport').classList.remove('has-new');
       }
 
-      $('#tabNotice').onclick = function () { select('notice'); };
-      $('#tabReport').onclick = function () { select('report'); showReportList(); };
-      $('#tabApp').onclick    = function () { select('app'); };
-      $('#tabBook').onclick   = function () { select('book'); };
-      $('#tabPhoto').onclick  = function () { select('photo'); };
+      $('#tabNotice').onclick = function () { select('notice'); navPush('notice'); };
+      $('#tabReport').onclick = function () { select('report'); showReportList(); navPush('reports'); };
+      $('#tabApp').onclick    = function () { select('app'); navPush('app'); };
+      $('#tabBook').onclick   = function () { select('book'); navPush('book'); };
+      $('#tabPhoto').onclick  = function () { select('photo'); navPush('photo'); };
 
-      if (h.view === 'report') {
+      /* 뒤로가기 — 주소(#코드/보기)를 보고 그 화면으로 */
+      nav.code = h.code;
+      nav.on = !PV;
+      nav.apply = function (v, arg) {
+        if (v === 'report' || v === 'reports') {
+          select('report');
+          var rr = arg && reports.find(function (x) { return x.week_start === arg; });
+          if (rr) openReport(h.code, rr); else showReportList();
+        } else if (v === 'app' || v === 'photo') select(v);
+        else if (v === 'book' && !$('#tabBook').hidden) select('book');
+        else select('notice');
+      };
+      if (nav.on) history.replaceState({ hub: { v: h.view || 'notice', arg: h.arg || '' } }, '', location.hash);
+
+      if (h.view === 'report' && h.arg) {
+        nav.apply('report', h.arg);
+      } else if (h.view === 'reports') {
+        select('report');
+      } else if (h.view === 'report') {
         select('report');
         if (reports.length) openReport(h.code, reports[0]);
       } else if (h.view === 'app') {
@@ -709,8 +745,17 @@
 
     host.addEventListener('click', function (e) {
       var b = e.target.closest('.rp-item');
-      if (b) { openReport(code, reports[+b.dataset.i]); return; }
-      if (e.target.closest('#reportBack')) showReportList();
+      if (b) {
+        var rp = reports[+b.dataset.i];
+        openReport(code, rp);
+        if (!rp.draft) navPush('report', rp.week_start);
+        return;
+      }
+      if (e.target.closest('#reportBack')) {
+        /* 목록으로 — 뒤로가기 기록이 레포트 한 편이면 뒤로가기와 같게 */
+        if (nav.on && history.state && history.state.hub && history.state.hub.v === 'report') history.back();
+        else showReportList();
+      }
     });
   }
 
@@ -925,8 +970,40 @@
     }).catch(function () { stopScreen(root, 'network'); });
   }
 
-  /* 주소의 # 뒤만 바꿔 다른 링크를 열면 새로 읽는다 */
-  global.addEventListener('hashchange', function () { location.reload(); });
+  /* 주소의 # 뒤 코드를 바꿔 다른 링크를 열면 새로 읽는다 (/보기 만 바뀐 것은 뒤로가기 — 새로 읽지 않는다) */
+  global.addEventListener('hashchange', function () {
+    var c = parseHash().code;
+    if (nav.code && c === nav.code) return;
+    if (!nav.code && !PV && c) { location.reload(); return; }
+    if (nav.code && c !== nav.code) location.reload();
+  });
+
+  global.addEventListener('popstate', function (e) {
+    if (!nav.on) return;
+    if (nav.ignore > 0) { nav.ignore--; return; }
+    var lb = lightboxOpen();
+    if (lb) { nav.lbClosing = true; lb.remove(); return; }       /* 크게 보던 사진 닫기 */
+    if (parseHash().code !== nav.code) return;
+    var st = (e.state && e.state.hub) || { v: parseHash().view, arg: parseHash().arg };
+    if (nav.apply) nav.apply(st.v, st.arg);
+  });
+
+  /* 사진을 크게 열면 기록 하나 — 뒤로가기 = 닫기. 눌러서 닫으면 그 기록도 지운다 */
+  if (global.MutationObserver) {
+    new MutationObserver(function (list) {
+      if (!nav.on) return;
+      list.forEach(function (m) {
+        Array.prototype.forEach.call(m.addedNodes, function (n) {
+          if (n.classList && n.classList.contains('ph-light')) history.pushState({ hub: (history.state && history.state.hub) || { v: 'notice' }, lb: 1 }, '', location.hash);
+        });
+        Array.prototype.forEach.call(m.removedNodes, function (n) {
+          if (!(n.classList && n.classList.contains('ph-light'))) return;
+          if (nav.lbClosing) { nav.lbClosing = false; return; }
+          if (history.state && history.state.lb) { nav.ignore++; history.back(); }
+        });
+      });
+    }).observe(document.body, { childList: true });
+  }
 
   global.Hub = { bootMe: bootMe, bootNotice: bootNotice, youtubeId: youtubeId };
 
