@@ -37,7 +37,7 @@
   var follow = {};                 /* 학생 id → 확인 필요 개수 */
   var ready = false;
 
-  function isTeacher() { return me.role === 'teacher'; }
+  function isTeacher() { return !!me.role; }   /* 조교 · 선생님 같은 권한 (migration-017) */
   function todayKST() { return window.DDay ? DDay.today() : Store.toISO(new Date()); }
   function fmtDT(iso) {
     if (!iso) return '';
@@ -451,7 +451,7 @@
     if (!g) return;
     if (act === 'del') {
       UI.confirmAsk('성적 줄 삭제', g.grade_level + ' ' + termLabel(g.kind, g.term) + ' ' + KIND[g.kind] +
-        ' 줄을 숨깁니다. 지우지 않고 "삭제됨"으로 남으며, 선생님 계정에서 되살릴 수 있습니다.', '삭제(숨김)')
+        ' 줄을 숨깁니다. 지우지 않고 "삭제됨"으로 남으며, 「숨긴 기록·성적 보기」에서 되살릴 수 있습니다.', '삭제(숨김)')
         .then(function (ok) {
           if (!ok) return;
           return UI.guardedSave(KIND[g.kind] + ' ' + g.grade_level + ' ' + termLabel(g.kind, g.term), function (chk) {
@@ -663,7 +663,7 @@
       return;
     }
     if (act === 'del') {
-      UI.confirmAsk('기록 삭제', '이 기록을 숨깁니다. 지우지 않고 "삭제됨(누가·언제)"으로 남으며, 선생님 계정에서 되살릴 수 있습니다.', '삭제(숨김)')
+      UI.confirmAsk('기록 삭제', '이 기록을 숨깁니다. 지우지 않고 "삭제됨(누가·언제)"으로 남으며, 「숨긴 기록·성적 보기」에서 되살릴 수 있습니다.', '삭제(숨김)')
         .then(function (ok) {
           if (!ok) return;
           return UI.guardedSave('이 기록', function (chk) {

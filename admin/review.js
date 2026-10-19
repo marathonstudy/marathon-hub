@@ -7,7 +7,7 @@
      고치기 · 대신 입력은 누가 · 언제 했는지 서버(review_log)에 남는다
    · [지금 제출 현황]: 교실 화면용 — 이름과 제출 여부만 (점수는 아예 불러오지 않는다), 실시간으로 초록색
    · [자주 틀린 번호]: 반 단위, 최근 4회 확인된 기록 (코치룸에서만)
-   · 선생님: [지난 시험지 사진 정리] — 점수는 남기고 사진만 지운다
+   · [지난 시험지 사진 정리] — 점수는 남기고 사진만 지운다
    ============================================================ */
 
 (function () {
@@ -37,7 +37,7 @@
     var d = new Date(iso);
     return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
   }
-  function isTeacher() { return st.role === 'teacher'; }
+  function isTeacher() { return !!st.role; }   /* 조교 · 선생님 같은 권한 (migration-017) */
 
   /* ============================================================
      불러오기 · 그리기 — weekly.js 의 render 가 부른다
@@ -252,7 +252,7 @@
     });
   }
 
-  /* ---------- 지난 시험지 사진 정리 (선생님) ---------- */
+  /* ---------- 지난 시험지 사진 정리 ---------- */
 
   function cleanPhotos() {
     var def = Lesson.addDays(DDay.today(), -120);

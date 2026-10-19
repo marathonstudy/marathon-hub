@@ -8,7 +8,7 @@
      · 자료 파일    끌어다 놓기로 여러 개. 파일명에 '필수과제' / '선택과제' 가 있으면 그 분류, 아니면 배부 자료.
                    올린 직후 분류를 보여 주고 바로 바꿀 수 있다.
    파일은 비공개 보관함(class-files)에만 올라간다. 학부모는 Edge Function(class-file)이 만든 2분짜리 주소로만 받는다.
-   지우기: 올린 사람은 하루 안에 자기 파일, 선생님은 언제든 ([지난 파일 정리]). 지울 때마다 서버에 기록이 남는다.
+   지우기: 직원 누구나 언제든 ([지난 파일 정리]). 지울 때마다 서버에 기록이 남는다.
    ============================================================ */
 
 (function () {
@@ -86,7 +86,7 @@
       .sort(function (a, b) { return (a.name || '').localeCompare(b.name || '', 'ko'); });
   }
 
-  function isTeacher() { return st.me.role === 'teacher'; }
+  function isTeacher() { return !!st.me.role; }   /* 조교 · 선생님 같은 권한 (migration-017) */
   function canDelete(f) {
     if (isTeacher()) return true;
     return !!st.me.email && f.created_by === st.me.email && (Date.now() - new Date(f.created_at).getTime()) < DAY_MS;
@@ -452,7 +452,7 @@
         ' · 필기 사진 ' + (u.photos || 0) + '장 ' + gb(u.photo_bytes || 0) +
         (u.review_bytes != null ? ' · 시험지 사진 ' + (u.reviews || 0) + '장 ' + gb(u.review_bytes || 0) : '') + ' · 무료 1GB 기준</span></div>' +
         '<div class="progress__bar"><div class="progress__fill ph-usage__fill' + (pct >= 80 ? ' is-warn' : '') + '" style="width:' + pct + '%"></div></div>' +
-        (pct >= 80 ? '<p class="wk-warn">⚠️ 저장 공간이 80%를 넘었습니다. 선생님이 [지난 파일 정리]로 지난 학기 파일을 지워 주세요. 가득 차면 사진 · 파일을 더 올릴 수 없습니다.</p>' : '') +
+        (pct >= 80 ? '<p class="wk-warn">⚠️ 저장 공간이 80%를 넘었습니다. [지난 파일 정리]로 지난 학기 파일을 지워 주세요. 가득 차면 사진 · 파일을 더 올릴 수 없습니다.</p>' : '') +
         '</div>';
     });
   }
@@ -589,7 +589,7 @@
     }, Promise.resolve()).then(function () { return n; });
   }
 
-  /* ---------- 지난 파일 정리 (선생님만) ---------- */
+  /* ---------- 지난 파일 정리 ---------- */
 
   var clean = { rows: [] };
 

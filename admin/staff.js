@@ -1,10 +1,11 @@
 /* ============================================================
-   staff.js — 직원 관리 (「오늘」 [설정] 창 안 · teacher 만 보인다)
+   staff.js — 직원 관리 (「오늘」 [설정] 창 안 · 직원 모두)
 
    · 팀 가입 코드 보기 · 복사 · 새로 만들기 · 직접 바꾸기 (바꾸면 옛 코드로는 가입 불가)
    · 직원 목록: 이름 · 이메일 · 역할 · 가입일 · 마지막 접속 · 상태
    · [사용 중지] / [다시 사용] · [teacher 로] / [조교로]
-   전부 서버 함수(staff_*)가 teacher 인지 다시 확인한다. 자기 자신 · 마지막 teacher 는 바꿀 수 없다.
+   전부 서버 함수(staff_*)가 직원인지 다시 확인한다. 자기 자신 · 마지막 teacher 는 바꿀 수 없다.
+   조교는 선생님 계정을 사용 중지 · 조교로 바꾸기 못 하고, 누구도 선생님으로 올리지 못한다 (migration-017).
    ============================================================ */
 
 (function () {
@@ -29,6 +30,7 @@
   }
 
   var data = null;
+  var myRole = '';
   var ROLE = { teacher: '선생님', assistant: '조교' };
 
   /* 헷갈리는 글자(0 O 1 I l)를 뺀 10자리 */
@@ -58,7 +60,7 @@
     var j = data.join;
     var host = $('#staffAdmin');
     host.innerHTML =
-      '<div class="extra-head" style="margin-top:18px"><span class="extra-head__title">직원 관리 — 선생님만 보입니다</span></div>' +
+      '<div class="extra-head" style="margin-top:18px"><span class="extra-head__title">직원 관리</span></div>' +
       '<div class="sa-code">' +
         '<div class="sa-code__now">팀 가입 코드 ' + (j ? '<code class="sa-code__val" id="saCodeVal">' + esc(j.code) + '</code>' +
           '<button class="btn btn--sm" type="button" id="saCopy">복사</button>'
@@ -75,10 +77,12 @@
         '<th>이름</th><th>이메일</th><th>역할</th><th>가입일</th><th>마지막 접속</th><th>상태</th><th></th></tr></thead><tbody>' +
       data.staff.map(function (s) {
         var me = s.email === data.me;
+        var lead = myRole === 'teacher';
         var acts = me ? '<span class="muted-note">나</span>' :
-          (s.active ? '<button class="btn btn--sm btn--danger" type="button" data-sa="off">사용 중지</button>'
-                    : '<button class="btn btn--sm" type="button" data-sa="on">다시 사용</button>') +
-          (s.role === 'teacher' ? '<button class="btn btn--sm btn--ghost" type="button" data-sa="assistant">조교로</button>'
+          (!s.active ? '<button class="btn btn--sm" type="button" data-sa="on">다시 사용</button>'
+            : (lead || s.role !== 'teacher') ? '<button class="btn btn--sm btn--danger" type="button" data-sa="off">사용 중지</button>' : '') +
+          (!lead ? (s.role === 'teacher' ? '<span class="muted-note">선생님 계정</span>' : '')
+            : s.role === 'teacher' ? '<button class="btn btn--sm btn--ghost" type="button" data-sa="assistant">조교로</button>'
                                 : '<button class="btn btn--sm btn--ghost" type="button" data-sa="teacher">선생님으로</button>');
         return '<tr data-email="' + esc(s.email) + '"' + (s.active ? '' : ' class="is-archived"') + '>' +
           '<td><span class="roster__name">' + esc(s.name || '') + '</span></td>' +
@@ -132,7 +136,7 @@
       p = sb().rpc('staff_set_active', { p_email: email, p_active: true });
     } else {
       p = UI.confirmAsk('역할 바꾸기', (s.name || email) + ' 님을 ' + ROLE[act] + ' 역할로 바꿉니다.' +
-          (act === 'teacher' ? ' 선생님 역할은 기록 삭제·되살리기, 직원 관리, 설정 변경을 할 수 있습니다.' : ''), '바꾸기')
+          (act === 'teacher' ? ' 선생님 계정은 조교 계정이 사용 중지하거나 역할을 바꿀 수 없습니다.' : ''), '바꾸기')
         .then(function (ok) { return ok ? sb().rpc('staff_set_role', { p_email: email, p_role: act }) : null; });
     }
     p.then(function (r) {
@@ -143,13 +147,14 @@
     }).catch(function (x) { toast(x.message, 'bad'); });
   });
 
-  /* [설정] 창이 열릴 때 — teacher 면 직원 관리도 */
+  /* [설정] 창이 열릴 때 — 직원 관리도 (조교 · 선생님 모두) */
   $('#tdSettingsBtn').addEventListener('click', function () {
     var host = $('#staffAdmin');
     host.hidden = true;
     host.innerHTML = '';
     DB.myStaff().then(function (m) {
-      if (!m || m.role !== 'teacher') return;
+      if (!m || !m.role) return;
+      myRole = m.role;
       host.hidden = false;
       host.innerHTML = '<p class="panel__hint">직원 목록을 불러오는 중…</p>';
       return load();

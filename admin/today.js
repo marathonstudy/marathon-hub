@@ -40,7 +40,7 @@
     if (!st.links || st.links.parentWrite === false) return '';
     return '<div class="td-transition">🔁 <b>전환 기간</b> — 학부모 링크로도 복습테스트 · 필기 사진 입력이 됩니다. ' +
       '① 명단에서 반마다 [학생 링크 모두 복사]로 학생 링크를 다 보내면 <b>끄세요</b>.' +
-      (st.role === 'teacher' ? ' <button type="button" class="btn btn--sm" id="tdTransitionOpen">설정에서 끄기</button>' : ' (선생님이 「설정」에서 끕니다)') +
+      (st.role ? ' <button type="button" class="btn btn--sm" id="tdTransitionOpen">설정에서 끄기</button>' : ' (「설정」에서 끕니다)') +
       '</div>';
   }
   var app = {};                     /* 학생 id → { rate, ok, at } */
@@ -310,10 +310,10 @@
       $('#tdSetWeeks').value = v.absentWeeks || 4;
       $('#tdSetMin').value = v.absentMin || 2;
       $('#tdSetParentWrite').checked = !st.links || st.links.parentWrite !== false;
-      var teacher = st.role === 'teacher';
+      var teacher = !!st.role;   /* 조교 · 선생님 같은 권한 (migration-017) */
       ['#tdSetMoney', '#tdSetWeeks', '#tdSetMin', '#tdSetParentWrite'].forEach(function (s) { $(s).disabled = !teacher; });
       $('#tdSetSave').hidden = !teacher;
-      $('#tdSetNote').textContent = teacher ? '' : '이 설정은 선생님(teacher) 계정만 바꿀 수 있습니다.';
+      $('#tdSetNote').textContent = teacher ? '' : '직원 정보를 불러오는 중입니다. 잠시 뒤 다시 열어 주세요.';
       $('#tdSettingsModal').showModal();
     }).catch(function (e) { toast(e.message, 'bad'); });
   });

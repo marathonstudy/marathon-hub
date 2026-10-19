@@ -1,5 +1,5 @@
 /* ============================================================
-   classes.js — 반 관리 (① 명단 → [반 관리] · 선생님만 보인다)
+   classes.js — 반 관리 (① 명단 → [반 관리] · 직원 모두)
 
    · 이름 바꾸기 — 그 반의 모든 기록이 새 이름을 따라간다 (서버 함수 class_rename 이 한 번에)
    · 보관 / 되살리기 — 보관한 반은 모든 반 목록에서 숨긴다. 기록 · 학생은 그대로
@@ -256,10 +256,10 @@
     load();
   });
 
-  /* 선생님 계정에만 버튼을 보인다 (서버 함수도 선생님인지 다시 확인한다) */
+  /* 직원(조교 · 선생님) 계정에 버튼을 보인다 (서버 함수도 직원인지 다시 확인한다) */
   window.addEventListener('jt:loaded', function () {
     $('#btnClassAdmin').hidden = true;
-    DB.myStaff().then(function (m) { $('#btnClassAdmin').hidden = !(m && m.role === 'teacher'); }).catch(function () {});
+    DB.myStaff().then(function (m) { $('#btnClassAdmin').hidden = !(m && m.role); }).catch(function () {});
   });
 
   /* 다른 기기에서 반이 바뀌면 — 이름을 고치는 중이 아니면 새로 */

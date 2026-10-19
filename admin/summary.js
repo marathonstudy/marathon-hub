@@ -7,7 +7,7 @@
    · Claude(Opus 5.5)가 만든 "1차시: … / 2차시: …" 는 **초안** — 학부모에게 안 보인다
    · 직원(조교 포함)이 읽고 고친 뒤 [확정] → 러닝노트 · 반 공지에 보이고, 「수업 내용」 칸에 들어가 레포트와 함께 공개
      누가 · 언제 확정했는지 서버에 남는다
-   · 한 달 상한(기본 80회)은 서버가 센다. 선생님만 바꾼다
+   · 한 달 상한(기본 80회)은 서버가 센다. 직원 누구나 바꾼다
    ============================================================ */
 
 (function () {
@@ -111,7 +111,7 @@
       st.usage = r.data || {};
       host.innerHTML = '이번 달 AI 요약 <b class="num">' + (st.usage.used || 0) + ' / ' + (st.usage.cap || 0) + '회</b>' +
         ' · 약 $' + Number(st.usage.cost_usd || 0).toFixed(2) +
-        (st.role === 'teacher' ? ' <button class="btn btn--sm btn--ghost" type="button" id="btnAiCap">상한 바꾸기</button>' : '');
+        (st.role ? ' <button class="btn btn--sm btn--ghost" type="button" id="btnAiCap">상한 바꾸기</button>' : '');
     });
   }
 

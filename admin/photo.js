@@ -35,7 +35,7 @@
 
   var st = { ready: false, cls: '', from: '', to: '', showHidden: false, rows: [], dates: [], role: '', cell: null };
 
-  function isTeacher() { return st.role === 'teacher'; }
+  function isTeacher() { return !!st.role; }   /* 조교 · 선생님 같은 권한 (migration-017) */
 
   function init() {
     if (st.ready) return;
@@ -235,7 +235,7 @@
             if (r.error) throw new Error(r.error.message);
             return sb().from('note_photos').delete().eq('id', p.id).select('id');
           }).then(check).then(function (r) {
-            if (!r.data.length) throw new Error('선생님(teacher) 계정만 완전 삭제할 수 있습니다.');
+            if (!r.data.length) throw new Error('완전 삭제 권한이 없습니다. migration-017 을 실행했는지 확인해 주세요.');
             st.photos = st.photos.filter(function (x) { return x.id !== p.id; });
             render(); renderGallery(); loadUsage();
             toast('완전히 지웠습니다', 'good');
