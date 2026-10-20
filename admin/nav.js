@@ -4,6 +4,7 @@
    · 탭(① 명단 · ② 작성 · 「오늘」 …) · ② 작성의 반 · 주차를 바꿀 때마다 뒤로가기 기록을 남긴다
      주소: #tab=write&cls=반포반&week=2026-10-12  → 새로고침해도 그 탭 · 반 · 주차가 그대로 열린다
      ② 작성의 주차 현황은 #tab=write&cls=반포반 (week 없음) — 작성 화면에서 뒤로가기 = 주차 현황
+     「오늘」 반 카드를 펼치면 #tab=today&open=반이름(여럿이면 | 로) — 뒤로가기 = 접기
    · 창(학생 정보 · 코멘트 · 확인 창 · 미리보기 · 지금 제출 현황 …)이 열리면 기록을 하나 더 —
      뒤로가기 = 창 닫기. 창을 단추로 닫으면 그 기록도 같이 지운다.
    · 더 돌아갈 곳이 없을 때만 사이트 밖으로 나간다.
@@ -46,16 +47,21 @@
       if (cls) o.cls = cls;
       if (d && d.weekStart && (!Writer.mode || Writer.mode() === 'edit')) o.week = d.weekStart;
     }
+    if (o.tab === 'today' && window.TodayView) {
+      var ol = TodayView.openList();
+      if (ol.length) o.open = ol.join('|');
+    }
     return o;
   }
   function hashOf(o) {
     var p = ['tab=' + o.tab];
     if (o.cls) p.push('cls=' + enc(o.cls));
     if (o.week) p.push('week=' + o.week);
+    if (o.open) p.push('open=' + enc(o.open));
     return '#' + p.join('&');
   }
   function sameNav(a, b) {
-    return !!a && !!b && a.tab === b.tab && (a.cls || '') === (b.cls || '') && (a.week || '') === (b.week || '');
+    return !!a && !!b && a.tab === b.tab && (a.cls || '') === (b.cls || '') && (a.week || '') === (b.week || '') && (a.open || '') === (b.open || '');
   }
 
   function push() {
@@ -71,8 +77,10 @@
   }
 
   /* 뒤로가기 · 새로고침 — 그 탭 · 주차 · 반으로 */
-  function apply(o) {
+  /* first = 새로고침 · 처음 열 때 — 주소에 open 이 없으면 이 기기에 기억해 둔 펼친 반을 그대로 둔다 */
+  function apply(o, first) {
     if (!o || !o.tab) return Promise.resolve();
+    if (o.tab === 'today' && window.TodayView && (o.open || !first)) TodayView.setOpen(o.open ? String(o.open).split('|') : []);
     restoring++;
     var idx = TABS.indexOf(o.tab);
     if (idx >= 0 && idx !== activeTab()) UI.selectTab(idx);
@@ -157,7 +165,7 @@
     setTimeout(function () {
       var h = parse();
       ready = true;
-      (h ? apply(h) : Promise.resolve()).then(replace);
+      (h ? apply(h, true) : Promise.resolve()).then(replace);
     }, 0);
   });
 

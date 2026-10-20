@@ -87,6 +87,7 @@ supabase/
   migration-019-summary-discard.sql AI 수업 요약 [초안 지우기] · [확정 취소] (직원만)
   migration-020-kakao.sql           카카오 알림톡(솔라피) — 학부모 번호 2 · 발송 기록(뒤 4자리만) · 설정 · 발송 준비/기록 함수 (직원만)
   migration-021-written-rule.sql    주차 현황의 「작성 중」도 새 작성 완료 규칙(개별 코멘트 또는 지각 · 결석)으로
+  migration-022-coach-cycle.sql     「오늘」을 반마다 수업 주기로 — 지난 수업일 레포트 · 그 주 복습테스트 · 주기별 필기 (직원만 · 읽기 전용)
   functions/kakao-send/index.ts     알림톡 발송 Edge Function (키는 Secrets 에만 · 직원만)
   kakao/template.txt · kakao/HOW-TO.md  알림톡 템플릿 초안 · 솔라피 등록 방법
   check-classes.sql               반 이름 점검 (읽기 전용 — 어느 표에 어떤 반이 있는지 · 비슷한 이름)
@@ -253,6 +254,10 @@ delete from public.staff where email = '조교이메일@example.com';
 ### 5-18. 작성 완료 규칙 (migration-021)
 1. 020 다음에 SQL Editor → **New query** → `supabase/migration-021-written-rule.sql` 전체 → **Run** (두 줄 모두 `true`)
 2. 작성 완료 = 그 학생 개별 코멘트가 있거나 출결을 지각 · 결석으로 바꾼 때 (기본값 출석 · 5 와 반 공통 내용만 있으면 「작성 중」)
+
+### 5-19. 「오늘」 반 수업 주기 (migration-022)
+1. 021 다음에 SQL Editor → **New query** → `supabase/migration-022-coach-cycle.sql` 전체 → **Run** (두 줄 모두 `true`)
+2. 실행 전에는 「오늘」이 예전처럼 달력 주로 세고, 카드 위에 안내 한 줄이 나온다
 
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.

@@ -59,6 +59,17 @@
       if (r.error) throw new Error(r.error.message);
       st.dash = (res[1] && res[1].value) || {};
       st.data = prepare(r.data);
+      st.classes = classList(st.data);
+      return loadCycle(st.classes).then(function (cy) {
+        st.cycleMissing = !cy;
+        st.cycle = null;
+        if (cy) {
+          st.cycle = {};
+          (cy.classes || []).forEach(function (c) { var by = {}; (c.students || []).forEach(function (x) { by[x.id] = x; }); st.cycle[c['class']] = { test: c.test, by: by }; });
+        }
+      }, function () { st.cycleMissing = false; st.cycle = null; });
+    }).then(function () {
+      if (!st.data) return;
       render();
       loadApp();
       loadReviewMissing();
@@ -154,7 +165,9 @@
 
   function dash() {
     var v = st.dash || {};
-    return { appLow: Math.max(1, Math.min(100, parseInt(v.appLow, 10) || 50)), photoWatch: v.photoWatch === true };
+    var g = parseInt(v.reportGrace, 10);
+    return { appLow: Math.max(1, Math.min(100, parseInt(v.appLow, 10) || 50)), photoWatch: v.photoWatch === true,
+             grace: isNaN(g) ? 2 : Math.max(0, Math.min(14, g)) };
   }
 
   /* 다음 수업일 — 오늘 포함, 휴강 주는 건너뛴다 (주 2회 반은 가까운 요일) · 요일을 안 정했으면 null */
@@ -172,10 +185,69 @@
     return null;
   }
 
-  function urgentOf(s, set) {
+
+  /* ---------- 반마다 수업 주기 (20261027a · migration-022) ----------
+     지난 수업일 L = 오늘 이하의 가장 최근 수업(휴강 반영) · 지금 주기 = L ~ 다음 수업 전날 · 직전 주기 = 그 앞 수업 ~ L 전날
+     레포트   L 이 든 주의 레포트. L ~ L+1일은 「작성 중」(급함 아님), L+[설정 · 기본 2]일부터 아직 안 보낸 학생 = 급함
+     복습     그 반 그 주에 실제로 만든 시험만. 시험 수업일 밤 12시(마감)가 지나도 안 낸 학생 = 급함
+     필기     지금 주기 · 직전 주기 모두 사진이 없으면 살펴보기 (설정에서 켰을 때만) */
+  function lessonDates(cls) {
+    var s = Store.schedOf(cls);
+    if (!s || !window.Lesson) return null;
+    var today = DDay.today();
+    var mon = Lesson.addDays(today, -((Lesson.dowOf(today) + 6) % 7));
+    var out = [];
+    for (var k = -14; k <= 10; k++) {
+      var L = Lesson.of(s, Lesson.addDays(mon, 7 * k));
+      if (!L || L.canceled) continue;
+      (L.days && L.days.length ? L.days : [L.date]).forEach(function (d) { if (d && out.indexOf(d) === -1) out.push(d); });
+    }
+    return out.sort();
+  }
+  function cycleOf(cls) {
+    var ds = lessonDates(cls);
+    if (!ds) return null;
+    var today = DDay.today();
+    var past = ds.filter(function (d) { return d <= today; });
+    var L = past.length ? past[past.length - 1] : '';
+    if (!L) return { L: '' };
+    var prev = ds.filter(function (d) { return d < L; }).pop() || '';
+    var next = ds.filter(function (d) { return d > L; })[0] || '';
+    return {
+      L: L, prev: prev, next: next,
+      week: Lesson.addDays(L, -((Lesson.dowOf(L) + 6) % 7)),
+      from: L, to: next ? Lesson.addDays(next, -1) : Lesson.addDays(L, 6),
+      pfrom: prev || Lesson.addDays(L, -7), pto: Lesson.addDays(L, -1),
+      since: Math.round((Date.parse(today) - Date.parse(L)) / 86400000)
+    };
+  }
+  /* 화면이 계산한 주기를 넘기고 반마다 공개 · 발송 · 복습 · 필기를 받는다 (022 전에는 null → 예전 기준) */
+  function loadCycle(classes) {
+    var list = classes.filter(function (c) { return c.cy && c.cy.L; }).map(function (c) {
+      return { 'class': c.name, week: c.cy.week, from: c.cy.from, to: c.cy.to, pfrom: c.cy.pfrom, pto: c.cy.pto };
+    });
+    if (!list.length) return Promise.resolve({ ok: true, classes: [] });
+    return sb().rpc('coach_cycle', { p: list }).then(function (r) {
+      if (r.error) return isMissing(r.error) ? null : Promise.reject(new Error(r.error.message));
+      return r.data;
+    });
+  }
+  function cycleRow(cls, id) {
+    var c = st.cycle && st.cycle[cls];
+    return c ? c.by[id] || null : null;
+  }
+  function urgentOf(s, set, dv, cy) {
     var out = [];
     if (s.absent_n >= set.absentMin) out.push({ k: 'absent', t: '최근 ' + set.absentWeeks + '주 결석 ' + s.absent_n + '회' });
-    (reviewMiss[s.id] || []).forEach(function (x) { out.push({ k: 'review', t: '복습테스트 ' + x.round_no + '회 미제출' }); });
+    /* 그 반 수업 주기 자료가 있으면 그것으로, 없으면(요일 미정 · 022 전) 예전 기준 */
+    var row = st.cycle ? cycleRow(s.class_name, s.id) : null;
+    if (row) {
+      var c = st.cycle[s.class_name];
+      if (cy && cy.L && cy.since >= dv.grace && !row.sent) out.push({ k: 'report', t: Lesson.md(cy.L, false) + ' 레포트 미발송' });
+      if (c && c.test && DDay.today() > String(c.test.lesson_date).slice(0, 10) && row.submitted === false) out.push({ k: 'review', t: '복습테스트 ' + c.test.round_no + '회 미제출' });
+    } else {
+      (reviewMiss[s.id] || []).forEach(function (x) { out.push({ k: 'review', t: '복습테스트 ' + x.round_no + '회 미제출' }); });
+    }
     if (s.follow_n) out.push({ k: 'follow', t: '확인 필요 상담 ' + s.follow_n });
     return out;
   }
@@ -183,7 +255,11 @@
     var out = [];
     var a = app[s.id];
     if (s.app && a && a.ok && a.rate < dv.appLow) out.push({ k: 'app', t: '앱 과제 ' + a.rate + '%' });
-    if (dv.photoWatch && !s.photos_week && !s.photos_prev) out.push({ k: 'photo', t: '필기 2주 연속 없음' });
+    if (dv.photoWatch) {
+      var row = st.cycle ? cycleRow(s.class_name, s.id) : null;
+      if (row) { if (!row.photos_cur && !row.photos_prev) out.push({ k: 'photo', t: '필기 2주기 연속 없음' }); }
+      else if (!s.photos_week && !s.photos_prev) out.push({ k: 'photo', t: '필기 2주 연속 없음' });
+    }
     return out;
   }
 
@@ -193,7 +269,7 @@
     Store.getClasses().forEach(function (c) { if (!by[c.name]) by[c.name] = { name: c.name, academy: '', rows: [] }; });
     return Object.keys(by).map(function (k) { return by[k]; })
       .filter(function (c) { return !Store.isArchivedClass(c.name); })
-      .map(function (c) { c.next = c.name === '(반 없음)' ? null : nextLesson(c.name); return c; })
+      .map(function (c) { c.next = c.name === '(반 없음)' ? null : nextLesson(c.name); c.cy = c.name === '(반 없음)' ? null : cycleOf(c.name); return c; })
       .sort(function (x, y) {
         if (!!x.next !== !!y.next) return x.next ? -1 : 1;               /* 수업일 미정은 맨 아래 */
         if (x.next && y.next && x.next.date !== y.next.date) return x.next.date < y.next.date ? -1 : 1;
@@ -218,8 +294,11 @@
     if (!d) return;
     var set = d.settings, dv = dash();
     var list = d.students;
+    var classes = classList(d);             /* 반이 바뀌어도 바로 (주기 자료는 반 이름으로 찾는다) */
+    var cyBy = {};
+    classes.forEach(function (c) { cyBy[c.name] = c.cy; });
     var why = {};
-    list.forEach(function (s) { why[s.id] = { urgent: urgentOf(s, set), watch: watchOf(s, dv) }; });
+    list.forEach(function (s) { why[s.id] = { urgent: urgentOf(s, set, dv, cyBy[s.class_name]), watch: watchOf(s, dv) }; });
 
     /* 탭 옆 숫자 = 급함 학생 수 (보관한 반 학생도 센다) */
     var urgentN = list.filter(function (s) { return why[s.id].urgent.length; }).length;
@@ -228,26 +307,28 @@
     badge.textContent = urgentN;
     badge.title = '급함 학생 ' + urgentN + '명';
 
-    var unsent = list.filter(function (s) { return !s.sent; }).length;
+    /* 반마다 지난 수업일 레포트 · 지금 주기 필기로 센 값의 합 (022 전에는 예전 이번 주 값) */
+    function rowOf(s) { return st.cycle ? cycleRow(s.class_name, s.id) : null; }
+    var unsent = list.filter(function (s) { var x = rowOf(s); return x ? !x.sent : !s.sent; }).length;
     var unpaidN = list.filter(function (s) { return s.unpaid_n; }).length;
     var follow = list.reduce(function (a, s) { return a + s.follow_n; }, 0);
-    var noPhoto = list.filter(function (s) { return !s.photos_week; }).length;
+    var noPhoto = list.filter(function (s) { var x = rowOf(s); return x ? !x.photos_cur : !s.photos_week; }).length;
     var summary = [
       ['재원생', list.length + '명'],
-      ['이번 주 레포트 미발송', unsent + '명'],
+      ['레포트 미발송', unsent + '명'],
       ['교재비 미납', unpaidN + '명'],
       ['확인 필요 상담', follow + '건'],
-      ['이번 주 필기 미제출', noPhoto + '명']
+      ['필기 미제출', noPhoto + '명']
     ];
     $('#tdWeek').textContent = '이번 주 ' + Store.dateWithDow(d.week.start) + ' ~ ' + Store.dateWithDow(d.week.end);
 
-    var classes = classList(d);
     $('#tdBody').innerHTML = transitionHtml() +
       '<div class="tb-cards td-summary">' + summary.map(function (c) {
         return '<div class="tb-card"><div class="tb-card__label">' + c[0] + '</div><div class="tb-card__val num">' + esc(c[1]) + '</div></div>';
       }).join('') + '</div>' +
-      '<p class="panel__hint tdc-rule">급함 — 최근 ' + set.absentWeeks + '주 결석 ' + set.absentMin + '회 이상 · 복습테스트 미제출 · 확인 필요 상담 &nbsp;|&nbsp; 살펴보기 — 앱 과제 ' + dv.appLow + '% 미만' +
-        (dv.photoWatch ? ' · 필기 2주 연속 없음' : '') + '</p>' +
+      (st.cycleMissing ? '<p class="panel__hint tdc-rule">migration-022 를 실행하면 반마다 수업 주기(지난 수업일 ~ 다음 수업 전날)로 셉니다. 지금은 달력 주 기준입니다.</p>' : '') +
+      '<p class="panel__hint tdc-rule">급함 — 레포트 미발송(수업일 +' + dv.grace + '일부터) · 복습테스트 미제출(마감 뒤) · 최근 ' + set.absentWeeks + '주 결석 ' + set.absentMin + '회 이상 · 확인 필요 상담 &nbsp;|&nbsp; 살펴보기 — 앱 과제 ' + dv.appLow + '% 미만' +
+        (dv.photoWatch ? ' · 필기 2주기 연속 없음' : '') + '</p>' +
       '<div class="tdc-list-wrap">' + classes.map(function (c) {
         var rows = c.rows, n = rows.length;
         var urgent = rows.filter(function (s) { return why[s.id].urgent.length; });
@@ -255,6 +336,21 @@
         var rest = rows.filter(function (s) { return !why[s.id].urgent.length && !why[s.id].watch.length; });
         var written = rows.filter(function (s) { return s.written; }).length;
         var pub = rows.filter(function (s) { return s.published; }).length;
+        var cy = c.cy, cd = st.cycle && st.cycle[c.name];
+        var meta = n + '명 · 작성 ' + written + '/' + n + ' · 공개 ' + pub + '/' + n;
+        var status = '';
+        if (cy && !cy.L) status = '<span class="tdc-status">첫 수업 전</span>';
+        else if (cy && cd && n) {
+          /* 그 반 상태 한마디 — 레포트 미발송(급함) → 복습테스트 진행 중 → 작성 중 → 발송 완료 */
+          var cpub = rows.filter(function (s) { return (cd.by[s.id] || {}).published; }).length;
+          var csent = rows.filter(function (s) { return (cd.by[s.id] || {}).sent; }).length;
+          meta = n + '명 · ' + Lesson.md(cy.L, false) + ' 레포트 공개 ' + cpub + '/' + n + ' · 발송 ' + csent + '/' + n;
+          var t = cd.test, open2 = t && DDay.today() <= String(t.lesson_date).slice(0, 10);
+          if (cy.since >= dv.grace && csent < n) status = '<span class="tdc-status tdc-status--bad">' + esc(Lesson.md(cy.L, false)) + ' 수업 레포트 미발송 ' + (n - csent) + '명</span>';
+          else if (open2) status = '<span class="tdc-status tdc-status--live">복습테스트 진행 중 ' + rows.filter(function (s) { return (cd.by[s.id] || {}).submitted; }).length + '/' + n + ' 제출</span>';
+          else if (csent < n) status = '<span class="tdc-status">' + esc(Lesson.md(cy.L, false)) + ' 레포트 작성 중</span>';
+          else status = '<span class="tdc-status tdc-status--ok">' + esc(Lesson.md(cy.L, false)) + ' 레포트 발송 완료 ✓</span>';
+        }
         var nx = c.next;
         var nextTxt = !nx ? '<span class="tdc-next tdc-next--none">수업일 미정</span>'
           : nx.dday === 0 ? '<span class="tdc-next tdc-next--today">오늘 수업</span>'
@@ -266,7 +362,8 @@
             '<button type="button" class="tdc-toggle" data-toggle aria-expanded="' + open + '">' +
               '<span class="tdc-title"><span class="tdc-name">' + esc(c.name) + '</span>' + (c.academy ? '<span class="muted-note">' + esc(c.academy) + '</span>' : '') +
                 '<span class="class-head__caret" aria-hidden="true">▾</span></span>' +
-              '<span class="tdc-row">' + nextTxt + '<span class="tdc-meta num">' + n + '명 · 작성 ' + written + '/' + n + ' · 공개 ' + pub + '/' + n + '</span></span>' +
+              '<span class="tdc-row">' + nextTxt + (status ? '<span class="tdc-dot" aria-hidden="true">·</span>' + status : '') + '</span>' +
+              '<span class="tdc-row"><span class="tdc-meta num">' + esc(meta) + '</span></span>' +
               '<span class="tdc-row">' +
                 '<span class="tdc-flag tdc-flag--urgent' + (urgent.length ? '' : ' is-zero') + '">급함 <b class="num">' + urgent.length + '</b></span>' +
                 '<span class="tdc-flag tdc-flag--watch' + (watch.length ? '' : ' is-zero') + '">살펴보기 <b class="num">' + watch.length + '</b></span>' +
@@ -296,8 +393,11 @@
     var t = e.target.closest('[data-toggle]');
     if (t) {
       var name = t.closest('.tdc-card').dataset.cls;
-      if (st.open[name]) delete st.open[name]; else st.open[name] = true;
+      var opening = !st.open[name];
+      if (opening) st.open[name] = true; else delete st.open[name];
       saveOpen();
+      /* 펼치면 뒤로가기 기록을 하나 더(뒤로가기 = 접기), 직접 접으면 기록을 고치기만 (nav.js) */
+      setTimeout(function () { if (opening) window.dispatchEvent(new CustomEvent('jt:write-nav')); else if (window.Nav) Nav.replace(); }, 0);
       render();
     }
   });
@@ -323,9 +423,11 @@
       $('#tdSetMin').value = v.absentMin || 2;
       $('#tdSetAppLow').value = Math.max(1, Math.min(100, parseInt(v.appLow, 10) || 50));
       $('#tdSetPhoto').checked = v.photoWatch === true;
+      var g0 = parseInt(v.reportGrace, 10);
+      $('#tdSetGrace').value = isNaN(g0) ? 2 : g0;
       $('#tdSetParentWrite').checked = !st.links || st.links.parentWrite !== false;
       var teacher = !!st.role;   /* 조교 · 선생님 같은 권한 (migration-017) */
-      ['#tdSetMoney', '#tdSetWeeks', '#tdSetMin', '#tdSetAppLow', '#tdSetPhoto', '#tdSetParentWrite'].forEach(function (s) { $(s).disabled = !teacher; });
+      ['#tdSetMoney', '#tdSetWeeks', '#tdSetMin', '#tdSetAppLow', '#tdSetPhoto', '#tdSetGrace', '#tdSetParentWrite'].forEach(function (s) { $(s).disabled = !teacher; });
       $('#tdSetSave').hidden = !teacher;
       $('#tdSetNote').textContent = teacher ? '' : '직원 정보를 불러오는 중입니다. 잠시 뒤 다시 열어 주세요.';
       $('#tdSettingsModal').showModal();
@@ -339,7 +441,8 @@
       absentWeeks: Math.max(1, Math.min(12, parseInt($('#tdSetWeeks').value, 10) || 4)),
       absentMin: Math.max(1, Math.min(12, parseInt($('#tdSetMin').value, 10) || 2)),
       appLow: Math.max(1, Math.min(100, parseInt($('#tdSetAppLow').value, 10) || 50)),
-      photoWatch: $('#tdSetPhoto').checked
+      photoWatch: $('#tdSetPhoto').checked,
+      reportGrace: Math.max(0, Math.min(14, parseInt($('#tdSetGrace').value, 10) || 0))
     };
     var pw = $('#tdSetParentWrite').checked;
     var pwChanged = !st.links || (st.links.parentWrite !== false) !== pw;
@@ -381,5 +484,16 @@
   window.addEventListener('jt:refreshed', function (e) { if (!(e.detail && e.detail.local)) remote(); });
   /* 반이 새로 생기면 (학생 0명 반 카드) 바로 다시 그린다 */
   window.addEventListener('jt:roster-changed', function () { if (st.data && !$('#appRoot').hidden) render(); });
+
+  /* 뒤로가기 · 새로고침 (nav.js) — 펼친 반 목록 */
+  window.TodayView = {
+    openList: function () { return Object.keys(st.open).sort(); },
+    setOpen: function (list) {
+      st.open = {};
+      (list || []).forEach(function (n) { if (n) st.open[n] = true; });
+      saveOpen();
+      if (st.data) render();
+    }
+  };
 
 })();

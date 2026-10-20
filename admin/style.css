@@ -1096,6 +1096,11 @@ kbd { display: inline-block; padding: 0 6px; border: 1px solid var(--line); bord
 .tdc-next--today { background: #EFEBFD; color: #5A3FD0; }
 .tdc-next--none { background: transparent; color: var(--ink-light); padding-left: 0; }
 .tdc-flag { padding: 1px 8px; border-radius: 999px; font-weight: 700; }
+.tdc-dot { color: var(--ink-light); }
+.tdc-status { font-weight: 700; color: var(--ink-mid); }
+.tdc-status--bad { color: #B03A55; }
+.tdc-status--live { color: #5A3FD0; }
+.tdc-status--ok { color: #35806A; }
 .tdc-flag--urgent { background: #FDECEF; color: #B03A55; }
 .tdc-flag--watch { background: #FFF3E3; color: #A86A1E; }
 .tdc-flag.is-zero { background: #F4F5FA; color: var(--ink-light); }
