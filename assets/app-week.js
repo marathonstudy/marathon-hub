@@ -77,8 +77,10 @@
 
   function md(iso) { return (+iso.slice(5, 7)) + '/' + (+iso.slice(8, 10)); }
 
-  function tableHtml(w) {
+  /* opt.pending — 진행 중 기간: 과제 · 강의가 있는 날이 아직 없으면 「0/0일」 대신 「아직 과제 시작 전」 · 「아직 강의 전」 */
+  function tableHtml(w, opt) {
     if (!w) return '';
+    var pending = !!(opt && opt.pending);
     var cols = 'grid-template-columns: 30px repeat(' + w.days.length + ', minmax(0, 1fr)) auto';
     function cells(kind) {
       return w.days.map(function (d) {
@@ -93,9 +95,11 @@
         w.days.map(function (d) { return '<span class="aw-head aw-day"><b class="num">' + md(d.date).split('/')[1] + '</b>' + d.dow + '</span>'; }).join('') +
         '<span class="aw-head"></span>' +
         '<span class="aw-label">과제</span>' + cells('hw') +
-        '<span class="aw-sum num">' + w.hwDone + '/' + w.hwDays + '일 제출' + (w.rate != null ? '<small>정답률 ' + w.rate + '%</small>' : '') + '</span>' +
+        (pending && !w.hwDays ? '<span class="aw-sum aw-sum--wait">아직 과제 시작 전</span>'
+          : '<span class="aw-sum num">' + w.hwDone + '/' + w.hwDays + '일 제출' + (w.rate != null ? '<small>정답률 ' + w.rate + '%</small>' : '') + '</span>') +
         '<span class="aw-label">강의</span>' + cells('lec') +
-        '<span class="aw-sum num">' + w.lecDone + '/' + w.lecDays + '일 시청</span>' +
+        (pending && !w.lecDays ? '<span class="aw-sum aw-sum--wait">아직 강의 전</span>'
+          : '<span class="aw-sum num">' + w.lecDone + '/' + w.lecDays + '일 시청</span>') +
       '</div>' +
       '<p class="aw-legend">' + esc(LEGEND) + '</p>' +
     '</div>';

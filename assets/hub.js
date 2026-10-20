@@ -773,7 +773,7 @@
     box.innerHTML = '<div class="card tw-prog">' +
       '<p class="tw-prog__t">다음 수업(' + esc(mdDow(p.next)) + ')까지 진행 중' +
         (p.from ? '<span class="tw-prog__d num">과제 기간 ' + esc(Lesson.md(p.from, false) + '~' + Lesson.md(p.to, false)) + '</span>' : '') + '</p>' +
-      (aw ? AppWeek.tableHtml(aw) : TW.app === 'loading' && p.from ? '<p class="tw-loading">앱 과제 기록을 불러오는 중…</p>' : '') +
+      (aw ? AppWeek.tableHtml(aw, { pending: true }) : TW.app === 'loading' && p.from ? '<p class="tw-loading">앱 과제 기록을 불러오는 중…</p>' : '') +
     '</div>';
   }
 
