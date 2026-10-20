@@ -1050,6 +1050,11 @@ dialog.modal--wide { width: min(680px, calc(100vw - 24px)); }
 .ai-vid { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 4px; }
 .ai-vid__name { min-width: 0; overflow-wrap: anywhere; }
 .is-dim { opacity: .45; }
+.ai-step--big { padding: 14px; border: 2px solid var(--indigo); background: var(--surface); font-size: 14.5px; }
+.ai-step--big .ai-step__t { font-size: 15.5px; }
+.ai-step--big .toolbar .input { min-height: 42px; font-size: 15px; }
+.ai-next { margin: 2px 2px 0; font-size: 13px; color: var(--ink-light); }
+.ai-vid--small { padding: 2px 2px 4px; font-size: 13px; }
 
 /* 자막 버튼 설치 (ytbm.js) */
 .ytbm-only { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: #FFF3E3; color: #A86A1E; font-size: 12px; font-weight: 800; vertical-align: 3px; }

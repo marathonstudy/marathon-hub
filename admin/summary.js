@@ -238,23 +238,46 @@
     var host = $('#aiSteps');
     if (!host) return;
     var vids = savedVideos();
-    var one = vids.length
-      ? vids.map(function (v) {
-          return '<div class="ai-vid"><span class="ai-step__t">① 영상:</span><span class="ai-vid__name">' + esc((PART[v.part] ? PART[v.part] + ' · ' : '') + (v.title || v.url)) + '</span>' +
-            '<a class="btn btn--sm" href="' + esc(v.url) + '" target="_blank" rel="noopener">유튜브에서 열기 ↗</a></div>';
-        }).join('')
-      : '<div class="ai-step__t">① 이번 주 수업 영상 링크를 먼저 넣어 주세요</div>' +
-        '<div class="toolbar"><input class="input" id="aiVidUrl" type="url" inputmode="url" placeholder="https://youtu.be/…" aria-label="유튜브 링크">' +
-        '<button class="btn btn--sm btn--primary" type="button" id="btnAiVidAdd">넣기</button></div>' +
-        '<p class="muted-note">넣으면 위 「수업 영상」 칸(기본 「전체」)에 저장되고 학생 · 학부모 화면에도 올라갑니다.</p>';
-    host.innerHTML = '<div class="ai-steps">' +
-      '<div class="ai-step">' + one + '</div>' +
-      '<div class="ai-step' + (vids.length ? '' : ' is-dim') + '"><span class="ai-step__t">② 열린 유튜브 화면에서 즐겨찾기 [마라톤 자막 가져오기] 누르기</span> ' +
-        '<button class="btn btn--sm btn--ghost" id="btnYtbmHelp" type="button">자막 버튼 설치</button></div>' +
-      '<div class="ai-step' + (vids.length ? '' : ' is-dim') + '"><span class="ai-step__t">③ [붙여 넣기] → [요약 초안 만들기] → 고치기 → [확정]</span></div>' +
-    '</div>';
     var p = $('#aiPanel');
-    if (p) p.classList.toggle('is-dim', !vids.length);
+    if (!vids.length) {
+      /* 링크가 없으면 ① 만 크게 — ② ③ · 차시 고르기 · 자막 칸 · [요약 초안 만들기]는 접어 둔다 */
+      host.innerHTML = '<div class="ai-steps">' +
+        '<div class="ai-step ai-step--big" data-step="1"><div class="ai-step__t">① 이번 주 수업 영상 링크를 먼저 넣어 주세요</div>' +
+          '<div class="toolbar"><input class="input" id="aiVidUrl" type="url" inputmode="url" placeholder="https://youtu.be/…" aria-label="유튜브 링크">' +
+          '<button class="btn btn--primary" type="button" id="btnAiVidAdd">넣기</button></div>' +
+          '<p class="muted-note">넣으면 위 「수업 영상」 칸(기본 「전체」)에 저장되고 학생 · 학부모 화면에도 올라갑니다.</p></div>' +
+        '<p class="ai-next">링크를 넣으면 다음 단계가 열립니다</p>' +
+      '</div>';
+      if (p) p.hidden = true;
+      return false;
+    }
+    /* 링크가 있으면 ① 은 「영상: 제목 [유튜브에서 열기 ↗]」 한 줄로 작게, 나머지는 바로 펼친다 */
+    host.innerHTML = '<div class="ai-steps">' +
+      vids.map(function (v) {
+        return '<div class="ai-vid ai-vid--small" data-step="1"><span class="ai-step__t">영상:</span><span class="ai-vid__name">' + esc((PART[v.part] ? PART[v.part] + ' · ' : '') + (v.title || v.url)) + '</span>' +
+          '<a class="btn btn--sm" href="' + esc(v.url) + '" target="_blank" rel="noopener">유튜브에서 열기 ↗</a></div>';
+      }).join('') +
+      '<div class="ai-step" data-step="2"><span class="ai-step__t">② 열린 유튜브 화면에서 즐겨찾기 [마라톤 자막 가져오기] 누르기</span> ' +
+        '<button class="btn btn--sm btn--ghost" id="btnYtbmHelp" type="button">자막 버튼 설치</button></div>' +
+      '<div class="ai-step" data-step="3"><span class="ai-step__t">③ [붙여 넣기] → [요약 초안 만들기] → 고치기 → [확정]</span></div>' +
+    '</div>';
+    if (p) p.hidden = false;
+    return true;
+  }
+
+  /* 머리 띠(sticky) 바로 아래에 오도록 내린다 — 위쪽 메뉴 + 띠 높이만큼 비워 둔다 */
+  function scrollUnderBar(el, smooth) {
+    if (!el || !el.getBoundingClientRect) return;
+    var top = document.getElementById('topbar'), bar = document.getElementById('writeBar');
+    /* 띠가 붙어 있으면(position: fixed) offsetParent 가 비므로 실제 크기로 잰다 (숨어 있으면 0) */
+    var gap = (top && !top.hidden ? top.getBoundingClientRect().height : 0) + (bar ? bar.getBoundingClientRect().height : 0) + 8;
+    var y = el.getBoundingClientRect().top + (window.pageYOffset || 0) - gap;
+    try { window.scrollTo({ top: Math.max(0, y), behavior: smooth ? 'smooth' : 'auto' }); } catch (e) { window.scrollTo(0, Math.max(0, y)); }
+  }
+  function focusLink() {
+    var inp = $('#aiVidUrl');
+    if (!inp) return;
+    try { inp.focus({ preventScroll: true }); } catch (e) { inp.focus(); }
   }
   function addVideoFromStep() {
     var inp = $('#aiVidUrl');
@@ -262,8 +285,8 @@
     var url = W && W.normalizeYoutube ? W.normalizeYoutube(inp ? inp.value : '') : '';
     if (!url) { toast('유튜브 링크(youtube.com · youtu.be)를 넣어 주세요', 'bad'); if (inp) inp.focus(); return; }
     W.addVideoUrl(st.cls, st.week, url, '').then(function (ok) {
-      if (!ok) toast('영상을 넣지 못했습니다 — 위 「수업 영상」 칸을 확인해 주세요', 'bad');
-      renderSteps();
+      if (!ok) { toast('영상을 넣지 못했습니다 — 위 「수업 영상」 칸을 확인해 주세요', 'bad'); renderSteps(); focusLink(); return; }
+      if (renderSteps()) scrollUnderBar(document.querySelector('#aiSteps [data-step="2"]'), true);
     });
   }
 
@@ -514,9 +537,10 @@
       box.hidden = false;
       sub.hidden = false;
       $('#btnAiOpen').setAttribute('aria-expanded', 'true');
-      renderSteps();
+      var ready = renderSteps();
       renderResult();
-      sub.scrollIntoView({ block: 'nearest' });
+      scrollUnderBar(document.querySelector('#aiSteps [data-step="1"]') || sub, false);   /* ① 이 띠 바로 아래 */
+      if (!ready) focusLink();
     });
     /* ① 영상 넣기 · ② 자막 버튼 설치 (펼친 칸 안 — 다시 그려지므로 위임) */
     $('#aiSub').addEventListener('click', function (e) {
