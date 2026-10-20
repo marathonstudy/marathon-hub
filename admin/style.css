@@ -1074,6 +1074,25 @@ kbd { display: inline-block; padding: 0 6px; border: 1px solid var(--line); bord
 #writeMain.is-weeks > #weekPanel, #writeMain.is-weeks > #commonPanel, #writeMain.is-weeks > #entryPanel,
 #writeMain.is-weeks > #notesSidePanel, #writeMain.is-weeks > #previewPanel { display: none !important; }
 #writeMain:not(.is-weeks) > #wkvPanel { display: none; }
+#writeMain.is-weeks > #writeBarWrap { display: none; }
+/* 작성 화면 머리 띠 */
+.wbar-wrap { margin: 0 0 12px; }
+.wbar { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid #DCD5FA; border-radius: 12px;
+  background: rgba(251, 250, 255, .96); backdrop-filter: blur(8px); z-index: 25; box-sizing: border-box; }
+.wbar.is-stuck { position: fixed; border-radius: 0 0 12px 12px; box-shadow: 0 6px 16px rgba(47, 61, 119, .12); }
+.wbar__back { flex: none; min-height: 36px; border: 2px solid var(--indigo); color: #4A34B8; background: var(--surface); font-size: 15px; font-weight: 800; padding: 4px 12px; }
+.wbar__now { flex: 1 1 auto; min-width: 0; text-align: center; font-size: 14px; color: var(--ink-mid); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wbar__now b { color: var(--ink-deep); font-weight: 800; }
+.wbar__off { display: inline-block; padding: 1px 7px; border-radius: 999px; background: #F3EEF0; color: #8E5F6B; font-size: 12px; font-weight: 800; }
+.wbar__nav { flex: none; display: flex; gap: 4px; }
+.wbar__step { min-height: 36px; min-width: 36px; }
+.wbar__step:disabled { opacity: .4; }
+@media (max-width: 480px) {
+  .wbar { gap: 6px; padding: 5px 6px; }
+  .wbar__t, .wbar__cls { display: none; }
+  .wbar__back { padding: 4px 10px; }
+  .wbar__now { font-size: 13.5px; }
+}
 #writeMain.is-weeks .chip__count { display: none; }
 .wkv-head { flex-wrap: wrap; row-gap: 8px; }
 .wkv-head__text { min-width: 0; }
@@ -1133,6 +1152,7 @@ kbd { display: inline-block; padding: 0 6px; border: 1px solid var(--line); bord
       "notes   preview"
       "week    preview"
       "class   preview"
+      "bar     preview"
       "common  preview"
       "entries preview";
     gap: 0 16px;
@@ -1143,6 +1163,7 @@ kbd { display: inline-block; padding: 0 6px; border: 1px solid var(--line); bord
   #draftNotes { grid-area: notes; }
   #weekPanel { grid-area: week; }
   #classPanel { grid-area: class; }
+  #writeBarWrap { grid-area: bar; }
   #commonPanel { grid-area: common; }
   #entryPanel { grid-area: entries; }
   #previewPanel {

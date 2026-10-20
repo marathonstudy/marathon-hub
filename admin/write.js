@@ -332,6 +332,7 @@
   function setMode(m) {
     mode = m === 'edit' ? 'edit' : 'weeks';
     $('#writeMain').classList.toggle('is-weeks', mode === 'weeks');
+    renderBar();
     window.dispatchEvent(new CustomEvent('jt:write-mode', { detail: { mode: mode } }));
   }
 
@@ -352,7 +353,56 @@
     window.dispatchEvent(new CustomEvent('jt:write-nav'));
   }
 
-  $('#btnWkvBack').addEventListener('click', openWeeks);
+  /* ---------- 머리 띠 — [← 주차 목록] · 반 · 주차 · 수업일 · [◀ 지난주] [다음주 ▶] ---------- */
+
+  function monOf(iso) { return Lesson.addDays(iso, -((Lesson.dowOf(iso) + 6) % 7)); }
+  function daysFrom(a, b) { return Math.round((Date.parse(a + 'T00:00:00Z') - Date.parse(b + 'T00:00:00Z')) / 86400000); }
+  /* 옆 주로 갈 수 있는가 — 첫 수업일이 든 주 ~ 이번 주의 다음 주 (주차 현황과 같은 범위) */
+  function stepOk(start, dir) {
+    var to = monOf(Lesson.addDays(start, 7 * dir));
+    if (dir > 0) return to <= Lesson.addDays(Store.thisWeek().start, 7);
+    var s = Store.schedOf(currentClass);
+    return !(s && s.first && to < monOf(s.first));
+  }
+  function renderBar() {
+    var now = $('#wbarNow');
+    if (!now || !draft || !draft.weekStart || !window.Lesson) return;
+    var start = draft.weekStart;
+    var s = Store.schedOf(currentClass);
+    var L = s ? Lesson.of(s, start) : null;
+    var n = s && s.first ? Math.floor(daysFrom(monOf(start), monOf(s.first)) / 7) + 1 : 0;
+    /* 휴강 주는 「9주차」 + 휴강 표시만 (주차 번호가 없으면 시작일) */
+    var when = L && L.date ? Lesson.md(L.date) : (L && L.canceled && n >= 1) ? '' : Store.dateWithDow(start) + ' 주';
+    now.innerHTML = '<span class="wbar__cls">' + escapeHtml(currentClass || '반 없음') + ' · </span>' +
+      '<b>' + escapeHtml(((n >= 1 ? n + '주차 ' : '') + when).trim()) + '</b>' +
+      (L && L.canceled ? ' <span class="wbar__off">휴강</span>' : '');
+    $('#btnWbarPrev').disabled = !stepOk(start, -1);
+    $('#btnWbarNext').disabled = !stepOk(start, 1);
+    stickBar();
+  }
+  function step(dir) {
+    if (!draft || !draft.weekStart || !stepOk(draft.weekStart, dir)) return;
+    openWeek(Lesson.addDays(draft.weekStart, 7 * dir));     /* switchWeek 가 지금 주를 먼저 저장(flushDraft)한 뒤 넘어간다 */
+  }
+  /* 내려도 위에 붙어 있게 — 넓은 화면은 칸(grid) 안이라 CSS sticky 가 칸을 못 벗어나므로 직접 붙인다 */
+  function stickBar() {
+    var wrap = $('#writeBarWrap'), bar = $('#writeBar'), top = $('#topbar');
+    if (!wrap || !bar) return;
+    var topH = top && !top.hidden ? top.offsetHeight : 0;
+    var r = wrap.getBoundingClientRect(), main = $('#writeMain').getBoundingClientRect();
+    var on = mode === 'edit' && r.height > 0 && r.top < topH && main.bottom > topH + bar.offsetHeight;
+    wrap.style.height = on ? bar.offsetHeight + 'px' : '';
+    bar.classList.toggle('is-stuck', on);
+    bar.style.top = on ? topH + 'px' : '';
+    bar.style.left = on ? r.left + 'px' : '';
+    bar.style.width = on ? r.width + 'px' : '';
+  }
+  window.addEventListener('scroll', stickBar, { passive: true });
+  window.addEventListener('resize', stickBar);
+  $('#btnWbarBack').addEventListener('click', openWeeks);
+  $('#btnWbarPrev').addEventListener('click', function () { step(-1); });
+  $('#btnWbarNext').addEventListener('click', function () { step(1); });
+  window.addEventListener('jt:schedule-changed', renderBar);
 
   /* ============================================================
      반 공통 — 수업 내용 · 테스트 이름
@@ -1575,6 +1625,7 @@
 
     renderWeek();
     renderClassPicker();
+    renderBar();
     renderCommon();
     renderEntries();
 
