@@ -6,7 +6,8 @@
    · 앱 과제 제출률은 바깥 앱 서버 자료라 화면이 뜬 뒤 app-report 함수로 4명씩 차례로 불러온다.
      불러온 값은 30분 동안 이 화면 메모리에만 둔다(브라우저에 저장하지 않는다).
    · 조교 금액 숨김이 켜져 있으면 서버가 금액을 보내지 않는다 (이 화면에만 적용).
-   · 「오늘」 탭 이름 옆 숫자 = 챙겨야 할 학생 수.
+   · 첫 화면은 반 카드 — 다음 수업이 가까운 반부터. 카드를 누르면 그 반 학생(급함 → 살펴보기 → 나머지)이 펼쳐진다.
+   · 「오늘」 탭 이름 옆 숫자 = 급함 학생 수. 금액은 이 화면에 넣지 않는다.
    ============================================================ */
 
 (function () {
@@ -20,10 +21,8 @@
     return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;')
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
-  function won(n) { return (Math.round(Number(n) || 0)).toLocaleString('ko-KR') + '원'; }
   function isMissing(e) { return /does not exist|Could not find the|schema cache/i.test((e && e.message) || ''); }
 
-  var APP_LOW = 50;                 /* 앱 과제 제출률 이 값 미만이면 챙기기 */
   var APP_TTL = 30 * 60 * 1000;
 
   var st = { data: null, loading: false, last: 0, open: {}, role: '', settingsAt: '', links: null, linksAt: '' };
@@ -54,9 +53,11 @@
     st.loading = true;
     st.last = Date.now();
     if (!st.data) $('#tdBody').innerHTML = '<p class="panel__hint">불러오는 중…</p>';
-    sb().rpc('coach_today').then(function (r) {
+    Promise.all([sb().rpc('coach_today'), DB.getSettingRow('dashboard').catch(function () { return null; })]).then(function (res) {
+      var r = res[0];
       st.loading = false;
       if (r.error) throw new Error(r.error.message);
+      st.dash = (res[1] && res[1].value) || {};
       st.data = prepare(r.data);
       render();
       loadApp();
@@ -92,16 +93,6 @@
     });
   }
 
-  function reasonsOf(s, set) {
-    var out = [];
-    (reviewMiss[s.id] || []).forEach(function (x) { out.push({ k: 'review', t: '복습테스트 ' + x.round_no + '회 미제출' }); });
-    if (s.absent_n >= set.absentMin) out.push({ k: 'absent', t: '최근 ' + set.absentWeeks + '주 결석 ' + s.absent_n + '회' });
-    var a = app[s.id];
-    if (s.app && a && a.ok && a.rate < APP_LOW) out.push({ k: 'app', t: '앱 과제 ' + a.rate + '%' });
-    if (!s.photos_week && !s.photos_prev) out.push({ k: 'photo', t: '필기 2주 연속 없음' });
-    if (s.follow_n) out.push({ k: 'follow', t: '확인 필요 상담 ' + s.follow_n });
-    return out;
-  }
 
   /* ---------- 앱 과제 제출률 (app-report, 4명씩) ---------- */
 
@@ -145,159 +136,180 @@
 
   /* ---------- 그리기 ---------- */
 
-  function bar(n, total, label) {
-    var pct = total ? Math.round(n / total * 100) : 0;
-    return '<div class="td-bar"><span class="td-bar__label">' + label + '</span>' +
-           '<span class="td-bar__track"><span class="td-bar__fill" style="width:' + pct + '%"></span></span>' +
-           '<span class="td-bar__num num">' + n + '/' + total + '</span></div>';
+
+
+
+  /* ---------- 반 카드 (20261026a) ----------
+     반마다 카드: 반 이름 · 학원 · 다음 수업(「오늘 수업」 / 「D-2 10/22(목)」, 휴강 주 건너뜀) · 인원 · 이번 주 작성 · 공개 n/전체 ·
+     급함 n · 살펴보기 n · [이번 주 작성하기]. 순서 = 다음 수업이 가까운 반부터 (오늘 수업 맨 위, 같은 날은 이름 순, 수업일 미정은 맨 아래).
+     카드를 누르면 그 반 학생 목록이 펼쳐진다 (여러 반 함께 · 펼친 반은 이 기기에만 기억).
+       급함     최근 결석 기준 이상 · 복습테스트 미제출 · 확인 필요 상담
+       살펴보기 앱 과제 제출률 기준(기본 50%) 미만 · 필기 2주 연속 없음(설정에서 켰을 때만, 기본 끔)
+     금액은 이 화면에 넣지 않는다. */
+  var OPEN_KEY = 'mhub.today.open';
+  function readOpen() { try { return JSON.parse(localStorage.getItem(OPEN_KEY) || '{}') || {}; } catch (e) { return {}; } }
+  function saveOpen() { try { localStorage.setItem(OPEN_KEY, JSON.stringify(st.open)); } catch (e) {} }
+  st.open = readOpen();
+  st.rest = {};
+
+  function dash() {
+    var v = st.dash || {};
+    return { appLow: Math.max(1, Math.min(100, parseInt(v.appLow, 10) || 50)), photoWatch: v.photoWatch === true };
   }
 
-  function appAvg(list) {
-    var withApp = list.filter(function (s) { return s.app; });
-    var ok = withApp.filter(function (s) { return app[s.id] && app[s.id].ok; });
-    var fail = withApp.filter(function (s) { return app[s.id] && !app[s.id].ok; }).length;
-    var avg = ok.length ? Math.round(ok.reduce(function (a, s) { return a + app[s.id].rate; }, 0) / ok.length) : null;
-    return { n: withApp.length, avg: avg, fail: fail, pending: withApp.length - ok.length - fail };
+  /* 다음 수업일 — 오늘 포함, 휴강 주는 건너뛴다 (주 2회 반은 가까운 요일) · 요일을 안 정했으면 null */
+  function nextLesson(cls) {
+    var s = Store.schedOf(cls);
+    if (!s || !window.Lesson) return null;
+    var today = DDay.today();
+    var mon = Lesson.addDays(today, -((Lesson.dowOf(today) + 6) % 7));
+    for (var k = 0; k < 10; k++) {
+      var L = Lesson.of(s, Lesson.addDays(mon, 7 * k));
+      if (!L || L.canceled) continue;
+      var days = (L.days && L.days.length ? L.days : [L.date]).filter(function (d) { return d && d >= today; }).sort();
+      if (days.length) return { date: days[0], dday: Math.round((Date.parse(days[0]) - Date.parse(today)) / 86400000) };
+    }
+    return null;
   }
 
-  var ATT = { attend: '출석', late: '지각', absent: '결석', makeup: '출석' };   /* 예전 보강 기록은 출석으로 */
+  function urgentOf(s, set) {
+    var out = [];
+    if (s.absent_n >= set.absentMin) out.push({ k: 'absent', t: '최근 ' + set.absentWeeks + '주 결석 ' + s.absent_n + '회' });
+    (reviewMiss[s.id] || []).forEach(function (x) { out.push({ k: 'review', t: '복습테스트 ' + x.round_no + '회 미제출' }); });
+    if (s.follow_n) out.push({ k: 'follow', t: '확인 필요 상담 ' + s.follow_n });
+    return out;
+  }
+  function watchOf(s, dv) {
+    var out = [];
+    var a = app[s.id];
+    if (s.app && a && a.ok && a.rate < dv.appLow) out.push({ k: 'app', t: '앱 과제 ' + a.rate + '%' });
+    if (dv.photoWatch && !s.photos_week && !s.photos_prev) out.push({ k: 'photo', t: '필기 2주 연속 없음' });
+    return out;
+  }
+
+  function classList(d) {
+    var by = {};
+    d.students.forEach(function (s) { var k = s.class_name || '(반 없음)'; (by[k] = by[k] || { name: k, academy: s.academy || '', rows: [] }).rows.push(s); });
+    Store.getClasses().forEach(function (c) { if (!by[c.name]) by[c.name] = { name: c.name, academy: '', rows: [] }; });
+    return Object.keys(by).map(function (k) { return by[k]; })
+      .filter(function (c) { return !Store.isArchivedClass(c.name); })
+      .map(function (c) { c.next = c.name === '(반 없음)' ? null : nextLesson(c.name); return c; })
+      .sort(function (x, y) {
+        if (!!x.next !== !!y.next) return x.next ? -1 : 1;               /* 수업일 미정은 맨 아래 */
+        if (x.next && y.next && x.next.date !== y.next.date) return x.next.date < y.next.date ? -1 : 1;
+        return x.name.localeCompare(y.name, 'ko');
+      });
+  }
+
+  function tagsHtml(list, cls) {
+    return list.map(function (w) { return '<span class="td-why td-why--' + w.k + ' ' + cls + '">' + esc(w.t) + '</span>'; }).join('');
+  }
+  function studentRow(s, why) {
+    return '<div class="tdc-st' + (why.urgent.length ? ' is-urgent' : why.watch.length ? ' is-watch' : '') + '" data-id="' + esc(s.id) + '">' +
+      '<div class="tdc-st__main"><button type="button" class="roster__name roster__name-btn" data-card="' + esc(s.id) + '">' + esc(s.name) + '</button>' +
+        tagsHtml(why.urgent, 'td-why--urgent') + tagsHtml(why.watch, 'td-why--watch') + '</div>' +
+      '<div class="tdc-st__acts"><button type="button" class="btn btn--sm" data-card="' + esc(s.id) + '">상담 카드</button>' +
+        '<button type="button" class="btn btn--sm btn--ghost" data-pv="student" data-sid="' + esc(s.id) + '">학생 화면 보기</button></div>' +
+    '</div>';
+  }
 
   function render() {
     var d = st.data;
     if (!d) return;
-    var set = d.settings;
+    var set = d.settings, dv = dash();
     var list = d.students;
+    var why = {};
+    list.forEach(function (s) { why[s.id] = { urgent: urgentOf(s, set), watch: watchOf(s, dv) }; });
 
-    /* 반 묶기 — 학원 → 반 */
-    var classes = [], idx = {};
-    list.forEach(function (s) {
-      var k = s.class_name || '(반 없음)';
-      if (!(k in idx)) { idx[k] = classes.length; classes.push({ name: k, academy: s.academy, rows: [] }); }
-      classes[idx[k]].rows.push(s);
-    });
-    /* 학생이 아직 0명인 반도 보인다 (반 목록은 Store.getClasses() 하나) */
-    Store.getClasses().forEach(function (c) {
-      if (!(c.name in idx)) { idx[c.name] = classes.length; classes.push({ name: c.name, academy: '', rows: [] }); }
-    });
-    /* 보관한 반은 카드만 숨긴다 — 그 반 학생은 위 '챙겨야 할 학생' 에 그대로 나온다 */
-    classes = classes.filter(function (c) { return !Store.isArchivedClass(c.name); });
-    classes.sort(function (a, b) {
-      return (a.academy || '힣').localeCompare(b.academy || '힣', 'ko') || a.name.localeCompare(b.name, 'ko');
-    });
-
-    /* 이유가 많은 학생부터 */
-    var care = list.map(function (s) { return { s: s, why: reasonsOf(s, set) }; })
-      .filter(function (x) { return x.why.length; })
-      .sort(function (a, b) { return b.why.length - a.why.length || (a.s.name || '').localeCompare(b.s.name || '', 'ko'); });
+    /* 탭 옆 숫자 = 급함 학생 수 (보관한 반 학생도 센다) */
+    var urgentN = list.filter(function (s) { return why[s.id].urgent.length; }).length;
     var badge = $('#todayBadge');
-    badge.hidden = !care.length;
-    badge.textContent = care.length;
-    badge.title = '챙겨야 할 학생 ' + care.length + '명';
+    badge.hidden = !urgentN;
+    badge.textContent = urgentN;
+    badge.title = '급함 학생 ' + urgentN + '명';
 
     var unsent = list.filter(function (s) { return !s.sent; }).length;
     var unpaidN = list.filter(function (s) { return s.unpaid_n; }).length;
-    var unpaidSum = list.reduce(function (a, s) { return a + (s.unpaid_amt || 0); }, 0);
     var follow = list.reduce(function (a, s) { return a + s.follow_n; }, 0);
     var noPhoto = list.filter(function (s) { return !s.photos_week; }).length;
-
     var summary = [
       ['재원생', list.length + '명'],
       ['이번 주 레포트 미발송', unsent + '명'],
-      ['교재비 미납', set.money ? won(unpaidSum) + ' · ' + unpaidN + '명' : unpaidN + '명'],
+      ['교재비 미납', unpaidN + '명'],
       ['확인 필요 상담', follow + '건'],
       ['이번 주 필기 미제출', noPhoto + '명']
     ];
-
     $('#tdWeek').textContent = '이번 주 ' + Store.dateWithDow(d.week.start) + ' ~ ' + Store.dateWithDow(d.week.end);
 
+    var classes = classList(d);
     $('#tdBody').innerHTML = transitionHtml() +
       '<div class="tb-cards td-summary">' + summary.map(function (c) {
         return '<div class="tb-card"><div class="tb-card__label">' + c[0] + '</div><div class="tb-card__val num">' + esc(c[1]) + '</div></div>';
       }).join('') + '</div>' +
-
-      '<div class="sub"><div class="sub__head"><span class="sub__title">챙겨야 할 학생 ' + care.length + '명</span>' +
-        '<span class="sub__hint">최근 ' + set.absentWeeks + '주 결석 ' + set.absentMin + '회 이상 · 앱 과제 ' + APP_LOW + '% 미만 · 필기 2주 연속 없음 · 확인 필요 상담</span></div>' +
-        (care.length ? '<div class="td-care">' + care.map(function (x) {
-          return '<div class="td-care__row"><button type="button" class="roster__name roster__name-btn" data-card="' + x.s.id + '">' + esc(x.s.name) + '</button>' +
-            '<span class="muted-note">' + esc(x.s.class_name) + '</span>' +
-            x.why.map(function (w) { return '<span class="td-why td-why--' + w.k + '">' + esc(w.t) + '</span>'; }).join('') + '</div>';
-        }).join('') + '</div>' : '<p class="panel__hint">지금은 챙겨야 할 학생이 없습니다 👍</p>') +
-      '</div>' +
-
-      '<div class="td-classes">' + classes.map(function (c) {
-        var rows = c.rows;
-        var n = rows.length;
-        if (!n) {
-          return '<div class="td-card td-card--empty" data-cls="' + esc(c.name) + '"><div class="td-card__head">' +
-            '<span class="td-card__name">' + esc(c.name) + '</span><span class="spacer"></span>' +
-            '<span class="td-card__count">0명</span></div>' +
-            '<div class="td-card__body"><div class="td-line muted-note">아직 학생이 없습니다. ① 명단 → 학생 추가에서 이 반을 고르세요.</div></div></div>';
-        }
-        var cnt = { attend: 0, late: 0, absent: 0 };
-        rows.forEach(function (s) {
-          if (s.attend === 'attend' || s.attend === 'makeup') cnt.attend++;
-          else if (s.attend === 'late') cnt.late++;
-          else if (s.attend === 'absent') cnt.absent++;
-        });
+      '<p class="panel__hint tdc-rule">급함 — 최근 ' + set.absentWeeks + '주 결석 ' + set.absentMin + '회 이상 · 복습테스트 미제출 · 확인 필요 상담 &nbsp;|&nbsp; 살펴보기 — 앱 과제 ' + dv.appLow + '% 미만' +
+        (dv.photoWatch ? ' · 필기 2주 연속 없음' : '') + '</p>' +
+      '<div class="tdc-list-wrap">' + classes.map(function (c) {
+        var rows = c.rows, n = rows.length;
+        var urgent = rows.filter(function (s) { return why[s.id].urgent.length; });
+        var watch = rows.filter(function (s) { return !why[s.id].urgent.length && why[s.id].watch.length; });
+        var rest = rows.filter(function (s) { return !why[s.id].urgent.length && !why[s.id].watch.length; });
         var written = rows.filter(function (s) { return s.written; }).length;
         var pub = rows.filter(function (s) { return s.published; }).length;
-        var sent = rows.filter(function (s) { return s.sent; }).length;
-        var ap = appAvg(rows);
-        var photo = rows.filter(function (s) { return s.photos_week; }).length;
-        var upN = rows.filter(function (s) { return s.unpaid_n; }).length;
-        var upSum = rows.reduce(function (a, s) { return a + (s.unpaid_amt || 0); }, 0);
-        var fol = rows.reduce(function (a, s) { return a + s.follow_n; }, 0);
-        var low = (d.low_stock || {})[c.name] || [];
+        var nx = c.next;
+        var nextTxt = !nx ? '<span class="tdc-next tdc-next--none">수업일 미정</span>'
+          : nx.dday === 0 ? '<span class="tdc-next tdc-next--today">오늘 수업</span>'
+          : '<span class="tdc-next">D-' + nx.dday + ' ' + esc(Lesson.md(nx.date)) + '</span>';
         var open = !!st.open[c.name];
-        return '<div class="td-card' + (open ? ' is-open' : '') + '" data-cls="' + esc(c.name) + '">' +
-          '<button type="button" class="td-card__head" data-toggle>' +
-            '<span class="td-card__name">' + esc(c.name) + '</span>' +
-            (c.academy ? '<span class="muted-note">' + esc(c.academy) + '</span>' : '') +
-            '<span class="spacer"></span><span class="td-card__count">' + n + '명</span><span class="class-head__caret" aria-hidden="true">▾</span>' +
-          '</button>' +
-          '<div class="td-card__body">' +
-            '<div class="td-line">출결 <b>출석 ' + cnt.attend + '</b> · 지각 ' + cnt.late + ' · <span class="' + (cnt.absent ? 'tb-warn' : '') + '">결석 ' + cnt.absent + '</span>' +
-              ' <span class="muted-note">(미입력 ' + (n - cnt.attend - cnt.late - cnt.absent) + ')</span></div>' +
-            bar(written, n, '작성') + bar(pub, n, '공개') + bar(sent, n, '발송') +
-            '<div class="td-line">앱 과제 ' + (ap.n ? (ap.avg == null ? (ap.pending ? '불러오는 중…' : '—') : '평균 <b>' + ap.avg + '%</b>') +
-              ' <span class="muted-note">(앱 연결 ' + ap.n + '명' + (ap.fail ? ' · 불러오기 실패 ' + ap.fail + '명' : '') + ')</span>' : '<span class="muted-note">앱 연결된 학생 없음</span>') + '</div>' +
-            '<div class="td-line">필기 <b>' + photo + '</b> / ' + n + '명</div>' +
-            '<div class="td-line">교재비 미납 ' + (upN ? '<b class="tb-warn">' + upN + '명' + (set.money ? ' · ' + won(upSum) : '') + '</b>' : '0명') +
-              (low.length ? ' · <span class="tb-warn">재고 부족 ' + low.map(esc).join(', ') + '</span>' : '') + '</div>' +
-            '<div class="td-line">다음 상담 때 확인 ' + (fol ? '<b class="tb-warn">' + fol + '건</b>' : '0건') + '</div>' +
+        var byName = function (x, y) { return (x.name || '').localeCompare(y.name || '', 'ko'); };
+        return '<div class="tdc-card' + (open ? ' is-open' : '') + (nx && nx.dday === 0 ? ' is-today' : '') + '" data-cls="' + esc(c.name) + '">' +
+          '<div class="tdc-head">' +
+            '<button type="button" class="tdc-toggle" data-toggle aria-expanded="' + open + '">' +
+              '<span class="tdc-title"><span class="tdc-name">' + esc(c.name) + '</span>' + (c.academy ? '<span class="muted-note">' + esc(c.academy) + '</span>' : '') +
+                '<span class="class-head__caret" aria-hidden="true">▾</span></span>' +
+              '<span class="tdc-row">' + nextTxt + '<span class="tdc-meta num">' + n + '명 · 작성 ' + written + '/' + n + ' · 공개 ' + pub + '/' + n + '</span></span>' +
+              '<span class="tdc-row">' +
+                '<span class="tdc-flag tdc-flag--urgent' + (urgent.length ? '' : ' is-zero') + '">급함 <b class="num">' + urgent.length + '</b></span>' +
+                '<span class="tdc-flag tdc-flag--watch' + (watch.length ? '' : ' is-zero') + '">살펴보기 <b class="num">' + watch.length + '</b></span>' +
+              '</span>' +
+            '</button>' +
+            (c.name === '(반 없음)' ? '' : '<button type="button" class="btn btn--sm tdc-write" data-write="' + esc(c.name) + '">이번 주 작성하기</button>') +
           '</div>' +
-          (open ? studentTable(rows, set) : '') +
+          (open ? '<div class="tdc-list">' +
+            (!n ? '<p class="panel__hint">아직 학생이 없습니다. ① 명단 → 학생 추가에서 이 반을 고르세요.</p>' :
+              urgent.sort(byName).map(function (s) { return studentRow(s, why[s.id]); }).join('') +
+              watch.sort(byName).map(function (s) { return studentRow(s, why[s.id]); }).join('') +
+              (rest.length ? (st.rest[c.name]
+                ? rest.sort(byName).map(function (s) { return studentRow(s, why[s.id]); }).join('') + '<button type="button" class="btn btn--sm btn--ghost tdc-rest" data-rest>나머지 접기</button>'
+                : '<button type="button" class="btn btn--sm btn--ghost tdc-rest" data-rest>나머지 ' + rest.length + '명 [펼치기]</button>') : '')) +
+          '</div>' : '') +
         '</div>';
       }).join('') + '</div>';
-  }
-
-  function studentTable(rows, set) {
-    return '<div class="roster-scroll td-students"><table class="roster tb-table"><thead><tr>' +
-      '<th>학생</th><th>출결</th><th>작성</th><th>공개</th><th>발송</th><th class="tb-r">앱</th><th class="tb-r">필기</th><th>미납</th><th>확인</th></tr></thead><tbody>' +
-      rows.map(function (s) {
-        var a = app[s.id];
-        var appTxt = !s.app ? '—' : !a ? '…' : a.ok ? a.rate + '%' : '실패';
-        return '<tr><td><button type="button" class="roster__name roster__name-btn" data-card="' + s.id + '">' + esc(s.name) + '</button></td>' +
-          '<td>' + esc(ATT[s.attend] || '—') + (s.absent_n ? ' <span class="muted-note">' + set.absentWeeks + '주 결석 ' + s.absent_n + '</span>' : '') + '</td>' +
-          '<td>' + (s.written ? '✓' : '') + '</td><td>' + (s.published ? '✓' : '') + '</td><td>' + (s.sent ? '✓' : '') + '</td>' +
-          '<td class="tb-r num' + (a && a.ok && a.rate < APP_LOW ? ' tb-warn' : '') + '">' + appTxt + '</td>' +
-          '<td class="tb-r num">' + (s.photos_week || '') + '</td>' +
-          '<td>' + (s.unpaid_n ? '<span class="tb-warn">' + (set.money ? won(s.unpaid_amt) : s.unpaid_n + '건') + '</span>' : '') + '</td>' +
-          '<td>' + (s.follow_n ? '<span class="note-badge">확인 ' + s.follow_n + '</span>' : '') + '</td></tr>';
-      }).join('') + '</tbody></table></div>';
   }
 
   $('#tdBody').addEventListener('click', function (e) {
     var c = e.target.closest('[data-card]');
     if (c) { if (window.Card) Card.open(c.dataset.card); return; }
+    var w = e.target.closest('[data-write]');
+    if (w) { writeWeek(w.dataset.write); return; }
+    var r = e.target.closest('[data-rest]');
+    if (r) { var cn = r.closest('.tdc-card').dataset.cls; st.rest[cn] = !st.rest[cn]; render(); return; }
     var t = e.target.closest('[data-toggle]');
     if (t) {
-      var name = t.closest('.td-card').dataset.cls;
-      st.open[name] = !st.open[name];
+      var name = t.closest('.tdc-card').dataset.cls;
+      if (st.open[name]) delete st.open[name]; else st.open[name] = true;
+      saveOpen();
       render();
     }
   });
   $('#tdRefresh').addEventListener('click', function () { app = {}; load(true); loadLinks(); });
+
+  /* [이번 주 작성하기] — ② 작성 탭에서 그 반 이번 주 작성 화면 */
+  function writeWeek(cls) {
+    if (!window.Writer) return;
+    UI.selectTab(1);
+    Writer.selectClass(cls);
+    Writer.openWeek(Store.thisWeek().start);
+  }
   $('#tdBody').addEventListener('click', function (e) { if (e.target.id === 'tdTransitionOpen') $('#tdSettingsBtn').click(); });
 
   /* ---------- 설정 (teacher 만 바꿀 수 있다) ---------- */
@@ -309,9 +321,11 @@
       $('#tdSetMoney').checked = v.assistantSeeMoney !== false;
       $('#tdSetWeeks').value = v.absentWeeks || 4;
       $('#tdSetMin').value = v.absentMin || 2;
+      $('#tdSetAppLow').value = Math.max(1, Math.min(100, parseInt(v.appLow, 10) || 50));
+      $('#tdSetPhoto').checked = v.photoWatch === true;
       $('#tdSetParentWrite').checked = !st.links || st.links.parentWrite !== false;
       var teacher = !!st.role;   /* 조교 · 선생님 같은 권한 (migration-017) */
-      ['#tdSetMoney', '#tdSetWeeks', '#tdSetMin', '#tdSetParentWrite'].forEach(function (s) { $(s).disabled = !teacher; });
+      ['#tdSetMoney', '#tdSetWeeks', '#tdSetMin', '#tdSetAppLow', '#tdSetPhoto', '#tdSetParentWrite'].forEach(function (s) { $(s).disabled = !teacher; });
       $('#tdSetSave').hidden = !teacher;
       $('#tdSetNote').textContent = teacher ? '' : '직원 정보를 불러오는 중입니다. 잠시 뒤 다시 열어 주세요.';
       $('#tdSettingsModal').showModal();
@@ -323,7 +337,9 @@
     var v = {
       assistantSeeMoney: $('#tdSetMoney').checked,
       absentWeeks: Math.max(1, Math.min(12, parseInt($('#tdSetWeeks').value, 10) || 4)),
-      absentMin: Math.max(1, Math.min(12, parseInt($('#tdSetMin').value, 10) || 2))
+      absentMin: Math.max(1, Math.min(12, parseInt($('#tdSetMin').value, 10) || 2)),
+      appLow: Math.max(1, Math.min(100, parseInt($('#tdSetAppLow').value, 10) || 50)),
+      photoWatch: $('#tdSetPhoto').checked
     };
     var pw = $('#tdSetParentWrite').checked;
     var pwChanged = !st.links || (st.links.parentWrite !== false) !== pw;
