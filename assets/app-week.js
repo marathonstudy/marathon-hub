@@ -42,14 +42,14 @@
     });
     (data.lectures || []).forEach(function (l) { if (l && l.order) lec[l.order] = l; });
 
-    var days = [], hwDone = 0, hwDays = 0, lecDone = 0, lecDays = 0;
+    var days = [], hwDone = 0, hwOnTime = 0, hwDays = 0, lecDone = 0, lecDays = 0;
     for (var d = from, k = 0; d <= to && k < 31; d = addDays(d, 1), k++) {
       var c = cal[d] || null;
       var future = !!today && d > today;
       var hw = future ? 'future' : !c ? 'off' : (c.status === 'onTime' ? 'onTime' : c.status === 'late' ? 'late' : 'none');
       var L = c && c.order ? lec[c.order] : null;
       var lv = future ? 'future' : !c || !c.order || !L ? 'off' : (L.videosTotal > 0 && L.videosDone >= L.videosTotal ? 'done' : 'todo');
-      if (hw !== 'off' && hw !== 'future') { hwDays++; if (hw === 'onTime' || hw === 'late') hwDone++; }
+      if (hw !== 'off' && hw !== 'future') { hwDays++; if (hw === 'onTime' || hw === 'late') hwDone++; if (hw === 'onTime') hwOnTime++; }
       if (lv === 'done' || lv === 'todo') { lecDays++; if (lv === 'done') lecDone++; }
       days.push({ date: d, dow: DOW[new Date(d + 'T00:00:00Z').getUTCDay()], hw: hw, lec: lv });
     }
@@ -63,7 +63,7 @@
     });
     var rate = rates.length ? Math.round(rates.reduce(function (a, b) { return a + b; }, 0) / rates.length) : null;
 
-    return { from: from, to: to, days: days, hwDone: hwDone, hwDays: hwDays, lecDone: lecDone, lecDays: lecDays, rate: rate,
+    return { from: from, to: to, days: days, hwDone: hwDone, hwOnTime: hwOnTime, hwDays: hwDays, lecDone: lecDone, lecDays: lecDays, rate: rate,
              any: hwDays > 0 || lecDays > 0 };
   }
 

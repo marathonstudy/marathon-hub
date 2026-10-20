@@ -833,3 +833,17 @@ label.hub-btn { cursor: pointer; text-align: center; }
 .aw-period + .aw { margin-top: 4px; }
 .tw-say { margin-top: 6px; }
 .aw-sum--wait { font-size: 11px; font-weight: 700; color: var(--ink-light); white-space: normal; max-width: 72px; }
+
+/* 앱 과제 요약 — 주간 동그라미 · 누적 한 줄 · 한 달 달력 (20261025c) */
+.awb .card-title { flex-wrap: wrap; row-gap: 2px; }
+.tw-prog .awb .card-title { font-size: 15px; margin-bottom: 4px; }
+.awb-sub { margin: -6px 0 8px; font-size: 12.5px; font-weight: 800; color: var(--ink-mid); }
+.awb-wait { margin: 6px 0 10px; padding: 14px; border-radius: 14px; background: var(--grad-soft); text-align: center; font-size: 15px; font-weight: 800; color: var(--ink-light); }
+.awb-total { margin: 4px 0 0; font-size: 12px; color: var(--ink-light); }
+.awb-cal { margin-top: 14px; }
+.awb-cal__t { font-size: 13.5px; font-weight: 800; color: var(--ink-mid); margin-bottom: 6px; }
+.cal-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.cal-nav .cal-month { margin: 0; }
+.cal-step { appearance: none; border: 0; font: inherit; cursor: pointer; min-width: 40px; min-height: 36px; border-radius: 10px; background: var(--grad-soft); color: var(--ink-mid); font-weight: 800; }
+.cal-step:disabled { opacity: .35; cursor: default; }
+.awb .rate-grid--three { gap: 6px; }
