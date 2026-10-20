@@ -868,7 +868,15 @@
   }
   function lightboxOpen() { return document.querySelector('.ph-light'); }
 
+  /* 알림톡 버튼은 /me/?c=코드 로 연다 (알림톡 변수 #{…} 와 # 주소가 겹쳐서). 열리면 #코드 주소로 바꾼다 */
+  function fromQuery() {
+    var m = /[?&]c=([A-Za-z0-9]{20,64})(?:&|$)/.exec(global.location.search || '');
+    if (!m || PV) return;
+    try { history.replaceState(null, '', global.location.pathname + '#' + m[1]); } catch (e) { global.location.hash = m[1]; }
+  }
+
   function bootMe() {
+    fromQuery();
     var root = $('#hubRoot');
     var head = $('#hubHead');
     var tabs = $('#hubTabs');

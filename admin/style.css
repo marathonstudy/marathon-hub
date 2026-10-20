@@ -1016,6 +1016,25 @@ dialog.modal::backdrop { background: rgba(51, 58, 87, .38); backdrop-filter: blu
 
 dialog.modal--wide { width: min(680px, calc(100vw - 24px)); }
 
+/* 카카오 알림톡 (kakao.js) · 번호 한꺼번에 넣기 (contacts.js) */
+.kk-panel:empty { display: none; }
+.kk-panel { margin: 10px 0 14px; padding: 12px; border: 1px solid #F3DE7A; border-radius: 12px; background: #FFFBEA; }
+.kk-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.kk-counts { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12.5px; color: var(--ink-mid); }
+.kk-c--ready b { color: #3B6FB6; } .kk-c--sent b { color: #35806A; } .kk-c--failed b { color: var(--danger); }
+.kk-acts { margin-top: 8px; flex-wrap: wrap; }
+.kk-unpub { margin: 6px 0 0; font-size: 12.5px; color: var(--ink-light); }
+.kk-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 4px 0; font-size: 12.5px; }
+.kk-badge { padding: 2px 8px; border-radius: 999px; font-weight: 700; background: #EEF0F7; color: var(--ink-mid); }
+.kk-badge--ready { background: #EAF2FC; color: #3B6FB6; } .kk-badge--sent { background: #E6F5EE; color: #35806A; }
+.kk-badge--failed { background: #FDECEF; color: #B03A55; } .kk-badge--nophone, .kk-badge--nolink { background: #FFF3E3; color: #A86A1E; }
+.kk-phones { color: var(--ink-light); }
+.kk-keys { list-style: none; margin: 6px 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; }
+.kk-keys .is-ok { color: #35806A; } .kk-keys .is-no { color: var(--danger); }
+.cp-sum { margin: 10px 0 6px; }
+.cp-list { margin: 0 0 8px; padding-left: 18px; max-height: 240px; overflow: auto; font-size: 13.5px; }
+.cp-warn { margin: 6px 0; font-size: 13px; color: #A86A1E; }
+
 /* AI 수업 요약 — 「수업 내용」 아래 펼침 칸 (summary.js) */
 #lessonSub .sub__head { flex-wrap: wrap; row-gap: 6px; }
 #lessonSub .wk-btns { flex-wrap: wrap; row-gap: 6px; }

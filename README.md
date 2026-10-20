@@ -85,6 +85,9 @@ supabase/
   migration-017-settings-guard.sql  조교 · 선생님 같은 권한 (선생님 계정 보호만 예외) · 설정 이름 바꾸기 막기
   migration-018-class-weeks.sql     ② 작성 → 반별 「주차 현황」 한 번에 가져오기 (직원만 · 읽기 전용)
   migration-019-summary-discard.sql AI 수업 요약 [초안 지우기] · [확정 취소] (직원만)
+  migration-020-kakao.sql           카카오 알림톡(솔라피) — 학부모 번호 2 · 발송 기록(뒤 4자리만) · 설정 · 발송 준비/기록 함수 (직원만)
+  functions/kakao-send/index.ts     알림톡 발송 Edge Function (키는 Secrets 에만 · 직원만)
+  kakao/template.txt · kakao/HOW-TO.md  알림톡 템플릿 초안 · 솔라피 등록 방법
   check-classes.sql               반 이름 점검 (읽기 전용 — 어느 표에 어떤 반이 있는지 · 비슷한 이름)
   functions/app-report/index.ts  앱 과제 기록을 대신 받아 오는 Edge Function
 ```
@@ -238,6 +241,13 @@ delete from public.staff where email = '조교이메일@example.com';
 1. 018 다음에 SQL Editor → **New query** → `supabase/migration-019-summary-discard.sql` 전체 → **Run**
    (결과에 `summary_discard` · `summary_unconfirm` 두 줄 모두 `true`)
 2. Edge Function 다시 배포: **app-report**(과제 기록 전부 · 주차 표) · **lesson-summary**(학생 이름 · 잡담 빼는 지시문)
+
+### 5-17. 카카오 알림톡 (migration-020 + Edge Function kakao-send + 솔라피)
+1. 019 다음에 SQL Editor → **New query** → `supabase/migration-020-kakao.sql` 전체 → **Run** (세 줄 모두 `true`)
+2. **Edge Functions → Deploy a new function → Via Editor** → 이름 `kakao-send` → `supabase/functions/kakao-send/index.ts` 전체 → Deploy
+   → **Verify JWT with legacy secret 끄기** (함수가 부른 사람의 로그인으로 DB 에 직원인지 직접 묻는다)
+3. 솔라피 채널 연동 · 템플릿 등록 · 키 만들기 · Secrets 다섯 개 — `kakao/HOW-TO.md`
+4. 코치룸 「오늘」 → [설정] → 「내 시험 번호」 → ④ 발송 → [나에게 시험 발송]
 
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.

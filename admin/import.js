@@ -287,7 +287,7 @@
 
     section('새로 추가', plan.adds, function (a) {
       var s = a.student;
-      return s.name + ' · ' + (s.className || '반 없음') + (s.parentPhone ? ' · ' + Store.phoneFormat(s.parentPhone) : '') +
+      return s.name + ' · ' + (s.className || '반 없음') + (s.parentPhone ? ' · ' + Store.phoneMask(s.parentPhone) : '') +
              (plan.appCodes[s.id] ? ' · 앱 연결' : '');
     });
     section('고침', plan.updates, function (u) {

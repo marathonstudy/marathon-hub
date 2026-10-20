@@ -126,7 +126,7 @@
     var phones = Store.phonesOf(s);
 
     var phoneText = phones.length
-      ? phones.map(function (p) { return p.label + ' ' + Store.phoneFormat(p.number); }).join(' · ')
+      ? phones.map(function (p) { return p.label + ' ' + Store.phoneMask(p.number); }).join(' · ')
       : '번호 없음';
 
     var hasLink = !!r.url;
@@ -162,13 +162,14 @@
     el.querySelector('.send-row__name').textContent = s.name || '';
     el.querySelector('.send-row__cls').textContent = s.className || '';
     el.querySelector('.send-row__phone').textContent = phones.length
-      ? phones.map(function (p) { return p.label + ' ' + Store.phoneFormat(p.number); }).join('  ·  ')
+      ? phones.map(function (p) { return p.label + ' ' + Store.phoneMask(p.number); }).join('  ·  ')
       : '번호 없음 — 명단에서 넣어 주세요';
   }
 
   function renderList() {
     var host = $('#sendList');
     host.textContent = '';
+    setTimeout(function () { window.dispatchEvent(new CustomEvent('jt:send-rendered')); }, 0);   /* 알림톡 상태 (kakao.js) */
 
     if (!state.week) {
       host.innerHTML = '<div class="empty-state">아직 공개한 레포트가 없습니다.<br>' +
@@ -529,6 +530,9 @@
 
   /* 기기마다 형식이 다른 sms 링크와 문구 조립은 여기서 가장 깨지기 쉽다.
      밖에서 직접 확인할 수 있게 내보낸다. */
+  /* 알림톡 칸(kakao.js)이 지금 주차 · 반 필터를 읽는다 */
+  window.SendTab = { week: function () { return state.week; }, classFilter: function () { return state.classFilter; } };
+
   window.Send = {
     smsHref: smsHref,
     messageFor: messageFor,

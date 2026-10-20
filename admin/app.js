@@ -306,7 +306,7 @@
         line.className = 'phone-line';
         line.innerHTML = '<span class="phone-line__title"></span><span class="phone-line__num"></span>';
         line.firstChild.textContent = p.label;
-        line.lastChild.textContent = Store.phoneFormat(p.number);
+        line.lastChild.textContent = Store.phoneMask(p.number);
         box.appendChild(line);
       });
     }
@@ -843,8 +843,10 @@
     $('#fGrade').value  = s ? (s.grade || '') : (settings.lastGrade || '');
     fillStudentClass(s ? (s.className || '') : (settings.lastClass || ''), !!s);
     $('#fParentTitle').value = s ? (s.parentTitle || '') : (settings.lastParentTitle || '');
-    $('#fPhone').value  = s && s.parentPhone ? Store.phoneFormat(s.parentPhone) : '';
-    $('#fPhone2').value = s && s.studentPhone ? Store.phoneFormat(s.studentPhone) : '';
+    /* 번호는 가려서 보여 준다 — 그대로 두면 원래 번호가 남고, 지우고 새로 적으면 바뀐다 */
+    $('#fPhone').value  = s && s.parentPhone ? Store.phoneMask(s.parentPhone) : '';
+    $('#fPhone3').value = s && s.parentPhone2 ? Store.phoneMask(s.parentPhone2) : '';
+    $('#fPhone2').value = s && s.studentPhone ? Store.phoneMask(s.studentPhone) : '';
     $('#fArchived').checked = !!(s && s.archived);
 
     var link = s ? Store.linkOf(s.id) : {};
@@ -864,11 +866,14 @@
   $('#btnAddStudent').addEventListener('click', function () { openStudentModal(null); });
   $('#btnStudentCancel').addEventListener('click', function () { studentModal.close(); });
 
-  ['#fPhone', '#fPhone2'].forEach(function (sel) {
+  ['#fPhone', '#fPhone2', '#fPhone3'].forEach(function (sel) {
     $(sel).addEventListener('blur', function (e) {
+      if (e.target.value.indexOf('*') !== -1) return;          /* 가린 번호 그대로 */
       var d = Store.phoneDigits(e.target.value);
       if (d) e.target.value = Store.phoneFormat(d);
     });
+    /* 가린 번호 칸에 글자를 넣기 시작하면 비우고 새로 적게 한다 */
+    $(sel).addEventListener('focus', function (e) { if (e.target.value.indexOf('*') !== -1) e.target.select(); });
   });
 
   $('#btnHubIssue').addEventListener('click', function () {
@@ -951,14 +956,20 @@
   function saveStudentForm() {
 
     var name   = $('#fName').value.trim();
-    var phone  = Store.phoneDigits($('#fPhone').value);
-    var phone2 = Store.phoneDigits($('#fPhone2').value);
+    var prev0 = editingId ? students.find(function (x) { return x.id === editingId; }) : null;
+    /* 가린 번호(*)가 그대로면 원래 번호 */
+    function keep(sel, old) { var v = $(sel).value; return v.indexOf('*') !== -1 ? Store.phoneDigits(old) : Store.phoneDigits(v); }
+    var phone  = keep('#fPhone', prev0 && prev0.parentPhone);
+    var phone2 = keep('#fPhone2', prev0 && prev0.studentPhone);
+    var phone3 = keep('#fPhone3', prev0 && prev0.parentPhone2);
     var appCode = Store.extractAppCode($('#fAppCode').value);
 
     if (!name) { showStudentError('이름을 입력해 주세요.'); return; }
     if ($('#fClass').value === NEW_CLASS) { showStudentError('새 반 이름을 적고 [만들기]를 누르거나, 목록에서 반을 골라 주세요.'); return; }
     if (!Store.phoneValid(phone))  { showStudentError('학부모 연락처의 자릿수를 확인해 주세요.'); return; }
     if (!Store.phoneValid(phone2)) { showStudentError('학생 연락처의 자릿수를 확인해 주세요.'); return; }
+    if (!Store.phoneValid(phone3)) { showStudentError('학부모 연락처 2의 자릿수를 확인해 주세요.'); return; }
+    if (phone3 && !DB.hasPhone2() && phone3 !== Store.phoneDigits(prev0 && prev0.parentPhone2)) { showStudentError('학부모 연락처 2는 migration-020 SQL 을 실행한 뒤에 저장됩니다.'); return; }
     if (appCode === null) {
       showStudentError('앱 공유 링크를 알아볼 수 없습니다. marathonstudy.com/share/report/… 주소를 그대로 붙여 넣어 주세요.');
       return;
@@ -979,6 +990,7 @@
       className: $('#fClass').value.trim(),
       parentTitle: $('#fParentTitle').value.trim(),
       parentPhone: phone,
+      parentPhone2: phone3,
       studentPhone: phone2,
       archived: $('#fArchived').checked,
       extra: collectExtra(prev),

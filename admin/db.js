@@ -23,8 +23,12 @@
 
   /* ---------- 학생 ---------- */
 
+  /* 학부모 번호 2 (students.parent_phone2 · migration-020) — 서버에 그 칸이 있을 때만 보낸다 */
+  var hasP2 = false;
+  function hasPhone2() { return hasP2; }
+
   function toDbStudent(s) {
-    return {
+    var row = {
       id: s.id,
       name: s.name || '',
       school: s.school || '',
@@ -37,6 +41,8 @@
       archived: !!s.archived,
       sort_order: s.sortOrder || 0
     };
+    if (hasP2) row.parent_phone2 = s.parentPhone2 || '';
+    return row;
   }
 
   function fromDbStudent(r) {
@@ -48,6 +54,7 @@
       className: r.class_name || '',
       parentTitle: r.parent_title || '',
       parentPhone: r.parent_phone || '',
+      parentPhone2: (r.parent_phone2 !== undefined && (hasP2 = true)) ? (r.parent_phone2 || '') : '',
       studentPhone: r.student_phone || '',
       extra: r.extra || {},
       archived: !!r.archived,
@@ -623,6 +630,7 @@
     entryPatch: entryPatch,
     gradePatch: gradePatch,
     myStaff: myStaff,
+    hasPhone2: hasPhone2,
     commonPatch: commonPatch,
     insertSnippet: insertSnippet,
     deleteSnippet: deleteSnippet,

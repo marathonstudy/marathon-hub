@@ -713,6 +713,14 @@
     return d === '' || (d.length >= 9 && d.length <= 11);
   }
 
+  /* 화면에 보이는 번호 — 010-****-1234 (복사 · 문자 앱 열기에는 원래 번호를 쓴다) */
+  function phoneMask(v) {
+    var d = phoneDigits(v);
+    if (!d) return '';
+    if (d.length < 8) return d.slice(0, 2) + '****';
+    return d.slice(0, 3) + '-****-' + d.slice(-4);
+  }
+
   function parentTitleOf(s) {
     return (s && String(s.parentTitle || '').trim()) || '어머님';
   }
@@ -720,6 +728,7 @@
   function phonesOf(s) {
     var out = [];
     if (s && s.parentPhone) out.push({ who: 'parent', label: parentTitleOf(s), number: s.parentPhone });
+    if (s && s.parentPhone2 && phoneDigits(s.parentPhone2) !== phoneDigits(s.parentPhone)) out.push({ who: 'parent2', label: parentTitleOf(s) + ' 2', number: s.parentPhone2 });
     if (s && s.studentPhone) out.push({ who: 'student', label: '학생 본인', number: s.studentPhone });
     return out;
   }
@@ -1585,6 +1594,7 @@
 
     phoneDigits: phoneDigits,
     phoneFormat: phoneFormat,
+    phoneMask: phoneMask,
     phoneValid: phoneValid,
     parentTitleOf: parentTitleOf,
     phonesOf: phonesOf,
