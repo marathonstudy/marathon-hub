@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" as="style" crossorigin
       href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
-<link rel="stylesheet" href="style.css?v=20261022a">
+<link rel="stylesheet" href="style.css?v=20261022b">
 </head>
 <body class="is-locked">
 
@@ -432,6 +432,7 @@
           <div class="sub__head">
             <span class="sub__title">AI 수업 요약</span>
             <span class="sub__hint" id="aiUsage"></span>
+            <div class="wk-btns"><button class="btn btn--sm btn--ghost" id="btnYtbmHelp" type="button">자막 버튼 설치</button></div>
           </div>
           <div id="aiPanel" hidden></div>
           <div id="aiResult"></div>
@@ -1783,6 +1784,38 @@
   </form>
 </dialog>
 
+<!-- 자막 버튼 설치 (ytbm.js) — 즐겨찾기 버튼 「마라톤 자막 가져오기」 -->
+<dialog class="modal modal--wide" id="ytbmModal">
+  <div class="modal__head">
+    <h2 class="modal__title">자막 버튼 설치 <span class="ytbm-only">PC 크롬 전용</span></h2>
+    <p class="modal__desc">한 번만 설치하면, 유튜브 영상 화면에서 버튼 하나로 스크립트 전체가 복사됩니다. 어떤 서버로도 보내지 않고 화면 안에서 읽어 복사만 합니다.</p>
+  </div>
+  <div class="modal__body">
+    <ol class="ytbm-steps">
+      <li><b>즐겨찾기 줄을 켭니다.</b> 크롬 주소창 아래에 즐겨찾기 줄이 안 보이면 <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd></li>
+      <li><b>아래 보라색 버튼을 마우스로 꾹 눌러 즐겨찾기 줄까지 끌어다 놓습니다.</b>
+        <div class="ytbm-drag"><a class="ytbm-btn" id="ytbmLink" href="#" draggable="true">📋 마라톤 자막 가져오기</a><span class="muted-note">← 이 버튼을 끌어서</span></div>
+        <div class="ytbm-pic" aria-hidden="true">
+          <div class="ytbm-pic__bar"><span class="ytbm-pic__dot"></span><span class="ytbm-pic__dot"></span><span class="ytbm-pic__dot"></span><span class="ytbm-pic__url">youtube.com/watch?v=…</span></div>
+          <div class="ytbm-pic__marks"><span>★ 즐겨찾기 줄</span><span class="ytbm-pic__new">📋 마라톤 자막 가져오기</span><span class="ytbm-pic__arrow">⬆ 여기에 놓기</span></div>
+          <div class="ytbm-pic__page">유튜브 영상 화면</div>
+        </div>
+      </li>
+      <li><b>유튜브에서 수업 영상을 열고 즐겨찾기 줄의 「마라톤 자막 가져오기」를 누릅니다.</b> 오른쪽 위에 「복사됐습니다 · n줄」이 뜨면 여기 AI 요약 칸의 <span class="btn btn--sm">붙여 넣기</span>를 누르세요.</li>
+    </ol>
+    <details class="ytbm-manual">
+      <summary>끌어다 놓기가 안 될 때 — 직접 추가하기</summary>
+      <ol>
+        <li><button class="btn btn--sm btn--primary" type="button" id="btnYtbmCopy">코드 복사</button> 를 누릅니다.</li>
+        <li>즐겨찾기 줄의 빈 곳을 마우스 오른쪽 버튼으로 누르고 → <b>페이지 추가</b> (또는 <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd> 즐겨찾기 관리자 → ⋮ → 새 북마크 추가)</li>
+        <li><b>이름</b>: 마라톤 자막 가져오기 · <b>URL</b>: 칸을 비우고 <kbd>Ctrl</kbd>+<kbd>V</kbd> 로 붙여 넣기 → 저장</li>
+      </ol>
+    </details>
+    <p class="muted-note">휴대폰 · 태블릿 · 다른 브라우저에서는 쓰지 않습니다. 자막이 없으면 「이 영상에는 자막이 없습니다」가 뜹니다 — 영상을 올린 직후면 잠시 뒤 다시 눌러 주세요.</p>
+  </div>
+  <div class="modal__foot"><div class="spacer"></div><button class="btn" type="button" id="btnYtbmClose">닫기</button></div>
+</dialog>
+
 <!-- 동시 수정 -->
 <dialog class="modal" id="conflictModal">
   <form method="dialog">
@@ -1809,40 +1842,41 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
 <!-- config.js 와 brand.js 가 먼저 와야 한다. 나머지가 이 값을 읽는다. -->
-<script src="../assets/config.js?v=20261022a"></script>
-<script src="../assets/brand.js?v=20261022a"></script>
-<script src="../assets/lesson.js?v=20261022a"></script>
-<script src="supabase.js?v=20261022a"></script>
-<script src="db.js?v=20261022a"></script>
-<script src="store.js?v=20261022a"></script>
-<script src="report.js?v=20261022a"></script>
-<script src="app.js?v=20261022a"></script>
-<script src="import.js?v=20261022a"></script>
-<script src="write.js?v=20261022a"></script>
-<script src="publish.js?v=20261022a"></script>
-<script src="send.js?v=20261022a"></script>
-<script src="notice.js?v=20261022a"></script>
-<script src="tb.js?v=20261022a"></script>
-<script src="tb-dash.js?v=20261022a"></script>
-<script src="tb-issue.js?v=20261022a"></script>
-<script src="tb-stock.js?v=20261022a"></script>
-<script src="tb-bill.js?v=20261022a"></script>
-<script src="../assets/dday.js?v=20261022a"></script>
-<script src="card.js?v=20261022a"></script>
-<script src="exams.js?v=20261022a"></script>
-<script src="photo.js?v=20261022a"></script>
-<script src="today.js?v=20261022a"></script>
-<script src="staff.js?v=20261022a"></script>
-<script src="classes.js?v=20261022a"></script>
-<script src="weekly.js?v=20261022a"></script>
-<script src="summary.js?v=20261022a"></script>
-<script src="weeks.js?v=20261022a"></script>
-<script src="../assets/photos.js?v=20261022a"></script>
-<script src="review.js?v=20261022a"></script>
-<script src="draftguard.js?v=20261022a"></script>
-<script src="preview.js?v=20261022a"></script>
-<script src="nav.js?v=20261022a"></script>
-<script src="sync.js?v=20261022a"></script>
-<script src="auth.js?v=20261022a"></script>
+<script src="../assets/config.js?v=20261022b"></script>
+<script src="../assets/brand.js?v=20261022b"></script>
+<script src="../assets/lesson.js?v=20261022b"></script>
+<script src="supabase.js?v=20261022b"></script>
+<script src="db.js?v=20261022b"></script>
+<script src="store.js?v=20261022b"></script>
+<script src="report.js?v=20261022b"></script>
+<script src="app.js?v=20261022b"></script>
+<script src="import.js?v=20261022b"></script>
+<script src="write.js?v=20261022b"></script>
+<script src="publish.js?v=20261022b"></script>
+<script src="send.js?v=20261022b"></script>
+<script src="notice.js?v=20261022b"></script>
+<script src="tb.js?v=20261022b"></script>
+<script src="tb-dash.js?v=20261022b"></script>
+<script src="tb-issue.js?v=20261022b"></script>
+<script src="tb-stock.js?v=20261022b"></script>
+<script src="tb-bill.js?v=20261022b"></script>
+<script src="../assets/dday.js?v=20261022b"></script>
+<script src="card.js?v=20261022b"></script>
+<script src="exams.js?v=20261022b"></script>
+<script src="photo.js?v=20261022b"></script>
+<script src="today.js?v=20261022b"></script>
+<script src="staff.js?v=20261022b"></script>
+<script src="classes.js?v=20261022b"></script>
+<script src="weekly.js?v=20261022b"></script>
+<script src="ytbm.js?v=20261022b"></script>
+<script src="summary.js?v=20261022b"></script>
+<script src="weeks.js?v=20261022b"></script>
+<script src="../assets/photos.js?v=20261022b"></script>
+<script src="review.js?v=20261022b"></script>
+<script src="draftguard.js?v=20261022b"></script>
+<script src="preview.js?v=20261022b"></script>
+<script src="nav.js?v=20261022b"></script>
+<script src="sync.js?v=20261022b"></script>
+<script src="auth.js?v=20261022b"></script>
 </body>
 </html>

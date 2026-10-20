@@ -1016,6 +1016,25 @@ dialog.modal::backdrop { background: rgba(51, 58, 87, .38); backdrop-filter: blu
 
 dialog.modal--wide { width: min(680px, calc(100vw - 24px)); }
 
+/* 자막 버튼 설치 (ytbm.js) */
+.ytbm-only { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: #FFF3E3; color: #A86A1E; font-size: 12px; font-weight: 800; vertical-align: 3px; }
+.ytbm-steps { margin: 0; padding-left: 20px; display: grid; gap: 14px; line-height: 1.6; }
+.ytbm-drag { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 10px 0; }
+.ytbm-btn { display: inline-flex; align-items: center; min-height: 44px; padding: 10px 16px; border-radius: 12px; background: var(--grad-strong); color: #fff; font-weight: 800; text-decoration: none; cursor: grab; box-shadow: 0 4px 14px rgba(74, 52, 184, .3); }
+.ytbm-btn:active { cursor: grabbing; }
+.ytbm-pic { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--surface-2); font-size: 12.5px; max-width: 520px; }
+.ytbm-pic__bar { display: flex; align-items: center; gap: 5px; padding: 7px 10px; background: #E9EBF3; }
+.ytbm-pic__dot { width: 9px; height: 9px; border-radius: 50%; background: #C9CDDC; }
+.ytbm-pic__url { flex: 1; min-width: 0; margin-left: 6px; padding: 3px 10px; border-radius: 999px; background: #fff; color: var(--ink-light); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ytbm-pic__marks { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 6px 10px; background: #F4F5FA; border-bottom: 1px solid var(--line); color: var(--ink-mid); }
+.ytbm-pic__new { padding: 2px 8px; border-radius: 6px; background: #EFEBFD; color: #5A3FD0; font-weight: 800; outline: 2px dashed #A693F2; }
+.ytbm-pic__arrow { color: #5A3FD0; font-weight: 800; }
+.ytbm-pic__page { padding: 18px 10px; text-align: center; color: var(--ink-light); }
+.ytbm-manual { margin-top: 14px; border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; background: var(--surface-2); }
+.ytbm-manual summary { cursor: pointer; font-weight: 700; min-height: 28px; }
+.ytbm-manual ol { padding-left: 20px; line-height: 1.7; }
+kbd { display: inline-block; padding: 0 6px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 6px; background: #fff; font: 700 12px/1.6 inherit; }
+
 /* ② 작성 — 주차 현황 (weeks.js). 주차 현황일 때는 작성 칸을 숨기고, 작성 화면일 때는 주차 현황을 숨긴다 */
 #writeMain.is-weeks > #weekPanel, #writeMain.is-weeks > #commonPanel, #writeMain.is-weeks > #entryPanel,
 #writeMain.is-weeks > #notesSidePanel, #writeMain.is-weeks > #previewPanel { display: none !important; }

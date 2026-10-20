@@ -705,7 +705,8 @@ label.hub-btn { cursor: pointer; text-align: center; }
 .yt-app { flex: 1 1 auto; background: var(--grad-strong); color: #fff; }
 .yt-close { background: var(--grad-soft); color: var(--ink-mid); }
 
-/* ---------- 다시보기 탭 ---------- */
+/* ---------- 수업 영상 탭 ---------- */
+.vd-title { margin: 2px 2px 12px; font-size: 22px; font-weight: 900; color: var(--ink-deep); letter-spacing: -0.02em; }
 .hub-more {
   appearance: none; border: 0; font: inherit; cursor: pointer; width: 100%;
   min-height: 48px; border-radius: 14px; background: rgba(255, 255, 255, .85);

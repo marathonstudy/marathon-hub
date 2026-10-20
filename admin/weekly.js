@@ -726,7 +726,19 @@
 
   bind();
 
+  /* 자막 붙여 넣기(summary.js)에서 — 그 주 영상 칸이 비어 있을 때만 「수업 영상(전체)」 한 줄로 넣는다 */
+  function addVideoUrl(cls, week, url, title) {
+    if (!st.cls || st.missing || st.cls !== cls || st.week !== week || st.videos.length) return Promise.resolve(false);
+    var u = normalizeYoutube(url);
+    if (!u) return Promise.resolve(false);
+    var v = { tmp: 't' + (++st.tmp), part: 'full', title: String(title || '').trim().slice(0, 100), url: u, student_ids: [] };
+    st.videos.push(v);
+    renderVideos();
+    return saveVideo(v).then(function () { return !!v.id; });
+  }
+
   window.Weekly = { render: render, classify: classify, normalizeYoutube: normalizeYoutube, reload: load,
-                    videos: function () { return st.videos.slice(); } };
+                    videos: function () { return st.videos.slice(); }, addVideoUrl: addVideoUrl,
+                    where: function () { return { cls: st.cls, week: st.week }; } };
 
 })();

@@ -201,7 +201,7 @@
 
     var vids = (n.videos || []).filter(function (v) { return v && safeUrl(v.url); });
     if (vids.length) {
-      html += '<div class="nt-sub">▶️ 수업 다시보기</div><div class="nt-videos">' + vids.map(function (v) {
+      html += '<div class="nt-sub">▶️ 수업 영상</div><div class="nt-videos">' + vids.map(function (v) {
         return videoHtml(v.url, esc(v.title || '수업 영상'));
       }).join('') + '</div>';
     }
@@ -413,7 +413,7 @@
   }
 
   /* ============================================================
-     다시보기 탭 (#코드/videos) — 영상이 있는 주만, 최신 주가 위.
+     수업 영상 탭 (#코드/videos · 탭 이름 「수업 영상」, 안 제목 「강의 다시 보기」) — 영상이 있는 주만, 최신 주가 위.
        최근 4주는 펼쳐 두고, 그 앞 주는 [이전 주 더 보기].
        보강 영상은 서버가 대상 학생에게만 준다 (그대로 쓴다).
      ============================================================ */
@@ -430,8 +430,9 @@
   }
   function renderVideos(host) {
     var list = videoWeeks();
-    if (!list.length) { host.innerHTML = '<div class="empty">아직 올라온 수업 영상이 없습니다.</div>'; return; }
-    host.innerHTML = list.slice(0, 4).map(videoWeekCard).join('') +
+    var head = '<h2 class="vd-title">강의 다시 보기</h2>';
+    if (!list.length) { host.innerHTML = head + '<div class="empty">아직 올라온 수업 영상이 없습니다.</div>'; return; }
+    host.innerHTML = head + list.slice(0, 4).map(videoWeekCard).join('') +
       (list.length > 4
         ? '<div id="vdMore"><button type="button" class="hub-more" data-vd-more>이전 주 더 보기 <span class="num">(' + (list.length - 4) + '주)</span></button></div>'
         : '');
@@ -584,7 +585,7 @@
       renderReportList(h.code, reports, d.draft || null);
       if (reports.length) $('#tabReport').classList.add('has-new');
 
-      /* 다시보기 — 영상이 있을 때만 탭이 보인다 */
+      /* 수업 영상 — 영상이 있을 때만 탭이 보인다 */
       var hasVideos = videoWeeks().length > 0;
       var tabVideo = $('#tabVideo');
       if (tabVideo) tabVideo.hidden = !hasVideos;
@@ -983,7 +984,7 @@
     });
   }
 
-  /* 레포트 아래 — 그 주 수업 영상 (이번 주 수업 · 다시보기와 같은 목록에서) */
+  /* 레포트 아래 — 그 주 수업 영상 (이번 주 수업 · 수업 영상 탭과 같은 목록에서) */
   function reportVideos(body, r) {
     if (r.draft || !WEEKLY || !r.week_start) return;
     function monday(iso) {

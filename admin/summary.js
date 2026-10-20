@@ -2,6 +2,8 @@
    summary.js — ② 작성 「반 공통」 → [자막으로 AI 요약] (migration-012 · Edge Function lesson-summary)
 
    · 자막 파일(.srt · .vtt · .txt)을 끌어다 놓거나, 스크립트를 붙여 넣는다
+     [붙여 넣기] = 클립보드 글을 바로 (즐겨찾기 버튼 「마라톤 자막 가져오기」 ytbm.js 로 복사한 것)
+     맨 위 「영상 제목 / 영상 주소」는 AI 에 보내지 않고, 그 주 영상 칸이 비어 있으면 그 주소로 채울지 묻는다
      — 영상 하나에 1 · 2차시가 다 들어 있으면 「영상 하나」, 차시마다 영상이 따로면 「차시별」
    · 파일은 올리지 않는다. 브라우저에서 글자만 뽑아 Edge Function 에 보내고, 서버도 원문을 저장하지 않는다
    · Claude(Opus 5.5)가 만든 "1차시: … / 2차시: …" 는 **초안** — 학부모에게 안 보인다
@@ -49,7 +51,8 @@
       if (/^\d+$/.test(t)) return;                                    /* srt 번호 */
       if (/-->/.test(t)) return;                                      /* 시간 줄 */
       if (/^\d{1,2}(:\d{2}){1,2}$/.test(t)) return;                    /* 스크립트 표시의 0:05 · 1:02:03 */
-      t = t.replace(/^\d{1,2}(:\d{2}){1,2}\s+/, '')                   /* 줄 앞 시각 */
+      t = t.replace(/^\[\d{1,2}(:\d{2}){1,2}\]\s*/, '')               /* 줄 앞 [0:14] (자막 가져오기 버튼) */
+           .replace(/^\d{1,2}(:\d{2}){1,2}\s+/, '')                   /* 줄 앞 시각 */
            .replace(/<[^>]+>/g, '').replace(/\{\\[^}]*\}/g, '')
            .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'").replace(/&quot;/g, '"')
            .replace(/\s+/g, ' ').trim();
@@ -61,6 +64,20 @@
       out.push(t);
     });
     return out.join(' ').replace(/\s+/g, ' ').trim();
+  }
+
+  /* 자막 가져오기 버튼으로 복사한 글 — 맨 위 「제목 / https://youtu.be/…」 를 떼어 낸다 */
+  var YT_URL = /^https:\/\/(youtu\.be\/[\w-]{11}|(www\.|m\.)?youtube\.com\/(watch\?v=|shorts\/|live\/)[\w-]{11})\S*$/;
+  function ytHeader(raw) {
+    var lines = String(raw || '').replace(/^\uFEFF/, '').replace(/\r/g, '').split('\n');
+    var idx = [];
+    for (var i = 0; i < lines.length && idx.length < 2; i++) if (lines[i].trim()) idx.push(i);
+    for (var k = 0; k < idx.length; k++) {
+      var u = lines[idx[k]].trim();
+      if (!YT_URL.test(u)) continue;
+      return { url: u, title: k === 1 ? lines[idx[0]].trim() : '', body: lines.slice(idx[k] + 1).join('\n') };
+    }
+    return null;
   }
 
   function readFile(file) {
@@ -189,6 +206,7 @@
     return '<div class="ai-area" data-ai-area="' + i + '">' +
       '<div class="ai-area__head"><span class="sub__title">' + esc(label) + '</span>' +
         '<span class="muted-note num" data-ai-count="' + i + '">' + (t ? t.length.toLocaleString() + '자' : '') + '</span>' +
+        '<button class="btn btn--sm" type="button" data-ai-paste="' + i + '">붙여 넣기</button>' +
         '<label class="btn btn--sm">파일 고르기<input type="file" accept=".srt,.vtt,.txt" data-ai-file="' + i + '" hidden></label>' +
       '</div>' +
       '<textarea class="textarea ai-text" rows="4" data-ai-text="' + i + '" placeholder="자막 파일(.srt · .vtt · .txt)을 여기에 끌어다 놓거나, 스크립트를 붙여 넣으세요">' + esc(t) + '</textarea>' +
@@ -207,6 +225,7 @@
           '<span class="muted-note">자동 자막은 영상을 올린 뒤 만들어지기까지 몇 분 ~ 몇 시간 걸립니다. 줄이 없으면 조금 뒤에 다시 보세요.</span></li>' +
         '<li>받은 파일(다운로드 폴더)을 위 칸에 <b>끌어다 놓기</b> 하거나 <b>[파일 고르기]</b>로 고릅니다.</li>' +
       '</ol>' +
+      '<p class="muted-note"><b>가장 쉬운 방법 — 자막 버튼:</b> PC 크롬에 즐겨찾기 버튼 「마라톤 자막 가져오기」를 한 번 설치해 두면(위 「자막 버튼 설치」), 유튜브 영상 화면에서 버튼을 누르고 → 여기 <b>[붙여 넣기]</b> 한 번이면 됩니다.</p>' +
       '<p class="muted-note"><b>파일을 받을 수 없을 때 — 붙여 넣기:</b> 유튜브에서 그 영상을 열고 설명란 아래 <b>[스크립트 표시]</b> → 오른쪽 스크립트 창의 <b>⋮ → 타임스탬프 전환</b>으로 시각을 끄고 → 내용을 모두 드래그해 복사 → 위 칸에 붙여 넣기. 화면 이름은 조금 다를 수 있습니다.</p>' +
     '</details>';
   }
@@ -218,11 +237,39 @@
   }
 
   function setText(i, raw, source) {
+    var h = ytHeader(raw);
+    if (h) { raw = h.body; offerVideo(h.url, h.title); }
     st.texts[i] = captionText(raw);
     st.source = source;
     var ta = document.querySelector('#aiPanel [data-ai-text="' + i + '"]');
     if (ta) ta.value = st.texts[i];
     updateCount(i);
+  }
+
+  /* 그 주 영상 칸이 비어 있으면 붙여 넣은 자막의 영상 주소로 채울지 묻는다 */
+  function offerVideo(url, title) {
+    var W = window.Weekly;
+    if (!W || !W.addVideoUrl || !W.videos || W.videos().length) return;
+    var at = W.where ? W.where() : {};
+    if (at.cls !== st.cls || at.week !== st.week) return;
+    var cls = st.cls, week = st.week;
+    UI.confirmAsk('수업 영상 채우기', '이번 주 「수업 영상」 칸이 비어 있습니다. 붙여 넣은 자막의 영상 주소를 넣을까요?\n' + url +
+      (title ? '\n(' + title + ')' : ''), '넣기').then(function (yes) {
+      if (!yes || W.videos().length) return;
+      W.addVideoUrl(cls, week, url, title);
+    });
+  }
+
+  /* [붙여 넣기] — 클립보드 글을 바로. 브라우저가 막으면 Ctrl+V 로 */
+  function pasteInto(i) {
+    var ta = document.querySelector('#aiPanel [data-ai-text="' + i + '"]');
+    var manual = function () { toast('Ctrl+V로 붙여 넣어 주세요', 'bad'); if (ta) ta.focus(); };
+    if (!navigator.clipboard || !navigator.clipboard.readText) { manual(); return; }
+    navigator.clipboard.readText().then(function (raw) {
+      if (!String(raw || '').trim()) { toast('클립보드가 비어 있습니다 — 유튜브에서 「마라톤 자막 가져오기」를 먼저 눌러 주세요', 'bad'); return; }
+      setText(i, raw, 'paste');
+      toast('자막 ' + st.texts[i].length.toLocaleString() + '자를 넣었습니다');
+    }, manual);
   }
 
   function takeFiles(i, files) {
@@ -345,6 +392,20 @@
       $('#aiSub').scrollIntoView({ block: 'nearest' });
     });
 
+    /* 자막 버튼 설치 창 (ytbm.js) */
+    var ym = $('#ytbmModal');
+    $('#btnYtbmHelp').addEventListener('click', function () {
+      if (!window.YTBM) return;
+      $('#ytbmLink').href = YTBM.href();
+      ym.showModal();
+    });
+    $('#btnYtbmClose').addEventListener('click', function () { ym.close(); });
+    $('#btnYtbmCopy').addEventListener('click', function () {
+      UI.copyText(YTBM.href()).then(function () { toast('코드를 복사했습니다 — 즐겨찾기 URL 칸에 붙여 넣으세요', 'good'); }, function () { toast('복사하지 못했습니다', 'bad'); });
+    });
+    /* 코치룸에서 누르면 실행하지 않고 안내만 (끌어다 놓기는 그대로) */
+    $('#ytbmLink').addEventListener('click', function (e) { e.preventDefault(); toast('이 버튼을 크롬 즐겨찾기 줄로 끌어다 놓아 주세요'); });
+
     var panel = $('#aiPanel');
     panel.addEventListener('change', function (e) {
       var t = e.target;
@@ -387,6 +448,8 @@
     });
     panel.addEventListener('click', function (e) {
       if (e.target.id === 'btnAiRun') run();
+      var pb = e.target.closest('[data-ai-paste]');
+      if (pb) pasteInto(Number(pb.dataset.aiPaste));
       if (e.target.id === 'btnAiClose') { panel.hidden = true; panel.innerHTML = ''; st.texts = ['', '', '', '']; }
     });
 
