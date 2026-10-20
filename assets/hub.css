@@ -814,3 +814,21 @@ label.hub-btn { cursor: pointer; text-align: center; }
 .aw-sum small { display: block; font-size: 10.5px; font-weight: 700; color: var(--ink-light); }
 .aw-legend { margin: 6px 0 0; font-size: 11px; line-height: 1.5; color: var(--ink-light); }
 .aw-card { padding: 16px; }
+
+/* 「이번 주」 — 레포트 주 기준 (20261024a) */
+.aw-period { margin: 10px 0 0; font-size: 12px; font-weight: 700; color: var(--ink-light); }
+.aw-period b { color: var(--ink-mid); }
+.tw-card--first { padding: 18px 16px; }
+.tw-first { margin: 0; font-size: 15px; font-weight: 800; color: var(--ink-mid); text-align: center; }
+.tw-prog { padding: 12px 14px; }
+.tw-prog__t { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-size: 13px; font-weight: 800; color: var(--ink-mid); }
+.tw-prog__d { font-size: 12px; font-weight: 700; color: var(--ink-light); }
+.tw-prog .aw { margin-top: 6px; }
+/* 이번 주 카드가 휴대폰 첫 화면에 다 들어오게 (360×740) — 간격만 줄인다 */
+.tw-card { padding: 14px 16px 12px; }
+.tw-card .card-title { margin-bottom: 8px; }
+.tw-tiles { gap: 6px; }
+.tw-tile { padding: 6px 10px; }
+.aw-period { margin-top: 8px; }
+.aw-period + .aw { margin-top: 4px; }
+.tw-say { margin-top: 6px; }

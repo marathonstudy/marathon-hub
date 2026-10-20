@@ -555,6 +555,10 @@
 
   /* ============================================================
      「이번 주」 — 링크를 열면 처음 보이는 화면 (#코드 · 예전 #코드/notice 도 여기로)
+       기준 = 이 학생에게 가장 최근에 공개된 레포트의 주 (달력 주가 아니다). 다음 레포트를 공개하면 그때 넘어간다.
+       카드 제목 「10/15(목) 수업 레포트」, 카드 안 앱 표 = 그 레포트의 과제 기간(「과제 기간 10/8~10/14」).
+       카드 아래 「다음 수업(10/22 목)까지 진행 중」 — 그 레포트 수업일 ~ 다음 수업일 전날 (오지 않은 날은 흐리게).
+       공개된 레포트가 없으면 카드 자리에 「첫 레포트는 첫 수업 날 올라옵니다」 (진행 중 줄은 오늘 기준 다음 수업까지).
        [복습테스트 입력하기](학생 링크 · 제출 기간) → 이번 주 카드 → 오늘 배운 것 → 이번 주 과제 · 자료
        → 수업 영상 → 누적 추이 한 줄 → 선생님 공지(작게)
        공개된 레포트 · 선생님이 확인한 복습 점수 · 확정된 요약 · 앱 기록만. 상담 · 성적 · 금액 · 다른 학생 정보는 넣지 않는다.
@@ -577,7 +581,7 @@
 
   function drawWeekCard() {
     var box = $('#twCard');
-    if (!box || !TW) return;
+    if (!box || !TW || !TW.rep) return;
     var r = TW.report && TW.report !== 'loading' ? TW.report : null;
     var st = r && r.attendance ? (r.attendance.status === 'makeup' ? 'attend' : r.attendance.status) : '';
     var ATT = { attend: '출석', late: '지각', absent: '결석' };
@@ -603,15 +607,17 @@
           : rr >= 100 ? '<b class="tw-ok">완료</b>' : '<b class="num">' + Math.round(rr) + '%</b>';
     }
     var app = '';
+    var per = reportPeriod();
+    var aw = TW.app && TW.app !== 'loading' && TW.app !== 'none' && per ? AppWeek.compute(TW.app, per.from, per.to, todayISO()) : null;
     if (TW.app === 'loading') app = '<p class="tw-loading">앱 과제 기록을 불러오는 중…</p>';
-    else if (TW.app && TW.app !== 'none' && TW.app.any) app = AppWeek.tableHtml(TW.app);
+    else if (aw && aw.any) app = '<p class="aw-period">과제 기간 <b class="num">' + esc(Lesson.md(per.from, false) + '~' + Lesson.md(per.to, false)) + '</b></p>' + AppWeek.tableHtml(aw);
     else if (TW.app !== 'none') app = '<p class="tw-row"><span class="tw-tile__k">앱 과제 · 강의</span> ' + YET + '</p>';
     var cm = r ? String(r.comment == null ? '' : r.comment).trim() : '';
-    var L = TW.L;
-    var note = ReportView.shortPeriod(TW.mon, plusDays(TW.mon, 6)) +
-      (L ? (L.canceled ? ' · 휴강' : L.date ? ' · 수업 ' + Lesson.md(L.date) : '') : '');
+    var ld = reportLessonDate();
+    var title = ld ? Lesson.md(ld) + ' 수업 레포트'
+      : ReportView.shortPeriod(TW.rep.week_start, TW.rep.week_end || plusDays(TW.rep.week_start, 6)) + ' 레포트';
     box.innerHTML =
-      '<h2 class="card-title">📅 이번 주<span class="card-note num">' + esc(note) + '</span></h2>' +
+      '<h2 class="card-title">📅 ' + esc(title) + '<span class="card-note">이번 주</span></h2>' +
       '<div class="tw-tiles">' + tile('출결', att) + tile('집중도', focus) + tile('복습테스트', rv) + tile('필수 과제', req) + '</div>' +
       app +
       '<div class="tw-say"><div class="tw-tile__k">선생님 한마디</div>' +
@@ -722,30 +728,83 @@
     }).catch(function () {});
   }
 
+  /* 그 레포트의 수업일 · 과제 기간 — 레포트에 저장된 값, 없으면 반 일정으로 */
+  function reportData() { return TW && TW.report && TW.report !== 'loading' ? TW.report : null; }
+  function reportLessonDate() {
+    var r = reportData(), rep = TW && TW.rep;
+    if (!rep) return '';
+    var d = (r && r.lessonDate) || rep.lesson_date || (TW.L && !TW.L.canceled ? TW.L.date : '');
+    return /^\d{4}-\d{2}-\d{2}/.test(d || '') ? String(d).slice(0, 10) : '';
+  }
+  function reportPeriod() {
+    var r = reportData(), L = TW && TW.L;
+    var from = (r && r.hwFrom) || (L && L.hwFrom) || '', to = (r && r.hwTo) || (L && L.hwTo) || '';
+    return from && to ? { from: from, to: to } : null;
+  }
+  /* date 보다 뒤의 첫 수업 (휴강 주는 건너뛴다 · 8주 안) */
+  function nextLessonAfter(date) {
+    if (!WEEKLY || !WEEKLY.schedule || !date) return null;
+    var mon = mondayOf(date);
+    for (var k = 0; k < 9; k++) {
+      var L = lessonOf(plusDays(mon, 7 * k));
+      if (L && !L.canceled && L.date && L.date > date) return L;
+    }
+    return null;
+  }
+  /* 진행 중인 과제 기간 — 레포트 수업일 ~ 다음 수업일 전날 (레포트가 없으면 오늘 기준 다음 수업의 과제 기간) */
+  function progressPeriod() {
+    var start = TW.rep ? reportLessonDate() : '';
+    if (TW.rep && !start) return null;
+    var next = nextLessonAfter(start || plusDays(todayISO(), -1));
+    if (!next) return null;
+    var from = start || next.hwFrom || '', to = plusDays(next.date, -1);
+    return { next: next.date, from: from && from <= to ? from : '', to: to };
+  }
+  function mdDow(iso) {
+    var m = Lesson.md(iso);                         /* 10/22(목) → 10/22 목 */
+    return m.replace('(', ' ').replace(')', '');
+  }
+  function drawProgress() {
+    var box = $('#twProg');
+    if (!box || !TW) return;
+    var p = progressPeriod();
+    if (!p) { box.innerHTML = ''; return; }
+    var aw = p.from && TW.app && TW.app !== 'loading' && TW.app !== 'none' ? AppWeek.compute(TW.app, p.from, p.to, todayISO()) : null;
+    box.innerHTML = '<div class="card tw-prog">' +
+      '<p class="tw-prog__t">다음 수업(' + esc(mdDow(p.next)) + ')까지 진행 중' +
+        (p.from ? '<span class="tw-prog__d num">과제 기간 ' + esc(Lesson.md(p.from, false) + '~' + Lesson.md(p.to, false)) + '</span>' : '') + '</p>' +
+      (aw ? AppWeek.tableHtml(aw) : TW.app === 'loading' && p.from ? '<p class="tw-loading">앱 과제 기록을 불러오는 중…</p>' : '') +
+    '</div>';
+  }
+
   function renderWeek(code, d) {
     var host = $('#panelWeek');
-    var mon = mondayOf(todayISO());
-    var w = weekOf(mon);
-    var rep = (d.reports || []).filter(function (r) { return r.week_start && mondayOf(r.week_start) === mon; })[0] || null;
-    TW = { code: code, mon: mon, L: lessonOf(mon), report: rep ? 'loading' : null,
-           app: APP.info && APP.info.linked ? 'loading' : 'none', review: reviewOfWeek(d.review || [], mon) };
+    /* 가장 최근에 공개된 레포트 (hub_get 은 공개된 것만 · 최신이 앞 — 미리보기의 「공개 전」 초안은 넣지 않는다) */
+    var rep = (d.reports || []).filter(function (r) { return r && r.week_start && !r.draft; })[0] || null;
+    var mon = rep ? mondayOf(rep.week_start) : '';
+    var w = rep ? weekOf(mon) : null;
+    TW = { code: code, rep: rep, mon: mon, L: rep ? lessonOf(rep.week_start) : null, report: rep ? 'loading' : null,
+           app: APP.info && APP.info.linked ? 'loading' : 'none', review: rep ? reviewOfWeek(d.review || [], mon) : null };
     host.innerHTML =
       '<div id="rvTop"><button type="button" class="tw-rv-btn" id="twRvBtn" hidden>📝 복습테스트 입력하기</button><div id="reviewCard" hidden></div></div>' +
-      '<div class="card tw-card" id="twCard"></div>' +
-      learnHtml(w) + filesSectionHtml(w, mon) + videosSectionHtml(w) +
+      (rep ? '<div class="card tw-card" id="twCard"></div>'
+           : '<div class="card tw-card tw-card--first" id="twCard"><p class="tw-first">첫 레포트는 첫 수업 날 올라옵니다</p></div>') +
+      '<div id="twProg"></div>' +
+      (rep ? learnHtml(w) + filesSectionHtml(w, mon) + videosSectionHtml(w) : '') +
       '<div id="twTrend"></div>' + teacherNoticeHtml(d.notices || []) +
       kakaoNoteHtml() + homeGuideHtml();
-    drawWeekCard();
+    if (rep) drawWeekCard();
+    drawProgress();
     if (rep) {
       rpc('hub_report', { p_code: code, p_week: rep.week_start }).then(function (data) {
-        TW.report = data || null; drawWeekCard();
-      }, function () { TW.report = null; drawWeekCard(); });
+        TW.report = data || null; drawWeekCard(); drawProgress();
+      }, function () { TW.report = null; drawWeekCard(); drawProgress(); });
     }
     if (TW.app === 'loading') {
       appData(code).then(function (data) {
-        var L = TW.L;
-        TW.app = data && L && L.hwFrom ? AppWeek.compute(data, L.hwFrom, L.hwTo, todayISO()) : null;
-        drawWeekCard();
+        TW.app = data || null;            /* 앱 기록 그대로 — 카드 · 진행 중 줄이 각자 기간만 잘라 쓴다 */
+        if (TW.rep) drawWeekCard();
+        drawProgress();
       });
     }
     loadTrendMini(code);

@@ -8,7 +8,7 @@
      lectures [{ order, videosDone, videosTotal }]
      history  [{ order, submittedAt, late, correctRate }]  (예전 함수는 recent 10건만 — 그때는 그것으로)
    날마다
-     과제 줄  ● 정시 · ◐ 늦게 · ○ 미제출 (그날 과제가 없으면 빈칸, 오늘 뒤의 날은 흐리게)
+     과제 줄  ● 정시 · ◐ 늦게 · ○ 미제출 (그날 과제가 없으면 빈칸, 아직 오지 않은 날은 흐리게)
      강의 줄  그날 강 번호의 강의 영상을 다 봤으면 ✓, 아니면 –   (강 번호는 화면에 보여 주지 않는다)
    오른쪽에 「n/7일 제출」 · 평균 정답률, 「n/7일 시청」. 7 = 그 기간에 과제가 있었던 날 수(보통 7일)
    ============================================================ */
@@ -46,9 +46,9 @@
     for (var d = from, k = 0; d <= to && k < 31; d = addDays(d, 1), k++) {
       var c = cal[d] || null;
       var future = !!today && d > today;
-      var hw = !c ? 'off' : future ? 'future' : (c.status === 'onTime' ? 'onTime' : c.status === 'late' ? 'late' : 'none');
+      var hw = future ? 'future' : !c ? 'off' : (c.status === 'onTime' ? 'onTime' : c.status === 'late' ? 'late' : 'none');
       var L = c && c.order ? lec[c.order] : null;
-      var lv = !c || !c.order || !L ? 'off' : (L.videosTotal > 0 && L.videosDone >= L.videosTotal ? 'done' : (future ? 'future' : 'todo'));
+      var lv = future ? 'future' : !c || !c.order || !L ? 'off' : (L.videosTotal > 0 && L.videosDone >= L.videosTotal ? 'done' : 'todo');
       if (hw !== 'off' && hw !== 'future') { hwDays++; if (hw === 'onTime' || hw === 'late') hwDone++; }
       if (lv === 'done' || lv === 'todo') { lecDays++; if (lv === 'done') lecDone++; }
       days.push({ date: d, dow: DOW[new Date(d + 'T00:00:00Z').getUTCDay()], hw: hw, lec: lv });
