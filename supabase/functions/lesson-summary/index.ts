@@ -4,7 +4,7 @@
 //  코치룸 ② 작성 → 반 공통 → [자막으로 AI 요약] 이 부른다. 로그인한 직원만.
 //    1) 부른 사람의 로그인 토큰으로 DB 함수 summary_begin 을 부른다
 //       → 직원인지 · 이번 달 상한(기본 80회)이 남았는지 서버가 확인하고 기록 한 줄
-//    2) Claude(Opus 5.5)에 자막을 보내 요약을 받는다 (정해 둔 JSON 모양으로)
+//    2) Claude(Sonnet 5.5)에 자막을 보내 요약을 받는다 (정해 둔 JSON 모양으로)
 //    3) summary_finish 로 초안 저장 (학부모에게는 안 보인다 — 직원이 [확정]해야 보인다)
 //  자막 원문은 저장하지 않는다. Claude 에 보낼 때만 쓴다.
 //
@@ -21,9 +21,9 @@ import Anthropic from "npm:@anthropic-ai/sdk";
 
 const ALLOWED_ORIGINS = ["https://marathonstudy.github.io"];
 
-const MODEL = "claude-opus-5-5";
-const PRICE_IN = 4 / 1_000_000;     // 달러 / 입력 토큰 (Opus 5.5)
-const PRICE_OUT = 20 / 1_000_000;   // 달러 / 출력 토큰
+const MODEL = "claude-sonnet-5-5";
+const PRICE_IN = 2 / 1_000_000;     // 달러 / 입력 토큰 (Sonnet 5.5)
+const PRICE_OUT = 10 / 1_000_000;   // 달러 / 출력 토큰
 const MAX_CHARS = 300_000;          // 한 번에 보내는 자막 글자 수 상한 (3시간 강의 ≈ 6만 자)
 
 function corsHeaders(origin: string | null): Record<string, string> {

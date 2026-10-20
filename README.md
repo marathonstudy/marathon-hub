@@ -76,7 +76,7 @@ supabase/
   migration-011-weekly.sql        수업일(요일 · 첫 수업일 · 이 주만 바꾸기) · 수업 영상 · 자료 파일(비공개 보관함 class-files)
   functions/class-file/index.ts   자료 파일 내려받기 Edge Function (링크 코드 · 파일의 반 확인 → 2분짜리 주소)
   migration-012-lesson-summary.sql  AI 수업 요약 — 초안 · 확정본 · 사용 기록 · 월 상한 · 「수업 영상(전체)」 칸
-  functions/lesson-summary/index.ts 자막 → Claude(Opus 5.5) 요약 Edge Function (직원만 · 키는 Secrets 에만)
+  functions/lesson-summary/index.ts 자막 → Claude(Sonnet 5.5) 요약 Edge Function (직원만 · 키는 Secrets 에만)
   migration-013-review-test.sql     복습테스트 — 회차 자동 생성 · 학생 제출 · 조교 확인 · 기록 · 시험지 사진 보관함
   functions/review-test/index.ts    복습테스트 학생 제출 Edge Function (개인 링크 · 수업일 당일 · 마감 확인)
   migration-014-draft-safety.sql    작성 글 안전장치 — 크게 줄면 · 10분마다 · 다른 글로 바뀔 때 이전 글을 서버에 보관
@@ -367,11 +367,11 @@ delete from public.staff where email = '조교이메일@example.com';
   기본은 **영상 하나(1 · 2차시 함께)** — 한 영상을 차시 수(기본 2)만큼 나눠 요약한다. 차시마다 영상이 따로면 「차시마다 영상 따로」.
 - 자막 파일 받는 법(유튜브 스튜디오 → 자막 → 그 영상 → 한국어(자동) ⋮ → 다운로드 → .srt)은 그 창 안 안내에 있다.
   조교 계정으로 받으려면 선생님이 스튜디오 **설정 → 권한**에서 조교를 초대해 둔다.
-- 서버(Edge Function `lesson-summary`)가 Claude(Opus 5.5)로 요약해 **초안**을 만든다. 초안은 학부모에게 안 보인다.
+- 서버(Edge Function `lesson-summary`)가 Claude(Sonnet 5.5)로 요약해 **초안**을 만든다. 초안은 학부모에게 안 보인다.
   직원(조교 포함)이 읽고 고친 뒤 **[확정]** → 러닝노트 · 반 공지 「이번 주 수업」에 보이고, 「수업 내용」 칸에 들어가 레포트를 공개할 때 함께 나간다.
   누가 · 언제 확정했는지 남는다. 「수업 내용」 칸에 다른 글이 있으면 바꾸기 전에 묻는다.
 - 자막 원문은 저장하지 않는다(요약에 쓸 때만 Anthropic 으로 보낸다). 저장되는 것은 요약 · 글자 수 · 토큰 수 · 대략 비용뿐.
-- **비용 · 상한**: 3시간 수업 자막(약 6만 자) 한 번에 대략 0.2~0.3달러(300~400원). 한 달 상한 기본 80회(실패는 안 셈) —
+- **비용 · 상한**: 3시간 수업 자막(약 6만 자) 한 번에 대략 0.1~0.15달러(150~200원, Sonnet 5.5 · 입력 100만 토큰 2달러 · 출력 10달러). 한 달 상한 기본 80회(실패는 안 셈)를 다 써도 대략 8~12달러 —
   선생님이 [상한 바꾸기]로 바꾼다. 이번 달 횟수와 대략 비용이 「AI 수업 요약」 옆에 보인다.
   Anthropic 쪽에도 충전액 · 월 한도(Spend limit)를 걸어 두어 이중으로 막는다.
 - 유튜브 자막 자동 가져오기는 시험해 보니 Supabase 서버에서 유튜브가 "로봇 확인"으로 막아서 지금은 쓰지 않는다

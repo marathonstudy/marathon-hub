@@ -6,7 +6,7 @@
      맨 위 「영상 제목 / 영상 주소」는 AI 에 보내지 않고, 그 주 영상 칸이 비어 있으면 그 주소로 채울지 묻는다
      — 영상 하나에 1 · 2차시가 다 들어 있으면 「영상 하나」, 차시마다 영상이 따로면 「차시별」
    · 파일은 올리지 않는다. 브라우저에서 글자만 뽑아 Edge Function 에 보내고, 서버도 원문을 저장하지 않는다
-   · Claude(Opus 5.5)가 만든 "1차시: … / 2차시: …" 는 **초안** — 학부모에게 안 보인다
+   · Claude(Sonnet 5.5)가 만든 "1차시: … / 2차시: …" 는 **초안** — 학부모에게 안 보인다
    · 직원(조교 포함)이 읽고 고친 뒤 [확정] → 러닝노트 · 반 공지에 보이고, 「수업 내용」 칸에 들어가 레포트와 함께 공개
      누가 · 언제 확정했는지 서버에 남는다
    · 한 달 상한(기본 80회)은 서버가 센다. 직원 누구나 바꾼다
@@ -289,7 +289,7 @@
         '<div class="wk-edit__btns">' +
           '<button class="btn btn--sm btn--primary" type="button" id="btnAiRun">요약 초안 만들기</button>' +
           '<button class="btn btn--sm btn--ghost" type="button" id="btnAiClose">접기</button>' +
-          '<span class="panel__hint" id="aiRunNote">Claude(Opus 5.5)로 요약합니다. 1번에 대략 300~400원 · 1분 안팎. 자막 원문은 저장하지 않습니다.</span>' +
+          '<span class="panel__hint" id="aiRunNote">Claude(Sonnet 5.5)로 요약합니다. 1번에 대략 150~200원(3시간 수업 기준) · 1분 안팎 · 한 달 80회를 다 써도 대략 1만 1천~1만 7천 원. 자막 원문은 저장하지 않습니다.</span>' +
         '</div>' +
       '</div>';
   }
