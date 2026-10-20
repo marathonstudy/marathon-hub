@@ -74,7 +74,10 @@
        집중도      1점 이상. 결석이면 면제
        리뷰테스트   반 공통에 이름이 있는 것 전부. 결석이면 면제
        코멘트      반 공통이든 개별이든 비어 있지 않을 것
+       그리고 (20261026b) — 그 학생 개별 코멘트(선생님 한마디)가 한 글자라도 있거나, 출결을 지각 · 결석으로 바꿨을 때만 작성 완료.
+                  출결 · 집중도 기본값(출석 · 5)과 반 공통 내용만 있는 학생은 작성 완료가 아니다 (작성 중).
      state  none(미작성) · partial(작성 중) · done(작성 완료)
+     「오늘」 반 카드 · ② 작성 · ③ 공개가 모두 이 함수 하나를 쓴다 (주차 현황은 서버 staff_class_weeks 가 같은 규칙 · migration-021)
      ============================================================ */
 
   function isAbsent(entry) {
@@ -109,6 +112,9 @@
       else if (noScore.length > 1) missing.push('점수 ' + noScore.length + '개');
     }
     if (!commentFor(common, e)) missing.push('코멘트');
+    /* 그 학생 몫을 직접 쓴 흔적 — 개별 코멘트 또는 지각 · 결석 */
+    var own = !!String(e.comment || '').trim() || att === 'late' || att === 'absent';
+    if (!own && missing.indexOf('코멘트') === -1) missing.push('개별 코멘트(또는 지각 · 결석)');
 
     var touched = !!att || Number(e.focusScore) > 0 ||
                   Object.keys(e.scores || {}).length > 0 ||
