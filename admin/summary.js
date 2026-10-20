@@ -10,6 +10,10 @@
    · 직원(조교 포함)이 읽고 고친 뒤 [확정] → 러닝노트 · 반 공지에 보이고, 「수업 내용」 칸에 들어가 레포트와 함께 공개
      누가 · 언제 확정했는지 서버에 남는다
    · 한 달 상한(기본 80회)은 서버가 센다. 직원 누구나 바꾼다
+   · 자리: 「수업 내용」 제목 줄의 [✨ 영상 자막으로 채우기]로 그 아래에 펼친다 (초안이 있으면 「초안 보기 · 확인 필요」)
+     ① 이번 주 영상(없으면 링크 넣기) ② 유튜브에서 「마라톤 자막 가져오기」 ③ [붙여 넣기] → 초안 → [확정]
+   · AI 에 보내기 전에 그 반 명단 이름을 「학생」으로 바꾼다 (바꾼 글도 저장하지 않는다)
+   · [초안 지우기] · [확정 취소] — migration-019 (직원만)
    ============================================================ */
 
 (function () {
@@ -80,6 +84,30 @@
     return null;
   }
 
+  /* ============================================================
+     학생 이름 가리기 — 요약은 반 학부모 모두가 보므로 AI 에 보내기 전에 명단 이름을 「학생」으로
+     전체 이름 · 성을 뺀 이름(3자 → 뒤 2자, 4자 → 뒤 2자), 뒤에 붙은 「이」 · 조사까지. 한 글자 이름은 바꾸지 않는다.
+     앞뒤가 한글이 아닐 때만 (「지원하다」 같은 낱말은 그대로)
+     ============================================================ */
+  function rosterNames(cls) {
+    var all = (window.Store && Store.getStudents ? Store.getStudents() : []).filter(function (s) { return (s.className || '') === cls; });
+    var set = {};
+    all.forEach(function (s) {
+      var n = String(s.name || '').replace(/\s+/g, '');
+      if (!/^[가-힣]{2,5}$/.test(n)) return;
+      set[n] = 1;
+      var given = n.length === 3 || n.length === 4 ? n.slice(-2) : '';
+      if (given.length >= 2) set[given] = 1;
+    });
+    return Object.keys(set).sort(function (a, b) { return b.length - a.length; });
+  }
+  function maskNames(text, cls) {
+    var names = rosterNames(cls);
+    if (!names.length) return text;
+    var re = new RegExp('(^|[^가-힣])(' + names.join('|') + ')(이)?(이가|이는|이도|이랑|이한테|가|는|은|도|랑|한테|에게|의|를|을|만|아|야|님|씨|요)?(?=$|[^가-힣])', 'g');
+    return String(text || '').replace(re, function (m, pre, name, i, josa) { return pre + '학생' + (josa || ''); });
+  }
+
   function readFile(file) {
     return new Promise(function (resolve, reject) {
       if (!/\.(srt|vtt|txt)$/i.test(file.name || '')) { reject(new Error('자막 파일(.srt · .vtt · .txt)만 넣을 수 있습니다')); return; }
@@ -103,7 +131,8 @@
       st.key = key;
       st.row = null; st.edit = null;
       st.texts = ['', '', '', ''];
-      $('#aiPanel').hidden = true;
+      $('#aiSub').hidden = true;
+      $('#btnAiOpen').setAttribute('aria-expanded', 'false');
       renderResult();
       load();
     }
@@ -146,7 +175,8 @@
     if (st.missing) { host.innerHTML = '<p class="panel__hint">' + NEED_SQL + '</p>'; return; }
     var r = st.row;
     if (!r) {
-      host.innerHTML = '<p class="panel__hint">아직 없습니다. [자막으로 AI 요약]을 누르면 자막으로 "1차시: … / 2차시: …" 초안을 만듭니다. 초안은 [확정]해야 학부모에게 보입니다.</p>';
+      host.innerHTML = '<p class="panel__hint">아직 초안이 없습니다. 위 ① ② ③ 순서로 자막을 넣고 [요약 초안 만들기]를 누르면 "1차시: … / 2차시: …" 초안이 생깁니다. 초안은 [확정]해야 학부모에게 보입니다.</p>';
+      aiButton();
       return;
     }
     var lines = currentLines();
@@ -168,10 +198,73 @@
         '<div class="wk-edit__btns">' +
           '<button class="btn btn--sm" type="button" data-ai-act="add">+ 줄 추가</button>' +
           '<div class="spacer"></div>' +
+          (confirmed
+            ? '<button class="btn btn--sm btn--ghost" type="button" data-ai-act="unconfirm">확정 취소</button>'
+            : '<button class="btn btn--sm btn--ghost" type="button" data-ai-act="discard">초안 지우기</button>') +
           '<button class="btn btn--sm btn--primary" type="button" data-ai-act="confirm">' + (confirmed ? '고친 내용으로 다시 확정' : '확정') + '</button>' +
         '</div>' +
-        '<p class="panel__hint">[확정]하면 러닝노트 · 반 공지 「이번 주 수업」에 보이고, 위 「수업 내용」 칸에 들어가 레포트를 공개할 때 함께 나갑니다. 자동 자막은 작품명 · 용어를 틀리게 받아 적을 때가 많으니 꼭 읽고 고쳐 주세요.</p>' +
+        '<p class="panel__hint">[확정]하면 러닝노트 「이번 주」 · 반 공지에 보이고, 위 「수업 내용」 차시 칸에 들어가 레포트를 공개할 때 함께 나갑니다. 자동 자막은 작품명 · 용어를 틀리게 받아 적을 때가 많으니 꼭 읽고 고쳐 주세요.</p>' +
       '</div>';
+    aiButton();
+  }
+
+  /* [✨ 영상 자막으로 채우기] — 초안이 있으면 「초안 보기 · 확인 필요」(주황), 확정된 주는 「AI 요약 확정됨」(흐리게) */
+  function aiButton() {
+    var b = $('#btnAiOpen');
+    if (!b) return;
+    var r = st.row;
+    var draft = !!(r && r.status === 'draft' && (r.draft || []).length);
+    var ok = !!(r && r.status === 'confirmed' && r.confirmed);
+    b.textContent = draft ? '초안 보기 · 확인 필요' : ok ? 'AI 요약 확정됨' : '✨ 영상 자막으로 채우기';
+    b.classList.toggle('ai-open--draft', draft);
+    b.classList.toggle('ai-open--ok', ok && !draft);
+    b.classList.toggle('btn--ghost', ok && !draft);
+  }
+
+  /* ① 이번 주 그 반 수업 영상 ② 자막 버튼 ③ 붙여 넣기 */
+  function savedVideos() {
+    var W = window.Weekly;
+    if (!W || !W.videos) return [];
+    var at = W.where ? W.where() : {};
+    if (at.cls !== st.cls || at.week !== st.week) return [];
+    return W.videos().filter(function (v) { return v.id && v.url; });
+  }
+  function ytId(u) {
+    var m = /(?:youtu\.be\/|[?&]v=|\/shorts\/|\/live\/|\/embed\/)([\w-]{11})/.exec(String(u || ''));
+    return m ? m[1] : '';
+  }
+  var PART = { full: '수업 전체', '1': '1차시', '2': '2차시', makeup: '보강' };
+  function renderSteps() {
+    var host = $('#aiSteps');
+    if (!host) return;
+    var vids = savedVideos();
+    var one = vids.length
+      ? vids.map(function (v) {
+          return '<div class="ai-vid"><span class="ai-step__t">① 영상:</span><span class="ai-vid__name">' + esc((PART[v.part] ? PART[v.part] + ' · ' : '') + (v.title || v.url)) + '</span>' +
+            '<a class="btn btn--sm" href="' + esc(v.url) + '" target="_blank" rel="noopener">유튜브에서 열기 ↗</a></div>';
+        }).join('')
+      : '<div class="ai-step__t">① 이번 주 수업 영상 링크를 먼저 넣어 주세요</div>' +
+        '<div class="toolbar"><input class="input" id="aiVidUrl" type="url" inputmode="url" placeholder="https://youtu.be/…" aria-label="유튜브 링크">' +
+        '<button class="btn btn--sm btn--primary" type="button" id="btnAiVidAdd">넣기</button></div>' +
+        '<p class="muted-note">넣으면 위 「수업 영상」 칸(기본 「전체」)에 저장되고 학생 · 학부모 화면에도 올라갑니다.</p>';
+    host.innerHTML = '<div class="ai-steps">' +
+      '<div class="ai-step">' + one + '</div>' +
+      '<div class="ai-step' + (vids.length ? '' : ' is-dim') + '"><span class="ai-step__t">② 열린 유튜브 화면에서 즐겨찾기 [마라톤 자막 가져오기] 누르기</span> ' +
+        '<button class="btn btn--sm btn--ghost" id="btnYtbmHelp" type="button">자막 버튼 설치</button></div>' +
+      '<div class="ai-step' + (vids.length ? '' : ' is-dim') + '"><span class="ai-step__t">③ [붙여 넣기] → [요약 초안 만들기] → 고치기 → [확정]</span></div>' +
+    '</div>';
+    var p = $('#aiPanel');
+    if (p) p.classList.toggle('is-dim', !vids.length);
+  }
+  function addVideoFromStep() {
+    var inp = $('#aiVidUrl');
+    var W = window.Weekly;
+    var url = W && W.normalizeYoutube ? W.normalizeYoutube(inp ? inp.value : '') : '';
+    if (!url) { toast('유튜브 링크(youtube.com · youtu.be)를 넣어 주세요', 'bad'); if (inp) inp.focus(); return; }
+    W.addVideoUrl(st.cls, st.week, url, '').then(function (ok) {
+      if (!ok) toast('영상을 넣지 못했습니다 — 위 「수업 영상」 칸을 확인해 주세요', 'bad');
+      renderSteps();
+    });
   }
 
   /* ---------- 입력 창 ---------- */
@@ -195,7 +288,7 @@
         guideHtml() +
         '<div class="wk-edit__btns">' +
           '<button class="btn btn--sm btn--primary" type="button" id="btnAiRun">요약 초안 만들기</button>' +
-          '<button class="btn btn--sm btn--ghost" type="button" id="btnAiClose">닫기</button>' +
+          '<button class="btn btn--sm btn--ghost" type="button" id="btnAiClose">접기</button>' +
           '<span class="panel__hint" id="aiRunNote">Claude(Opus 5.5)로 요약합니다. 1번에 대략 300~400원 · 1분 안팎. 자막 원문은 저장하지 않습니다.</span>' +
         '</div>' +
       '</div>';
@@ -236,14 +329,26 @@
     if (el) el.textContent = t ? t.length.toLocaleString() + '자' + (t.length > MAX_CHARS ? ' — 너무 깁니다' : '') : '';
   }
 
+  /* 넣은 글 → 칸. 맨 위가 「제목 / 영상 주소」면 떼어 내고, 이번 주 영상과 다른 영상이면 묻는다 (Promise: 넣었는가) */
   function setText(i, raw, source) {
     var h = ytHeader(raw);
-    if (h) { raw = h.body; offerVideo(h.url, h.title); }
-    st.texts[i] = captionText(raw);
-    st.source = source;
-    var ta = document.querySelector('#aiPanel [data-ai-text="' + i + '"]');
-    if (ta) ta.value = st.texts[i];
-    updateCount(i);
+    function put(text) {
+      st.texts[i] = captionText(text);
+      st.source = source;
+      var ta = document.querySelector('#aiPanel [data-ai-text="' + i + '"]');
+      if (ta) ta.value = st.texts[i];
+      updateCount(i);
+      return true;
+    }
+    if (!h) return Promise.resolve(put(raw));
+    var vids = savedVideos();
+    if (vids.length && ytId(h.url) && !vids.some(function (v) { return ytId(v.url) === ytId(h.url); })) {
+      return UI.confirmAsk('다른 영상의 자막', '이번 주 영상과 다른 영상의 자막입니다. 계속할까요?\n' + h.url + (h.title ? '\n(' + h.title + ')' : ''), '계속')
+        .then(function (yes) { return yes ? put(h.body) : false; });
+    }
+    put(h.body);
+    offerVideo(h.url, h.title);
+    return Promise.resolve(true);
   }
 
   /* 그 주 영상 칸이 비어 있으면 붙여 넣은 자막의 영상 주소로 채울지 묻는다 */
@@ -267,8 +372,9 @@
     if (!navigator.clipboard || !navigator.clipboard.readText) { manual(); return; }
     navigator.clipboard.readText().then(function (raw) {
       if (!String(raw || '').trim()) { toast('클립보드가 비어 있습니다 — 유튜브에서 「마라톤 자막 가져오기」를 먼저 눌러 주세요', 'bad'); return; }
-      setText(i, raw, 'paste');
-      toast('자막 ' + st.texts[i].length.toLocaleString() + '자를 넣었습니다');
+      setText(i, raw, 'paste').then(function (done) {
+        if (done) toast('자막 ' + st.texts[i].length.toLocaleString() + '자를 넣었습니다');
+      });
     }, manual);
   }
 
@@ -284,8 +390,9 @@
       return;
     }
     readFile(list[0]).then(function (raw) {
-      setText(i, raw, 'file');
-      toast('자막 ' + st.texts[i].length.toLocaleString() + '자를 넣었습니다');
+      return setText(i, raw, 'file').then(function (done) {
+        if (done) toast('자막 ' + st.texts[i].length.toLocaleString() + '자를 넣었습니다');
+      });
     }, function (e) { toast(e.message, 'bad'); });
   }
 
@@ -306,7 +413,8 @@
       var btn = $('#btnAiRun'); if (btn) btn.disabled = true;
       $('#aiRunNote').textContent = '요약 중입니다… 1분 안팎 걸립니다. 창을 닫지 마세요.';
       var key = st.key;
-      invoke({ class_name: st.cls, week_start: st.week, mode: st.mode, lessons: n, texts: texts, source: st.source }).then(function (res) {
+      var cls0 = st.cls;
+      invoke({ class_name: st.cls, week_start: st.week, mode: st.mode, lessons: n, texts: texts.map(function (t) { return maskNames(t, cls0); }), source: st.source }).then(function (res) {
         st.busy = false;
         if (btn) btn.disabled = false;
         if (!res || !res.ok) {
@@ -360,7 +468,7 @@
     var have = window.Writer && Writer.lessonsOf ? Writer.lessonsOf(cls) : [];
     var same = have.join('\n') === lines.join('\n');
     var ask = (have.length && !same)
-      ? UI.confirmAsk('수업 내용 바꾸기', '「수업 내용」 칸에 이미 적힌 글(' + have.length + '줄)이 있습니다. 확정한 요약으로 바꿀까요?', '바꾸고 확정')
+      ? UI.confirmAsk('수업 내용 바꾸기', '지금 쓴 내용을 바꿀까요? 「수업 내용」 칸에 이미 적힌 글(' + have.length + '줄)이 확정한 요약으로 바뀝니다.', '바꾸고 확정')
       : Promise.resolve(true);
     ask.then(function (yes) {
       if (!yes) return;
@@ -369,6 +477,20 @@
         if (window.Writer && Writer.setLessons && !same) Writer.setLessons(cls, lines);
         if (key === st.key) { st.row = (r.data && r.data.summary) || st.row; st.edit = null; renderResult(); }
         toast('확정했습니다 — 러닝노트에 보이고, 수업 내용 칸에 들어갔습니다', 'good');
+      });
+    });
+  }
+
+  /* ---------- 초안 지우기 · 확정 취소 (migration-019) ---------- */
+
+  function serverAct(fn, title, desc, okLabel, done) {
+    var cls = st.cls, week = st.week, key = st.key;
+    UI.confirmAsk(title, desc, okLabel).then(function (yes) {
+      if (!yes) return;
+      sb().rpc(fn, { p_class: cls, p_week: week }).then(function (r) {
+        if (r.error) { toast(isMissing(r.error) ? 'migration-019 SQL 을 먼저 실행해 주세요.' : r.error.message, 'bad'); return; }
+        if (key === st.key) { st.row = (r.data && r.data.summary) || null; st.edit = null; renderResult(); }
+        toast(done, 'good');
       });
     });
   }
@@ -382,20 +504,33 @@
     $('#btnAiOpen').addEventListener('click', function () {
       if (!st.cls) { toast('반을 먼저 골라 주세요', 'bad'); return; }
       if (st.missing) { toast(NEED_SQL, 'bad'); return; }
+      var sub = $('#aiSub');
+      if (!sub.hidden) { sub.hidden = true; $('#btnAiOpen').setAttribute('aria-expanded', 'false'); return; }
       var box = $('#aiPanel');
-      if (!box.hidden) { box.hidden = true; return; }
       /* 차시별 영상이 따로 있는 주면 「차시마다」로 시작 */
       var parts = window.Weekly && Weekly.videos ? Weekly.videos().map(function (v) { return v.part; }) : [];
       if (parts.indexOf('full') === -1 && parts.indexOf('1') !== -1 && parts.indexOf('2') !== -1) st.mode = 'split';
       renderPanel();
       box.hidden = false;
-      $('#aiSub').scrollIntoView({ block: 'nearest' });
+      sub.hidden = false;
+      $('#btnAiOpen').setAttribute('aria-expanded', 'true');
+      renderSteps();
+      renderResult();
+      sub.scrollIntoView({ block: 'nearest' });
     });
+    /* ① 영상 넣기 · ② 자막 버튼 설치 (펼친 칸 안 — 다시 그려지므로 위임) */
+    $('#aiSub').addEventListener('click', function (e) {
+      if (e.target.closest('#btnAiVidAdd')) addVideoFromStep();
+    });
+    $('#aiSub').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && e.target.id === 'aiVidUrl') { e.preventDefault(); addVideoFromStep(); }
+    });
+    window.addEventListener('jt:videos-changed', function () { if (!$('#aiSub').hidden) renderSteps(); });
 
     /* 자막 버튼 설치 창 (ytbm.js) */
     var ym = $('#ytbmModal');
-    $('#btnYtbmHelp').addEventListener('click', function () {
-      if (!window.YTBM) return;
+    document.addEventListener('click', function (e) {
+      if (!e.target.closest || !e.target.closest('#btnYtbmHelp') || !window.YTBM) return;
       $('#ytbmLink').href = YTBM.href();
       ym.showModal();
     });
@@ -450,7 +585,7 @@
       if (e.target.id === 'btnAiRun') run();
       var pb = e.target.closest('[data-ai-paste]');
       if (pb) pasteInto(Number(pb.dataset.aiPaste));
-      if (e.target.id === 'btnAiClose') { panel.hidden = true; panel.innerHTML = ''; st.texts = ['', '', '', '']; }
+      if (e.target.id === 'btnAiClose') { $('#aiSub').hidden = true; $('#btnAiOpen').setAttribute('aria-expanded', 'false'); }
     });
 
     var result = $('#aiResult');
@@ -477,6 +612,8 @@
         if (ins.length) ins[ins.length - 1].focus();
       }
       if (act.dataset.aiAct === 'confirm') confirm();
+      if (act.dataset.aiAct === 'discard') serverAct('summary_discard', '초안 지우기', '이 초안을 지웁니다. 되돌릴 수 없습니다. (이번 달 사용 횟수는 돌아오지 않습니다)', '지우기', '초안을 지웠습니다');
+      if (act.dataset.aiAct === 'unconfirm') serverAct('summary_unconfirm', '확정 취소', '학부모 화면에서 요약이 내려가고 초안으로 돌아갑니다. 「수업 내용」 칸과 이미 공개한 레포트는 그대로입니다.', '확정 취소', '확정을 취소했습니다 — 초안으로 돌아갔습니다');
     });
 
     $('#aiUsage').addEventListener('click', function (e) {

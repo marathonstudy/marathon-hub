@@ -761,3 +761,56 @@ label.hub-btn { cursor: pointer; text-align: center; }
 .tr-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .tr-table th, .tr-table td { padding: 6px 4px; text-align: center; border-bottom: 1px solid #EEECF7; white-space: nowrap; }
 .tr-week { appearance: none; border: 0; background: none; font: inherit; font-weight: 800; color: #5B42D6; cursor: pointer; min-height: 32px; }
+
+/* ---------- 이번 주 (첫 화면) ---------- */
+.tw-card { padding: 16px 16px 14px; }
+.tw-card .card-title { margin-bottom: 10px; }
+.tw-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.tw-tile { padding: 8px 10px; border-radius: 14px; background: var(--grad-soft); min-width: 0; }
+.tw-tile__k { font-size: 12px; font-weight: 800; color: var(--ink-light); }
+.tw-tile__v { margin-top: 2px; font-size: 16px; font-weight: 800; color: var(--ink-deep); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tw-yet { font-size: 13px; font-weight: 700; color: var(--muted); }
+.tw-att--attend { color: #3F8CB8; } .tw-att--late { color: #C07A3E; } .tw-att--absent { color: #A05C6C; }
+.tw-ok { color: #2F8F6E; }
+.tw-up { color: #2F8F6E; font-size: 13px; } .tw-down { color: #C4566F; font-size: 13px; } .tw-same { color: var(--ink-light); font-size: 13px; }
+.tw-stars { letter-spacing: 1px; font-size: 15px; }
+.tw-star { color: var(--track); } .tw-star.is-on { color: #F4B63F; }
+.tw-row { margin-top: 10px; display: flex; align-items: center; gap: 8px; }
+.tw-loading { margin-top: 10px; font-size: 13px; color: var(--ink-light); }
+.tw-say { margin-top: 10px; }
+.tw-comment { margin: 2px 0 0; font-size: 14px; line-height: 1.55; color: var(--ink); white-space: pre-line;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
+.tw-comment.is-open { -webkit-line-clamp: unset; display: block; }
+.tw-rv-btn { appearance: none; border: 0; font: inherit; cursor: pointer; width: 100%; min-height: 56px; margin-bottom: 12px;
+  border-radius: 16px; background: var(--grad-strong); color: #fff; font-size: 17px; font-weight: 900; box-shadow: var(--card-shadow); }
+.tw-learn.is-short .lesson-item:nth-child(n+4) { display: none; }
+.tw-more, .tw-detail { appearance: none; border: 0; font: inherit; cursor: pointer; background: none; color: #5A3FD0; font-size: 14px; font-weight: 800; min-height: 40px; padding: 6px 4px; }
+.tw-trend__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.tw-trend__head .card-title { margin-bottom: 0; }
+.tw-sparks { display: grid; grid-template-columns: repeat(auto-fit, minmax(64px, 1fr)); gap: 8px; }
+.tw-spark { display: grid; gap: 2px; min-width: 0; }
+.tw-spark__k { font-size: 11.5px; font-weight: 800; color: var(--ink-light); }
+.tw-spark svg { width: 100%; height: 26px; }
+.tw-spark polyline { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.tw-spark b { font-size: 13px; color: var(--ink-deep); }
+.tw-notice { padding: 14px 16px; font-size: 14px; }
+.tw-notice .card-title { font-size: 15px; margin-bottom: 8px; }
+.tw-pastnotice > summary, .tw-pastfiles > summary { cursor: pointer; font-weight: 800; color: var(--ink-mid); min-height: 32px; }
+.tw-pastfiles { padding: 14px 16px; }
+.tw-pastweek { margin-top: 10px; }
+
+/* ---------- 앱 과제 · 강의 표 (app-week.js) ---------- */
+.aw { margin-top: 10px; }
+.aw-grid { display: grid; align-items: center; gap: 4px 2px; }
+.aw-head { font-size: 11px; color: var(--ink-light); text-align: center; line-height: 1.2; }
+.aw-day b { display: block; font-size: 12px; color: var(--ink-mid); }
+.aw-label { font-size: 12px; font-weight: 800; color: var(--ink-mid); }
+.aw-cell { text-align: center; font-size: 17px; line-height: 26px; height: 26px; border-radius: 8px; background: #F6F6FC; color: var(--ink-deep); }
+.aw-hw--onTime { color: #4A34B8; } .aw-hw--late { color: #C07A3E; } .aw-hw--none { color: #B4B8CC; }
+.aw-lec--done { color: #2F8F6E; font-weight: 900; } .aw-lec--todo { color: #B4B8CC; }
+.aw-cell[class*="--future"] { color: #C9CCDC; background: #FAFAFD; }
+.aw-cell[class*="--off"] { background: transparent; }
+.aw-sum { padding-left: 6px; font-size: 12px; font-weight: 800; color: var(--ink-deep); white-space: nowrap; text-align: right; line-height: 1.25; }
+.aw-sum small { display: block; font-size: 10.5px; font-weight: 700; color: var(--ink-light); }
+.aw-legend { margin: 6px 0 0; font-size: 11px; line-height: 1.5; color: var(--ink-light); }
+.aw-card { padding: 16px; }

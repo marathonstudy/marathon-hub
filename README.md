@@ -39,6 +39,7 @@ admin/        코치룸 (명단 · 작성 · 공개 · 발송 · 반 공지 · �
   auth.js       로그인 · 조교 가입 · 비밀번호 찾기
   weekly.js     ② 작성 반 공통 — 수업일 · 수업 영상 · 배부 자료/과제 파일 · 지난 파일 정리
   summary.js    ② 작성 반 공통 — 자막으로 AI 수업 요약 (초안 → 확정)
+  ../assets/app-week.js  러닝노트 앱 과제 · 강의 표 (레포트 주차의 과제 기간만)
   ytbm.js       즐겨찾기 버튼 「마라톤 자막 가져오기」 (PC 크롬 · 유튜브 화면에서 스크립트 복사 → AI 요약 [붙여 넣기])
   weeks.js      ② 작성 → 반별 「주차 현황」 (migration-018)
   review.js     ② 작성 반 공통 — 복습테스트 확인 표 · 대신 입력 · 지금 제출 현황 · 자주 틀린 번호
@@ -83,6 +84,7 @@ supabase/
   migration-016-attend-trend.sql    출결 기본값(출석 · 집중도 5, 빈 칸만) · 결석 기준에서 보강 빼기 · 러닝노트 누적 추이
   migration-017-settings-guard.sql  조교 · 선생님 같은 권한 (선생님 계정 보호만 예외) · 설정 이름 바꾸기 막기
   migration-018-class-weeks.sql     ② 작성 → 반별 「주차 현황」 한 번에 가져오기 (직원만 · 읽기 전용)
+  migration-019-summary-discard.sql AI 수업 요약 [초안 지우기] · [확정 취소] (직원만)
   check-classes.sql               반 이름 점검 (읽기 전용 — 어느 표에 어떤 반이 있는지 · 비슷한 이름)
   functions/app-report/index.ts  앱 과제 기록을 대신 받아 오는 Edge Function
 ```
@@ -231,6 +233,11 @@ delete from public.staff where email = '조교이메일@example.com';
 1. 017 다음에 SQL Editor → **New query** → `supabase/migration-018-class-weeks.sql` 전체 → **Run**
    (결과에 `staff_class_weeks` · `anon blocked` 두 줄 모두 `true`)
 2. 실행 전에는 주차 현황 자리에 안내만 나오고, [이번 주 작성하기]로 예전처럼 작성할 수 있습니다
+
+### 5-16. AI 요약 초안 지우기 · 확정 취소 (migration-019)
+1. 018 다음에 SQL Editor → **New query** → `supabase/migration-019-summary-discard.sql` 전체 → **Run**
+   (결과에 `summary_discard` · `summary_unconfirm` 두 줄 모두 `true`)
+2. Edge Function 다시 배포: **app-report**(과제 기록 전부 · 주차 표) · **lesson-summary**(학생 이름 · 잡담 빼는 지시문)
 
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.

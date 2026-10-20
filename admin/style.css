@@ -1016,6 +1016,22 @@ dialog.modal::backdrop { background: rgba(51, 58, 87, .38); backdrop-filter: blu
 
 dialog.modal--wide { width: min(680px, calc(100vw - 24px)); }
 
+/* AI 수업 요약 — 「수업 내용」 아래 펼침 칸 (summary.js) */
+#lessonSub .sub__head { flex-wrap: wrap; row-gap: 6px; }
+#lessonSub .wk-btns { flex-wrap: wrap; row-gap: 6px; }
+.ai-open--draft { background: #FFF3E3; border-color: #F0C58A; color: #A0601A; font-weight: 800; }
+.ai-open--ok { opacity: .7; }
+.ai-sub { margin-top: 12px; padding: 12px; border: 1px solid #DCD5FA; border-radius: 12px; background: #FBFAFF; }
+.ai-sub__top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 8px; }
+.ai-steps { display: grid; gap: 8px; margin-bottom: 10px; }
+.ai-step { padding: 8px 10px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line-soft); font-size: 13.5px; line-height: 1.55; }
+.ai-step__t { font-weight: 800; color: var(--ink-deep); }
+.ai-step .toolbar { margin-top: 6px; display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ai-step .toolbar .input { flex: 1 1 180px; min-width: 0; width: auto; height: auto; }
+.ai-vid { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 4px; }
+.ai-vid__name { min-width: 0; overflow-wrap: anywhere; }
+.is-dim { opacity: .45; }
+
 /* 자막 버튼 설치 (ytbm.js) */
 .ytbm-only { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: #FFF3E3; color: #A86A1E; font-size: 12px; font-weight: 800; vertical-align: 3px; }
 .ytbm-steps { margin: 0; padding-left: 20px; display: grid; gap: 14px; line-height: 1.6; }

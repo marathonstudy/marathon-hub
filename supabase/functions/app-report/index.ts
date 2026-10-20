@@ -14,7 +14,8 @@
 //
 //  무엇을 돌려주나
 //    제출률·정시율·강의 시청률, 날짜별 제출, 영역별 정답률, 차시 요약,
-//    최근 과제 몇 건(제목·날짜·지각 여부·정답률)만.
+//    과제 기록 전부(제목·날짜·지각 여부·정답률·강 번호) — 러닝노트가 레포트 주차의 과제 기간만 잘라 보여 준다.
+//    (예전 화면을 위해 최근 10건 recent 도 함께)
 //    제출 사진 주소, 선생님 피드백, 학생이 쓴 글, 프로필 사진은 빼고 보낸다.
 //
 //  키
@@ -66,6 +67,18 @@ function pick(src: Any) {
   const cal = Array.isArray(src?.calendarData) ? src.calendarData : [];
   const cats = Array.isArray(src?.categoryStats) ? src.categoryStats : [];
   const hist = Array.isArray(src?.homeworkHistory) ? src.homeworkHistory : [];
+  /* 과제 기록 — 제목 · 날짜 · 지각 여부 · 정답률 · 강 번호만 (사진 · 피드백 · 학생 글은 넘기지 않는다). 오래된 것부터 */
+  const hw = hist
+    .slice()
+    .sort((a: Any, b: Any) => String(a?.submittedAt ?? "").localeCompare(String(b?.submittedAt ?? "")))
+    .slice(-2000)
+    .map((h: Any) => ({
+      title: String(h?.title ?? "").slice(0, 200),
+      order: num(h?.lectureOrder),
+      submittedAt: String(h?.submittedAt ?? ""),
+      late: !!h?.isLate,
+      correctRate: h?.correctRate == null ? null : Math.round(num(h.correctRate)),
+    }));
 
   return {
     classTitle: String(src?.classInfo?.title ?? ""),
@@ -100,17 +113,8 @@ function pick(src: Any) {
       hwOnTime: num(l?.onTimeHomework),
       hwTotal: num(l?.totalHomework),
     })),
-    recent: hist
-      .slice()
-      .sort((a: Any, b: Any) => String(b?.submittedAt ?? "").localeCompare(String(a?.submittedAt ?? "")))
-      .slice(0, 10)
-      .map((h: Any) => ({
-        title: String(h?.title ?? ""),
-        order: num(h?.lectureOrder),
-        submittedAt: String(h?.submittedAt ?? ""),
-        late: !!h?.isLate,
-        correctRate: h?.correctRate == null ? null : Math.round(num(h.correctRate)),
-      })),
+    history: hw,
+    recent: hw.slice().reverse().slice(0, 10),
   };
 }
 
