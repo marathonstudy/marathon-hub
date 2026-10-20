@@ -151,7 +151,7 @@
   function restore() {
     var p = pending;
     if (!p) return;
-    var go = p.week !== week() ? Writer.switchWeek(p.week, 0) : Promise.resolve();
+    var go = Writer.openWeek ? Writer.openWeek(p.week) : (p.week !== week() ? Writer.switchWeek(p.week, 0) : Promise.resolve());
     go.then(function () {
       return Store.applyBackup(p);
     }).then(function (ok) {

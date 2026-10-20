@@ -56,6 +56,7 @@
     blockMsg: BLOCK,
     get role() { return cur.role; },
     view: '',
+    arg: '',
 
     rpc: function (name, args) {
       if (name === 'hub_get') {
@@ -154,7 +155,7 @@
     document.body.appendChild(o);
     o.addEventListener('click', function (e) {
       var b = e.target.closest('[data-pvset]');
-      if (b) { cur.role = b.dataset.pvset; load(); }
+      if (b) { cur.role = b.dataset.pvset; bridge.view = ''; bridge.arg = ''; load(); }
       if (e.target.id === 'pvClose') close();
     });
     o.querySelector('#pvPhone').addEventListener('change', function (e) {
@@ -174,9 +175,12 @@
     o.querySelector('#pvFrame').src = '../me/index.html?preview=1&v=' + encodeURIComponent(CONFIG.version) + '&t=' + Date.now();
   }
 
-  function open(sid, role) {
+  /* view · arg — 처음 열 화면 (주차 현황 [보기] = 'report', 그 주 시작일) */
+  function open(sid, role, view, arg) {
     if (!sid) return;
     if (window.Writer && Writer.flush) Writer.flush();
+    bridge.view = view || '';
+    bridge.arg = arg || '';
     cur.sid = sid;
     cur.role = role === 'student' ? 'student' : 'parent';
     var o = build();

@@ -30,6 +30,7 @@
 
   var draft = null;
   var currentClass = '';
+  var mode = 'weeks';           /* weeks 주차 현황 (weeks.js) · edit 작성 화면 */
   var selectedId = '';          /* 미리보기 중인 학생 */
   var collapsedEntries = {};
   var commentTargetId = '';
@@ -320,8 +321,38 @@
     currentClass = chip.dataset.cls;
     selectedId = '';
     refreshAll();
+    if (mode === 'weeks') setMode('weeks');                   /* 주차 현황이면 그 반 주차로 */
     window.dispatchEvent(new CustomEvent('jt:write-nav'));     /* 뒤로가기 기록 (nav.js) */
   });
+
+  /* ============================================================
+     주차 현황 ↔ 작성 화면
+     ============================================================ */
+
+  function setMode(m) {
+    mode = m === 'edit' ? 'edit' : 'weeks';
+    $('#writeMain').classList.toggle('is-weeks', mode === 'weeks');
+    window.dispatchEvent(new CustomEvent('jt:write-mode', { detail: { mode: mode } }));
+  }
+
+  /* 그 주 작성 화면으로 (주차 현황의 줄 · [이번 주 작성하기]) */
+  function openWeek(start) {
+    setMode('edit');
+    var p = (start && start !== draft.weekStart) ? switchWeek(start, 0) : Promise.resolve();
+    return p.then(function () {
+      window.scrollTo(0, 0);
+      window.dispatchEvent(new CustomEvent('jt:write-nav'));
+    });
+  }
+
+  function openWeeks() {
+    flushDraft();
+    setMode('weeks');
+    window.scrollTo(0, 0);
+    window.dispatchEvent(new CustomEvent('jt:write-nav'));
+  }
+
+  $('#btnWkvBack').addEventListener('click', openWeeks);
 
   /* ============================================================
      반 공통 — 수업 내용 · 테스트 이름
@@ -1677,6 +1708,10 @@
     setModalText: function (v) { freshCommentText(v); updateCommentCount(); applyModal(); return flushDraft(); },
     current: function () { return draft; },
     currentClass: function () { return currentClass; },
+    mode: function () { return mode; },
+    setMode: setMode,
+    openWeek: openWeek,
+    openWeeks: openWeeks,
     /* 뒤로가기 · 새로고침으로 반을 되돌릴 때 (nav.js) */
     selectClass: function (cls) {
       if (!cls || cls === currentClass) return;

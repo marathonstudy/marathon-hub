@@ -80,6 +80,7 @@ supabase/
   migration-015-student-link.sql    학생 링크 · 학부모 링크 나누기 · 전환 기간 스위치 · 직원 미리보기 함수
   migration-016-attend-trend.sql    출결 기본값(출석 · 집중도 5, 빈 칸만) · 결석 기준에서 보강 빼기 · 러닝노트 누적 추이
   migration-017-settings-guard.sql  조교 · 선생님 같은 권한 (선생님 계정 보호만 예외) · 설정 이름 바꾸기 막기
+  migration-018-class-weeks.sql     ② 작성 → 반별 「주차 현황」 한 번에 가져오기 (직원만 · 읽기 전용)
   check-classes.sql               반 이름 점검 (읽기 전용 — 어느 표에 어떤 반이 있는지 · 비슷한 이름)
   functions/app-report/index.ts  앱 과제 기록을 대신 받아 오는 Edge Function
 ```
@@ -223,6 +224,11 @@ delete from public.staff where email = '조교이메일@example.com';
    (결과에 `same role` · `key guard` · `links row` 세 줄 모두 `true`)
 2. 실행 뒤에는 조교도 반 관리 · 설정 · 직원 관리 · 삭제 · 되살리기를 모두 씁니다.
    조교는 선생님 계정을 사용 중지 · 조교로 바꾸기 못 하고, 누구도 선생님으로 올리지 못합니다
+
+### 5-15. 반별 주차 현황 (migration-018)
+1. 017 다음에 SQL Editor → **New query** → `supabase/migration-018-class-weeks.sql` 전체 → **Run**
+   (결과에 `staff_class_weeks` · `anon blocked` 두 줄 모두 `true`)
+2. 실행 전에는 주차 현황 자리에 안내만 나오고, [이번 주 작성하기]로 예전처럼 작성할 수 있습니다
 
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.

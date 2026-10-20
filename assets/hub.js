@@ -543,7 +543,7 @@
     var tabs = $('#hubTabs');
     var h = parseHash();
 
-    if (PV) { h = { code: 'preview', view: PV.view || '' }; previewBand(); }
+    if (PV) { h = { code: 'preview', view: PV.view || '', arg: PV.arg || '' }; previewBand(); }
     else if (!/^[A-Za-z0-9]{20,64}$/.test(h.code)) { stopScreen(root, 'nocode'); return; }
 
     rpc('hub_get', { p_code: h.code }).then(function (d) {

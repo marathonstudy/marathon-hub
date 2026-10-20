@@ -1016,8 +1016,61 @@ dialog.modal::backdrop { background: rgba(51, 58, 87, .38); backdrop-filter: blu
 
 dialog.modal--wide { width: min(680px, calc(100vw - 24px)); }
 
+/* ② 작성 — 주차 현황 (weeks.js). 주차 현황일 때는 작성 칸을 숨기고, 작성 화면일 때는 주차 현황을 숨긴다 */
+#writeMain.is-weeks > #weekPanel, #writeMain.is-weeks > #commonPanel, #writeMain.is-weeks > #entryPanel,
+#writeMain.is-weeks > #notesSidePanel, #writeMain.is-weeks > #previewPanel { display: none !important; }
+#writeMain:not(.is-weeks) > #wkvPanel { display: none; }
+#writeMain.is-weeks .chip__count { display: none; }
+.wkv-head { flex-wrap: wrap; row-gap: 8px; }
+.wkv-head__text { min-width: 0; }
+.wkv-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.wkv-row {
+  display: grid;
+  grid-template-columns: 150px 108px minmax(0, 1fr) auto;
+  grid-template-areas: "wk st body act";
+  gap: 6px 14px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  cursor: pointer;
+}
+.wkv-row:hover { border-color: #C9C2F2; background: #FBFAFF; }
+.wkv-row:focus-visible { outline: 2px solid var(--indigo); outline-offset: 2px; }
+.wkv-row.is-now { border-color: var(--indigo); box-shadow: 0 0 0 1px var(--indigo) inset; }
+.wkv-row.is-next { background: var(--surface-2); }
+.wkv-wk { grid-area: wk; min-width: 0; }
+.wkv-wk__name { font-size: 14.5px; color: var(--ink-deep); }
+.wkv-wk__date { font-size: 12.5px; color: var(--ink-mid); margin-top: 2px; }
+.wkv-status { grid-area: st; }
+.wkv-body { grid-area: body; min-width: 0; }
+.wkv-act { grid-area: act; }
+.wkv-act .btn { min-height: 34px; min-width: 52px; }
+.wkv-lesson { font-size: 14px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wkv-stats { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 12.5px; color: var(--ink-mid); margin-top: 3px; }
+.wkv-muted { color: var(--ink-light); font-weight: 400; }
+.wkv-tag { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 11.5px; font-weight: 700; background: #EEF0F7; color: var(--ink-mid); vertical-align: 1px; }
+.wkv-tag--now { background: #EFEBFD; color: #5A3FD0; }
+.wkv-tag--off { background: #F3EEF0; color: #8E5F6B; }
+.wkv-tag--moved { background: #FFF3E3; color: #A86A1E; }
+.wkv-tag--draft { background: #FFF3E3; color: #A86A1E; }
+.wkv-st { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+.wkv-st--sent { background: #E6F5EE; color: #35806A; }
+.wkv-st--doing { background: #EFEBFD; color: #5A3FD0; }
+.wkv-st--empty { background: #EEF0F7; color: var(--ink-light); }
+.wkv-miss { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+.wkv-miss__i { padding: 1px 7px; border-radius: 999px; font-size: 11.5px; font-weight: 700; background: #FDECEF; color: #B03A55; }
+.wkv-more { display: block; width: 100%; margin-top: 10px; }
+/* 휴대폰 — 한 주를 두 줄 카드로 (위: 주차 · 상태 · 보기 / 아래: 내용 · 숫자 · 빠진 것) */
+@media (max-width: 720px) {
+  .wkv-row { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "wk st act" "body body body"; gap: 6px 8px; }
+  .wkv-head .btn--primary { width: 100%; }
+}
+
 /* 넓은 화면에서는 미리보기를 오른쪽에 붙인다 */
 @media (min-width: 1100px) {
+  #writeMain.is-weeks { display: block; }
   #writeMain {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 420px;

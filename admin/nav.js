@@ -3,6 +3,7 @@
 
    · 탭(① 명단 · ② 작성 · 「오늘」 …) · ② 작성의 반 · 주차를 바꿀 때마다 뒤로가기 기록을 남긴다
      주소: #tab=write&cls=반포반&week=2026-10-12  → 새로고침해도 그 탭 · 반 · 주차가 그대로 열린다
+     ② 작성의 주차 현황은 #tab=write&cls=반포반 (week 없음) — 작성 화면에서 뒤로가기 = 주차 현황
    · 창(학생 정보 · 코멘트 · 확인 창 · 미리보기 · 지금 제출 현황 …)이 열리면 기록을 하나 더 —
      뒤로가기 = 창 닫기. 창을 단추로 닫으면 그 기록도 같이 지운다.
    · 더 돌아갈 곳이 없을 때만 사이트 밖으로 나간다.
@@ -43,7 +44,7 @@
       var cls = Writer.currentClass && Writer.currentClass();
       var d = Writer.current && Writer.current();
       if (cls) o.cls = cls;
-      if (d && d.weekStart) o.week = d.weekStart;
+      if (d && d.weekStart && (!Writer.mode || Writer.mode() === 'edit')) o.week = d.weekStart;
     }
     return o;
   }
@@ -78,8 +79,12 @@
     var p = Promise.resolve();
     if (o.tab === 'write' && window.Writer) {
       var d = Writer.current && Writer.current();
-      if (o.week && d && o.week !== d.weekStart && /^\d{4}-\d{2}-\d{2}$/.test(o.week)) p = Writer.switchWeek(o.week, 0) || Promise.resolve();
-      p = p.then(function () { if (o.cls) Writer.selectClass(o.cls); });
+      var edit = !!o.week && /^\d{4}-\d{2}-\d{2}$/.test(o.week);
+      if (edit && d && o.week !== d.weekStart) p = Writer.switchWeek(o.week, 0) || Promise.resolve();
+      p = p.then(function () {
+        if (o.cls) Writer.selectClass(o.cls);
+        if (Writer.setMode) Writer.setMode(edit ? 'edit' : 'weeks');
+      });
     }
     return p.then(function () { restoring--; }, function () { restoring--; });
   }
