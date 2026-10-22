@@ -356,6 +356,12 @@
       <!-- 주차 현황 (weeks.js) — 반을 고르면 처음 나온다. 줄을 누르면 아래 작성 화면 -->
       <div class="panel wkv-panel" id="wkvPanel"></div>
 
+      <!-- 이미 보낸 주를 고쳤을 때 (write.js · 20261029g) -->
+      <div class="repub-note" id="rePubNote" hidden>
+        <span>고친 내용은 다시 공개해야 학부모에게 반영됩니다</span>
+        <button class="btn btn--sm btn--primary" id="btnRePublish" type="button">다시 공개</button>
+      </div>
+
       <div class="panel" id="commonPanel">
         <div class="panel__head">
           <h2 class="panel__title" id="commonTitle">반 공통</h2>
@@ -410,15 +416,8 @@
           </div>
         </div>
 
-        <div class="sub">
-          <div class="sub__head">
-            <span class="sub__title">리뷰테스트</span>
-            <span class="sub__hint">이름만 적습니다. 점수는 학생별로 넣습니다</span>
-            <button class="btn btn--sm" id="btnAddTest" type="button">+ 테스트 추가</button>
-          </div>
-          <div id="testList"></div>
-        </div>
-
+        <!-- 수기 「리뷰테스트(테스트 이름)」 · 「필수과제」 · 「선택과제」 칸은 뺐다 (20261029g) — 시험은 아래 복습테스트(학생 QR 기록),
+             과제 수행은 앱 연동으로 보여 준다. 예전에 넣은 값은 지우지 않고 화면에서만 숨긴다 -->
         <div class="sub" id="rvSub">
           <div class="sub__head">
             <span class="sub__title">복습테스트</span>
@@ -432,28 +431,10 @@
           <div id="rvTable"></div>
         </div>
 
-        <div class="sub">
-          <div class="sub__head">
-            <span class="sub__title">필수과제</span>
-            <span class="sub__hint">이름만 적습니다. 했는지는 학생별로 체크합니다</span>
-            <button class="btn btn--sm" id="btnAddHwReq" type="button">+ 필수과제 추가</button>
-          </div>
-          <div id="hwReqList"></div>
-        </div>
-
-        <div class="sub">
-          <div class="sub__head">
-            <span class="sub__title">선택과제</span>
-            <span class="sub__hint">안 쓰면 레포트에 안 나옵니다</span>
-            <button class="btn btn--sm" id="btnAddHwOpt" type="button">+ 선택과제 추가</button>
-          </div>
-          <div id="hwOptList"></div>
-        </div>
-
         <div class="sub" id="wkFileSub">
           <div class="sub__head">
             <span class="sub__title">배부 자료 · 과제 파일</span>
-            <span class="sub__hint">파일명에 ‘필수과제’ · ‘선택과제’가 있으면 그 분류로, 아니면 배부 자료로 나눕니다</span>
+            <span class="sub__hint">필수·선택은 학생에게 보여 주는 안내입니다. 파일마다 골라 주세요.</span>
             <button class="btn btn--sm btn--ghost" id="btnWkCleanup" type="button" hidden>지난 파일 정리</button>
           </div>
           <div id="wkUsage"></div>
@@ -470,7 +451,7 @@
 
         <div class="sub">
           <div class="sub__head">
-            <span class="sub__title">반 공통 코멘트</span>
+            <span class="sub__title">반 공통 코멘트 <span class="say-note">학부모 화면의 '선생님 한마디'에 나옵니다</span></span>
             <span class="sub__hint">여기 쓰면 이 반 전원 레포트에 똑같이 들어갑니다</span>
             <div class="spacer"></div>
             <button class="btn btn--sm btn--ghost" id="btnCommonHistory" type="button">이전 내용 보기</button>
@@ -1374,6 +1355,18 @@
 </dialog>
 
 <!-- 주차 띠 ⋯ (rtabs.js) — 날짜 직접 고르기 · 이번 주로 (write.js 의 시작일 · 종료일 칸) -->
+<!-- 복습테스트 — 이번 주 시험 빼기 (review.js · 20261029g) -->
+<dialog class="modal" id="rvSkipModal">
+  <div class="modal__body">
+    <div class="panel__head">
+      <h2 class="panel__title">이번 주 시험 빼기</h2>
+      <p class="panel__hint">이번 주에 보지 않은 시험을 고르세요. 학생이 한 명이라도 낸 시험은 뺄 수 없습니다.</p>
+    </div>
+    <div class="rv-skip-list" id="rvSkipList"></div>
+    <div class="modal__foot"><button class="btn" type="button" id="rvSkipClose">닫기</button></div>
+  </div>
+</dialog>
+
 <dialog class="modal" id="weekPickModal">
   <div class="modal__body">
       <div id="weekPanel">
@@ -1400,12 +1393,6 @@
   <div class="modal__foot"><div class="spacer"></div><button class="btn" type="button" id="weekPickClose">닫기</button></div>
 </dialog>
 
-<!-- 레포트 미리보기 — 휴대폰 폭에서 학생 줄 [미리보기] (write.js · 20261029b) -->
-<dialog class="modal modal--wide pv-sheet" id="previewSheet">
-  <div class="modal__head"><h2 class="modal__title" id="previewSheetWho">미리보기</h2></div>
-  <div class="modal__body"><iframe id="previewSheetFrame" title="레포트 미리보기" class="pv-sheet__frame"></iframe></div>
-  <div class="modal__foot"><div class="spacer"></div><button class="btn" type="button" id="previewSheetClose">닫기</button></div>
-</dialog>
 
 <!-- 더보기 (rtabs.js) -->
 <dialog class="modal sheet" id="moreMenu">

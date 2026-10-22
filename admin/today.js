@@ -317,7 +317,8 @@
         tagsHtml(why.urgent, 'td-why--urgent') + tagsHtml(why.watch, 'td-why--watch') + '</div>' + appDetailHtml(s, why) +
       '<div class="tdc-st__acts"><button type="button" class="btn btn--sm" data-card="' + esc(s.id) + '">상담 카드</button>' +
         '<button type="button" class="btn btn--sm" data-sms-sid="' + esc(s.id) + '">문자</button>' +
-        '<button type="button" class="btn btn--sm btn--ghost" data-pv="student" data-sid="' + esc(s.id) + '">학생 화면 보기</button></div>' +
+        '<button type="button" class="btn btn--sm btn--ghost" data-pv="parent" data-sid="' + esc(s.id) + '">학부모 화면 미리보기</button>' +
+        '<button type="button" class="btn btn--sm btn--ghost" data-pv="student" data-sid="' + esc(s.id) + '">학생 화면 미리보기</button></div>' +
     '</div>';
   }
 

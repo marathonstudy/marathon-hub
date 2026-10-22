@@ -5,8 +5,8 @@
    자동 저장 · 지난주 불러오기 · 코멘트 상용구 · 맞춤법 경고
 
    40~100명을 매주 입력하므로, 반복 입력을 최대한 줄이는 것이 목표다.
-     · 수업 내용과 테스트 이름은 반마다 한 번
-     · 학생별로는 출결·별점·점수·과제·코멘트만
+     · 수업 내용은 반마다 한 번 (수기 테스트 이름 · 필수/선택 과제 칸은 없앴다 — 시험은 복습테스트, 과제는 앱 연동 · 20261029g)
+     · 학생별로는 출결·별점·코멘트 · 복습테스트는 그 주 기록을 보여 주기만
    퇴원한 학생은 작성 목록에 나오지 않는다.
    ============================================================ */
 
@@ -57,27 +57,6 @@
     return { lessons: [''], tests: [''], comment: '', homework: [] };
   }
 
-  /* 과제 목록을 꺼낸다. 없으면 만들어 둔다. */
-  function hwListOf(cls) {
-    var c = commonOf(cls);
-    if (!Array.isArray(c.homework)) c.homework = [];
-    return c.homework;
-  }
-
-  function hwOfGroup(cls, group) {
-    return hwListOf(cls).filter(function (it) { return Report.groupOf(it) === group; });
-  }
-
-  /* 항목 key 는 한 번 정하면 바꾸지 않는다. 학생이 체크해 둔 값이
-     이 key 로 붙어 있기 때문에, 이름을 고쳐도 체크가 따라온다. */
-  function newHwKey(cls) {
-    var used = {};
-    hwListOf(cls).forEach(function (it) { used[it.key] = 1; });
-    for (var n = 1; n < 999; n++) {
-      if (!used['h' + n]) return 'h' + n;
-    }
-    return 'h' + Date.now();
-  }
 
   /* 이 학생 레포트에 실제로 들어갈 코멘트와 그 출처.
      학생 코멘트에 글이 있으면 그것, 비어 있으면 반 공통.
@@ -333,8 +312,40 @@
     mode = m === 'edit' ? 'edit' : 'weeks';
     $('#writeMain').classList.toggle('is-weeks', mode === 'weeks');
     renderBar();
+    showRePub();
     window.dispatchEvent(new CustomEvent('jt:write-mode', { detail: { mode: mode } }));
   }
+
+  /* ---------- 이미 보낸 주를 고쳤을 때 — 「고친 내용은 다시 공개해야 학부모에게 반영됩니다 [다시 공개]」 (20261029g) ----------
+     그 반 그 주에 보낸 학생이 있고, 이 화면에서 무엇이든 고치면 띠를 보인다. [다시 공개] → 주간 레포트 → 공개 */
+  var rePub = { key: '', sent: 0, edited: {} };
+  function rePubKey() { return (currentClass || '') + '|' + (draft.weekStart || ''); }
+  function checkSent() {
+    var key = rePubKey();
+    if (!currentClass || !draft.weekStart || !window.DB || !DB.weekSendData) { rePub.key = key; rePub.sent = 0; showRePub(); return; }
+    DB.weekSendData(draft.weekStart).then(function (x) {
+      if (key !== rePubKey()) return;
+      rePub.key = key;
+      rePub.sent = studentsOfClass(currentClass).filter(function (s) { return x.sent && x.sent[s.id]; }).length;
+      showRePub();
+    }, function () {});
+  }
+  function showRePub() {
+    var n = $('#rePubNote');
+    if (n) n.hidden = !(mode === 'edit' && rePub.key === rePubKey() && rePub.sent > 0 && rePub.edited[rePubKey()]);
+  }
+  function markEdited(ev) {
+    if (!ev.target.closest || !ev.target.closest('#commonPanel, #entryList, #commentModal')) return;
+    /* 누르기는 출결 · 별점 · 차시 지우기만 고친 것으로 (펼치기 · 상담 기록 · 미리보기는 아님) */
+    if (ev.type === 'click' && !ev.target.closest('[data-act="status"], [data-act="star"], [data-del]')) return;
+    rePub.edited[rePubKey()] = true;
+    showRePub();
+  }
+  document.addEventListener('input', markEdited, true);
+  document.addEventListener('click', markEdited, true);
+  window.addEventListener('jt:write-nav', function () { setTimeout(checkSent, 0); });
+  window.addEventListener('jt:remote', function (e) { var t = e.detail && e.detail.table; if (t === 'sent' || t === 'published') checkSent(); });
+  $('#btnRePublish').addEventListener('click', function () { flushDraft(); UI.selectTab(2); });
 
   /* 그 주 작성 화면으로 (주차 현황의 줄 · [이번 주 작성하기]) */
   function openWeek(start) {
@@ -410,38 +421,6 @@
      반 공통 — 수업 내용 · 테스트 이름
      ============================================================ */
 
-  /* 반 공통의 과제 이름 목록. 리뷰테스트 목록과 같은 모양이다. */
-  function renderHomeworkList(group, hostId, label, placeholder) {
-    var host = $('#' + hostId);
-    if (!host) return;
-    host.textContent = '';
-
-    var items = hwOfGroup(currentClass || '_', group);
-
-    if (!items.length) {
-      var p = document.createElement('p');
-      p.className = 'panel__hint';
-      p.textContent = group === 'required'
-        ? '아직 없습니다. 과제 이름을 넣어야 학생 카드에 체크 칸이 생깁니다.'
-        : '아직 없습니다. 선택과제가 없으면 레포트에도 안 나옵니다.';
-      host.appendChild(p);
-      return;
-    }
-
-    items.forEach(function (it) {
-      var row = document.createElement('div');
-      row.className = 'row-item';
-      row.innerHTML =
-        '<span class="row-item__no">' + label + '</span>' +
-        '<input class="input" type="text" data-kind="hw" data-key="' + it.key + '">' +
-        '<button class="btn btn--sm btn--ghost" type="button" data-del="hw"' +
-        ' data-key="' + it.key + '" aria-label="삭제">×</button>';
-      row.querySelector('input').value = it.name || '';
-      row.querySelector('input').placeholder = placeholder;
-      host.appendChild(row);
-    });
-  }
-
   function renderCommonComment() {
     var c = commonOf(currentClass || '_');
     setFresh($('#commonComment'), c.comment || '');
@@ -483,50 +462,16 @@
     /* 수업일 · 수업 영상 · 자료 파일 (weekly.js) */
     if (window.Weekly) Weekly.render(currentClass, draft.weekStart);
 
-    renderHomeworkList('required', 'hwReqList', '필수', '예) 문학 주간지');
-    renderHomeworkList('optional', 'hwOptList', '선택', '예) 기출 추가문제');
+    /* 수기 과제(필수 · 선택) · 테스트 이름 칸은 없앴다 (20261029g) — 예전 값은 그대로 두고 화면에서만 숨긴다 */
     renderCommonComment();
-
-    var tests = $('#testList');
-    tests.textContent = '';
-    (c.tests.length ? c.tests : ['']).forEach(function (name, i) {
-      var row = document.createElement('div');
-      row.className = 'row-item';
-      row.innerHTML =
-        '<span class="row-item__no">테스트</span>' +
-        '<input class="input" type="text" data-kind="test" data-i="' + i + '"' +
-        ' placeholder="예) 문법 리뷰테스트">' +
-        '<button class="btn btn--sm btn--ghost" type="button" data-del="test" data-i="' + i + '" aria-label="삭제">×</button>';
-      row.querySelector('input').value = name || '';
-      tests.appendChild(row);
-    });
-  }
-
-  /* 테스트 이름이 바뀌면 학생 카드의 점수 칸 개수도 달라진다.
-     타이핑 중에 매번 다시 그리면 무거우니 잠깐 묶어서 처리한다. */
-  var entriesTimer = null;
-  function scheduleEntries() {
-    clearTimeout(entriesTimer);
-    entriesTimer = setTimeout(renderEntries, 300);
   }
 
   $('#commonPanel').addEventListener('input', function (e) {
     var el = e.target;
-    if (el.dataset.kind === 'lesson' || el.dataset.kind === 'test' || el.dataset.kind === 'hw') showState('common', currentClass, 'saving');
     if (el.dataset.kind === 'lesson') {
+      showState('common', currentClass, 'saving');
       commonOf(currentClass).lessons[+el.dataset.i] = el.value;
       saveDraft(); schedulePreview();
-    } else if (el.dataset.kind === 'test') {
-      commonOf(currentClass).tests[+el.dataset.i] = el.value;
-      saveDraft(); schedulePreview();
-      scheduleEntries();
-    } else if (el.dataset.kind === 'hw') {
-      var it = hwListOf(currentClass || '_').find(function (x) {
-        return x.key === el.dataset.key;
-      });
-      if (it) it.name = el.value;
-      saveDraft(); schedulePreview();
-      scheduleEntries();          /* 이름이 생겨야 학생 카드에 체크 칸이 뜬다 */
     }
   });
 
@@ -535,42 +480,9 @@
     if (!btn) return;
     var c = commonOf(currentClass);
     var i = +btn.dataset.i;
-
-    if (btn.dataset.del === 'hw') {
-      /* 과제 항목을 지운다. 학생들이 체크해 둔 값도 같이 지운다.
-         key 로 붙어 있으므로 다른 항목은 건드리지 않는다. */
-      var key = btn.dataset.key;
-      var list = hwListOf(currentClass || '_');
-      var idx = list.findIndex(function (x) { return x.key === key; });
-      if (idx >= 0) list.splice(idx, 1);
-      Object.keys(draft.entries).forEach(function (id) {
-        if (draft.entries[id].homework) delete draft.entries[id].homework[key];
-      });
-      saveDraft();
-      renderCommon();
-      renderEntries();
-      schedulePreview();
-      return;
-    }
-
-    if (btn.dataset.del === 'lesson') {
-      c.lessons.splice(i, 1);
-      if (!c.lessons.length) c.lessons = [''];
-    } else {
-      c.tests.splice(i, 1);
-      if (!c.tests.length) c.tests = [''];
-      /* 테스트를 지우면 학생들의 점수 인덱스도 같이 당긴다 */
-      Object.keys(draft.entries).forEach(function (id) {
-        var sc = draft.entries[id].scores || {};
-        var next = {};
-        Object.keys(sc).forEach(function (k) {
-          var n = +k;
-          if (n < i) next[n] = sc[k];
-          else if (n > i) next[n - 1] = sc[k];
-        });
-        draft.entries[id].scores = next;
-      });
-    }
+    if (btn.dataset.del !== 'lesson') return;
+    c.lessons.splice(i, 1);
+    if (!c.lessons.length) c.lessons = [''];
     saveDraft();
     renderCommon();
     renderEntries();
@@ -594,29 +506,9 @@
     openCommentModal('', { classComment: true });
   });
 
-  function addHomework(group) {
-    var cls = currentClass || '_';
-    hwListOf(cls).push({ key: newHwKey(cls), group: group, name: '' });
-    saveDraft();
-    renderCommon();
-    renderEntries();
-    /* 새로 생긴 칸에 바로 쓸 수 있게 */
-    var host = $(group === 'required' ? '#hwReqList' : '#hwOptList');
-    var inputs = host ? host.querySelectorAll('input') : [];
-    if (inputs.length) inputs[inputs.length - 1].focus();
-  }
-
-  $('#btnAddHwReq').addEventListener('click', function () { addHomework('required'); });
-  $('#btnAddHwOpt').addEventListener('click', function () { addHomework('optional'); });
-
   $('#btnAddLesson').addEventListener('click', function () {
     commonOf(currentClass).lessons.push('');
     saveDraft(); renderCommon();
-  });
-
-  $('#btnAddTest').addEventListener('click', function () {
-    commonOf(currentClass).tests.push('');
-    saveDraft(); renderCommon(); renderEntries();
   });
 
   /* ---------- 지난주 불러오기 (C단계) ---------- */
@@ -637,25 +529,19 @@
       if (!h) { toast('이 반의 지난 회차 기록이 없습니다', 'bad'); return; }
 
       var c = commonOf(currentClass);
-      var hasContent = c.lessons.some(function (x) { return String(x || '').trim(); }) ||
-                       c.tests.some(function (x) { return String(x || '').trim(); });
+      var hasContent = c.lessons.some(function (x) { return String(x || '').trim(); });
 
       function apply() {
+        /* 수업 내용만 (수기 테스트 이름 · 과제 칸은 없앴다 · 20261029g) */
         c.lessons = (h.lessons || ['']).slice();
-        c.tests   = (h.tests || ['']).slice();
         if (!c.lessons.length) c.lessons = [''];
-        if (!c.tests.length) c.tests = [''];
-        /* 과제 이름은 지난주 것을 그대로 쓰는 일이 많다. 체크는 학생마다 새로 한다. */
-        if ((h.homework || []).length && !Report.homeworkItems(c).length) {
-          c.homework = h.homework.map(function (it) { return { key: it.key, group: it.group, name: it.name }; });
-        }
         saveDraft(); renderCommon(); renderEntries(); schedulePreview();
         toast(Store.shortDate(h.weekStart) + ' 주차를 불러왔습니다', 'good');
       }
 
       if (!hasContent) { apply(); return; }
       UI.confirmAsk('지난주 불러오기',
-        Store.shortDate(h.weekStart) + ' 주차 내용으로 바꿉니다. 지금 입력한 수업 내용과 테스트 이름은 사라집니다.',
+        Store.shortDate(h.weekStart) + ' 주차 내용으로 바꿉니다. 지금 입력한 수업 내용은 사라집니다.',
         '바꾸기').then(function (ok) { if (ok) apply(); });
 
     }).catch(function (e) {
@@ -686,14 +572,6 @@
                '" data-act="star" data-v="' + i + '" aria-label="' + i + '점"' + (absent ? ' disabled' : '') + '>★</button>';
     }
 
-    var scoreRow = tests.length
-      ? tests.map(function (name, i) {
-          return '<label class="score"><span class="score__name"></span>' +
-                 '<input class="input input--num" type="number" inputmode="numeric" min="0" max="100" ' +
-                 'data-act="score" data-i="' + i + '" placeholder="-"></label>';
-        }).join('')
-      : '<span class="muted-note">반 공통에 테스트 이름을 넣으면 점수 칸이 생깁니다</span>';
-
     var needNote = e.attendStatus === 'late';
 
     return '' +
@@ -717,16 +595,13 @@
             '<span class="stars">' + stars + '</span>' +
             '<span class="stars__val num">' + (e.focusScore || 0) + ' / 5</span>' +
           '</div>' +
-          '<div class="fieldline">' +
-            '<span class="fieldline__label">점수</span>' +
-            '<span class="scores">' + scoreRow + '</span>' +
-          '</div>' +
-          '<div class="fieldline fieldline--hw">' +
-            '<span class="fieldline__label">과제</span>' +
-            '<div class="hwd" data-role="hwchecks"></div>' +
+          '<div class="fieldline fieldline--rv">' +
+            '<span class="fieldline__label">복습테스트</span>' +
+            '<span class="entry__rv" data-role="rv"></span>' +
+            '<button type="button" class="btn btn--sm btn--ghost" data-act="rvfix">고치기</button>' +
           '</div>' +
           '<div class="fieldline">' +
-            '<span class="fieldline__label">코멘트</span>' +
+            '<span class="fieldline__label">코멘트 <span class="say-note">학부모 화면의 \'선생님 한마디\'에 나옵니다</span></span>' +
             '<button type="button" class="comment-btn" data-act="comment">' +
               '<span class="comment-btn__text"></span>' +
               '<span class="comment-btn__count num"></span>' +
@@ -739,84 +614,11 @@
           '</div>' +
           '<div class="fieldline fieldline--pv">' +
             '<span class="fieldline__label">미리보기</span>' +
-            '<button type="button" class="btn btn--sm" data-act="preview">미리보기</button>' +
-            '<button type="button" class="btn btn--sm btn--ghost" data-pv="parent">학부모 화면 보기</button>' +
-            '<button type="button" class="btn btn--sm btn--ghost" data-pv="student">학생 화면 보기</button>' +
+            '<button type="button" class="btn btn--sm" data-pv="parent">학부모 화면 미리보기</button>' +
+            '<button type="button" class="btn btn--sm btn--ghost" data-pv="student">학생 화면 미리보기</button>' +
           '</div>' +
         '</div>' +
       '</div>';
-  }
-
-  /* 학생 카드의 과제 체크 칸.
-     항목은 반 공통에서 오므로 이름을 고치거나 지우면 여기도 같이 바뀐다.
-
-     항목 한 줄:  [필수] 이름 · 월 화 수 목 금 · 3/5
-     필수/선택 표시는 그 묶음 첫 줄에만 붙인다. 이름을 누르면 월~금을
-     한꺼번에 켜고 끈다. */
-  function fillHomework(el, s, e) {
-    var host = el.querySelector('[data-role="hwchecks"]');
-    if (!host) return;
-
-    var common = commonOf((s && s.className) || '_');
-    var items = Report.homeworkItems(common);
-    var hw = e.homework || {};
-    host.textContent = '';
-
-    if (!items.length) {
-      var hint = document.createElement('span');
-      hint.className = 'hw-empty';
-      hint.textContent = '반 공통에 과제 이름을 넣어 주세요';
-      host.appendChild(hint);
-      return;
-    }
-
-    var first = true;
-    ['required', 'optional'].forEach(function (g) {
-      var list = items.filter(function (it) { return Report.groupOf(it) === g; });
-      if (!list.length) return;
-
-      if (!first) host.appendChild(span('hwd-sep', ''));
-      first = false;
-
-      list.forEach(function (it, i) {
-        var v = hw[it.key];
-
-        host.appendChild(i === 0
-          ? span('hw-tag hw-tag--' + g, g === 'required' ? '필수' : '선택')
-          : span('', ''));
-
-        var name = document.createElement('button');
-        name.type = 'button';
-        name.className = 'hwd-name';
-        name.dataset.act = 'hwall';
-        name.dataset.key = it.key;
-        name.title = '누르면 월~금 한꺼번에 켜고 끕니다';
-        name.textContent = it.name;
-        host.appendChild(name);
-
-        var days = span('hwd-days', '');
-        Report.DAYS.forEach(function (day) {
-          var b = document.createElement('button');
-          b.type = 'button';
-          b.className = 'hw' + (v && typeof v === 'object' && v[day] ? ' is-on' : '');
-          b.dataset.act = 'hwday';
-          b.dataset.key = it.key;
-          b.dataset.day = day;
-          b.textContent = day;
-          days.appendChild(b);
-        });
-        host.appendChild(days);
-
-        host.appendChild(span('hwd-n num', Report.daysDone(v) + '/5'));
-      });
-    });
-
-    var foot = span('hwd-foot', '');
-    var rate = span('rate-note num', homeworkRateText(common, hw));
-    rate.dataset.role = 'rate';
-    foot.appendChild(rate);
-    foot.appendChild(span('hwd-hint', '이름을 누르면 월~금 한꺼번에'));
-    host.appendChild(foot);
   }
 
   function span(cls, text) {
@@ -824,18 +626,6 @@
     if (cls) el.className = cls;
     el.textContent = text;
     return el;
-  }
-
-  /* '필수 12/15 (80%) · 선택 2/10 (20%)' — 레포트 게이지와 같은 함수로 센다 */
-  function homeworkRateText(common, hw) {
-    var parts = [];
-    [['required', '필수'], ['optional', '선택']].forEach(function (p) {
-      var c = Report.countOf(common, hw, p[0]);
-      if (!c) return;
-      parts.push(p[1] + ' ' + c.done + '/' + c.total +
-                 ' (' + Math.round(c.done / c.total * 100) + '%)');
-    });
-    return parts.join(' · ');
   }
 
   /* 카드 오른쪽 위 딱지 — 미작성(회색) · 작성 중(주황) · 작성 완료(초록).
@@ -856,17 +646,10 @@
     if (sv && uiState.entry[s.id]) { sv.textContent = SAVE_TEXT[uiState.entry[s.id]] || ''; sv.className = 'entry__save save-state save-state--' + uiState.entry[s.id]; }
     fillBadge(el, s.id);
 
-    $$('.score', el).forEach(function (lab, i) {
-      lab.querySelector('.score__name').textContent = tests[i] || '';
-      var inp = lab.querySelector('input');
-      var v = e.scores && e.scores[i];
-      inp.value = (v === 0 || v) ? v : '';
-    });
-
     var note = el.querySelector('[data-act="note"]');
     if (note) note.value = e.attendNote || '';
 
-    fillHomework(el, s, e);
+    fillReview(el, s.id);
 
     var c = commentOf(s.id);
     var txt = c.text;
@@ -878,6 +661,19 @@
           : '코멘트 작성';
     el.querySelector('.comment-btn__count').textContent = txt ? txt.length + '자' : '';
   }
+
+  /* 학생 카드 「복습테스트」 — 그 주 수업일 복습테스트 기록 (review.js 가 불러온 것 · 20261029g)
+     「복습 TEST 6/10 · 화작문 TEST 10/10 · 확인 전」 · 제출이 없으면 「아직 제출 안 함」 */
+  function fillReview(el, id) {
+    var host = el.querySelector('[data-role="rv"]');
+    if (!host) return;
+    var line = window.Review && Review.lineOf ? Review.lineOf(currentClass, draft.weekStart, id) : null;
+    host.textContent = line == null ? '불러오는 중…' : line;
+    host.classList.toggle('is-none', line === '아직 제출 안 함');
+  }
+  window.addEventListener('jt:review-drawn', function () {
+    $('#entryList .entry').forEach(function (el) { fillReview(el, el.dataset.id); });
+  });
 
   function renderEntries() {
     var host = $('#entryList');
@@ -938,10 +734,9 @@
       return;
     }
 
-    /* [미리보기] — 그 학생으로. 휴대폰 폭에서는 창으로 */
-    if (act === 'preview') {
-      selectStudent(id, true);
-      if (phoneWide()) openPreviewSheet(id);
+    /* [고치기] — 반 공통의 복습테스트 화면으로 (그 학생 줄을 표시) */
+    if (act === 'rvfix') {
+      if (window.Review && Review.focusStudent) Review.focusStudent(id);
       return;
     }
 
@@ -981,31 +776,6 @@
       return;
     }
 
-    /* 과제 — 요일 한 칸, 또는 이름을 눌러 월~금 한꺼번에.
-       '했다' 만 있던 항목(true)은 누르는 순간 요일 모양으로 바뀐다. */
-    if (act === 'hwday' || act === 'hwall') {
-      var key = btn.dataset.key;
-      if (!e.homework) e.homework = {};
-      var cur = e.homework[key];
-      var days = (cur && typeof cur === 'object') ? Object.assign({}, cur) : {};   /* 새 상자 — 저장 비교가 바뀐 것을 알아보게 */
-
-      if (act === 'hwday') {
-        if (days[btn.dataset.day]) delete days[btn.dataset.day];
-        else days[btn.dataset.day] = true;
-      } else {
-        var all = Report.daysDone(days) === Report.DAYS.length;
-        days = {};
-        if (!all) Report.DAYS.forEach(function (d) { days[d] = true; });
-      }
-      e.homework[key] = days;
-
-      var s2 = students().find(function (x) { return x.id === id; });
-      fillHomework(card, s2, e);
-      fillBadge(card, id);
-      afterChange(id, true);
-      return;
-    }
-
     if (act === 'comment') {
       openCommentModal(id);
     }
@@ -1018,13 +788,7 @@
     var e = entryOf(id);
     var act = ev.target.dataset.act;
 
-    if (act === 'score') {
-      var i = +ev.target.dataset.i;
-      var raw = ev.target.value.trim();
-      if (raw === '') delete e.scores[i];
-      else e.scores[i] = Math.max(0, Math.min(100, parseInt(raw, 10) || 0));
-      afterChange(id);
-    } else if (act === 'note') {
+    if (act === 'note') {
       e.attendNote = ev.target.value;
       afterChange(id);
     }
@@ -1107,22 +871,10 @@
       '</body></html>';
   }
 
-  /* 휴대폰 폭 — 오른쪽(아래) 미리보기 칸 대신 [미리보기] 창 */
-  function phoneWide() { return !!(window.matchMedia && window.matchMedia('(max-width: 720px)').matches); }
-  function openPreviewSheet(id) {
-    var s = students().find(function (x) { return x.id === id; });
-    if (!s) return;
-    var data = Report.toReportData(s, commonOf(currentClass), entryOf(s.id), { start: draft.weekStart, end: draft.weekEnd });
-    $('#previewSheetWho').textContent = s.name + ' 학생 · 레포트 미리보기';
-    $('#previewSheetFrame').srcdoc = previewHtml(data);
-    $('#previewSheet').showModal();
-  }
-  $('#previewSheetClose').addEventListener('click', function () { $('#previewSheet').close(); });
-
   function renderPreview() {
     var s = students().find(function (x) { return x.id === selectedId; });
     if (!s) {
-      /* 처음에는 안내만 — 학생 줄을 누르거나 [미리보기]를 누르면 그 학생으로 (20261029b) */
+      /* 처음에는 안내만 — 학생 줄을 누르면 그 학생으로 (20261029b) */
       $('#previewWho').textContent = '학생을 누르면 그 학생 레포트 미리보기가 나옵니다';
       $('#previewFrame').srcdoc = '<!DOCTYPE html><html><body style="font-family:sans-serif;color:#8A90AC;display:grid;place-items:center;height:90vh;margin:0;text-align:center;font-size:14px">학생을 누르면 그 학생 레포트<br>미리보기가 나옵니다</body></html>';
       return;

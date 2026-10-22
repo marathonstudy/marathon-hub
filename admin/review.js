@@ -3,7 +3,7 @@
 
    반 수업일마다 기본 시험들(「복습 TEST」 · 「화작문 TEST」, 반 관리에서 바꿈)이 서버에서 저절로 생긴다.
    모든 곳에서 「10/22(목) 복습 TEST」처럼 수업일 + 시험 이름으로 부른다 (회차는 쓰지 않는다).
-   · 그 주 시험 줄: 시험마다 [이번 주 없음] · [다시 켜기], [+ 시험 추가](그 주만)
+   · 그 주 시험 줄: [+ 시험 추가](그 주만) · [이번 주 시험 빼기](제출이 있는 시험은 뺄 수 없음) · 뺀 시험은 요약 줄에 「… 이번 주 안 봄 · 되돌리기」 (20261029g)
    · 확인 표: 학생 한 줄 — 시험마다 점수 · 상태(미제출/제출/확인) · [확인] [고치기] [대신 입력], 사진(여러 장)
      고치기 · 대신 입력은 시험마다 「전체 문항 수」 · 「틀린 개수」. 누가 · 언제 했는지 서버(review_log)에 남는다
      예전 기록(틀린 번호 방식)은 「복습 TEST」로 그대로 보인다
@@ -76,6 +76,10 @@
   function onTests() { return tests().filter(function (t) { return !t.off; }); }
 
   function draw() {
+    drawInner();
+    window.dispatchEvent(new CustomEvent('jt:review-drawn'));     /* 학생 카드 「복습테스트」 줄 (write.js) */
+  }
+  function drawInner() {
     var line = $('#rvLine'), tools = $('#rvTools'), host = $('#rvTable');
     if (!line) return;
     $('#btnRvLive').disabled = $('#btnRvStats').disabled = !st.cls;
@@ -94,16 +98,15 @@
     var ok = 0;
     rows.forEach(function (x) { on.forEach(function (t) { var s = x.subs && x.subs[t.id]; if (s && s.status === 'confirmed') ok++; }); });
     var day = all[0].lesson_date;
-    line.innerHTML = '<b>' + esc(Lesson.md(String(day).slice(0, 10))) + '</b> · ' + all.map(function (t) {
-        return t.off ? '<s>' + esc(t.test_name) + '</s>' : '<b>' + esc(t.test_name) + '</b>';
-      }).join(' · ') + ' · 마감 ' + esc(Lesson.md(String(day).slice(0, 10))) + ' 밤 12시' +
-      ' <span class="muted-note">모두 제출 ' + allDone + ' / ' + rows.length + ' · 확인 ' + ok + '</span>';
-    tools.innerHTML = all.map(function (t) {
-        return t.off
-          ? '<button class="btn btn--sm" type="button" data-rv="on" data-tid="' + esc(t.id) + '">' + esc(t.test_name) + ' 다시 켜기</button>'
-          : '<button class="btn btn--sm btn--ghost" type="button" data-rv="off" data-tid="' + esc(t.id) + '">' + esc(t.test_name) + ' 이번 주 없음</button>';
-      }).join('') +
-      '<button class="btn btn--sm" type="button" data-rv="add">+ 시험 추가 (이번 주만)</button>' +
+    /* 요약 줄 — 보는 시험은 굵게, 뺀 시험은 「복습 TEST 이번 주 안 봄 · 되돌리기」 (20261029g) */
+    line.innerHTML = '<b>' + esc(Lesson.md(String(day).slice(0, 10))) + '</b> · ' + (on.length ? on.map(function (t) { return '<b>' + esc(t.test_name) + '</b>'; }).join(' · ') : '시험 없음') +
+      ' · 마감 ' + esc(Lesson.md(String(day).slice(0, 10))) + ' 밤 12시' +
+      ' <span class="muted-note">모두 제출 ' + allDone + ' / ' + rows.length + ' · 확인 ' + ok + '</span>' +
+      all.filter(function (t) { return t.off; }).map(function (t) {
+        return ' <span class="rv-off">' + esc(t.test_name) + ' 이번 주 안 봄 · <button type="button" class="link-btn" data-rv="on" data-tid="' + esc(t.id) + '">되돌리기</button></span>';
+      }).join('');
+    tools.innerHTML = '<button class="btn btn--sm" type="button" data-rv="add">+ 시험 추가 (이번 주만)</button>' +
+      '<button class="btn btn--sm btn--ghost" type="button" data-rv="skip"' + (on.length ? '' : ' disabled') + '>이번 주 시험 빼기</button>' +
       (isTeacher() ? cleanBtn() : '');
 
     if (!on.length) { host.innerHTML = '<p class="panel__hint">이번 주 시험을 모두 껐습니다.</p>'; return; }
@@ -202,11 +205,17 @@
     var t = b.dataset.tid ? testOf(b.dataset.tid) : null;
     var s = x && t && x.subs ? x.subs[t.id] : null;
 
-    if (act === 'off' && t) {
-      UI.confirmAsk('이번 주 없음', label(t) + ' 을(를) 끕니다. 학생 러닝노트 기록 카드에 이 시험이 뜨지 않습니다.', '끄기')
-        .then(function (yes) { if (yes) call('review_test_set', { p_test: t.id, p_off: true }, label(t) + ' 을(를) 껐습니다'); });
+    if (act === 'skip') { openSkip(); return; }
+    if (act === 'skip-pick' && t) {
+      $('#rvSkipModal').close();
+      /* 창이 닫힌 뒤 확인 창 (뒤로가기 기록이 꼬이지 않게 · nav.js) */
+      setTimeout(function () {
+        UI.confirmAsk('이번 주 시험 빼기', label(t) + '를 이번 주 시험에서 뺄까요? 학생 화면에서도 사라집니다.', '빼기')
+          .then(function (yes) { if (yes) call('review_test_set', { p_test: t.id, p_off: true }, label(t) + '를 이번 주 시험에서 뺐습니다'); });
+      }, 60);
+      return;
     }
-    if (act === 'on' && t) call('review_test_set', { p_test: t.id, p_off: false }, label(t) + ' 을(를) 다시 켰습니다');
+    if (act === 'on' && t) call('review_test_set', { p_test: t.id, p_off: false }, label(t) + '를 다시 넣었습니다');
     if (act === 'add') {
       var nm = window.prompt('이번 주(' + Lesson.md(String((tests()[0] || {}).lesson_date || st.mon).slice(0, 10)) + ')에만 더 넣을 시험 이름 (예: 어휘 TEST)', '');
       if (nm == null || !nm.trim()) return;
@@ -219,6 +228,23 @@
     if (act === 'cancel') { st.edit = null; draw(); }
     if (act === 'save') save();
     if (act === 'photo' && x) showPhotos(photosOf(x));
+  }
+
+  /* 이번 주 시험 빼기 — 보는 시험 목록에서 고른다. 제출이 있으면 뺄 수 없다 (서버 review_test_set 도 막는다) */
+  function subCount(t) {
+    return ((st.data && st.data.rows) || []).filter(function (x) { return x.subs && x.subs[t.id]; }).length;
+  }
+  function openSkip() {
+    var on = onTests();
+    if (!on.length) return;
+    $('#rvSkipList').innerHTML = on.map(function (t) {
+      var n = subCount(t);
+      return '<div class="rv-skip-row">' +
+        '<span class="rv-skip-name"><b>' + esc(label(t)) + '</b>' + (n ? ' <span class="muted-note">제출 ' + n + '명 있음 · 뺄 수 없음</span>' : ' <span class="muted-note">제출 없음</span>') + '</span>' +
+        '<button class="btn btn--sm" type="button" data-rv="skip-pick" data-tid="' + esc(t.id) + '"' + (n ? ' disabled' : '') + '>빼기</button>' +
+      '</div>';
+    }).join('');
+    $('#rvSkipModal').showModal();
   }
 
   function focusEditor() { var i = document.querySelector('#rvTable [data-rv-eq]'); if (i) try { i.focus(); } catch (er) {} }
@@ -406,6 +432,8 @@
   function bind() {
     if (!$('#rvSub')) return;
     $('#rvSub').addEventListener('click', onClick);
+    $('#rvSkipList').addEventListener('click', onClick);
+    $('#rvSkipClose').addEventListener('click', function () { $('#rvSkipModal').close(); });
     $('#rvSub').addEventListener('change', onChange);
     $('#rvSub').addEventListener('input', onInput);
     $('#btnRvLive').addEventListener('click', openLive);
@@ -434,6 +462,39 @@
 
   bind();
 
-  window.Review = { render: render, reload: load, openLive: openLive };
+  /* 학생 카드 「복습테스트」 한 줄 (write.js · 20261029g) — 그 반 그 주를 아직 안 불러왔으면 null
+     「복습 TEST 6/10 · 화작문 TEST 10/10 · 확인 전」 · 하나도 안 냈으면 「아직 제출 안 함」 */
+  function lineOf(cls, week, sid) {
+    if (st.missing) return '복습테스트 SQL(025) 전';
+    if (!cls || st.cls !== cls || st.mon !== monday(week) || !st.data) return null;
+    var on = onTests();
+    if (!on.length) return '이번 주 복습테스트 없음';
+    var x = rowOf(sid);
+    var subs = (x && x.subs) || {};
+    if (!on.some(function (t) { return subs[t.id]; })) return '아직 제출 안 함';
+    var pending = false;
+    var parts = on.map(function (t) {
+      var s = subs[t.id];
+      if (!s) return t.test_name + ' 미제출';
+      if (s.status !== 'confirmed') pending = true;
+      return t.test_name + ' ' + s.correct + '/' + s.q_count;
+    });
+    return parts.join(' · ') + ' · ' + (pending ? '확인 전' : '확인 완료');
+  }
+
+  /* 학생 카드 [고치기] — 복습테스트 화면으로 가서 그 학생 줄을 잠깐 표시 */
+  function focusStudent(sid) {
+    var sub = $('#rvSub');
+    if (!sub) return;
+    sub.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    var tr = document.querySelector('#rvTable tr[data-sid="' + sid + '"]');
+    if (!tr) return;
+    tr.classList.add('is-focus');
+    setTimeout(function () { tr.classList.remove('is-focus'); }, 2400);
+    var b = tr.querySelector('[data-rv="edit"], [data-rv="entry"]');
+    if (b) try { b.focus(); } catch (er) {}
+  }
+
+  window.Review = { render: render, reload: load, openLive: openLive, lineOf: lineOf, focusStudent: focusStudent };
 
 })();

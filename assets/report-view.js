@@ -10,10 +10,8 @@
      school · grade · studentName · startDate · endDate
      attendance {status: attend|late|absent (예전 makeup 은 출석으로 보임), note}
      lessons ["1차시 내용", …]  focusScore 0~5
-     tests [{name, score}]
-     homeworkItems [{key, group: required|optional, name}]
-     homework {h1: {"월":true, …}}
-     requiredRate · optionalRate (-1 이면 그 묶음 없음)
+     tests [{name, score}] — 복습테스트(kind: review)만 보인다. 확인 전이면 {submitted: true} → 「제출 완료」
+     (예전 레포트의 수기 리뷰테스트 점수 · homework · requiredRate 는 남아 있어도 그리지 않는다 · 20261029g)
      comment
      lessonDate · lessonDays[] · hwFrom · hwTo  (반 수업 요일을 정한 뒤 공개한 레포트만 · migration-011)
        있으면 머리에 "수업일 10/15(목) · 과제 기간 10/8~10/14", 없으면(예전 레포트) 예전처럼 기간
@@ -32,6 +30,15 @@
     return String(v == null ? '' : v)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  /* 글 표시 — **굵게** · __굵게__ 는 굵게, 줄 앞 # 제목 기호와 남은 ** · __ 는 지운다 (저장된 글은 그대로 · 20261029g) */
+  function mdHtml(v) {
+    return esc(v)
+      .replace(/\*\*([^*\n]+?)\*\*/g, '<b>$1</b>')
+      .replace(/__([^_\n]+?)__/g, '<b>$1</b>')
+      .replace(/^[ \t]*#{1,6}[ \t]+/gm, '')
+      .replace(/\*\*|__/g, '');
   }
 
   function pct(v) {
@@ -176,7 +183,7 @@
       var L = splitLesson(raw, i);
       return '<li class="lesson-item">' +
                '<span class="lesson-check">✓</span>' +
-               '<span><b class="lesson-no">' + esc(L.no) + '</b>' + esc(L.text) + '</span>' +
+               '<span><b class="lesson-no">' + esc(L.no) + '</b>' + mdHtml(L.text) + '</span>' +
              '</li>';
     }).join('') + '</ul>';
     return card('📖 이번주 학습 내용', body, '총 ' + list.length + '차시');
@@ -195,118 +202,30 @@
     return card('⭐ 수업 집중도', body);
   }
 
+  /* 복습테스트 — 학생 QR 기록만 (수기 리뷰테스트 점수는 그리지 않는다 · 20261029g).
+     선생님이 확인한 시험은 점수, 아직 확인 전이면 「제출 완료」만 */
   function testsHtml(d) {
-    var list = (d.tests || []).filter(function (t) { return t && String(t.name || '').trim(); });
+    var list = (d.tests || []).filter(function (t) { return t && t.kind === 'review' && String(t.name || '').trim(); });
     if (!list.length) return '';
     var body = list.map(function (t) {
-      var score = pct(t.score);
-      if (t.kind === 'review') {
-        return '<div class="test-item">' +
+      if (t.submitted) {
+        return '<div class="test-item test-item--sub">' +
                  '<div class="test-header">' +
-                   '<span class="test-name">' + esc(t.name) + '<span class="test-badge test-badge--ok">선생님 확인</span></span>' +
-                   '<span class="test-score-text num">' + (+t.correct) + ' / ' + (+t.total) + ' · ' + score + '<small>점</small></span>' +
+                   '<span class="test-name">' + esc(t.name) + '</span>' +
+                   '<span class="test-badge test-badge--sub">제출 완료</span>' +
                  '</div>' +
-                 '<div class="progress-bar"><div class="progress-fill" data-width="' + score + '"></div></div>' +
                '</div>';
       }
-      var none = score === 0;
-      return '<div class="test-item' + (none ? ' is-none' : '') + '">' +
+      var score = pct(t.score);
+      return '<div class="test-item">' +
                '<div class="test-header">' +
-                 '<span class="test-name">' + esc(t.name) +
-                   (none ? '<span class="test-badge">미응시</span>' : '') +
-                 '</span>' +
-                 '<span class="test-score-text num">' + score + ' <small>/ 100</small></span>' +
+                 '<span class="test-name">' + esc(t.name) + '<span class="test-badge test-badge--ok">선생님 확인</span></span>' +
+                 '<span class="test-score-text num">' + (+t.correct) + ' / ' + (+t.total) + ' · ' + score + '<small>점</small></span>' +
                '</div>' +
-               '<div class="progress-bar">' +
-                 '<div class="progress-fill" data-width="' + score + '"></div>' +
-               '</div>' +
+               '<div class="progress-bar"><div class="progress-fill" data-width="' + score + '"></div></div>' +
              '</div>';
     }).join('');
-    return card('📝 리뷰테스트 점수', body);
-  }
-
-  /* ---------- 과제 — 항목마다 월~금 ---------- */
-
-  function hwDaysGroupHtml(title, items, hw, kind) {
-    if (!items.length) return '';
-    var done = 0;
-    var rows = items.map(function (it) {
-      var v = hw[it.key];
-      var marks = [];
-      var dots = DAYS.map(function (day) {
-        var ok = !!(v && typeof v === 'object' && v[day]);
-        if (ok) { done++; marks.push(day); }
-        return '<span class="hwd-dot' + (ok ? ' done' : '') + '">' + (ok ? '✓' : '✗') + '</span>';
-      }).join('');
-      return '<li class="hwd-row">' +
-               '<span class="hwd-name">' + esc(it.name) + '</span>' +
-               '<span class="hwd-dots" aria-hidden="true">' + dots + '</span>' +
-               '<span class="sr-only">' +
-                 (marks.length ? marks.join('·') + '요일 제출' : '제출한 요일 없음') +
-               '</span>' +
-             '</li>';
-    }).join('');
-
-    return '<div class="hwd-group hwd-group--' + kind + '">' +
-             '<div class="hwd-head">' +
-               '<span class="hwd-title">' + title + '</span>' +
-               '<span class="hwd-count num">' + done + ' / ' + (items.length * DAYS.length) + '</span>' +
-               '<span class="hwd-days-label" aria-hidden="true">' +
-                 DAYS.map(function (day) { return '<span>' + day + '</span>'; }).join('') +
-               '</span>' +
-             '</div>' +
-             '<ul class="hwd-list">' + rows + '</ul>' +
-           '</div>';
-  }
-
-  function homeworkHtml(d) {
-    var items = d.homeworkItems || [];
-    if (!items.length) return '';
-    var hw = d.homework || {};
-    var req = items.filter(function (it) { return it.group !== 'optional'; });
-    var opt = items.filter(function (it) { return it.group === 'optional'; });
-    return card('✅ 과제 수행',
-      hwDaysGroupHtml('필수과제', req, hw, 'required') +
-      hwDaysGroupHtml('선택과제', opt, hw, 'optional'));
-  }
-
-  /* ---------- 과제 제출률 (원형 게이지) ---------- */
-
-  function rateCircle(value, label) {
-    var v = pct(value);
-    var R = 45;
-    var C = 2 * Math.PI * R;
-    return '' +
-      '<div class="rate-circle-wrapper' + (v === 0 ? ' is-zero' : '') + '">' +
-        '<div class="rate-circle">' +
-          '<svg viewBox="0 0 110 110" aria-hidden="true" focusable="false">' +
-            '<circle class="rate-circle-bg" cx="55" cy="55" r="' + R + '" fill="none" stroke-width="10"/>' +
-            '<circle class="rate-circle-fill" cx="55" cy="55" r="' + R + '" fill="none" stroke-width="10"' +
-              ' stroke-dasharray="' + C.toFixed(2) + '"' +
-              ' stroke-dashoffset="' + C.toFixed(2) + '"' +
-              ' data-offset="' + (C - (v / 100) * C).toFixed(2) + '"/>' +
-          '</svg>' +
-          '<div class="rate-num num">' + v + '<small>%</small></div>' +
-        '</div>' +
-        '<div class="rate-label">' + esc(label) + '</div>' +
-      '</div>';
-  }
-
-  function pctOrNull(v) {
-    var n = Number(v);
-    if (v == null || isNaN(n) || n < 0) return null;
-    return pct(n);
-  }
-
-  function ratesHtml(d) {
-    var parts = [];
-    if (pctOrNull(d.requiredRate) !== null) parts.push(rateCircle(d.requiredRate, '필수과제 제출률'));
-    if (pctOrNull(d.optionalRate) !== null) parts.push(rateCircle(d.optionalRate, '선택과제 제출률'));
-    if (!parts.length) return '';
-    return card('📊 과제 제출률',
-      '<div class="rate-grid' + (parts.length === 1 ? ' rate-grid--one' : '') + '">' +
-        parts.join('') +
-      '</div>');
+    return card('📝 복습테스트', body);
   }
 
   /* ---------- 종합 코멘트 ---------- */
@@ -316,7 +235,7 @@
     if (!text) return '';
     var body = '<div class="comment-box">' +
                  '<span class="comment-quote-open" aria-hidden="true">“</span>' +
-                 esc(text) +
+                 mdHtml(text) +
                  '<span class="comment-quote-close" aria-hidden="true">”</span>' +
                '</div>';
     return card('✍️ ' + esc(B().commentTitle), body);
@@ -361,9 +280,7 @@
         lessonsHtml(data) +
         focusHtml(data) +
         testsHtml(data) +
-        homeworkHtml(data) +
-        ratesHtml(data) +
-        commentHtml(data);
+        commentHtml(data);       /* 수기 과제 수행 · 과제 제출률 카드는 그리지 않는다 (앱 연동으로 · 20261029g) */
       animate(root);
     } catch (e) {
       root.innerHTML = '<div class="empty">레포트를 그리지 못했습니다.<br>선생님께 다시 확인 부탁드립니다.</div>';
@@ -373,6 +290,7 @@
   global.ReportView = {
     render: render,
     esc: esc,
+    mdHtml: mdHtml,
     shortPeriod: shortPeriod,
     shortDate: shortDate,
     dowDate: dowDate,

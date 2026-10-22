@@ -67,8 +67,10 @@
   }
 
   /* 글 안의 주소를 눌러지는 링크로. 먼저 이스케이프하고 나서 바꾼다. */
+  /* 글 칸 — ** · __ · # 같은 표시 기호는 보이지 않게 (report-view.js 의 mdHtml · 저장된 글은 그대로 · 20261029g) */
+  function md(text) { return global.ReportView && ReportView.mdHtml ? ReportView.mdHtml(text) : esc(text); }
   function linkify(text) {
-    return esc(text).replace(/https?:\/\/[^\s<>"']+/g, function (u) {
+    return md(text).replace(/https?:\/\/[^\s<>"']+/g, function (u) {
       return '<a href="' + u + '" target="_blank" rel="noopener">' + u + '</a>';
     });
   }
@@ -218,7 +220,7 @@
       '<div class="card nt-card">' +
         '<h2 class="card-title">📢 ' + esc(weekLabel(latest)) + ' 공지' +
           '<span class="card-note">최신</span></h2>' +
-        (String(latest.title || '').trim() ? '<p class="nt-title">' + esc(latest.title) + '</p>' : '') +
+        (String(latest.title || '').trim() ? '<p class="nt-title">' + md(latest.title) + '</p>' : '') +
         lessonLineHtml(latest.week_start) +
         noticeBodyHtml(latest) +
       '</div>';
@@ -229,7 +231,7 @@
               list.slice(1).map(function (n, i) {
                 return '<details class="nt-past" data-i="' + (i + 1) + '">' +
                          '<summary><span class="nt-past__week num">' + esc(weekLabel(n)) + '</span>' +
-                         '<span class="nt-past__title">' + esc(n.title || '') + '</span></summary>' +
+                         '<span class="nt-past__title">' + md(n.title || '') + '</span></summary>' +
                          '<div class="nt-past__body"></div>' +
                        '</details>';
               }).join('') + '</div></div>';
@@ -317,7 +319,7 @@
       var m = /^(\d+)\s*차시\s*[:：.\-]?\s*([\s\S]*)$/.exec(String(t).trim());
       var no = m && m[2].trim() ? m[1] + '차시' : (i + 1) + '차시';
       var text = m && m[2].trim() ? m[2].trim() : String(t).trim();
-      return '<li class="lesson-item"><span class="lesson-check">✓</span><span><b class="lesson-no">' + esc(no) + '</b>' + esc(text) + '</span></li>';
+      return '<li class="lesson-item"><span class="lesson-check">✓</span><span><b class="lesson-no">' + esc(no) + '</b>' + md(text) + '</span></li>';
     }).join('') + '</ul>';
   }
 
@@ -494,13 +496,16 @@
   }
 
   /* 코치룸 미리보기 띠 */
+  /* 띠 글은 코치룸(preview.js)이 정한다 — 「이 주차 · 아직 공개 전입니다 · 공개하면 학부모에게 이렇게 보입니다」 등 (20261029g) */
   function previewBand() {
-    if (document.getElementById('pvBand')) return;
-    var b = document.createElement('div');
-    b.id = 'pvBand';
-    b.className = 'pv-band';
-    b.textContent = '미리보기 — 조교 화면 · ' + (PV.role === 'student' ? '학생 링크' : '학부모 링크') + '로 열었을 때 모습입니다. 눌러도 아무것도 바뀌지 않습니다';
-    document.body.insertBefore(b, document.body.firstChild);
+    var b = document.getElementById('pvBand');
+    if (!b) {
+      b = document.createElement('div');
+      b.id = 'pvBand';
+      b.className = 'pv-band';
+      document.body.insertBefore(b, document.body.firstChild);
+    }
+    b.textContent = PV.band || ('미리보기 — 조교 화면 · ' + (PV.role === 'student' ? '학생 링크' : '학부모 링크') + '로 열었을 때 모습입니다. 눌러도 아무것도 바뀌지 않습니다');
   }
 
   /* ============================================================
@@ -705,19 +710,19 @@
       for (var i = 1; i <= 5; i++) stars += '<span class="tw-star' + (i <= sc ? ' is-on' : '') + '">★</span>';
       focus = '<span class="tw-stars" aria-label="5점 만점에 ' + sc + '점">' + stars + '</span>';
     }
+    /* 복습테스트 — 선생님이 확인한 시험은 점수, 냈지만 아직 확인 전이면 「제출 완료」만 (확인 전 점수는 안 보인다 · 20261029g) */
     var rv = YET;
-    if (TW.review && TW.review.length) {
-      rv = '<span class="tw-rvs">' + TW.review.map(function (x) {
+    var conf = TW.review || [];
+    var done = rvSubmittedNames(r).filter(function (n) { return !conf.some(function (x) { return x.name === n; }); });
+    if (conf.length || done.length) {
+      var many = conf.length + done.length > 1;
+      rv = '<span class="tw-rvs">' + conf.map(function (x) {
         var df = x.diff;
-        return '<span>' + (TW.review.length > 1 ? '<small>' + esc(x.name.replace(/ TEST$/, '')) + '</small> ' : '') + '<b class="num">' + x.score + '점</b>' +
+        return '<span>' + (many ? '<small>' + esc(x.name.replace(/ TEST$/, '')) + '</small> ' : '') + '<b class="num">' + x.score + '점</b>' +
           (df > 0 ? ' <span class="tw-up num">▲' + df + '</span>' : df < 0 ? ' <span class="tw-down num">▼' + (-df) + '</span>' : df === 0 ? ' <span class="tw-same">–</span>' : '') + '</span>';
-      }).join('') + '</span>';
-    }
-    var req = YET;
-    if (r) {
-      var rr = Number(r.requiredRate);
-      req = r.requiredRate == null || isNaN(rr) || rr < 0 ? '<span class="tw-yet">없음</span>'
-          : rr >= 100 ? '<b class="tw-ok">완료</b>' : '<b class="num">' + Math.round(rr) + '%</b>';
+      }).concat(done.map(function (n) {
+        return '<span>' + (many ? '<small>' + esc(n.replace(/ TEST$/, '')) + '</small> ' : '') + '<b class="tw-ok">제출 완료</b></span>';
+      })).join('') + '</span>';
     }
     var app = '';
     var per = reportPeriod();
@@ -731,10 +736,26 @@
       : ReportView.shortPeriod(TW.rep.week_start, TW.rep.week_end || plusDays(TW.rep.week_start, 6)) + ' 레포트';
     box.innerHTML =
       '<h2 class="card-title">📅 ' + esc(title) + '<span class="card-note">이번 주</span></h2>' +
-      '<div class="tw-tiles">' + tile('출결', att) + tile('집중도', focus) + tile('복습테스트', rv) + tile('필수 과제', req) + '</div>' +
+      /* 출결 · 집중도 · 복습테스트 세 칸 (수기 「필수 과제」 칸은 뺐다 — 과제는 아래 앱 표로 · 20261029g) */
+      '<div class="tw-tiles tw-tiles--3">' + tile('출결', att) + tile('집중도', focus) + tile('복습테스트', rv) + '</div>' +
       app +
       '<div class="tw-say"><div class="tw-tile__k">선생님 한마디</div>' +
-        (cm ? '<p class="tw-comment" tabindex="0" role="button" aria-label="선생님 한마디 펼치기">' + esc(cm) + '</p>' : YET) + '</div>';
+        (cm ? '<p class="tw-comment" tabindex="0" role="button" aria-label="선생님 한마디 펼치기">' + ReportView.mdHtml(cm) + '</p>' : YET) + '</div>';
+  }
+
+  /* 그 주에 냈지만 아직 확인 전인 시험 이름 — hub_review_week(migration-027), 없으면 레포트에 담긴 「제출 완료」 */
+  function rvSubmittedNames(r) {
+    var out = [];
+    if (TW.rvStatus) {
+      TW.rvStatus.forEach(function (x) { if (x && x.status === 'submitted' && out.indexOf(x.test_name) === -1) out.push(x.test_name); });
+      return out;
+    }
+    ((r && r.tests) || []).forEach(function (t) {
+      if (!t || t.kind !== 'review' || !t.submitted) return;
+      var n = String(t.name || '').replace(/^\d+\/\d+(\([^)]*\))?\s*/, '');
+      if (n && out.indexOf(n) === -1) out.push(n);
+    });
+    return out;
   }
 
   function learnHtml(w) {
@@ -760,7 +781,7 @@
   function filesOf(w) {
     var files = (w && w.files) || [], html = '';
     FILE_ORDER.forEach(function (k) {
-      var list = files.filter(function (f) { return f.kind === k[0]; });
+      var list = files.filter(function (f) { var kd = f.kind === 'required' || f.kind === 'optional' ? f.kind : 'material'; return kd === k[0]; });
       if (list.length) html += '<div class="nt-sub">' + k[1] + '</div>' + fileButtons(list);
     });
     return html;
@@ -793,12 +814,12 @@
     var latest = items[0];
     return '<div class="card tw-notice" id="twNotice">' +
       '<h2 class="card-title">📢 선생님 공지<span class="card-note">' + esc(weekLabel(latest)) + '</span></h2>' +
-      (String(latest.title || '').trim() ? '<p class="nt-title">' + esc(latest.title) + '</p>' : '') +
+      (String(latest.title || '').trim() ? '<p class="nt-title">' + md(latest.title) + '</p>' : '') +
       noticeBodyHtml(latest) +
       (items.length > 1 ? '<details class="tw-pastnotice"><summary>지난 공지 ' + (items.length - 1) + '개</summary><div class="nt-archive">' +
         items.slice(1).map(function (n, i) {
           return '<details class="nt-past" data-i="' + (i + 1) + '"><summary><span class="nt-past__week num">' + esc(weekLabel(n)) + '</span>' +
-                 '<span class="nt-past__title">' + esc(n.title || '') + '</span></summary><div class="nt-past__body"></div></details>';
+                 '<span class="nt-past__title">' + md(n.title || '') + '</span></summary><div class="nt-past__body"></div></details>';
         }).join('') + '</div></details>' : '') +
     '</div>';
   }
@@ -911,6 +932,10 @@
       rpc('hub_report', { p_code: code, p_week: rep.week_start }).then(function (data) {
         TW.report = data || null; drawWeekCard(); drawProgress();
       }, function () { TW.report = null; drawWeekCard(); drawProgress(); });
+      /* 그 주 복습테스트 낸 것 / 확인 전 (migration-027 · 점수는 오지 않는다). 027 전이면 레포트에 담긴 것으로 */
+      rpc('hub_review_week', { p_code: code, p_week: mon }).then(function (list) {
+        TW.rvStatus = Array.isArray(list) ? list : null; drawWeekCard();
+      }, function () {});
     }
     if (TW.app === 'loading') {
       appData(code).then(function (data) {
@@ -1005,6 +1030,7 @@
     else if (!/^[A-Za-z0-9]{20,64}$/.test(h.code)) { stopScreen(root, 'nocode'); return; }
 
     rpc('hub_get', { p_code: h.code }).then(function (d) {
+      if (PV) previewBand();          /* 공개 여부를 안 뒤 띠 글을 다시 */
       if (!d || !d.ok) {
         /* 남겨 둔 로그인이 더 이상 열리지 않으면(재발급 · 퇴원) 지우고 입구 안내 */
         if (EL && EL.get() === h.code) EL.clear();

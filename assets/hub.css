@@ -766,6 +766,8 @@ label.hub-btn { cursor: pointer; text-align: center; }
 .tw-card { padding: 16px 16px 14px; }
 .tw-card .card-title { margin-bottom: 10px; }
 .tw-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+/* 세 칸 — 출결 · 집중도 위 한 줄, 복습테스트는 아래 한 줄 넓게 (20261029g) */
+.tw-tiles--3 > .tw-tile:nth-child(3) { grid-column: 1 / -1; }
 .tw-tile { padding: 8px 10px; border-radius: 14px; background: var(--grad-soft); min-width: 0; }
 .tw-tile__k { font-size: 12px; font-weight: 800; color: var(--ink-light); }
 .tw-tile__v { margin-top: 2px; font-size: 16px; font-weight: 800; color: var(--ink-deep); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

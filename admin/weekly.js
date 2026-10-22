@@ -6,6 +6,7 @@
                    휴강 · 보강은 [이 주만 바꾸기] — 그 주 그 반만, 다음 주부터는 원래 요일
      · 수업 영상    1차시 · 2차시 · 보강 (유튜브 링크만). 보강은 반 전체 또는 고른 학생만
      · 자료 파일    끌어다 놓기로 여러 개. 파일명에 '필수과제' / '선택과제' 가 있으면 그 분류, 아니면 배부 자료.
+                    필수 · 선택은 학생에게 보여 주는 안내다 — 파일마다 분류 드롭다운으로 고른다 (눈에 띄게 · 20261029g)
                    올린 직후 분류를 보여 주고 바로 바꿀 수 있다.
    파일은 비공개 보관함(class-files)에만 올라간다. 학부모는 Edge Function(class-file)이 만든 2분짜리 주소로만 받는다.
    지우기: 직원 누구나 언제든 ([지난 파일 정리]). 지울 때마다 서버에 기록이 남는다.
@@ -423,7 +424,7 @@
       return '<div class="wk-file' + (fresh ? ' is-fresh' : '') + '" data-f="' + esc(f.id) + '">' +
         '<span class="wk-file__ext">' + esc(String(f.ext).toUpperCase()) + '</span>' +
         '<input class="input wk-file__name" data-wk="fname" maxlength="120" value="' + esc(f.name) + '" aria-label="보이는 이름">' +
-        '<select class="input wk-file__kind wk-kind--' + esc(f.kind) + '" data-wk="kind" aria-label="분류">' + KINDS.map(function (k) {
+        '<select class="input wk-file__kind wk-kind--' + esc(f.kind) + '" data-wk="kind" aria-label="학생에게 보이는 분류" title="학생에게 보이는 분류 — 필수 과제 · 선택 과제 · 배부 자료">' + KINDS.map(function (k) {
           return '<option value="' + k[0] + '"' + (f.kind === k[0] ? ' selected' : '') + '>' + k[1] + '</option>';
         }).join('') + '</select>' +
         '<span class="wk-file__size num">' + sizeText(f.bytes) + '</span>' +

@@ -85,7 +85,7 @@
     if (!L && s.dow !== null && s.dow !== undefined) return out;   /* 첫 수업 전 주 */
     if (!w.lesson) out.push('수업 내용 없음');
     if (!w.videos.n) out.push('영상 없음');
-    if (!w.files.required && !w.files.optional && !w.hw_names) out.push('과제 없음');
+    if (!w.files.required && !w.files.optional) out.push('과제 파일 없음');      /* 수기 과제 이름(hw_names)은 이제 안 셈 · 20261029g */
     if (w.week_start < d.this_week && d.total > 0 && w.sent < d.total) out.push('미제출 레포트 ' + (d.total - w.sent));
     return out;
   }

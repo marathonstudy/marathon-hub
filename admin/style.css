@@ -2614,3 +2614,22 @@ body:not(.report-step-write) #classPanel { display: none; }
 .td-todo__btn { flex: none; }
 .td-todo__none { margin: 2px 0; font-size: 13.5px; color: #35806A; font-weight: 700; }
 .tdc-n { margin-left: 2px; }
+
+/* 복습테스트 — 이번 주 시험 빼기 (review.js · 20261029g) */
+.rv-off { display: inline-flex; align-items: baseline; gap: 4px; margin-left: 6px; padding: 1px 8px; border-radius: 999px; background: #F3F1F8; color: var(--ink-mid); font-size: 12.5px; }
+.link-btn { border: 0; background: none; padding: 0; color: #5B42D6; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.rv-skip-list { display: grid; gap: 6px; margin: 8px 0 12px; }
+.rv-skip-row { display: flex; align-items: center; gap: 8px; justify-content: space-between; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; flex-wrap: wrap; }
+
+/* 배부 자료 · 과제 파일 — 분류 드롭다운을 눈에 띄게 (학생에게 보이는 안내 · 20261029g) */
+.wk-file__kind { font-weight: 800; border-width: 2px; border-radius: 999px; padding-left: 12px; background-color: #F6F4FE; border-color: #CFC6F4; color: #4A3AA8; }
+.wk-file__kind.wk-kind--required { background-color: #FFF1F4; border-color: #EBA9B9; color: #B2455F; }
+.wk-file__kind.wk-kind--optional { background-color: #EEF6FB; border-color: #A9CDE3; color: #2F6F96; }
+/* 학생 카드 「복습테스트」 줄 · 선생님 한마디 안내 (write.js · 20261029g) */
+.entry__rv { font-size: 13px; color: var(--ink-deep); }
+.entry__rv.is-none { color: var(--ink-light); }
+.say-note { display: block; font-size: 11px; font-weight: 600; color: var(--ink-light); }
+.rv-table tr.is-focus td { background: #FFF6D9; transition: background .3s; }
+/* 이미 보낸 주를 고쳤을 때 (write.js · 20261029g) */
+.repub-note { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 12px; padding: 10px 14px; border-radius: 12px; background: #FFF6E5; border: 1px solid #F0D9A8; color: #8A5A12; font-size: 13.5px; font-weight: 700; }
+.repub-note[hidden] { display: none; }

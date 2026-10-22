@@ -16,7 +16,7 @@
      · 안 맨 위 [알림톡 n명 보내기] (그 반 보낼 수 있는 학생만) · [반 전체 문자] (sms.js)
    학생 줄 한 줄: 이름 · 상태 꼬리표(공개 전 / 보낼 수 있음 / 보냄 시각 / 실패 …) · 주 버튼 하나 · ⋯
      · ⋯ — 사이트에서 문자 · 내 폰으로 보내기 · 번호 복사 · 문구 복사 · 카톡용 복사 · 공유 · 보냄 되돌리기 ·
-           학부모 화면 보기 · 학생 화면 보기 (가린 번호는 ⋯ 안이나 줄을 눌렀을 때만)
+           학부모 화면 미리보기 · 학생 화면 미리보기 (가린 번호는 ⋯ 안이나 줄을 눌렀을 때만)
 
    「내 폰으로 보내기」는 sms: 링크로 이 기기의 문자 앱을 연다 (유료 문자 아님).
    ============================================================ */
@@ -342,7 +342,7 @@
     if (navigator.share) items.push({ act: 'share', label: '공유', hint: needPub || needLink, disabled: !pub || !url });
     if (k === 'sent' && kakaoOn()) items.push({ act: 'kkresend', label: '알림톡 다시 보내기' });
     if (k === 'sent') items.push({ act: 'undo', label: '보냄 되돌리기', danger: true });
-    items.push({ act: 'pvparent', label: '학부모 화면 보기' }, { act: 'pvstudent', label: '학생 화면 보기' });
+    items.push({ act: 'pvparent', label: '학부모 화면 미리보기' }, { act: 'pvstudent', label: '학생 화면 미리보기' });
     var desc = phones.length ? phones.map(function (p) { return p.label + ' ' + Store.phoneMask(p.number); }).join(' · ') : '번호 없음';
     menu((s.name || '') + ' · ' + clsOf(s), desc, items, function (act) { doAct(s, act); });
   }

@@ -1,12 +1,14 @@
 /* ============================================================
-   preview.js — 코치룸 「학부모 화면 보기」 · 「학생 화면 보기」 (migration-015)
+   preview.js — 코치룸 「학부모 화면 미리보기」 · 「학생 화면 미리보기」 (migration-015)
 
    그 학생의 러닝노트(/me/)를 학부모 링크 · 학생 링크로 열었을 때와 똑같이 보여 준다.
      · 링크 코드를 화면 주소에 쓰지 않는다 — /me/?preview=1 만 열고, 내용은 이 창(로그인한 직원)이
        staff_hub_get 등 직원 전용 함수로 대신 받아 넘긴다 (hub.js 의 HUB_PREVIEW).
      · 아무것도 바뀌지 않는다 — 제출 · 사진 올리기 · 지우기는 눌러도 「미리보기에서는 바뀌지 않습니다」.
      · 학생 · 학부모 쪽 열람 기록은 남지 않는다 (그런 기록 자체가 없고, 직원 함수도 남기지 않는다).
-     · 공개 전 이번 주 레포트는 「공개하면 이렇게 보입니다」로 함께 (주간 레포트 → 작성 내용으로 만든다).
+     · 기본은 「이 주차」 — 주간 레포트 → 작성에서 고른 주(예: 10/22 수업)를 지금 입력된 그대로, 첫 화면 「이번 주」로 보여 준다.
+       공개 전이면 띠에 「아직 공개 전입니다 · 공개하면 학부모에게 이렇게 보입니다」. 위 [이 주차] / [지금 학부모가 보는 화면] 으로 바꾼다.
+       「지금 학부모가 보는 화면」은 공개된 레포트만 (실제 /me/ 와 같다) (20261029g)
      · [휴대폰 크기로 보기]
    ============================================================ */
 
@@ -19,7 +21,7 @@
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
   var BLOCK = '미리보기에서는 바뀌지 않습니다 (조교 화면)';
-  var cur = { sid: '', role: 'parent', phone: false };
+  var cur = { sid: '', role: 'parent', phone: false, mode: 'week', published: false };
 
   function unwrap(r) {
     if (r.error) throw new Error(/Could not find the function|schema cache/i.test(r.error.message) ? 'migration-015 SQL 을 먼저 실행해 주세요.' : r.error.message);
@@ -28,7 +30,7 @@
   function student() { return Store.getStudents().find(function (x) { return x.id === cur.sid; }) || null; }
   function today() { return DDay.today(); }
 
-  /* 공개 전 이번 주 레포트 — 주간 레포트 → 작성 내용으로 (그 학생 입력이나 반 공통이 있을 때만) */
+  /* 작성 화면에서 고른 주의 레포트 — 주간 레포트 → 작성 내용으로 (그 학생 입력이나 반 공통이 있을 때만) */
   function draftReport() {
     var d = window.Writer && Writer.current();
     var s = student();
@@ -62,12 +64,23 @@
       if (name === 'hub_get') {
         return sb().rpc('staff_hub_get', { p_student: cur.sid, p_role: cur.role }).then(unwrap).then(function (d) {
           var dr = draftReport();
-          if (d && d.ok && dr) d.draft = { week_start: dr.startDate, week_end: dr.endDate, lesson_date: dr.lessonDate || '' };
+          if (!d || !d.ok) return d;
+          var reports = d.reports || [];
+          cur.published = !!dr && reports.some(function (r) { return r && r.week_start === dr.startDate; });
+          if (dr && cur.mode === 'week') {
+            /* 「이 주차」 — 고른 주를 맨 앞(가장 최근 레포트)으로. 내용은 hub_report 가 작성 내용으로 준다 */
+            d.reports = [{ week_start: dr.startDate, week_end: dr.endDate, lesson_date: dr.lessonDate || '', visible: true, week_preview: true }]
+              .concat(reports.filter(function (r) { return !(r && r.week_start >= dr.startDate); }));
+          } else if (dr && !cur.published) {
+            d.draft = { week_start: dr.startDate, week_end: dr.endDate, lesson_date: dr.lessonDate || '' };
+          }
+          bridge.band = bandText(dr);
           return d;
         });
       }
       if (name === 'hub_report') {
-        if (args.p_week === '__draft') return Promise.resolve(draftReport());
+        var dr2 = draftReport();
+        if (args.p_week === '__draft' || (cur.mode === 'week' && dr2 && args.p_week === dr2.startDate)) return Promise.resolve(dr2);
         return sb().rpc('staff_hub_report', { p_student: cur.sid, p_week: args.p_week }).then(unwrap);
       }
       if (name === 'hub_textbook') return sb().rpc('staff_hub_textbook', { p_student: cur.sid }).then(unwrap);
@@ -138,6 +151,18 @@
   };
   window.HubPreview = bridge;
 
+  /* 미리보기 띠 글 (hub.js 가 맨 위에 붙인다) */
+  function bandText(dr) {
+    var who = cur.role === 'student' ? '학생' : '학부모';
+    if (cur.mode === 'week' && dr) {
+      var day = dr.lessonDate ? Lesson.md(dr.lessonDate) + ' 수업' : Store.dateWithDow(dr.startDate) + ' 주';
+      return cur.published
+        ? '미리보기 · ' + day + ' — 이미 공개한 주의 지금 입력 내용입니다 · 고친 내용은 다시 공개해야 ' + who + '에게 반영됩니다'
+        : '미리보기 · ' + day + ' — 아직 공개 전입니다 · 공개하면 ' + who + '에게 이렇게 보입니다';
+    }
+    return '미리보기 — 지금 ' + who + '가 보는 화면입니다 (공개된 레포트만) · 눌러도 아무것도 바뀌지 않습니다';
+  }
+
   /* ---------- 미리보기 창 ---------- */
 
   function el() { return document.getElementById('pvOverlay'); }
@@ -151,6 +176,10 @@
     o.innerHTML =
       '<div class="pv-bar">' +
         '<div class="pv-bar__title" id="pvTitle"></div>' +
+        '<div class="pv-seg" role="group" aria-label="어느 주를 볼지">' +
+          '<button type="button" class="btn btn--sm" data-pvmode="week">이 주차</button>' +
+          '<button type="button" class="btn btn--sm" data-pvmode="live">지금 학부모가 보는 화면</button>' +
+        '</div>' +
         '<div class="pv-seg" role="group" aria-label="어느 링크로 볼지">' +
           '<button type="button" class="btn btn--sm" data-pvset="parent">학부모 화면</button>' +
           '<button type="button" class="btn btn--sm" data-pvset="student">학생 화면</button>' +
@@ -163,6 +192,8 @@
     o.addEventListener('click', function (e) {
       var b = e.target.closest('[data-pvset]');
       if (b) { cur.role = b.dataset.pvset; bridge.view = ''; bridge.arg = ''; load(); }
+      var m = e.target.closest('[data-pvmode]');
+      if (m) { cur.mode = m.dataset.pvmode; bridge.view = ''; bridge.arg = ''; load(); }
       if (e.target.id === 'pvClose') close();
     });
     o.querySelector('#pvPhone').addEventListener('change', function (e) {
@@ -179,6 +210,12 @@
     Array.prototype.forEach.call(o.querySelectorAll('[data-pvset]'), function (b) {
       b.classList.toggle('btn--primary', b.dataset.pvset === cur.role);
     });
+    var dr = draftReport();
+    Array.prototype.forEach.call(o.querySelectorAll('[data-pvmode]'), function (b) {
+      b.classList.toggle('btn--primary', b.dataset.pvmode === (dr ? cur.mode : 'live'));
+      if (b.dataset.pvmode === 'week') { b.disabled = !dr; b.title = dr ? '' : '작성 화면에서 이 학생 반의 주를 열면 볼 수 있습니다'; }
+    });
+    bridge.band = bandText(dr);
     o.querySelector('#pvFrame').src = '../me/index.html?preview=1&v=' + encodeURIComponent(CONFIG.version) + '&t=' + Date.now();
   }
 
@@ -190,6 +227,7 @@
     bridge.arg = arg || '';
     cur.sid = sid;
     cur.role = role === 'student' ? 'student' : 'parent';
+    cur.mode = view ? 'live' : 'week';         /* 주차 현황 [보기] 처럼 볼 주를 정해 열면 공개된 화면 */
     var o = build();
     o.hidden = false;
     document.body.classList.add('pv-open');
