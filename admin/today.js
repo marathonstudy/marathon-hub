@@ -392,12 +392,28 @@
     badge.textContent = urgentN;
     badge.title = '급함 학생 ' + urgentN + '명';
 
-    /* 반마다 지난 수업일 레포트 · 지금 주기 필기로 센 값의 합 (022 전에는 예전 이번 주 값) */
-    function rowOf(s) { return st.cycle ? cycleRow(s.class_name, s.id) : null; }
-    var unsent = list.filter(function (s) { var x = rowOf(s); return x ? !x.sent : !s.sent; }).length;
-    /* 주간 레포트 탭 옆 숫자 = 아직 발송 안 된 학생 수 (반마다 지난 수업일 레포트 · rtabs.js 20261029a) */
+    /* 주간 레포트 탭 옆 숫자 = 「오늘」 급함과 같은 기준의 레포트 미발송 학생 수 (20261029f)
+       반마다 지난 수업일 +[설정 · 기본 2]일이 지났는데 아직 안 보낸 학생만. 0 이면 숨김.
+       마우스를 올리면 반별로 「반포반 10/20 레포트 미발송 3명」 */
+    var late = {}, lateList = [];
+    list.forEach(function (s) {
+      var r = why[s.id].urgent.filter(function (x) { return x.k === 'report'; })[0];
+      if (!r) return;
+      var cls = s.class_name || '(반 없음)', key = cls + '|' + r.t;
+      if (!late[key]) { late[key] = { cls: cls, t: r.t, n: 0 }; lateList.push(late[key]); }
+      late[key].n++;
+    });
+    var unsent = lateList.reduce(function (a, x) { return a + x.n; }, 0);
+    var rank = {};
+    classes.forEach(function (c, i) { rank[c.name] = i; });
+    lateList.sort(function (a, b) { return (rank[a.cls] || 0) - (rank[b.cls] || 0); });
     var rb = $('#reportBadge');
-    if (rb) { rb.hidden = !unsent; rb.textContent = unsent; rb.title = '레포트 아직 발송 안 된 학생 ' + unsent + '명'; }
+    if (rb) {
+      rb.hidden = !unsent;
+      rb.textContent = unsent ? unsent : '';
+      rb.title = lateList.map(function (x) { return x.cls + ' ' + x.t + ' ' + x.n + '명'; }).join('\n');
+      if (unsent) rb.setAttribute('aria-label', '레포트 미발송(급함) ' + unsent + '명'); else rb.removeAttribute('aria-label');
+    }
     $('#tdTitle').textContent = '오늘 · ' + Store.dateWithDow(DDay.today());
     $('#tdInfo').setAttribute('aria-expanded', String(!!st.rulesOpen));
 
