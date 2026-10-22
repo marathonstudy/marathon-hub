@@ -1215,7 +1215,7 @@
 
   /* ---------- 복습테스트 — 그 주 확인된 점수 (migration-013 · 레포트에 넣는다) ---------- */
 
-  var reviewScores = {};     /* 주차(월요일) → { 학생 id: {round_no, correct, q_count, score} } */
+  var reviewScores = {};     /* 주차(월요일) → { 학생 id: [{test_name, label, correct, q_count, score}] } — 시험마다 (migration-025) */
   function mondayISO(iso) {
     var d = parseISO(iso);
     return d ? toISO(mondayOf(d)) : '';
@@ -1226,16 +1226,17 @@
     return global.SB.client.rpc('review_week_scores', { p_week: mon }).then(function (r) {
       if (r.error) return reviewScores[mon] || {};
       var m = {};
-      (r.data || []).forEach(function (x) { m[x.student_id] = x; });
+      (r.data || []).forEach(function (x) { (m[x.student_id] = m[x.student_id] || []).push(x); });
       reviewScores[mon] = m;
       emit('jt:review-scores', { week: mon });
       return m;
     }, function () { return reviewScores[mon] || {}; });
   }
-  function reviewOf(studentId, week) {
+  function reviewsOf(studentId, week) {
     var m = reviewScores[mondayISO(week)];
-    return (m && m[studentId]) || null;
+    return (m && m[studentId]) || [];
   }
+  function reviewOf(studentId, week) { return reviewsOf(studentId, week)[0] || null; }
 
   /* ---------- 저장 전 내용 임시 보관 (이 기기 브라우저) ----------
      저장되지 않은 칸만 남긴다. 저장되면 지우고, 로그아웃하면 지운다.
@@ -1583,6 +1584,7 @@
     },
     loadReview: loadReview,
     reviewOf: reviewOf,
+    reviewsOf: reviewsOf,
     lessonOf: lessonOf,
     classWeekOf: classWeekOf,
     setSchedule: setSchedule,

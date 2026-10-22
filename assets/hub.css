@@ -868,3 +868,24 @@ label.hub-btn { cursor: pointer; text-align: center; }
 .hub-logout { display: block; margin: 12px 0 0 auto; appearance: none; border: 1.5px solid rgba(255, 255, 255, .55); background: rgba(255, 255, 255, .14);
   color: #fff; font: inherit; font-size: 12.5px; font-weight: 800; padding: 6px 12px; border-radius: 999px; cursor: pointer; }
 .hub-entry-link { margin-top: 14px; }
+
+/* ---------- 복습테스트 시험 여러 개 · 전체 + 틀린 개수 · 사진 여러 장 (migration-025 · 20261028d) ---------- */
+.rv-test { padding: 12px 0; border-bottom: 1px dashed #E3DFF6; }
+.rv-test:last-of-type { border-bottom: 0; }
+.rv-test__name { font-size: 15px; font-weight: 800; color: var(--ink-deep); margin-bottom: 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.rv-test__inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.rv-in { display: grid; gap: 4px; font-size: 13px; font-weight: 700; color: var(--ink-mid); }
+.rv-in input { width: 100%; min-height: 48px; padding: 8px 12px; border-radius: 12px; border: 1.5px solid #D9D3F5; font: inherit; font-size: 18px; font-weight: 800;
+  color: var(--ink-deep); text-align: center; background: #fff; }
+.rv-in input:focus { outline: none; border-color: #7858E8; box-shadow: 0 0 0 3px rgba(120, 88, 232, .18); }
+.rv-test__score { margin-top: 8px; font-size: 16px; font-weight: 900; color: #5B42D6; }
+.rv-test__score.is-bad { font-size: 13.5px; font-weight: 800; color: #A03553; }
+.rv-test.is-locked .rv-test__score { color: #2F7D63; }
+.rv-thumbs { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.rv-thumbs:empty { display: none; }
+.rv-thumbs .rv-thumb { margin: 0; }
+.rv-card--done .rv-done + .rv-done { margin-top: 10px; }
+.rv-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 4px; font-size: 12.5px; font-weight: 700; color: var(--ink-mid); }
+.rv-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+.rv-hist__sum { flex-wrap: wrap; row-gap: 4px; }
+.tw-rvs { display: grid; gap: 2px; }

@@ -102,9 +102,16 @@
     review: function () {
       return sb().rpc('staff_review_status', { p_student: cur.sid }).then(unwrap).then(function (d) {
         if (!d || !d.ok) return d;
-        var items = [d.submission].concat(d.recent || []).filter(Boolean);
-        return signAll('review-photos', items, 'photo_path').then(function (m) {
-          items.forEach(function (x) { x.photo_url = x.photo_path ? (m[x.photo_path] || '') : ''; delete x.photo_path; });
+        /* 시험 여러 개 · 사진 여러 장 (migration-025) — 함수(review-test)가 학생에게 주는 모양과 같게 photo_url · photo_urls */
+        var items = [d.submission].concat(d.recent || [], (d.tests || []).map(function (t) { return t.submission; })).filter(Boolean);
+        var all = [];
+        items.forEach(function (x) { (x.photos || (x.photo_path ? [x.photo_path] : [])).forEach(function (p) { if (all.indexOf(p) === -1) all.push(p); }); });
+        return signAll('review-photos', all.map(function (p) { return { p: p }; }), 'p').then(function (m) {
+          items.forEach(function (x) {
+            x.photo_url = x.photo_path ? (m[x.photo_path] || '') : '';
+            x.photo_urls = (x.photos || (x.photo_path ? [x.photo_path] : [])).map(function (p) { return m[p] || ''; }).filter(Boolean);
+            delete x.photo_path; delete x.photos;
+          });
           return d;
         });
       });

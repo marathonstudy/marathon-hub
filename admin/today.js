@@ -248,9 +248,13 @@
     if (row) {
       var c = st.cycle[s.class_name];
       if (cy && cy.L && cy.since >= dv.grace && !row.sent) out.push({ k: 'report', t: Lesson.md(cy.L, false) + ' 레포트 미발송' });
-      if (c && c.test && DDay.today() > String(c.test.lesson_date).slice(0, 10) && row.submitted === false) out.push({ k: 'review', t: '복습테스트 ' + c.test.round_no + '회 미제출' });
+      /* 마감(수업일 밤 12시)이 지난 뒤 안 낸 시험마다 — 「10/22 화작문 TEST 미제출」 (migration-025 · 예전 함수면 시험 하나) */
+      if (c && c.test && DDay.today() > String(c.test.lesson_date).slice(0, 10) && row.submitted === false) {
+        var day = Lesson.md(String(c.test.lesson_date).slice(0, 10), false);
+        (row.missing ? row.missing : [c.test.test_name || '복습 TEST']).forEach(function (nm) { out.push({ k: 'review', t: day + ' ' + nm + ' 미제출' }); });
+      }
     } else {
-      (reviewMiss[s.id] || []).forEach(function (x) { out.push({ k: 'review', t: '복습테스트 ' + x.round_no + '회 미제출' }); });
+      (reviewMiss[s.id] || []).forEach(function (x) { out.push({ k: 'review', t: Lesson.md(String(x.lesson_date).slice(0, 10), false) + ' ' + (x.test_name || '복습 TEST') + ' 미제출' }); });
     }
     if (s.follow_n) out.push({ k: 'follow', t: '확인 필요 상담 ' + s.follow_n });
     return out;

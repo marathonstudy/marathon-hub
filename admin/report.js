@@ -27,14 +27,15 @@
       })
       .filter(Boolean);
 
-    /* 복습테스트 (migration-013) — 선생님이 확인한 점수만. 반 공통에 같은 이름을 손으로 적었으면 그쪽을 쓴다 */
-    var rv = global.Store && global.Store.reviewOf ? global.Store.reviewOf(student.id, week.start) : null;
-    if (rv && rv.round_no) {
-      var rvName = '복습테스트 ' + rv.round_no + '회';
+    /* 복습테스트 (migration-013 · 025) — 선생님이 확인한 점수만, 시험마다 「10/22(목) 복습 TEST」처럼 날짜 이름으로.
+       반 공통에 같은 이름을 손으로 적었으면 그쪽을 쓴다 */
+    var rvs = global.Store && global.Store.reviewsOf ? global.Store.reviewsOf(student.id, week.start) : [];
+    rvs.forEach(function (rv) {
+      var rvName = rv.label || ('복습테스트 ' + rv.round_no + '회');
       if (!tests.some(function (t) { return t.name === rvName; })) {
         tests.push({ name: rvName, score: clampPct(rv.score), correct: rv.correct, total: rv.q_count, kind: 'review', confirmed: true });
       }
-    }
+    });
 
     /* 수업일 · 과제 기간 (반 수업 요일을 정했을 때만 · migration-011). 예전 레포트에는 없다 */
     var lesson = (global.Store && global.Store.lessonOf && global.Lesson)

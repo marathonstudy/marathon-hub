@@ -89,15 +89,15 @@
       '<td class="num">' + (+c.active) + '</td>' +
       '<td class="num">' + (+c.left) + '</td>' +
       '<td>' + records(c) + '</td>' +
-      '<td>' + (c.review_q == null ? '<span class="muted-note">—</span>'
-        : '<input class="input ca-q" type="number" min="1" max="100" inputmode="numeric" data-ca-q value="' + (+c.review_q) + '" aria-label="복습테스트 기본 문항 수">') + '</td>' +
+      '<td>' + (c.review_names == null ? '<span class="muted-note">—</span>'
+        : '<input class="input ca-names" type="text" maxlength="110" data-ca-names value="' + esc((c.review_names || []).join(', ')) + '" aria-label="복습테스트 기본 시험 목록 (쉼표로 나눠 순서대로)">') + '</td>' +
       '<td class="roster__actions tb-acts">' + acts + '</td></tr>';
   }
 
   function table(list, empty) {
     if (!list.length) return '<p class="panel__hint">' + empty + '</p>';
     return '<div class="roster-scroll"><table class="roster tb-table ca-table"><thead><tr>' +
-      '<th>반</th><th>재원</th><th>퇴원</th><th>기록</th><th title="복습테스트 기본 문항 수 — 그 주만 바꾸기는 ② 작성 반 공통에서">복습 문항</th><th></th></tr></thead><tbody>' +
+      '<th>반</th><th>재원</th><th>퇴원</th><th>기록</th><th title="반 수업일마다 저절로 생기는 복습테스트 — 쉼표로 나눠 순서대로 (예: 복습 TEST, 화작문 TEST). 그 주만 끄기 · 더 넣기는 ② 작성 반 공통에서">복습 시험 (순서대로)</th><th></th></tr></thead><tbody>' +
       list.map(row).join('') + '</tbody></table></div>';
   }
 
@@ -225,7 +225,24 @@
     if (act === 'delete') doDelete(c);
   });
 
-  /* 복습테스트 기본 문항 수 (migration-013) — 칸에서 나오면 저장. 이미 만들어진 주는 그대로, 앞으로 생기는 주부터 */
+  /* 복습테스트 기본 시험 목록 (migration-025) — 쉼표로 나눠 순서대로 · 칸에서 나오면 저장. 이미 만들어진 주는 그대로, 앞으로 생기는 주부터 */
+  $('#caBody').addEventListener('change', function (e) {
+    if (e.target.dataset.caNames == null) return;
+    var c = find(e.target.closest('tr').dataset.name);
+    if (!c) return;
+    var names = e.target.value.split(/[,，]/).map(function (x) { return x.trim(); }).filter(Boolean);
+    if (!names.length || names.length > 5 || names.some(function (n) { return n.length > 20; })) {
+      UI.toast('시험은 1 ~ 5개, 이름은 20자까지 — 쉼표로 나눠 적어 주세요', 'bad'); e.target.value = (c.review_names || []).join(', '); return;
+    }
+    sb().rpc('class_review_names_set', { p_name: c.name, p_names: names }).then(function (r) {
+      if (r.error) { UI.toast(/Could not find the function|schema cache/i.test(r.error.message) ? 'migration-025 SQL 을 먼저 실행해 주세요' : r.error.message, 'bad'); e.target.value = (c.review_names || []).join(', '); return; }
+      c.review_names = (r.data && r.data.review_names) || names;
+      e.target.value = c.review_names.join(', ');
+      UI.toast('‘' + c.name + '’ 복습테스트 — ' + c.review_names.join(' · ') + ' (앞으로 생기는 수업일부터)', 'good');
+    });
+  });
+
+  /* (예전) 복습테스트 기본 문항 수 — migration-025 뒤로는 학생이 전체 문항 수를 적으므로 칸이 없다 */
   $('#caBody').addEventListener('change', function (e) {
     if (e.target.dataset.caQ == null) return;
     var c = find(e.target.closest('tr').dataset.name);

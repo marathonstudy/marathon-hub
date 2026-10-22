@@ -43,7 +43,7 @@ admin/        코치룸 (명단 · 작성 · 공개 · 발송 · 반 공지 · �
   ../assets/app-week.js  러닝노트 앱 과제 · 강의 표 (레포트 주차의 과제 기간만)
   ytbm.js       즐겨찾기 버튼 「마라톤 자막 가져오기」 (PC 크롬 · 유튜브 화면에서 스크립트 복사 → AI 요약 [붙여 넣기])
   weeks.js      ② 작성 → 반별 「주차 현황」 (migration-018)
-  review.js     ② 작성 반 공통 — 복습테스트 확인 표 · 대신 입력 · 지금 제출 현황 · 자주 틀린 번호
+  review.js     ② 작성 반 공통 — 복습테스트 확인 표(시험별) · 고치기 · 대신 입력 · 지금 제출 현황 · 시험별 평균 (migration-025)
   draftguard.js ② 작성 글 지키기 — 다른 사람이 고친 칸 알림 · 저장 안 된 내용 복구 · 이전 내용 보기
   preview.js    학부모 화면 · 학생 화면 미리보기 (조교 화면 · 링크 코드 없이 · 아무것도 안 바뀜)
   nav.js        뒤로가기 · 새로고침 (탭 · 반 · 주차 · 창마다 기록) · 저장 안 된 글이 있으면 떠나기 전 확인
@@ -95,6 +95,7 @@ supabase/
   migration-023-sms.sql             사이트 문자(SMS · LMS) — 보낸 기록(뒤 4자리만) · 자주 쓰는 문구(직원 공용) · 설정 · 발송 준비/기록 함수 (직원만)
   functions/kakao-send/index.ts     알림톡 발송 Edge Function (키는 Secrets 에만 · 직원만)
   functions/sms-send/index.ts       문자 발송 Edge Function (알림톡과 같은 솔라피 키 · 직원만 · 번호는 DB 에서 찾음)
+  migration-025-review-two.sql      복습테스트 시험 2개(복습 TEST · 화작문 TEST) · 전체 + 틀린 개수 · 사진 여러 장 · 날짜 이름(「10/22(목) 복습 TEST」) · 예전 기록 그대로
   migration-024-student-login.sql   학생 공용 입구 — 반 · 이름 목록 · 휴대폰 번호 로그인(맞음/틀림 + 학생 링크 코드만) · 로그인 기록(직원만)
   kakao/template.txt · kakao/HOW-TO.md  알림톡 템플릿 초안 · 솔라피 등록 방법
   check-classes.sql               반 이름 점검 (읽기 전용 — 어느 표에 어떤 반이 있는지 · 비슷한 이름)
@@ -286,6 +287,15 @@ delete from public.staff where email = '조교이메일@example.com';
 - 로그인 유지(기본 켬)는 이 기기에 학생 링크 코드 하나만(`mhub.slogin`) 남긴다. 러닝노트 머리 [로그아웃]이 지운다.
 - 로그인 기록(student_logins: 학생 · 시각 · 성공/실패 · 이유, 비밀번호 · 넣은 값은 저장 안 함)은 상담 카드에서 본다.
 - 잠금 · 비밀번호 바꾸기는 없다(요청대로). 학생 연락처를 고치면 비밀번호도 바로 바뀐다.
+
+### 5-22. 복습테스트 시험 2개 · 전체 + 틀린 개수 (migration-025 + Edge Function review-test 다시 배포)
+1. 024 다음에 SQL Editor → **New query** → `supabase/migration-025-review-two.sql` 전체 → **Run** (세 줄 모두 `true`)
+2. Edge Function **review-test** 를 새 코드로 다시 배포 (Verify JWT 는 끈 채로)
+- 반 수업일마다 `classes.review_names`(처음엔 「복습 TEST」 · 「화작문 TEST」)가 저절로 생긴다. 두 번째 시험부터는 바꾼 날(처음 실행한 날, 늦어도 2026-10-22) 이후
+  수업일에만 만든다 — 지난 수업일에 새 시험이 생겨 「미제출」로 잡히지 않게. 그 주만 끄기(review_test_set) · 더 넣기(review_test_add) · 반 목록(class_review_names_set).
+- 학생은 시험마다 전체 문항 수 + 틀린 개수(wrong_n), 사진 여러 장(photos · 필수 · 두 시험이 같이 씀). 마감 · 확인 전 고치기 · 확인 후 잠김은 그대로.
+- 예전 기록(틀린 번호)은 지우지 않는다 — 「복습 TEST」로 보이고 점수 그대로. round_no 칸도 그대로 둔다(화면에서만 안 쓴다).
+- 아래 「복습테스트」 절의 회차 · 틀린 번호 · 자주 틀린 번호 설명은 예전 방식이다.
 
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.

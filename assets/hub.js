@@ -673,12 +673,17 @@
   var TW = null;
   var YET = '<span class="tw-yet">아직 입력 전</span>';
 
+  /* 그 주 확인된 복습테스트 — 시험마다 점수와 같은 시험 지난번과의 차이 (migration-025: 「복습 TEST」 · 「화작문 TEST」 …) */
   function reviewOfWeek(list, mon) {
-    var end = plusDays(mon, 6), i = -1;
-    list.forEach(function (x, k) { var d = String(x.lesson_date || '').slice(0, 10); if (d >= mon && d <= end) i = k; });
-    if (i === -1) return null;
-    var prev = i > 0 ? list[i - 1] : null;
-    return { score: Number(list[i].score), diff: prev ? Number(list[i].score) - Number(prev.score) : null };
+    var end = plusDays(mon, 6), out = [];
+    list.forEach(function (x, k) {
+      var d = String(x.lesson_date || '').slice(0, 10);
+      if (d < mon || d > end) return;
+      var name = x.test_name || '복습 TEST', prev = null;
+      for (var j = k - 1; j >= 0; j--) if ((list[j].test_name || '복습 TEST') === name) { prev = list[j]; break; }
+      out.push({ name: name, score: Number(x.score), diff: prev ? Number(x.score) - Number(prev.score) : null });
+    });
+    return out.length ? out : null;
   }
 
   function tile(label, value) {
@@ -701,10 +706,12 @@
       focus = '<span class="tw-stars" aria-label="5점 만점에 ' + sc + '점">' + stars + '</span>';
     }
     var rv = YET;
-    if (TW.review && !isNaN(TW.review.score)) {
-      var df = TW.review.diff;
-      rv = '<b class="num">' + TW.review.score + '점</b>' +
-        (df > 0 ? ' <span class="tw-up num">▲' + df + '</span>' : df < 0 ? ' <span class="tw-down num">▼' + (-df) + '</span>' : df === 0 ? ' <span class="tw-same">–</span>' : '');
+    if (TW.review && TW.review.length) {
+      rv = '<span class="tw-rvs">' + TW.review.map(function (x) {
+        var df = x.diff;
+        return '<span>' + (TW.review.length > 1 ? '<small>' + esc(x.name.replace(/ TEST$/, '')) + '</small> ' : '') + '<b class="num">' + x.score + '점</b>' +
+          (df > 0 ? ' <span class="tw-up num">▲' + df + '</span>' : df < 0 ? ' <span class="tw-down num">▼' + (-df) + '</span>' : df === 0 ? ' <span class="tw-same">–</span>' : '') + '</span>';
+      }).join('') + '</span>';
     }
     var req = YET;
     if (r) {
@@ -1058,9 +1065,11 @@
             /* 제출 기간이고 아직 안 냈으면 큰 [복습테스트 입력하기] → 누르면 입력 카드. 냈으면 「제출함」 카드 그대로 */
             var btn = $('#twRvBtn'), card = $('#reviewCard');
             if (!btn || !card) return;
-            var open = !!(rv && rv.test);
+            /* 시험 여러 개 (migration-025) — 하나라도 냈으면 카드를 그대로 (남은 시험도 거기서 낸다) */
+            var open = !!(rv && ((rv.tests && rv.tests.length) || rv.test));
             if (!open) { btn.hidden = true; card.hidden = true; return; }
-            if (rv.submission) { btn.hidden = true; card.hidden = false; }
+            var anySub = !!rv.submission || (rv.tests || []).some(function (t) { return t.submission; });
+            if (anySub) { btn.hidden = true; card.hidden = false; }
             else if (card.hidden) btn.hidden = false;
           });
         }

@@ -2523,3 +2523,19 @@ body.pv-open { overflow: hidden; }
   .wk-video__title { grid-column: 1 / -1; grid-row: 2; }
   .wk-video__url { grid-column: 1 / -1; grid-row: 3; }
 }
+
+/* 복습테스트 시험 여러 개 (migration-025 · 20261028d) */
+.rv-cell { vertical-align: top; min-width: 150px; }
+.rv-cell.is-pending { background: #FFFBF4; }
+.rv-cell__score { font-weight: 800; color: var(--ink-deep); }
+.rv-cell .tb-acts { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px; }
+.rv-editor__in { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 12px; }
+.rv-light--many { display: flex; flex-wrap: wrap; justify-content: center; align-content: flex-start; gap: 12px; overflow: auto; }
+.rv-light--many img { max-width: min(100%, 720px); max-height: none; }
+.rv-live__cell { flex-direction: column; gap: 6px; }
+.rv-live__tests { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 8px; font-size: 14px; font-weight: 800; }
+.rv-live__t { padding: 1px 8px; border-radius: 999px; background: #F1F2F8; color: var(--ink-light); }
+.rv-live__t.is-ok { background: #DDF1E8; color: #2F7D63; }
+.rv-live__cell.is-done .rv-live__t { background: rgba(255, 255, 255, .22); color: #fff; }
+.rv-bar--avg { grid-template-columns: minmax(0, 170px) minmax(0, 1fr) 96px; }
+.ca-names { min-width: 190px; }
