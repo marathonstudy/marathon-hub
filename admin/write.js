@@ -672,7 +672,7 @@
     host.classList.toggle('is-none', line === '아직 제출 안 함');
   }
   window.addEventListener('jt:review-drawn', function () {
-    $('#entryList .entry').forEach(function (el) { fillReview(el, el.dataset.id); });
+    $$('#entryList .entry').forEach(function (el) { fillReview(el, el.dataset.id); });
   });
 
   function renderEntries() {
@@ -1533,6 +1533,91 @@
   });
 
   /* 주간 레포트 → 공개이 목록을 만들기 전에 마지막 입력까지 저장해 둔다 */
+  /* ============================================================
+     「AI로 다듬기」 · 「AI로 초안 쓰기」 (aipolish.js · text-polish · 20261029g)
+       반 공통 코멘트 · 학생 코멘트(코멘트 창) — 다듬기 + 초안 · 수업 내용(차시 줄 묶음) — 다듬기
+       글 칸은 다시 그릴 때 새로 만들어지므로(setFresh · freshCommentText) 읽기 · 쓰기를 함수로 준다
+       초안 자료는 화면에 이미 있는 것만 — 수업 내용 · 앱 과제 수행 · 복습테스트 제출 여부(점수 없음) · 자료 이름 · 출결 · 집중도.
+       학생 이름 · 전화번호 · 금액 · 상담 내용은 넣지 않는다
+     ============================================================ */
+
+  function lessonsOfClass() {
+    if (!draft) return [];
+    return (commonOf(currentClass || '_').lessons || []).map(function (x) { return String(x || '').trim(); }).filter(Boolean);
+  }
+  var NEED_LESSONS = '수업 내용 요약을 먼저 채우면 더 정확합니다';
+
+  function classDraftFacts() {
+    var cls = currentClass;
+    if (!cls) return null;
+    var f = {};
+    var L = window.Lesson && Store.lessonOf ? Lesson.reportFields(Store.lessonOf(cls, draft.weekStart)) : {};
+    if (L && L.lessonDate) f.수업일 = Lesson.md(L.lessonDate);
+    var ls = lessonsOfClass();
+    if (ls.length) f.수업내용 = ls;
+    var app = window.Today && Today.classApp ? Today.classApp(cls) : null;
+    if (app) f.앱과제 = app;
+    var rv = window.Review && Review.classFacts ? Review.classFacts(cls, draft.weekStart) : null;
+    if (rv && rv.length) f.복습테스트 = rv;
+    var files = window.Weekly && Weekly.fileFacts ? Weekly.fileFacts(cls, draft.weekStart) : null;
+    if (files && files.length) f.배부자료 = files;
+    return { target: 'class', facts: f, note: ls.length ? '' : NEED_LESSONS };
+  }
+
+  var ATT_LABEL = { attend: '출석', late: '지각', absent: '결석', makeup: '출석' };
+  function studentDraftFacts(id) {
+    var s = students().find(function (x) { return x.id === id; });
+    if (!s) return null;
+    var e = entryOf(id);
+    var f = {};
+    f.출결 = (ATT_LABEL[e.attendStatus] || '기록 없음') + (e.attendStatus === 'late' && String(e.attendNote || '').trim() ? ' (' + String(e.attendNote).trim() + ')' : '');
+    if (e.attendStatus !== 'absent') f.집중도 = (Number(e.focusScore) || 0) + '/5';
+    var t = window.Today && Today.studentFacts ? Today.studentFacts(id) : null;
+    if (t) Object.keys(t).forEach(function (k) { f[k] = t[k]; });
+    var rv = window.Review && Review.studentFacts ? Review.studentFacts(currentClass, draft.weekStart, id) : null;
+    if (rv && rv.length) f.복습테스트 = rv;
+    var ls = lessonsOfClass();
+    if (ls.length) f.이번주수업 = ls;
+    var cc = String(commonOf((s.className || '').trim() || currentClass || '_').comment || '').trim();
+    if (cc) f.반공통코멘트 = cc;
+    return { target: 'student', facts: f, note: ls.length ? '' : NEED_LESSONS };
+  }
+
+  if (window.AiPolish) {
+    /* 반 공통 코멘트 */
+    AiPolish.attach($('#commonComment'), {
+      kind: 'comment', id: 'commonAi', host: $('#commonAiHost'),
+      get: function () { return $('#commonComment').value; },
+      set: function (v) { var el = $('#commonComment'); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); },
+      draft: function () { return Promise.resolve(classDraftFacts()); }
+    });
+    /* 코멘트 창 — 반 공통(크게 쓰기) 또는 학생 한 명. 학생 창에서 반 공통을 쓰는 중이면 빈 칸으로 보고 초안을 바로 넣는다 */
+    AiPolish.attach($('#commentText'), {
+      kind: 'comment', id: 'commentAi', host: $('#commentAiHost'),
+      get: function () { return $('#commentText').value; },
+      set: function (v) { var el = $('#commentText'); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); },
+      isEmpty: function () { return !$('#commentText').value.trim() || (!commentIsClass && !commentOwnMode); },
+      draft: function () { return Promise.resolve(commentIsClass ? classDraftFacts() : studentDraftFacts(commentTargetId)); }
+    });
+    /* 수업 내용 — 차시 줄을 한 번에 (줄 수 그대로) */
+    AiPolish.attach($('#lessonList'), {
+      kind: 'lessons', id: 'lessonAi', host: $('#lessonAiHost'),
+      get: function () { return lessonsOfClass().join('\n'); },
+      set: function (v) {
+        var c = commonOf(currentClass || '_');
+        c.lessons = String(v || '').split('\n').map(function (x) { return x.trim(); }).filter(Boolean);
+        if (!c.lessons.length) c.lessons = [''];
+        showState('common', currentClass, 'saving');
+        saveDraft(); renderCommon(); schedulePreview();
+      }
+    });
+    /* 다른 반 · 다른 주 · 다른 학생으로 바뀌면 결과 · 되돌리기를 지운다 */
+    window.addEventListener('jt:write-nav', function () {
+      AiPolish.reset('commonAi'); AiPolish.reset('lessonAi');
+    });
+    commentModal.addEventListener('close', function () { AiPolish.reset('commentAi'); });
+  }
+
   window.Writer = {
     flush: flushDraft,
     switchWeek: switchWeek,

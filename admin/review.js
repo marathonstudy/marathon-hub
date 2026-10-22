@@ -495,6 +495,22 @@
     if (b) try { b.focus(); } catch (er) {}
   }
 
-  window.Review = { render: render, reload: load, openLive: openLive, lineOf: lineOf, focusStudent: focusStudent };
+  /* 코멘트 「AI로 초안 쓰기」 자료 — 제출 여부만 (점수는 보내지 않는다 · write.js · 20261029g) */
+  function ready(cls, week) { return !!cls && st.cls === cls && st.mon === monday(week) && !!st.data; }
+  function classFacts(cls, week) {
+    if (!ready(cls, week)) return null;
+    var rows = st.data.rows || [];
+    return onTests().map(function (t) {
+      return { 시험: t.test_name, 제출: rows.filter(function (x) { return x.subs && x.subs[t.id]; }).length, 전체: rows.length };
+    });
+  }
+  function studentFacts(cls, week, sid) {
+    if (!ready(cls, week)) return null;
+    var x = rowOf(sid), subs = (x && x.subs) || {};
+    return onTests().map(function (t) { return { 시험: t.test_name, 제출: subs[t.id] ? '냄' : '안 냄' }; });
+  }
+
+  window.Review = { render: render, reload: load, openLive: openLive, lineOf: lineOf, focusStudent: focusStudent,
+                    classFacts: classFacts, studentFacts: studentFacts };
 
 })();

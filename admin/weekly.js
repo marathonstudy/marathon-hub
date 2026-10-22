@@ -745,6 +745,11 @@
 
   window.Weekly = { render: render, classify: classify, normalizeYoutube: normalizeYoutube, reload: load,
                     videos: function () { return st.videos.slice(); }, addVideoUrl: addVideoUrl,
-                    where: function () { return { cls: st.cls, week: st.week }; } };
+                    where: function () { return { cls: st.cls, week: st.week }; },
+                    /* 코멘트 「AI로 초안 쓰기」 자료 — 그 반 그 주 파일 이름 · 분류 (write.js · 20261029g) */
+                    fileFacts: function (cls, week) {
+                      if (st.cls !== cls || st.week !== week) return null;
+                      return st.files.map(function (f) { return { 이름: f.name, 분류: KIND_LABEL[f.kind] || '배부 자료' }; });
+                    } };
 
 })();

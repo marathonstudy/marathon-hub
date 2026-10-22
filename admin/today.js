@@ -479,6 +479,44 @@
       }).join('') + '</div>';
   }
 
+  /* ---------- 코멘트 「AI로 초안 쓰기」 자료 (write.js · 20261029g) ----------
+     앱 과제 — 그 반 직전 과제 기간(오늘 화면과 같은 계산)과 그 앞 기간. 앱 기록을 아직 못 불러왔으면 null */
+  function appFactsOf(s) {
+    if (!s) return null;
+    var cy = cycleOf(s.class_name || '');
+    var w = appWeekOf(s, cy);
+    if (!w) return null;
+    var out = { 기간: md(w.from) + '~' + md(w.to), 과제있던날: w.hwDays, 제출한날: w.hwDone, 정시제출: w.hwOnTime };
+    var a = app[s.id];
+    if (cy && cy.pfrom && cy.pto && a && a.data && window.AppWeek) {
+      var len = Math.round((Date.parse(cy.pto) - Date.parse(cy.pfrom)) / 86400000) + 1;
+      var pf = Lesson.addDays(cy.pfrom, -len), pt = Lesson.addDays(cy.pfrom, -1);
+      var p = AppWeek.compute(a.data, pf, pt, DDay.today());
+      if (p && p.hwDays) out.지난기간 = { 기간: md(pf) + '~' + md(pt), 과제있던날: p.hwDays, 제출한날: p.hwDone };
+    }
+    return out;
+  }
+  function rowById(sid) { return st.data ? st.data.students.find(function (x) { return x.id === sid; }) || null : null; }
+  window.Today = {
+    studentFacts: function (sid) {
+      var s = rowById(sid);
+      if (!s) return null;
+      var set = st.data.settings || {};
+      var out = {};
+      var a = appFactsOf(s);
+      if (a) out.앱과제 = a;
+      out.최근결석 = '최근 ' + (set.absentWeeks || 4) + '주 ' + (s.absent_n || 0) + '회';
+      return out;
+    },
+    classApp: function (cls) {
+      if (!st.data) return null;
+      var ws = st.data.students.filter(function (s) { return (s.class_name || '') === cls; }).map(appFactsOf).filter(Boolean);
+      if (!ws.length) return null;
+      var avg = function (k) { return Math.round(ws.reduce(function (x, w) { return x + w[k]; }, 0) / ws.length * 10) / 10; };
+      return { 기간: ws[0].기간, 앱연결학생: ws.length, 평균제출한날: avg('제출한날'), 평균과제있던날: avg('과제있던날') };
+    }
+  };
+
   $('#tdBody').addEventListener('click', function (e) {
     var td = e.target.closest('[data-todo]');
     if (td) { todoGo(td.dataset.todo, td.dataset.todoCls, td.dataset.todoWeek); return; }

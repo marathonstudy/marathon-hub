@@ -1376,17 +1376,6 @@ body.report-step-write.write-weeks #writeBarWrap { display: none; }
 .sms-tpl .select { min-width: 0; flex: 1 1 160px; }
 .sms-tpl .input { flex: 1 1 120px; min-width: 0; }
 .sms-vars { margin-top: 6px; flex-wrap: wrap; }
-.sms-ai { margin: 8px 0; padding: 8px 10px; border: 1px solid #E4DDF7; border-radius: 12px; background: #FAF8FF; }
-.sms-ai__bar { flex-wrap: wrap; align-items: center; gap: 6px; }
-.sms-ai__len { display: inline-flex; gap: 2px; }
-.sms-ai__len .btn.is-on { background: #EDE7FB; color: #5B45A8; font-weight: 800; }
-.sms-ai__result { margin-top: 8px; }
-.sms-ai__title { font-size: 13px; font-weight: 800; color: var(--ink-deep); display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
-.sms-ai__text { margin: 6px 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff; white-space: pre-wrap; word-break: break-all; font-size: 13px; color: var(--ink-deep); }
-.sms-ai__check { margin: 6px 0; font-size: 12.5px; color: #8A5A12; }
-.sms-ai__check ul { margin: 4px 0 0 18px; padding: 0; }
-.sms-ai__acts { flex-wrap: wrap; gap: 6px; }
-.sms-ai #smsAiMsg { margin: 6px 0 0; }
 .sms-sum { margin: 2px 0 8px; font-size: 13.5px; color: var(--ink-mid); }
 .sms-sib { margin: 6px 0; }
 .sms-pv { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; margin: 6px 0; background: #FBFBFE; }
@@ -1421,9 +1410,6 @@ body.report-step-write.write-weeks #writeBarWrap { display: none; }
   .toolbar.sms-vars, .toolbar.sms-tpl, .toolbar.sms-log-filter { flex-direction: row; flex-wrap: wrap; align-items: center; }
   .toolbar.sms-vars > *, .toolbar.sms-tpl > *, .toolbar.sms-log-filter > * { width: auto; }
   .toolbar.sms-vars .btn { min-height: 40px; flex: 1 1 0; }
-  .toolbar.sms-ai__bar, .toolbar.sms-ai__acts { flex-direction: row; flex-wrap: wrap; align-items: center; }
-  .toolbar.sms-ai__bar > *, .toolbar.sms-ai__acts > * { width: auto; }
-  .toolbar.sms-ai__bar .btn, .toolbar.sms-ai__acts .btn { min-height: 40px; }
   .toolbar.sms-tpl .select { flex: 1 1 100%; }
   .toolbar.sms-tpl .input { flex: 1 1 120px; }
   .toolbar.sms-tpl .btn { flex: 0 0 auto; min-height: 44px; }
@@ -2633,3 +2619,23 @@ body:not(.report-step-write) #classPanel { display: none; }
 /* 이미 보낸 주를 고쳤을 때 (write.js · 20261029g) */
 .repub-note { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 12px; padding: 10px 14px; border-radius: 12px; background: #FFF6E5; border: 1px solid #F0D9A8; color: #8A5A12; font-size: 13.5px; font-weight: 700; }
 .repub-note[hidden] { display: none; }
+
+/* 글 칸 「AI로 다듬기」 · 「AI로 초안 쓰기」 공통 부품 (aipolish.js · 20261029g) */
+.aip-bar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 6px 0 4px; }
+.aip-spacer { flex: 1 1 auto; }
+.aip-len { display: inline-flex; gap: 2px; }
+.aip-len .btn.is-on { background: #EDE7FB; color: #5B42D6; font-weight: 800; }
+.aip-btn { background: #F4F0FF; border-color: #D9CFF7; color: #4A3AA8; font-weight: 700; }
+.aip-btn:disabled { opacity: .5; }
+.aip-box .aip-note { margin: 4px 0; font-size: 12.5px; color: #8A5A12; }
+.aip-box .aip-msg { margin: 6px 0; }
+.aip-result { margin: 8px 0; padding: 10px; border: 1px solid #E4DDF7; border-radius: 12px; background: #FAF8FF; }
+.aip-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.aip-col__t { font-size: 12.5px; font-weight: 800; color: var(--ink-mid); margin-bottom: 4px; }
+.aip-col__t--new { color: #4A3AA8; }
+.aip-text { padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff; white-space: pre-wrap; word-break: break-all; font-size: 13px; color: var(--ink-deep); min-height: 40px; }
+.aip-text--orig { color: var(--ink-mid); background: #F7F7FA; }
+.aip-check { margin: 6px 0; font-size: 12.5px; color: #8A5A12; }
+.aip-check ul { margin: 4px 0 0 18px; padding: 0; }
+.aip-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+@media (max-width: 720px) { .aip-cols { grid-template-columns: 1fr; } }
