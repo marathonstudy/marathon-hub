@@ -211,6 +211,39 @@
     });
   }
 
+  /* ---------- 학생 공용 입구 /s/ (migration-024) ----------
+     로그인하면 그 학생의 학생 링크가 열리므로, 복사할 때 학생 링크가 없는 재원생에게 먼저 만들어 둔다 (보내지는 않는다) */
+  function entryUrl() { return CONFIG.siteUrl + '/s/'; }
+  function noPhoneCount() {
+    return Store.activeStudents().filter(function (s) { return Store.phoneDigits(s.studentPhone).length < 8; }).length;
+  }
+  function entryCopy(text, what) {
+    var ids = Store.activeStudents().map(function (s) { return s.id; });
+    ensureStudentLinks(ids).catch(function () { return 0; }).then(function (made) {
+      return copyText(text).then(function () {
+        var n = noPhoneCount();
+        toast(what + '을 복사했습니다' + (made ? ' · 학생 링크가 없던 ' + made + '명에게 새로 만들었습니다' : '') +
+              (n ? ' · 학생 휴대폰 번호가 없는 ' + n + '명은 로그인할 수 없습니다' : ''), n ? 'warn' : 'good');
+        updateEntryHint();
+      });
+    }).catch(function (e) { toast(e.message, 'bad'); });
+  }
+  function updateEntryHint() {
+    var el = $('#entryHint');
+    if (!el) return;
+    var n = noPhoneCount();
+    el.textContent = n ? '학생 휴대폰 번호가 없는 재원생 ' + n + '명 — 「번호 한꺼번에 넣기」 → 학생 본인 번호' : '';
+  }
+  var ENTRY_NOTICE = '[마라톤국어] 러닝노트 학생 입구 안내\n' +
+    '이제 모두 같은 주소로 내 러닝노트에 들어올 수 있어요.\n{주소}\n' +
+    '① 반 고르기 → ② 이름 고르기 → ③ 비밀번호: 내 휴대폰 번호에서 010 을 뺀 8자리\n' +
+    '「이 휴대폰에서 로그인 유지」를 켜 두면 다음부터 바로 열려요.\n' +
+    '휴대폰 번호가 등록돼 있지 않으면 조교 선생님께 말해 주세요.';
+  if ($('#btnEntryCopy')) {
+    $('#btnEntryCopy').addEventListener('click', function () { entryCopy(entryUrl(), '학생 입구 주소'); });
+    $('#btnEntryNotice').addEventListener('click', function () { entryCopy(ENTRY_NOTICE.split('{주소}').join(entryUrl()), '단톡방 안내 문구'); });
+  }
+
   /* 링크가 없는 학생 여럿에게 한 번에 */
   function issueMissing(ids) {
     var list = ids.map(function (id) { return { studentId: id, hubCode: Store.randomCode(24) }; });
@@ -1502,6 +1535,8 @@
   });
 
   window.addEventListener('jt:roster-changed', reloadFromStore);
+  window.addEventListener('jt:roster-changed', updateEntryHint);
+  window.addEventListener('jt:loaded', updateEntryHint);
   window.addEventListener('jt:fields', reloadFromStore);
   /* 서버에서 새로 받아 온 뒤 (탭 열기 · 창으로 돌아오기 · 실시간 반영) */
   window.addEventListener('jt:refreshed', function () {
@@ -1521,6 +1556,8 @@
     selectTab: selectTab,
     whoami: whoami,
     issueMissing: issueMissing,
+    entryUrl: entryUrl,
+    entryNotice: function () { return ENTRY_NOTICE.split('{주소}').join(entryUrl()); },
     getStudents: function () { return students; },
     activeStudents: function () { return students.filter(function (s) { return !s.archived; }); }
   };

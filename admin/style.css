@@ -1404,6 +1404,12 @@ kbd { display: inline-block; padding: 0 6px; border: 1px solid var(--line); bord
 .sms-log__by { margin-top: 2px; }
 .cp-to { margin-bottom: 10px; }
 .tdc-sms { flex: none; }
+.entry-bar { margin: 2px 0 10px; flex-wrap: wrap; align-items: center; }
+.entry-bar__label { font-size: 13px; font-weight: 800; color: var(--ink-mid); }
+.cd-login { margin-top: 4px; }
+.cd-login summary { cursor: pointer; font-size: 13.5px; font-weight: 700; color: var(--ink-mid); }
+.cd-login ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
+.cd-login .is-ok { color: #35806A; } .cd-login .is-no { color: #B03A55; }
 @media (max-width: 720px) {
   /* 좁은 화면에서도 한 줄로 감싸며 (세로로 늘어나지 않게) */
   .toolbar.sms-vars, .toolbar.sms-tpl, .toolbar.sms-log-filter { flex-direction: row; flex-wrap: wrap; align-items: center; }

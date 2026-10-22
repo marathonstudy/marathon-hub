@@ -123,11 +123,13 @@
     $('#cardBody').innerHTML =
       '<div id="cdPinned"></div>' +
       '<section class="cd-sec" id="cdBasic"></section>' +
+      '<section class="cd-sec" id="cdLogin"></section>' +
       '<section class="cd-sec" id="cdGrades-school"></section>' +
       '<section class="cd-sec" id="cdGrades-mock"></section>' +
       '<section class="cd-sec" id="cdNotes"></section>';
     renderPinned();
     renderBasic();
+    loadLogin();
     renderGrades('school');
     renderGrades('mock');
     renderNotes();
@@ -151,6 +153,30 @@
           '<span class="spacer"></span><button class="btn btn--sm btn--primary" type="button" data-nact="done">확인 완료</button></div>' +
           '<div class="cd-pin__body">' + esc(n.body) + '</div></div>';
       }).join('') + '</div>';
+  }
+
+  /* ---------- 학생 입구 로그인 기록 (migration-024) — 학생 · 시각 · 성공/실패만 ---------- */
+
+  var LOGIN_WHY = { wrong: '비밀번호 틀림', nophone: '휴대폰 번호 없음', nolink: '학생 링크 없음' };
+  function loadLogin() {
+    var sid = C.sid;
+    sb().rpc('student_login_log', { p_student: sid }).then(function (r) {
+      var host = $('#cdLogin');
+      if (!host || !C || C.sid !== sid) return;
+      if (r.error) {
+        host.innerHTML = isMissing(r.error) ? '' : '<p class="panel__hint">학생 입구 로그인 기록을 불러오지 못했습니다 — ' + esc(r.error.message) + '</p>';
+        return;
+      }
+      var rows = r.data || [];
+      var last = rows.find(function (x) { return x.ok; });
+      host.innerHTML = '<details class="cd-login"><summary>학생 입구 로그인 기록 — ' +
+          (rows.length ? '최근 ' + rows.length + '회 · 마지막 성공 ' + (last ? esc(fmtDT(last.at)) : '없음') : '아직 없음') + '</summary>' +
+        (rows.length ? '<ul>' + rows.map(function (x) {
+          return '<li><span class="num">' + esc(fmtDT(x.at)) + '</span> · ' +
+            (x.ok ? '<b class="is-ok">성공</b>' : '<b class="is-no">실패</b> ' + esc(LOGIN_WHY[x.reason] || x.reason)) + '</li>';
+        }).join('') + '</ul>' : '<p class="panel__hint">학생이 학생 입구(/s/)로 들어오면 여기에 남습니다.</p>') +
+        '</details>';
+    }, function () {});
   }
 
   /* ---------- 기본 정보 ---------- */

@@ -9,6 +9,7 @@
 | `/admin/` | 선생님·조교 — 명단 · 작성 · 공개 · 발송 · 반 공지 · 교재 | 이메일 (staff 에 등록된 계정만) |
 | `/me/#개인링크코드` | 학생·학부모 — 반 공지 / 내 레포트 / 앱 과제 / 교재비 | 없음 |
 | `/notice/#반코드` | 반 단톡방 — 반 공지만 (학생 정보 없음) | 없음 |
+| `/s/` | 학생 공용 입구 — 반 → 이름 → 휴대폰 번호 8자리 → 그 학생의 학생 링크 화면 | 학생 연락처 뒤 8자리 (migration-024) |
 
 ## 저장소에 올리지 않는 것 (공개 저장소다)
 
@@ -49,6 +50,7 @@ admin/        코치룸 (명단 · 작성 · 공개 · 발송 · 반 공지 · �
   send.js       ④ 발송 — 주차 띠 · 반마다 카드 · 학생 줄 한 줄 · ⋯ 메뉴 (알림톡은 kakao.js)
   sms.js        사이트에서 문자 보내기 (SMS · LMS) · 자주 쓰는 문구 · 문자 보낸 기록 · [설정] 문자 칸
 me/           학생·학부모 개인 페이지
+s/            학생 공용 입구 (반 · 이름 · 휴대폰 번호 8자리 → /me/#학생링크) — assets/entry.js
 notice/       반 공용 공지 페이지
 assets/
   config.js     ← 배포 주소 · Supabase 주소와 publishable key · 버전
@@ -93,6 +95,7 @@ supabase/
   migration-023-sms.sql             사이트 문자(SMS · LMS) — 보낸 기록(뒤 4자리만) · 자주 쓰는 문구(직원 공용) · 설정 · 발송 준비/기록 함수 (직원만)
   functions/kakao-send/index.ts     알림톡 발송 Edge Function (키는 Secrets 에만 · 직원만)
   functions/sms-send/index.ts       문자 발송 Edge Function (알림톡과 같은 솔라피 키 · 직원만 · 번호는 DB 에서 찾음)
+  migration-024-student-login.sql   학생 공용 입구 — 반 · 이름 목록 · 휴대폰 번호 로그인(맞음/틀림 + 학생 링크 코드만) · 로그인 기록(직원만)
   kakao/template.txt · kakao/HOW-TO.md  알림톡 템플릿 초안 · 솔라피 등록 방법
   check-classes.sql               반 이름 점검 (읽기 전용 — 어느 표에 어떤 반이 있는지 · 비슷한 이름)
   functions/app-report/index.ts  앱 과제 기록을 대신 받아 오는 Edge Function
@@ -101,7 +104,7 @@ supabase/
 ## 고칠 때 규칙
 
 파일을 고치면 **버전을 함께 올린다.** `assets/config.js` 의 `version` 과
-`admin/index.html` · `me/index.html` · `notice/index.html` · `index.html` 의 `?v=…` 를 같은 값으로.
+`admin/index.html` · `me/index.html` · `notice/index.html` · `s/index.html` · `index.html` 의 `?v=…` 를 같은 값으로.
 안 올리면 GitHub Pages 캐시 때문에 최대 10분간 옛 파일이 나간다.
 
 ---
@@ -273,6 +276,16 @@ delete from public.staff where email = '조교이메일@example.com';
 - 화면은 학생 id 와 보낼 곳(학부모 1 · 2 · 학생 본인)만 넘긴다. 번호는 함수가 DB 에서 찾고, 기록에는 뒤 4자리만 남는다.
 - 같은 번호는 한 번만(형제는 「따로 보내기」를 직접 켰을 때만) · 한 번 200건 · 하루 500건(설정) · 광고 문자는 수신거부 번호가 없거나 밤 9시 ~ 아침 8시면 막는다.
 - 실행 전에는 「문자 보내기」 창에 안내만 나오고, 알림톡 · 문구 복사 · 내 폰 문자는 그대로 쓴다.
+
+### 5-21. 학생 공용 입구 /s/ (migration-024)
+1. 023 다음에 SQL Editor → **New query** → `supabase/migration-024-student-login.sql` 전체 → **Run** (세 줄 모두 `true`)
+2. Edge Function 은 없다. 코치룸 ① 명단 위쪽 [학생 입구 주소 복사] · [단톡방 안내 문구 복사]
+- 학생: `/s/` → 반 → 이름 → 비밀번호(students.student_phone 뒤 8자리 · 따로 저장하지 않고 student_login 함수가 비교) → `/me/#학생링크`
+- 누구나 부를 수 있는 함수는 student_entry_classes · student_entry_names · student_login 셋뿐. 이름 목록에는 이름과 고르기용 표시값만,
+  로그인은 맞음/틀림(+ 맞으면 그 학생의 학생 링크 코드)만 돌려준다. 학부모 번호 · 상담 · 성적 · 금액 · 다른 학생 정보는 나가지 않는다.
+- 로그인 유지(기본 켬)는 이 기기에 학생 링크 코드 하나만(`mhub.slogin`) 남긴다. 러닝노트 머리 [로그아웃]이 지운다.
+- 로그인 기록(student_logins: 학생 · 시각 · 성공/실패 · 이유, 비밀번호 · 넣은 값은 저장 안 함)은 상담 카드에서 본다.
+- 잠금 · 비밀번호 바꾸기는 없다(요청대로). 학생 연락처를 고치면 비밀번호도 바로 바뀐다.
 
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.

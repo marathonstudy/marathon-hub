@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>마라톤국어 러닝노트 · 학생 입구</title>
+
+<!-- 학생 공용 입구 (migration-024). 반 → 이름 → 비밀번호(내 휴대폰 번호에서 010 을 뺀 8자리) → 내 러닝노트(학생 링크).
+     이 화면이 서버에서 받는 것은 반 이름 · 학생 이름 · 맞음/틀림(맞으면 그 학생 링크 코드)뿐이다. 검색에 노출하지 않는다. -->
+<meta name="robots" content="noindex, nofollow">
+<meta name="googlebot" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#E8E6F8">
+<link rel="apple-touch-icon" href="../assets/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="../assets/icon-192.png">
+<meta name="apple-mobile-web-app-title" content="러닝노트">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="마라톤국어 러닝노트 · 학생 입구">
+<meta property="og:description" content="반과 이름을 고르고 내 휴대폰 번호로 들어와요">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:image" content="https://marathonstudy.github.io/marathon-hub/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" as="style" crossorigin
+      href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
+<link rel="stylesheet" href="../assets/report.css?v=20261028c">
+<link rel="stylesheet" href="../assets/hub.css?v=20261028c">
+</head>
+<body>
+
+<div class="container">
+
+  <header class="hub-head">
+    <div class="hub-head__top">
+      <span class="hub-head__id">
+        <img class="hub-head__logo" data-brand-logo src="../assets/logo.png" alt="" width="53" height="30">
+        <span class="hub-head__brand" data-brand="noteTitle">마라톤국어 러닝노트</span>
+      </span>
+      <span class="hub-head__tag">학생 입구</span>
+    </div>
+    <div class="hub-head__name">내 러닝노트 열기</div>
+    <div class="hub-head__meta">반 → 이름 → 비밀번호 순서로 골라 주세요</div>
+  </header>
+
+  <main class="card en-card" id="enRoot">
+    <form id="enForm" autocomplete="off" novalidate>
+      <label class="en-field">
+        <span class="en-label">① 반</span>
+        <select class="en-input" id="enClass" required disabled><option value="">불러오는 중…</option></select>
+      </label>
+      <label class="en-field">
+        <span class="en-label">② 이름</span>
+        <select class="en-input" id="enName" required disabled><option value="">반을 먼저 골라 주세요</option></select>
+      </label>
+      <label class="en-field">
+        <span class="en-label">③ 비밀번호 <small>내 휴대폰 번호에서 010 을 뺀 8자리</small></span>
+        <input class="en-input" id="enPw" type="password" inputmode="numeric" autocomplete="off" maxlength="20" placeholder="예) 12345678">
+      </label>
+      <label class="en-keep"><input type="checkbox" id="enKeep" checked> 이 휴대폰에서 로그인 유지</label>
+      <p class="en-msg" id="enMsg" role="alert" hidden></p>
+      <button class="hub-btn en-go" id="enGo" type="submit" disabled>들어가기</button>
+      <p class="en-note">함께 쓰는 휴대폰 · 컴퓨터라면 「로그인 유지」를 끄고 들어가세요.<br>휴대폰 번호가 등록돼 있지 않으면 조교 선생님께 부탁하세요.</p>
+    </form>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-brand" data-brand="brandName">마라톤국어</div>
+    <div class="footer-contact">
+      문의 · <span data-brand="contactName">김종현 T</span>
+      <a data-brand-tel href="tel:01072009055">010-7200-9055</a>
+    </div>
+  </footer>
+
+</div>
+
+<script src="../assets/config.js?v=20261028c"></script>
+<script src="../assets/brand.js?v=20261028c"></script>
+<script src="../assets/entry.js?v=20261028c"></script>
+</body>
+</html>

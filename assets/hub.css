@@ -847,3 +847,24 @@ label.hub-btn { cursor: pointer; text-align: center; }
 .cal-step { appearance: none; border: 0; font: inherit; cursor: pointer; min-width: 40px; min-height: 36px; border-radius: 10px; background: var(--grad-soft); color: var(--ink-mid); font-weight: 800; }
 .cal-step:disabled { opacity: .35; cursor: default; }
 .awb .rate-grid--three { gap: 6px; }
+
+/* ---------- 학생 공용 입구 /s/ · [로그아웃] (migration-024 · 20261028c) ---------- */
+.en-card { padding: 22px 20px; }
+.en-field { display: block; margin-bottom: 14px; }
+.en-label { display: block; margin-bottom: 6px; font-size: 14px; font-weight: 800; color: var(--ink-mid); }
+.en-label small { font-size: 12.5px; font-weight: 700; color: var(--ink-light); margin-left: 4px; }
+.en-input { width: 100%; min-height: 50px; padding: 10px 14px; border-radius: 14px; border: 1.5px solid #D9D3F5; background: #fff;
+  font: inherit; font-size: 16px; color: var(--ink-deep); }
+.en-input:focus { outline: none; border-color: #7858E8; box-shadow: 0 0 0 3px rgba(120, 88, 232, .18); }
+.en-input:disabled { background: #F5F4FC; color: var(--ink-light); }
+.en-keep { display: flex; align-items: center; gap: 8px; margin: 4px 0 14px; font-size: 14px; font-weight: 700; color: var(--ink); }
+.en-keep input { width: 20px; height: 20px; }
+.en-go { display: block; width: 100%; min-height: 54px; font-size: 16.5px; }
+.en-go:disabled { opacity: .5; cursor: not-allowed; }
+.en-msg { margin: 0 0 12px; padding: 10px 12px; border-radius: 12px; font-size: 14px; font-weight: 700; line-height: 1.5; background: #F5F4FC; color: var(--ink-mid); }
+.en-msg--bad { background: #FDECEF; color: #A03553; }
+.en-msg--ok { background: #E8F6EF; color: #2F7D63; }
+.en-note { margin-top: 14px; font-size: 12.5px; line-height: 1.6; color: var(--ink-light); text-align: center; }
+.hub-logout { display: block; margin: 12px 0 0 auto; appearance: none; border: 1.5px solid rgba(255, 255, 255, .55); background: rgba(255, 255, 255, .14);
+  color: #fff; font: inherit; font-size: 12.5px; font-weight: 800; padding: 6px 12px; border-radius: 999px; cursor: pointer; }
+.hub-entry-link { margin-top: 14px; }

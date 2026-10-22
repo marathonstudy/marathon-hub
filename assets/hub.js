@@ -477,6 +477,22 @@
     (id || top).appendChild(t);
   }
 
+  /* 학생 입구로 로그인한 기기 — 머리에 [로그아웃] (이 기기에 남긴 학생 링크 코드를 지우고 입구로) */
+  function logoutButton(EL) {
+    var head = $('#hubHead');
+    if (!head || document.getElementById('hubLogout')) return;
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.id = 'hubLogout';
+    b.className = 'hub-logout';
+    b.textContent = '로그아웃';
+    b.addEventListener('click', function () {
+      EL.clear();
+      global.location.replace('../s/?out=1');
+    });
+    head.appendChild(b);
+  }
+
   /* 코치룸 미리보기 띠 */
   function previewBand() {
     if (document.getElementById('pvBand')) return;
@@ -921,7 +937,7 @@
 
   function stopScreen(root, kind) {
     var msg = {
-      nocode:   '주소가 올바르지 않습니다.<br>받으신 링크를 다시 눌러 주세요.',
+      nocode:   '주소가 올바르지 않습니다.<br>받으신 링크를 다시 눌러 주세요.<br><a class="hub-btn hub-entry-link" href="../s/">학생은 여기에서 로그인</a>',
       notfound: '링크를 찾을 수 없습니다.<br>받으신 링크가 맞는지 확인해 주세요.',
       closed:   '더 이상 열 수 없는 링크입니다.<br>궁금한 점은 아래 문의처로 연락해 주세요.',
       network:  '불러오지 못했습니다.<br>인터넷 연결을 확인하고 새로고침해 주세요.'
@@ -971,15 +987,28 @@
     var tabs = $('#hubTabs');
     var h = parseHash();
 
+    /* 학생 입구(/s/)에서 로그인해 둔 기기 — 주소에 코드가 없으면 남겨 둔 학생 링크로 (migration-024) */
+    var EL = PV ? null : global.EntryLogin;
+    if (!PV && !/^[A-Za-z0-9]{20,64}$/.test(h.code) && EL && EL.get()) {
+      try { history.replaceState(null, '', global.location.pathname + '#' + EL.get()); } catch (e) { global.location.hash = EL.get(); }
+      h = parseHash();
+    }
+
     if (PV) { h = { code: 'preview', view: PV.view || '', arg: PV.arg || '' }; previewBand(); }
     else if (!/^[A-Za-z0-9]{20,64}$/.test(h.code)) { stopScreen(root, 'nocode'); return; }
 
     rpc('hub_get', { p_code: h.code }).then(function (d) {
-      if (!d || !d.ok) { stopScreen(root, (d && d.reason) || 'notfound'); return; }
+      if (!d || !d.ok) {
+        /* 남겨 둔 로그인이 더 이상 열리지 않으면(재발급 · 퇴원) 지우고 입구 안내 */
+        if (EL && EL.get() === h.code) EL.clear();
+        stopScreen(root, (d && d.reason) || 'notfound');
+        return;
+      }
 
       /* 학생 링크 · 학부모 링크 (migration-015). 015 전에는 role 이 없다 — 예전처럼 모두 입력 가능 */
       var canWrite = d.can_write !== false;
       roleTag(d.role);
+      if (EL && EL.get() === h.code) logoutButton(EL);
 
       var st = d.student || {};
       $('#hubName').textContent = (st.name || '') + ' 학생의 러닝노트';
