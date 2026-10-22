@@ -273,6 +273,7 @@
       .sort(function (x, y) {
         if (!!x.next !== !!y.next) return x.next ? -1 : 1;               /* 수업일 미정은 맨 아래 */
         if (x.next && y.next && x.next.date !== y.next.date) return x.next.date < y.next.date ? -1 : 1;
+        if ((x.name === '(반 없음)') !== (y.name === '(반 없음)')) return x.name === '(반 없음)' ? 1 : -1;
         return x.name.localeCompare(y.name, 'ko');
       });
   }
@@ -285,6 +286,7 @@
       '<div class="tdc-st__main"><button type="button" class="roster__name roster__name-btn" data-card="' + esc(s.id) + '">' + esc(s.name) + '</button>' +
         tagsHtml(why.urgent, 'td-why--urgent') + tagsHtml(why.watch, 'td-why--watch') + '</div>' +
       '<div class="tdc-st__acts"><button type="button" class="btn btn--sm" data-card="' + esc(s.id) + '">상담 카드</button>' +
+        '<button type="button" class="btn btn--sm" data-sms-sid="' + esc(s.id) + '">문자</button>' +
         '<button type="button" class="btn btn--sm btn--ghost" data-pv="student" data-sid="' + esc(s.id) + '">학생 화면 보기</button></div>' +
     '</div>';
   }
@@ -369,6 +371,7 @@
                 '<span class="tdc-flag tdc-flag--watch' + (watch.length ? '' : ' is-zero') + '">살펴보기 <b class="num">' + watch.length + '</b></span>' +
               '</span>' +
             '</button>' +
+            (c.name === '(반 없음)' || !n ? '' : '<button type="button" class="btn btn--sm tdc-sms" data-sms-cls="' + esc(c.name) + '" aria-label="' + esc(c.name) + ' 문자 보내기">문자</button>') +
             (c.name === '(반 없음)' ? '' : '<button type="button" class="btn btn--sm tdc-write" data-write="' + esc(c.name) + '">이번 주 작성하기</button>') +
           '</div>' +
           (open ? '<div class="tdc-list">' +
@@ -487,6 +490,17 @@
 
   /* 뒤로가기 · 새로고침 (nav.js) — 펼친 반 목록 */
   window.TodayView = {
+    /* ④ 발송 · 문자 보내기도 같은 반 순서 — 오늘 수업 → 가까운 날 → 같은 날은 이름 순 → 수업일 미정 맨 아래 */
+    orderClasses: function (names) {
+      return names.map(function (n) { return { name: n, next: n === '(반 없음)' ? null : nextLesson(n) }; })
+        .sort(function (x, y) {
+          if (!!x.next !== !!y.next) return x.next ? -1 : 1;
+          if (x.next && y.next && x.next.date !== y.next.date) return x.next.date < y.next.date ? -1 : 1;
+          if ((x.name === '(반 없음)') !== (y.name === '(반 없음)')) return x.name === '(반 없음)' ? 1 : -1;
+          return x.name.localeCompare(y.name, 'ko');
+        }).map(function (x) { return x.name; });
+    },
+    nextLesson: nextLesson,
     openList: function () { return Object.keys(st.open).sort(); },
     setOpen: function (list) {
       st.open = {};

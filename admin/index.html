@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" as="style" crossorigin
       href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
-<link rel="stylesheet" href="style.css?v=20261027a">
+<link rel="stylesheet" href="style.css?v=20261028a">
 </head>
 <body class="is-locked">
 
@@ -564,38 +564,27 @@
   <section id="panel-send" role="tabpanel" aria-labelledby="tab-send" hidden>
 
     <div class="panel">
-      <div class="panel__head">
-        <h2 class="panel__title">발송</h2>
-        <p class="panel__hint" id="sendProgress"></p>
-        <div class="spacer"></div>
-        <button class="btn btn--sm" id="btnSendRefresh" type="button">새로고침</button>
+      <!-- 발송 머리 띠 (send.js) — [◀] 「발송 · 10/15(목) 수업 레포트」 [▶] [⋯] · 작성 화면 띠와 같은 모양 -->
+      <div class="wbar sbar" id="sendBar">
+        <button class="btn btn--sm wbar__step" id="btnSendPrev" type="button" aria-label="지난주"><span aria-hidden="true">◀</span></button>
+        <div class="wbar__now" id="sendNow" aria-live="polite"></div>
+        <div class="wbar__nav">
+          <button class="btn btn--sm wbar__step" id="btnSendNext" type="button" aria-label="다음주"><span aria-hidden="true">▶</span></button>
+          <button class="btn btn--sm wbar__step sbar__more" id="btnSendMore" type="button" aria-label="발송 메뉴 — 인사말 · 시험 발송 · 문자 · 기록 · 새로고침">⋯</button>
+        </div>
       </div>
+      <p class="panel__hint snd-progress" id="sendProgress"></p>
 
-      <div class="toolbar">
-        <select class="select" id="sendWeek" aria-label="주차 선택"></select>
-        <select class="select" id="sendClassFilter" aria-label="반 필터">
-          <option value="">전체 반</option>
-        </select>
-        <select class="select" id="sendFilter" aria-label="보냄 여부 필터">
-          <option value="all">전체</option>
-          <option value="todo">안 보낸 학생만</option>
-          <option value="done">보낸 학생만</option>
-        </select>
-        <button class="btn btn--sm" id="btnEditGreeting" type="button">인사말 고치기</button>
-      </div>
-
-      <!-- 카카오 알림톡 (kakao.js) -->
-      <div class="kk-panel" id="kakaoPanel"></div>
-
-      <div id="sendList" aria-live="polite"></div>
+      <!-- 반 카드 (send.js · 알림톡은 kakao.js · 문자는 sms.js) -->
+      <div id="sendList" class="snd-list" aria-live="polite"></div>
     </div>
 
     <div class="notice notice--info">
       <span class="notice__icon" aria-hidden="true">💬</span>
       <div class="notice__body">
-        문자에 들어가는 주소는 <b>학생 개인 페이지 링크</b>입니다. 매주 같은 링크라서 학부모는
+        레포트에 들어가는 주소는 <b>학부모 링크</b>입니다. 매주 같은 링크라서 학부모는
         한 번 받은 링크로 지난 레포트·반 공지·앱 과제를 계속 볼 수 있습니다.
-        <b>[문자 보내기]</b>는 이 기기의 문자 앱을 엽니다. 안 열리면 <b>[문구]</b>로 복사하세요.
+        학생 줄 <b>⋯</b>의 <b>[내 폰으로 보내기]</b>는 이 기기의 문자 앱을 엽니다. 안 열리면 <b>[문구 복사]</b>로 복사하세요.
       </div>
     </div>
   </section>
@@ -1392,6 +1381,99 @@
   </form>
 </dialog>
 
+<!-- ④ 발송 ⋯ 메뉴 (send.js) — 학생 줄 · 띠가 같이 쓴다 -->
+<dialog class="modal sheet" id="sendMenu">
+  <div class="modal__head">
+    <h2 class="modal__title" id="sendMenuTitle"></h2>
+    <p class="modal__desc num" id="sendMenuDesc"></p>
+  </div>
+  <div class="modal__body sheet__list" id="sendMenuList"></div>
+  <div class="modal__foot"><div class="spacer"></div><button class="btn" type="button" id="sendMenuClose">닫기</button></div>
+</dialog>
+
+<!-- 문자 보내기 (sms.js · Edge Function sms-send · migration-023) -->
+<dialog class="modal modal--wide" id="smsModal">
+  <div class="modal__head">
+    <h2 class="modal__title">문자 보내기</h2>
+    <p class="modal__desc" id="smsDesc">사이트에서 바로 보냅니다. 화면은 학생과 보낼 곳만 넘기고, 번호는 서버가 찾습니다.</p>
+  </div>
+  <div class="modal__body">
+    <p class="cp-warn" id="smsMissing" hidden></p>
+    <div class="sms-sec">
+      <div class="sms-sec__title">받는 사람</div>
+      <div class="chips sms-mode" role="group" aria-label="받는 사람 고르는 방법">
+        <button class="chip" type="button" data-smsmode="class">반 전체</button>
+        <button class="chip" type="button" data-smsmode="student">학생 골라서</button>
+      </div>
+      <div class="chips sms-classes" id="smsClassBox"></div>
+      <div id="smsStudentBox" hidden>
+        <input class="input" id="smsFind" type="search" placeholder="이름 · 반으로 찾기" autocomplete="off">
+        <div class="sms-stu-list" id="smsStuList"></div>
+      </div>
+      <p class="field__hint" id="smsPickedHint"></p>
+    </div>
+    <div class="sms-sec">
+      <div class="sms-sec__title">보낼 곳</div>
+      <div class="sms-to">
+        <label class="check-line"><input type="checkbox" id="smsToP1" checked> <span>학부모 1</span></label>
+        <label class="check-line"><input type="checkbox" id="smsToP2" checked> <span>학부모 2</span></label>
+        <label class="check-line"><input type="checkbox" id="smsToSt"> <span>학생 본인</span></label>
+      </div>
+    </div>
+    <div class="sms-sec">
+      <div class="sms-sec__title">내용 <span class="sms-len" id="smsLen"></span></div>
+      <div class="toolbar sms-tpl">
+        <select class="select" id="smsTpl" aria-label="자주 쓰는 문구"><option value="">자주 쓰는 문구</option></select>
+        <input class="input" id="smsTplName" type="text" maxlength="40" placeholder="문구 이름" aria-label="문구 이름">
+        <button class="btn btn--sm" type="button" id="smsTplSave">문구 저장</button>
+        <button class="btn btn--sm btn--ghost" type="button" id="smsTplDel" disabled>지우기</button>
+      </div>
+      <textarea class="textarea" id="smsBody" rows="6" maxlength="2000" placeholder="안녕하세요, 마라톤국어입니다. …"></textarea>
+      <div class="toolbar sms-vars" aria-label="넣을 수 있는 칸">
+        <button class="btn btn--sm btn--ghost" type="button" data-var="#{이름}">#{이름}</button>
+        <button class="btn btn--sm btn--ghost" type="button" data-var="#{반}">#{반}</button>
+        <button class="btn btn--sm btn--ghost" type="button" data-var="#{링크}">#{링크}</button>
+        <button class="btn btn--sm btn--ghost" type="button" data-var="#{수업일}">#{수업일}</button>
+      </div>
+      <p class="field__hint">#{링크} 학부모에겐 학부모 링크, 학생에겐 학생 링크 · #{수업일} <span id="smsLessonHint">다음 수업일</span></p>
+      <label class="check-line"><input type="checkbox" id="smsAd"> <span>광고 문자 <span class="field__opt">맨 앞에 (광고)와 발신처, 끝에 무료수신거부 안내가 붙습니다 · 밤 9시 ~ 아침 8시에는 못 보냅니다</span></span></label>
+      <p class="cp-warn" id="smsAdWarn" hidden></p>
+      <label class="check-line" id="smsMarkLine" hidden><input type="checkbox" id="smsMark" checked> <span>보낸 학생은 ④ 발송에 「보냄」으로 표시 <span class="field__opt" id="smsMarkHint"></span></span></label>
+    </div>
+    <div class="sms-sec">
+      <div class="sms-sec__title">미리보기</div>
+      <div id="smsPreview"></div>
+    </div>
+    <div id="smsResult" aria-live="polite"></div>
+  </div>
+  <div class="modal__foot">
+    <button class="btn" type="button" id="smsTest">나에게 시험 발송</button>
+    <div class="spacer"></div>
+    <button class="btn" type="button" id="smsClose">닫기</button>
+    <button class="btn btn--primary" type="button" id="smsSend">보내기</button>
+  </div>
+</dialog>
+
+<!-- 문자 보낸 기록 (sms.js) -->
+<dialog class="modal modal--wide" id="smsLogModal">
+  <div class="modal__head">
+    <h2 class="modal__title">문자 보낸 기록</h2>
+    <p class="modal__desc">사이트에서 보낸 문자만 · 번호는 뒤 4자리만 남습니다</p>
+  </div>
+  <div class="modal__body">
+    <div class="toolbar sms-log-filter">
+      <select class="select" id="smsLogClass" aria-label="반"><option value="">전체 반</option></select>
+      <select class="select" id="smsLogStudent" aria-label="학생"><option value="">전체 학생</option></select>
+      <input class="input" id="smsLogFrom" type="date" aria-label="며칠부터">
+      <span>~</span>
+      <input class="input" id="smsLogTo" type="date" aria-label="며칠까지">
+      <button class="btn btn--sm btn--primary" type="button" id="smsLogFind">찾기</button>
+    </div>
+    <div id="smsLogList"></div>
+  </div>
+  <div class="modal__foot"><div class="spacer"></div><button class="btn" type="button" id="smsLogClose">닫기</button></div>
+</dialog>
+
 <dialog class="modal" id="phonePickModal">
   <form method="dialog">
     <div class="modal__head">
@@ -1807,6 +1889,8 @@
       </label>
       <!-- 카카오 알림톡 설정 (kakao.js) -->
       <div id="kakaoSettings" hidden></div>
+      <!-- 사이트 문자 설정 (sms.js) -->
+      <div id="smsSettings" hidden></div>
       <!-- 직원 관리 (staff.js) -->
       <div id="staffAdmin" hidden></div>
     </div>
@@ -1853,10 +1937,14 @@
 <!-- 번호 한꺼번에 넣기 (contacts.js) -->
 <dialog class="modal modal--wide" id="phonePasteModal">
   <div class="modal__head">
-    <h2 class="modal__title">학부모 번호 한꺼번에 넣기</h2>
-    <p class="modal__desc">엑셀에서 「이름」 「번호」 두 칸을 같이 골라 복사(Ctrl+C)한 뒤 아래에 붙여 넣으세요. 학부모 번호 1 이 비었으면 1, 아니면 2 에 들어갑니다.</p>
+    <h2 class="modal__title">번호 한꺼번에 넣기</h2>
+    <p class="modal__desc" id="cpDesc">엑셀에서 「이름」 「번호」 두 칸을 같이 골라 복사(Ctrl+C)한 뒤 아래에 붙여 넣으세요. 학부모 번호 1 이 비었으면 1, 아니면 2 에 들어갑니다.</p>
   </div>
   <div class="modal__body">
+    <div class="chips cp-to" role="group" aria-label="어느 번호인가요">
+      <button class="chip is-on" type="button" data-cpto="parent" aria-pressed="true">학부모 번호</button>
+      <button class="chip" type="button" data-cpto="student" aria-pressed="false">학생 본인 번호</button>
+    </div>
     <textarea class="textarea" id="cpText" rows="7" placeholder="김하늘&#9;010-1234-5678&#10;이바다&#9;010-2345-6789"></textarea>
     <div class="toolbar"><button class="btn btn--sm" type="button" id="cpPreviewBtn">미리 보기</button></div>
     <div id="cpPreview"></div>
@@ -1890,43 +1978,44 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
 <!-- config.js 와 brand.js 가 먼저 와야 한다. 나머지가 이 값을 읽는다. -->
-<script src="../assets/config.js?v=20261027a"></script>
-<script src="../assets/brand.js?v=20261027a"></script>
-<script src="../assets/lesson.js?v=20261027a"></script>
-<script src="supabase.js?v=20261027a"></script>
-<script src="db.js?v=20261027a"></script>
-<script src="store.js?v=20261027a"></script>
-<script src="report.js?v=20261027a"></script>
-<script src="app.js?v=20261027a"></script>
-<script src="import.js?v=20261027a"></script>
-<script src="write.js?v=20261027a"></script>
-<script src="publish.js?v=20261027a"></script>
-<script src="send.js?v=20261027a"></script>
-<script src="kakao.js?v=20261027a"></script>
-<script src="contacts.js?v=20261027a"></script>
-<script src="notice.js?v=20261027a"></script>
-<script src="tb.js?v=20261027a"></script>
-<script src="tb-dash.js?v=20261027a"></script>
-<script src="tb-issue.js?v=20261027a"></script>
-<script src="tb-stock.js?v=20261027a"></script>
-<script src="tb-bill.js?v=20261027a"></script>
-<script src="../assets/dday.js?v=20261027a"></script>
-<script src="card.js?v=20261027a"></script>
-<script src="exams.js?v=20261027a"></script>
-<script src="photo.js?v=20261027a"></script>
-<script src="today.js?v=20261027a"></script>
-<script src="staff.js?v=20261027a"></script>
-<script src="classes.js?v=20261027a"></script>
-<script src="weekly.js?v=20261027a"></script>
-<script src="ytbm.js?v=20261027a"></script>
-<script src="summary.js?v=20261027a"></script>
-<script src="weeks.js?v=20261027a"></script>
-<script src="../assets/photos.js?v=20261027a"></script>
-<script src="review.js?v=20261027a"></script>
-<script src="draftguard.js?v=20261027a"></script>
-<script src="preview.js?v=20261027a"></script>
-<script src="nav.js?v=20261027a"></script>
-<script src="sync.js?v=20261027a"></script>
-<script src="auth.js?v=20261027a"></script>
+<script src="../assets/config.js?v=20261028a"></script>
+<script src="../assets/brand.js?v=20261028a"></script>
+<script src="../assets/lesson.js?v=20261028a"></script>
+<script src="supabase.js?v=20261028a"></script>
+<script src="db.js?v=20261028a"></script>
+<script src="store.js?v=20261028a"></script>
+<script src="report.js?v=20261028a"></script>
+<script src="app.js?v=20261028a"></script>
+<script src="import.js?v=20261028a"></script>
+<script src="write.js?v=20261028a"></script>
+<script src="publish.js?v=20261028a"></script>
+<script src="send.js?v=20261028a"></script>
+<script src="kakao.js?v=20261028a"></script>
+<script src="sms.js?v=20261028a"></script>
+<script src="contacts.js?v=20261028a"></script>
+<script src="notice.js?v=20261028a"></script>
+<script src="tb.js?v=20261028a"></script>
+<script src="tb-dash.js?v=20261028a"></script>
+<script src="tb-issue.js?v=20261028a"></script>
+<script src="tb-stock.js?v=20261028a"></script>
+<script src="tb-bill.js?v=20261028a"></script>
+<script src="../assets/dday.js?v=20261028a"></script>
+<script src="card.js?v=20261028a"></script>
+<script src="exams.js?v=20261028a"></script>
+<script src="photo.js?v=20261028a"></script>
+<script src="today.js?v=20261028a"></script>
+<script src="staff.js?v=20261028a"></script>
+<script src="classes.js?v=20261028a"></script>
+<script src="weekly.js?v=20261028a"></script>
+<script src="ytbm.js?v=20261028a"></script>
+<script src="summary.js?v=20261028a"></script>
+<script src="weeks.js?v=20261028a"></script>
+<script src="../assets/photos.js?v=20261028a"></script>
+<script src="review.js?v=20261028a"></script>
+<script src="draftguard.js?v=20261028a"></script>
+<script src="preview.js?v=20261028a"></script>
+<script src="nav.js?v=20261028a"></script>
+<script src="sync.js?v=20261028a"></script>
+<script src="auth.js?v=20261028a"></script>
 </body>
 </html>

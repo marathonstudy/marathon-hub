@@ -46,6 +46,8 @@ admin/        코치룸 (명단 · 작성 · 공개 · 발송 · 반 공지 · �
   draftguard.js ② 작성 글 지키기 — 다른 사람이 고친 칸 알림 · 저장 안 된 내용 복구 · 이전 내용 보기
   preview.js    학부모 화면 · 학생 화면 미리보기 (조교 화면 · 링크 코드 없이 · 아무것도 안 바뀜)
   nav.js        뒤로가기 · 새로고침 (탭 · 반 · 주차 · 창마다 기록) · 저장 안 된 글이 있으면 떠나기 전 확인
+  send.js       ④ 발송 — 주차 띠 · 반마다 카드 · 학생 줄 한 줄 · ⋯ 메뉴 (알림톡은 kakao.js)
+  sms.js        사이트에서 문자 보내기 (SMS · LMS) · 자주 쓰는 문구 · 문자 보낸 기록 · [설정] 문자 칸
 me/           학생·학부모 개인 페이지
 notice/       반 공용 공지 페이지
 assets/
@@ -88,7 +90,9 @@ supabase/
   migration-020-kakao.sql           카카오 알림톡(솔라피) — 학부모 번호 2 · 발송 기록(뒤 4자리만) · 설정 · 발송 준비/기록 함수 (직원만)
   migration-021-written-rule.sql    주차 현황의 「작성 중」도 새 작성 완료 규칙(개별 코멘트 또는 지각 · 결석)으로
   migration-022-coach-cycle.sql     「오늘」을 반마다 수업 주기로 — 지난 수업일 레포트 · 그 주 복습테스트 · 주기별 필기 (직원만 · 읽기 전용)
+  migration-023-sms.sql             사이트 문자(SMS · LMS) — 보낸 기록(뒤 4자리만) · 자주 쓰는 문구(직원 공용) · 설정 · 발송 준비/기록 함수 (직원만)
   functions/kakao-send/index.ts     알림톡 발송 Edge Function (키는 Secrets 에만 · 직원만)
+  functions/sms-send/index.ts       문자 발송 Edge Function (알림톡과 같은 솔라피 키 · 직원만 · 번호는 DB 에서 찾음)
   kakao/template.txt · kakao/HOW-TO.md  알림톡 템플릿 초안 · 솔라피 등록 방법
   check-classes.sql               반 이름 점검 (읽기 전용 — 어느 표에 어떤 반이 있는지 · 비슷한 이름)
   functions/app-report/index.ts  앱 과제 기록을 대신 받아 오는 Edge Function
@@ -259,6 +263,17 @@ delete from public.staff where email = '조교이메일@example.com';
 1. 021 다음에 SQL Editor → **New query** → `supabase/migration-022-coach-cycle.sql` 전체 → **Run** (두 줄 모두 `true`)
 2. 실행 전에는 「오늘」이 예전처럼 달력 주로 세고, 카드 위에 안내 한 줄이 나온다
 
+### 5-20. 사이트에서 문자 보내기 (migration-023 + Edge Function sms-send)
+1. 022 다음에 SQL Editor → **New query** → `supabase/migration-023-sms.sql` 전체 → **Run** (세 줄 모두 `true`)
+2. **Edge Functions → Deploy a new function → Via Editor** → 이름 `sms-send` → `supabase/functions/sms-send/index.ts` 전체 → Deploy
+   → **Verify JWT with legacy secret 끄기** (함수가 부른 사람의 로그인으로 DB 에 직원인지 직접 묻는다)
+3. Secrets 는 알림톡과 같은 `SOLAPI_API_KEY` · `SOLAPI_API_SECRET` · `SOLAPI_SENDER` 를 그대로 쓴다 (새로 넣을 것 없음)
+4. 「오늘」 → [설정] → 「사이트 문자」 칸에서 키 세 개가 ✓ 인지 · 단가 · 상한 · 광고 발신처 · 무료수신거부 번호(광고 문자를 쓸 때만)
+5. ④ 발송 → [반 전체 문자] → [나에게 시험 발송]으로 한 건 먼저 받아 본다
+- 화면은 학생 id 와 보낼 곳(학부모 1 · 2 · 학생 본인)만 넘긴다. 번호는 함수가 DB 에서 찾고, 기록에는 뒤 4자리만 남는다.
+- 같은 번호는 한 번만(형제는 「따로 보내기」를 직접 켰을 때만) · 한 번 200건 · 하루 500건(설정) · 광고 문자는 수신거부 번호가 없거나 밤 9시 ~ 아침 8시면 막는다.
+- 실행 전에는 「문자 보내기」 창에 안내만 나오고, 알림톡 · 문구 복사 · 내 폰 문자는 그대로 쓴다.
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.
@@ -269,7 +284,7 @@ delete from public.staff where email = '조교이메일@example.com';
 
 1. **② 작성** — 주차 · 반 공통(수업일 · 수업 내용 · 테스트 · 과제 · 수업 영상 · 자료 파일 · 코멘트) · 학생별 입력
 2. **③ 공개** — 다 쓴 학생이 체크돼 있다 → [N명 공개]. 고친 뒤에는 다시 공개
-3. **④ 발송** — [문자 보내기] 또는 [문구]·[카톡용] 복사. 링크는 학생마다 매주 같다
+3. **④ 발송** — 반 카드 [알림톡 n명 보내기] · [반 전체 문자], 학생 줄 ⋯ (내 폰으로 보내기 · 문구 · 카톡용 복사). 링크는 학생마다 매주 같다
 4. **⑤ 반 공지** — 반(여러 개 가능) · 주차 고르고 내용 → [공지 올리기] (영상 · 자료 파일은 ② 작성 반 공통에서)
 
 ## 여러 기기에서 같이 쓰기

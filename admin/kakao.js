@@ -1,11 +1,12 @@
 /* ============================================================
    kakao.js — 카카오 알림톡 발송 (솔라피 · Edge Function kakao-send · migration-020)
 
-   ④ 발송 탭 위 「알림톡」 칸
-     · 학생마다 상태: 번호 없음 / 공개 전 / 보낼 수 있음 / 보냄(시각) / 실패(이유) — 번호는 가려서
-     · [알림톡 보내기 (n명)] → 「n명에게 알림톡을 보냅니다. 예상 비용 약 n원」 확인 → 함수가 DB 에서 번호를 찾아 보낸다
-       (화면은 학생 id 만 넘긴다). 이미 보낸 학생은 건너뛰고, 줄마다 [다시 보내기]로 한 번 더 확인받고 다시.
-     · [나에게 시험 발송] — 설정에 넣은 내 번호로 한 건만
+   ④ 발송 (send.js 가 그린다 · 20261028a)
+     · 학생마다 상태: 보낼 수 있음 / 보냄 / 실패(이유) — 이 파일은 상태 자료(kakao_status)만 불러온다
+     · 반 카드 [알림톡 n명 보내기] · 학생 줄 [알림톡] → 「n명에게 알림톡을 보냅니다. 예상 비용 약 n원」 확인
+       → 함수가 DB 에서 번호를 찾아 보낸다 (화면은 학생 id 만 넘긴다). 이미 보낸 학생은 건너뛰고,
+       ⋯ [알림톡 다시 보내기]로 한 번 더 확인받고 다시.
+     · 띠 ⋯ [알림톡 나에게 시험 발송] — 설정에 넣은 내 번호로 한 건만
    「오늘」 → [설정] 알림톡 칸 — 키가 들어갔는지(✓/✗) · 템플릿 ID · 문자로 대신 보내기 · 하루 최대 · 1건 예상 비용 · 내 시험 번호
    키 값은 어디에도 보이지 않는다 (함수가 있음/없음만 알려 준다).
    ============================================================ */
@@ -24,12 +25,6 @@
   var FN = 'kakao-send';
   var LMS_WON = 45;                     /* 문자로 대신 보낼 때 대략 (LMS) */
   var st = { week: '', data: null, missing: false, busy: false, run: 0 };
-
-  function fmtDT(iso) {
-    if (!iso) return '';
-    var d = new Date(iso);
-    return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
-  }
 
   function invoke(body) {
     var fns = sb() && sb().functions;
@@ -59,94 +54,28 @@
     if (s.last && s.last.status === 'fail') return 'failed';
     return 'ready';
   }
-  var LABEL = { nophone: '번호 없음', unpublished: '공개 전', nolink: '학부모 링크 없음', ready: '보낼 수 있음', sent: '보냄', failed: '실패' };
 
-  function classFilter() { return window.SendTab ? SendTab.classFilter() : ''; }
-  function inClass(s) {
-    var cf = classFilter();
-    if (!cf) return true;
-    var stu = Store.getStudents().find(function (x) { return x.id === s.id; });
-    return !!stu && (stu.className || '') === cf;
+  function byId(id) {
+    return ((st.data && st.data.students) || []).find(function (x) { return x.id === id; }) || null;
   }
 
   function load() {
-    var week = window.SendTab ? SendTab.week() : '';
+    var week = window.SendView ? SendView.week() : '';
     var run = ++st.run;
     st.week = week;
-    if (!week) { st.data = null; render(); return Promise.resolve(); }
+    if (!week) { st.data = null; changed(); return Promise.resolve(); }
     return sb().rpc('kakao_status', { p_week: week }).then(function (r) {
       if (run !== st.run) return;
       st.missing = !!(r.error && isMissing(r.error));
       st.data = r.error ? null : r.data;
       if (r.error && !st.missing) toast('알림톡 상태를 불러오지 못했습니다 — ' + r.error.message, 'bad');
-      render();
-      decorateRows();
+      changed();
     });
   }
+  function changed() { window.dispatchEvent(new CustomEvent('jt:kakao')); }
 
-  function counts() {
-    var c = { nophone: 0, unpublished: 0, nolink: 0, ready: 0, sent: 0, failed: 0 };
-    ((st.data && st.data.students) || []).filter(inClass).forEach(function (s) { c[stateOf(s)]++; });
-    return c;
-  }
-  function targets() {
-    return ((st.data && st.data.students) || []).filter(inClass).filter(function (s) { var k = stateOf(s); return k === 'ready' || k === 'failed'; });
-  }
-
-  function render() {
-    var host = $('#kakaoPanel');
-    if (!host) return;
-    if (st.missing) {
-      host.innerHTML = '<div class="kk-head"><b>알림톡</b><span class="panel__hint">migration-020 SQL 을 실행하면 알림톡으로 보낼 수 있습니다.</span></div>';
-      return;
-    }
-    if (!st.week || !st.data) { host.innerHTML = ''; return; }
-    var c = counts(), t = targets();
-    var cfg = st.data.cfg || {};
-    var unpub = ((st.data.students) || []).filter(inClass).filter(function (s) { return stateOf(s) === 'unpublished'; });
-    var names = unpub.map(function (s) { var x = Store.getStudents().find(function (y) { return y.id === s.id; }); return x ? x.name : ''; }).filter(Boolean);
-    host.innerHTML =
-      '<div class="kk-head"><b>💬 알림톡</b>' +
-        '<span class="kk-counts">' +
-          '<span class="kk-c kk-c--ready">보낼 수 있음 <b class="num">' + c.ready + '</b></span>' +
-          '<span class="kk-c kk-c--sent">보냄 <b class="num">' + c.sent + '</b></span>' +
-          (c.failed ? '<span class="kk-c kk-c--failed">실패 <b class="num">' + c.failed + '</b></span>' : '') +
-          '<span class="kk-c">번호 없음 <b class="num">' + c.nophone + '</b></span>' +
-          (c.nolink ? '<span class="kk-c">링크 없음 <b class="num">' + c.nolink + '</b></span>' : '') +
-          '<span class="kk-c">공개 전 <b class="num">' + c.unpublished + '</b></span>' +
-        '</span></div>' +
-      '<div class="toolbar kk-acts">' +
-        '<button class="btn btn--primary" type="button" id="btnKakaoSend"' + (t.length && !st.busy ? '' : ' disabled') + '>알림톡 보내기 (' + t.length + '명)</button>' +
-        '<button class="btn" type="button" id="btnKakaoTest"' + (st.busy ? ' disabled' : '') + '>나에게 시험 발송</button>' +
-        '<span class="panel__hint">오늘 ' + (st.data.today || 0) + ' / ' + (cfg.dailyMax || 300) + '건 · 1건 약 ' + (cfg.unitWon != null ? cfg.unitWon : 13) + '원' +
-          (cfg.smsFallback ? ' · 실패하면 문자로 대신' : '') + '</span>' +
-      '</div>' +
-      (names.length ? '<p class="kk-unpub">공개 전 (알림톡 못 보냄): ' + esc(names.slice(0, 30).join(', ')) + (names.length > 30 ? ' 외 ' + (names.length - 30) + '명' : '') + '</p>' : '');
-  }
-
-  /* ④ 발송 목록의 줄마다 알림톡 상태 */
-  function decorateRows() {
-    if (!st.data) return;
-    var by = {};
-    (st.data.students || []).forEach(function (s) { by[s.id] = s; });
-    Array.prototype.forEach.call(document.querySelectorAll('#sendList .send-row'), function (row) {
-      var s = by[row.dataset.id];
-      var box = row.querySelector('.kk-row');
-      if (!box) {
-        box = document.createElement('div');
-        box.className = 'kk-row';
-        var acts = row.querySelector('.send-row__acts');
-        row.insertBefore(box, acts);
-      }
-      if (!s) { box.innerHTML = ''; return; }
-      var k = stateOf(s);
-      var text = LABEL[k] +
-        (k === 'sent' ? ' (' + fmtDT(s.last.at) + ')' : '') +
-        (k === 'failed' ? ' (' + (s.last.error || '이유 모름') + ')' : '');
-      box.innerHTML = '<span class="kk-badge kk-badge--' + k + '">알림톡 · ' + esc(text) + '</span>' +
-        (k === 'sent' ? '<button class="btn btn--sm btn--ghost" type="button" data-kk-resend="' + esc(s.id) + '">알림톡 다시 보내기</button>' : '');
-    });
-  }
+  /* 알림톡을 쓸 수 있는가 — 020 을 실행했고 이 주 상태를 불러왔다 */
+  function ready() { return !!st.data && !st.missing && st.week === (window.SendView ? SendView.week() : ''); }
 
   /* ---------- 보내기 ---------- */
 
@@ -169,12 +98,14 @@
 
   function after() {
     st.busy = false;
-    var rb = $('#btnSendRefresh');
-    if (rb) rb.click();                  /* ④ 발송의 「보냄」 표시도 새로 */
-    load();
+    if (window.SendView) SendView.refresh();     /* ④ 발송의 「보냄」 표시도 새로 */
+    else load();
   }
 
-  function send(list, resend) {
+  /* ids — 학생 id 목록 (알림톡 상태 자료에 있는 학생만) */
+  function send(ids, resend) {
+    var list = ids.map(byId).filter(Boolean);
+    if (!list.length) { toast('알림톡을 보낼 학생이 없습니다', 'bad'); return Promise.resolve(); }
     var cfg = (st.data && st.data.cfg) || {};
     var n = list.length;
     var msgs = list.reduce(function (a, s) { return a + Math.max(1, (s.phones || []).length); }, 0);
@@ -183,14 +114,14 @@
       (msgs !== n ? ' (번호 ' + msgs + '개)' : '') + '.' +
       (cfg.smsFallback ? ' 알림톡이 실패하면 문자로 대신 보내며, 그때는 건당 약 ' + LMS_WON + '원까지 더 들 수 있습니다.' : '') +
       (resend ? ' 이미 보낸 학생에게 한 번 더 보냅니다.' : '');
-    UI.confirmAsk(resend ? '알림톡 다시 보내기' : '알림톡 보내기', desc, '보내기').then(function (yes) {
+    return UI.confirmAsk(resend ? '알림톡 다시 보내기' : '알림톡 보내기', desc, '보내기').then(function (yes) {
       if (!yes) return;
-      st.busy = true; render();
-      var ids = list.map(function (s) { return s.id; });
+      st.busy = true; changed();
+      var all = list.map(function (s) { return s.id; });
       var chunks = [];
-      for (var i = 0; i < ids.length; i += 100) chunks.push(ids.slice(i, i + 100));
+      for (var i = 0; i < all.length; i += 100) chunks.push(all.slice(i, i + 100));
       var total = { ok: true, sent: 0, failed: 0, skipped: [], results: [] };
-      chunks.reduce(function (p, c) {
+      return chunks.reduce(function (p, c) {
         return p.then(function () {
           if (!total.ok) return;
           return invoke({ action: 'send', week: st.week, students: c, resend: !!resend }).then(function (r) {
@@ -205,9 +136,9 @@
 
   function testSend() {
     var pub = ((st.data && st.data.students) || []).filter(function (s) { return s.published && s.link; });
-    if (!pub.length) { toast('이 주에 공개된 레포트가 있어야 시험 발송을 할 수 있습니다', 'bad'); return; }
-    st.busy = true; render();
-    invoke({ action: 'test', week: st.week, students: pub.slice(0, 100).map(function (s) { return s.id; }) })
+    if (!pub.length) { toast('이 주에 공개된 레포트가 있어야 시험 발송을 할 수 있습니다', 'bad'); return Promise.resolve(); }
+    st.busy = true; changed();
+    return invoke({ action: 'test', week: st.week, students: pub.slice(0, 100).map(function (s) { return s.id; }) })
       .then(function (r) { summarize(r, true); after(); });
   }
 
@@ -231,7 +162,7 @@
             '<button class="btn btn--sm" type="button" id="kkSaveCfg">알림톡 설정 저장</button>' +
           '</div>' +
           '<div class="toolbar">' +
-            '<label class="field"><span class="field__label">내 시험 번호 <span class="field__opt">나만 보입니다 · [나에게 시험 발송]에 씀</span></span>' +
+            '<label class="field"><span class="field__label">내 시험 번호 <span class="field__opt">나만 보입니다 · 알림톡 · 문자 [나에게 시험 발송]에 씀</span></span>' +
               '<input class="input" id="kkTestPhone" type="tel" inputmode="numeric" autocomplete="off" placeholder="' + esc(cfg.testPhone || '010-1234-5678') + '"></label>' +
             '<button class="btn btn--sm" type="button" id="kkSaveTest">내 번호 저장</button>' +
           '</div>' +
@@ -271,21 +202,6 @@
   /* ---------- 시작 ---------- */
 
   function init() {
-    var panel = $('#kakaoPanel');
-    if (!panel) return;
-    panel.addEventListener('click', function (e) {
-      if (e.target.closest('#btnKakaoSend')) send(targets(), false);
-      if (e.target.closest('#btnKakaoTest')) testSend();
-    });
-    $('#sendList').addEventListener('click', function (e) {
-      var b = e.target.closest('[data-kk-resend]');
-      if (!b) return;
-      e.stopPropagation();
-      var s = ((st.data && st.data.students) || []).find(function (x) { return x.id === b.dataset.kkResend; });
-      if (s) send([s], true);
-    });
-    window.addEventListener('jt:send-rendered', function () { if (st.week === (window.SendTab ? SendTab.week() : '')) { render(); decorateRows(); } else load(); });
-    document.addEventListener('jt:tab', function (e) { if (e.detail.index === 3) load(); });
     var set = $('#kakaoSettings');
     if (set) {
       $('#tdSettingsBtn').addEventListener('click', loadSettings);
@@ -297,5 +213,17 @@
   }
   init();
 
-  window.Kakao = { reload: load, stateOf: stateOf, state: function () { return st; } };
+  window.Kakao = {
+    reload: load,
+    stateOf: stateOf,
+    state: function () { return st; },
+    ready: ready,
+    busy: function () { return st.busy; },
+    missing: function () { return st.missing; },
+    of: byId,
+    cfg: function () { return (st.data && st.data.cfg) || {}; },
+    today: function () { return (st.data && st.data.today) || 0; },
+    send: send,
+    testSend: testSend
+  };
 })();

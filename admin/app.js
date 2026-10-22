@@ -277,6 +277,7 @@
       '<td class="roster__actions">' +
         '<button class="btn btn--sm btn--ghost" data-pv="parent" title="학부모 링크로 열었을 때 모습 (미리보기)">학부모 화면</button>' +
         '<button class="btn btn--sm btn--ghost" data-pv="student" title="학생 링크로 열었을 때 모습 (미리보기)">학생 화면</button>' +
+        '<button class="btn btn--sm btn--ghost" data-sms-sid="" title="사이트에서 문자 보내기 (sms.js)">문자</button>' +
         '<button class="btn btn--sm" data-act="edit">수정</button>' +
       '</td>';
   }
