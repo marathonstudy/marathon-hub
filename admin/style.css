@@ -1101,6 +1101,8 @@ kbd { display: inline-block; padding: 0 6px; border: 1px solid var(--line); bord
 .tdc-st .td-why.td-why--urgent { background: #FDECEF; color: #B03A55; }
 .tdc-st .td-why.td-why--watch { background: #FFF3E3; color: #A86A1E; }
 .tdc-rest { justify-self: start; margin-top: 4px; }
+.td-why--btn { appearance: none; border: 0; font: inherit; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+.tdc-st__detail { flex: 1 1 100%; font-size: 12.5px; color: #A86A1E; padding: 0 0 2px; }
 @media (max-width: 720px) {
   .tdc-list-wrap { grid-template-columns: minmax(0, 1fr); }
   .tdc-head { flex-wrap: wrap; }

@@ -3,7 +3,8 @@
 
    · 서버 함수 coach_today() 한 번으로 반·학생별 숫자를 받는다 (새 표 없음).
    · '작성 완료' 는 ② 작성 탭과 같은 규칙(report.js Report.entryStatus)으로 센다.
-   · 앱 과제 제출률은 바깥 앱 서버 자료라 화면이 뜬 뒤 app-report 함수로 4명씩 차례로 불러온다.
+   · 앱 과제는 바깥 앱 서버 자료라 화면이 뜬 뒤 app-report 함수로 4명씩 차례로 불러온다.
+     날짜별 기록으로 그 반 직전 과제 기간의 「제출일 / 과제 있던 날」을 센다 (러닝노트 표와 같은 AppWeek.compute).
      불러온 값은 30분 동안 이 화면 메모리에만 둔다(브라우저에 저장하지 않는다).
    · 조교 금액 숨김이 켜져 있으면 서버가 금액을 보내지 않는다 (이 화면에만 적용).
    · 첫 화면은 반 카드 — 다음 수업이 가까운 반부터. 카드를 누르면 그 반 학생(급함 → 살펴보기 → 나머지)이 펼쳐진다.
@@ -125,9 +126,10 @@
       return fetch(url, { headers: { apikey: CFG.supabase.key } })
         .then(function (r) { return r.json(); })
         .then(function (res) {
-          var rate = res && res.ok && res.data && res.data.stats ? Number(res.data.stats.submissionRate) : NaN;
-          app[s.id] = { ok: !isNaN(rate), rate: isNaN(rate) ? null : Math.round(rate), at: Date.now() };
-        }, function () { app[s.id] = { ok: false, rate: null, at: Date.now() }; })
+          /* 날짜별 기록만 남긴다 — 반마다 직전 과제 기간을 그릴 때 AppWeek.compute 로 센다 (러닝노트 「이번 주 과제·강의」 표와 같은 계산) */
+          var dt = res && res.ok && res.data ? res.data : null;
+          app[s.id] = { ok: !!dt, data: dt ? { calendar: dt.calendar || [], lectures: dt.lectures || [], history: dt.history || dt.recent || [] } : null, at: Date.now() };
+        }, function () { app[s.id] = { ok: false, data: null, at: Date.now() }; })
         .then(function () {
           done++;
           if (run === appRun) renderApp(done, total);
@@ -155,13 +157,15 @@
      급함 n · 살펴보기 n · [이번 주 작성하기]. 순서 = 다음 수업이 가까운 반부터 (오늘 수업 맨 위, 같은 날은 이름 순, 수업일 미정은 맨 아래).
      카드를 누르면 그 반 학생 목록이 펼쳐진다 (여러 반 함께 · 펼친 반은 이 기기에만 기억).
        급함     최근 결석 기준 이상 · 복습테스트 미제출 · 확인 필요 상담
-       살펴보기 앱 과제 제출률 기준(기본 50%) 미만 · 필기 2주 연속 없음(설정에서 켰을 때만, 기본 끔)
+       살펴보기 앱 과제 제출 기준(기본 50%) 미만 — 그 반 직전 과제 기간(지난 수업일 ~ 이번 수업일 전날)의 제출일 / 과제 있던 날 (20261028b)
+                · 필기 2주 연속 없음(설정에서 켰을 때만, 기본 끔)
      금액은 이 화면에 넣지 않는다. */
   var OPEN_KEY = 'mhub.today.open';
   function readOpen() { try { return JSON.parse(localStorage.getItem(OPEN_KEY) || '{}') || {}; } catch (e) { return {}; } }
   function saveOpen() { try { localStorage.setItem(OPEN_KEY, JSON.stringify(st.open)); } catch (e) {} }
   st.open = readOpen();
   st.rest = {};
+  st.appOpen = {};
 
   function dash() {
     var v = st.dash || {};
@@ -251,10 +255,21 @@
     if (s.follow_n) out.push({ k: 'follow', t: '확인 필요 상담 ' + s.follow_n });
     return out;
   }
-  function watchOf(s, dv) {
-    var out = [];
+  /* 앱 과제 — 그 반 직전 과제 기간 (주기의 pfrom ~ pto · 오늘이 수업일이면 막 끝난 기간). 과제 있던 날이 없으면 null */
+  function appWeekOf(s, cy) {
     var a = app[s.id];
-    if (s.app && a && a.ok && a.rate < dv.appLow) out.push({ k: 'app', t: '앱 과제 ' + a.rate + '%' });
+    if (!s.app || !a || !a.ok || !a.data || !cy || !cy.L || !window.AppWeek) return null;
+    var w = AppWeek.compute(a.data, cy.pfrom, cy.pto, DDay.today());
+    return w && w.hwDays ? w : null;
+  }
+  function md(iso) { return (+iso.slice(5, 7)) + '/' + (+iso.slice(8, 10)); }
+  function watchOf(s, dv, cy) {
+    var out = [];
+    var w = appWeekOf(s, cy);
+    if (w && w.hwDone / w.hwDays * 100 < dv.appLow) {
+      out.push({ k: 'app', t: '앱 과제 ' + w.hwDone + '/' + w.hwDays + '일', sid: s.id,
+        detail: md(w.from) + '~' + md(w.to) + ' · 정시 ' + w.hwOnTime + '일 · 늦게 ' + (w.hwDone - w.hwOnTime) + '일 · 미제출 ' + (w.hwDays - w.hwDone) + '일' });
+    }
     if (dv.photoWatch) {
       var row = st.cycle ? cycleRow(s.class_name, s.id) : null;
       if (row) { if (!row.photos_cur && !row.photos_prev) out.push({ k: 'photo', t: '필기 2주기 연속 없음' }); }
@@ -279,12 +294,20 @@
   }
 
   function tagsHtml(list, cls) {
-    return list.map(function (w) { return '<span class="td-why td-why--' + w.k + ' ' + cls + '">' + esc(w.t) + '</span>'; }).join('');
+    return list.map(function (w) {
+      /* 앱 과제 꼬리표는 누르면 기간 · 정시 · 늦게 · 미제출을 펼친다 */
+      if (w.detail) return '<button type="button" class="td-why td-why--' + w.k + ' td-why--btn ' + cls + '" data-appd="' + esc(w.sid) + '" aria-expanded="' + !!st.appOpen[w.sid] + '" title="' + esc(w.detail) + '">' + esc(w.t) + '</button>';
+      return '<span class="td-why td-why--' + w.k + ' ' + cls + '">' + esc(w.t) + '</span>';
+    }).join('');
+  }
+  function appDetailHtml(s, why) {
+    var w = why.watch.filter(function (x) { return x.detail; })[0];
+    return w && st.appOpen[s.id] ? '<div class="tdc-st__detail num">앱 과제 ' + esc(w.detail) + '</div>' : '';
   }
   function studentRow(s, why) {
     return '<div class="tdc-st' + (why.urgent.length ? ' is-urgent' : why.watch.length ? ' is-watch' : '') + '" data-id="' + esc(s.id) + '">' +
       '<div class="tdc-st__main"><button type="button" class="roster__name roster__name-btn" data-card="' + esc(s.id) + '">' + esc(s.name) + '</button>' +
-        tagsHtml(why.urgent, 'td-why--urgent') + tagsHtml(why.watch, 'td-why--watch') + '</div>' +
+        tagsHtml(why.urgent, 'td-why--urgent') + tagsHtml(why.watch, 'td-why--watch') + '</div>' + appDetailHtml(s, why) +
       '<div class="tdc-st__acts"><button type="button" class="btn btn--sm" data-card="' + esc(s.id) + '">상담 카드</button>' +
         '<button type="button" class="btn btn--sm" data-sms-sid="' + esc(s.id) + '">문자</button>' +
         '<button type="button" class="btn btn--sm btn--ghost" data-pv="student" data-sid="' + esc(s.id) + '">학생 화면 보기</button></div>' +
@@ -300,7 +323,7 @@
     var cyBy = {};
     classes.forEach(function (c) { cyBy[c.name] = c.cy; });
     var why = {};
-    list.forEach(function (s) { why[s.id] = { urgent: urgentOf(s, set, dv, cyBy[s.class_name]), watch: watchOf(s, dv) }; });
+    list.forEach(function (s) { why[s.id] = { urgent: urgentOf(s, set, dv, cyBy[s.class_name]), watch: watchOf(s, dv, cyBy[s.class_name]) }; });
 
     /* 탭 옆 숫자 = 급함 학생 수 (보관한 반 학생도 센다) */
     var urgentN = list.filter(function (s) { return why[s.id].urgent.length; }).length;
@@ -329,7 +352,7 @@
         return '<div class="tb-card"><div class="tb-card__label">' + c[0] + '</div><div class="tb-card__val num">' + esc(c[1]) + '</div></div>';
       }).join('') + '</div>' +
       (st.cycleMissing ? '<p class="panel__hint tdc-rule">migration-022 를 실행하면 반마다 수업 주기(지난 수업일 ~ 다음 수업 전날)로 셉니다. 지금은 달력 주 기준입니다.</p>' : '') +
-      '<p class="panel__hint tdc-rule">급함 — 레포트 미발송(수업일 +' + dv.grace + '일부터) · 복습테스트 미제출(마감 뒤) · 최근 ' + set.absentWeeks + '주 결석 ' + set.absentMin + '회 이상 · 확인 필요 상담 &nbsp;|&nbsp; 살펴보기 — 앱 과제 ' + dv.appLow + '% 미만' +
+      '<p class="panel__hint tdc-rule">급함 — 레포트 미발송(수업일 +' + dv.grace + '일부터) · 복습테스트 미제출(마감 뒤) · 최근 ' + set.absentWeeks + '주 결석 ' + set.absentMin + '회 이상 · 확인 필요 상담 &nbsp;|&nbsp; 살펴보기 — 앱 과제 제출 ' + dv.appLow + '% 미만(직전 과제 기간)' +
         (dv.photoWatch ? ' · 필기 2주기 연속 없음' : '') + '</p>' +
       '<div class="tdc-list-wrap">' + classes.map(function (c) {
         var rows = c.rows, n = rows.length;
@@ -391,6 +414,8 @@
     if (c) { if (window.Card) Card.open(c.dataset.card); return; }
     var w = e.target.closest('[data-write]');
     if (w) { writeWeek(w.dataset.write); return; }
+    var ad = e.target.closest('[data-appd]');
+    if (ad) { var sid = ad.dataset.appd; if (st.appOpen[sid]) delete st.appOpen[sid]; else st.appOpen[sid] = true; render(); return; }
     var r = e.target.closest('[data-rest]');
     if (r) { var cn = r.closest('.tdc-card').dataset.cls; st.rest[cn] = !st.rest[cn]; render(); return; }
     var t = e.target.closest('[data-toggle]');
