@@ -96,6 +96,8 @@ supabase/
   functions/kakao-send/index.ts     알림톡 발송 Edge Function (키는 Secrets 에만 · 직원만)
   functions/sms-send/index.ts       문자 발송 Edge Function (알림톡과 같은 솔라피 키 · 직원만 · 번호는 DB 에서 찾음)
   migration-025-review-two.sql      복습테스트 시험 2개(복습 TEST · 화작문 TEST) · 전체 + 틀린 개수 · 사진 여러 장 · 날짜 이름(「10/22(목) 복습 TEST」) · 예전 기록 그대로
+  migration-026-text-polish.sql     문자 「AI로 다듬기」 — 사용 기록(글은 저장 안 함) · 월 상한(기본 500회 · AI 요약과 따로) · 직원만
+  functions/text-polish/index.ts    문자 다듬기 Edge Function — Claude(Haiku 5.5) · 내용 칸 글만 보냄 · 자리표시 · 숫자 · 요일 검사 (직원만 · 키는 Secrets 에만)
   migration-024-student-login.sql   학생 공용 입구 — 반 · 이름 목록 · 휴대폰 번호 로그인(맞음/틀림 + 학생 링크 코드만) · 로그인 기록(직원만)
   kakao/template.txt · kakao/HOW-TO.md  알림톡 템플릿 초안 · 솔라피 등록 방법
   check-classes.sql               반 이름 점검 (읽기 전용 — 어느 표에 어떤 반이 있는지 · 비슷한 이름)
@@ -296,6 +298,20 @@ delete from public.staff where email = '조교이메일@example.com';
 - 학생은 시험마다 전체 문항 수 + 틀린 개수(wrong_n), 사진 여러 장(photos · 필수 · 두 시험이 같이 씀). 마감 · 확인 전 고치기 · 확인 후 잠김은 그대로.
 - 예전 기록(틀린 번호)은 지우지 않는다 — 「복습 TEST」로 보이고 점수 그대로. round_no 칸도 그대로 둔다(화면에서만 안 쓴다).
 - 아래 「복습테스트」 절의 회차 · 틀린 번호 · 자주 틀린 번호 설명은 예전 방식이다.
+
+### 5-23. 문자 「AI로 다듬기」 (migration-026 + Edge Function text-polish)
+1. 025 다음에 SQL Editor → **New query** → `supabase/migration-026-text-polish.sql` 전체 → **Run**
+2. **Edge Functions → Deploy a new function → Via Editor** → 이름 `text-polish` → `supabase/functions/text-polish/index.ts` 전체 → Deploy,
+   **Verify JWT 끄기** (로그인 확인은 함수가 DB 에 직접 한다). 키는 AI 요약과 같은 Secrets 의 `ANTHROPIC_API_KEY` — 새로 넣을 것 없음
+- 문자 보내기 창 내용 칸 아래 [AI로 다듬기] · 길이(짧게 · 보통 · 자세히, 기본 보통) · 버튼 옆 「이번 달 n회 남음」.
+  결과는 「다듬은 문장」으로만 보이고 [이걸로 바꾸기]를 눌러야 내용 칸이 바뀐다 ([다시] · [원래대로] · 바꾼 뒤 [되돌리기]).
+- Claude 에는 내용 칸 글만 간다 — 학생 이름 · 번호 · 링크는 #{이름} #{링크} 같은 자리표시 그대로라 보내지 않는다.
+  원래 글 · 다듬은 글은 저장하지 않는다(polish_usage 에는 시각 · 직원 · 글자 수 · 토큰 · 대략 비용만).
+- 함수가 받은 글을 검사한다: 자리표시(#{이름} #{반} #{링크} #{수업일})가 원래와 같은지, 원래 글에 없던 숫자 · 날짜 · 요일이 생기지 않았는지,
+  (광고) · 수신거부를 붙이지 않았는지. 어긋나면 돌려주지 않고 「지금은 다듬을 수 없어요. 직접 보내도 됩니다」. ** · 이모지는 지운다.
+  원래 숫자가 빠지면 「확인할 것」에 적는다. 「짧게」인데 90바이트가 넘으면 그렇게 알려 준다.
+- 월 상한 기본 500회(실패는 안 셈) — 「오늘」 → [설정] → 「문자 AI로 다듬기」 칸 (AI 요약 상한과 같은 권한). 상한 · 실패 · 키 없음이어도 문자 보내기는 그대로 된다.
+- 모델 claude-haiku-5-5 · effort low · 정해 둔 JSON 모양. 1번 약 1원 안팎.
 
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.

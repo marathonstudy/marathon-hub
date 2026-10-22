@@ -1376,6 +1376,17 @@ body.report-step-write.write-weeks #writeBarWrap { display: none; }
 .sms-tpl .select { min-width: 0; flex: 1 1 160px; }
 .sms-tpl .input { flex: 1 1 120px; min-width: 0; }
 .sms-vars { margin-top: 6px; flex-wrap: wrap; }
+.sms-ai { margin: 8px 0; padding: 8px 10px; border: 1px solid #E4DDF7; border-radius: 12px; background: #FAF8FF; }
+.sms-ai__bar { flex-wrap: wrap; align-items: center; gap: 6px; }
+.sms-ai__len { display: inline-flex; gap: 2px; }
+.sms-ai__len .btn.is-on { background: #EDE7FB; color: #5B45A8; font-weight: 800; }
+.sms-ai__result { margin-top: 8px; }
+.sms-ai__title { font-size: 13px; font-weight: 800; color: var(--ink-deep); display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.sms-ai__text { margin: 6px 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff; white-space: pre-wrap; word-break: break-all; font-size: 13px; color: var(--ink-deep); }
+.sms-ai__check { margin: 6px 0; font-size: 12.5px; color: #8A5A12; }
+.sms-ai__check ul { margin: 4px 0 0 18px; padding: 0; }
+.sms-ai__acts { flex-wrap: wrap; gap: 6px; }
+.sms-ai #smsAiMsg { margin: 6px 0 0; }
 .sms-sum { margin: 2px 0 8px; font-size: 13.5px; color: var(--ink-mid); }
 .sms-sib { margin: 6px 0; }
 .sms-pv { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; margin: 6px 0; background: #FBFBFE; }
@@ -1410,6 +1421,9 @@ body.report-step-write.write-weeks #writeBarWrap { display: none; }
   .toolbar.sms-vars, .toolbar.sms-tpl, .toolbar.sms-log-filter { flex-direction: row; flex-wrap: wrap; align-items: center; }
   .toolbar.sms-vars > *, .toolbar.sms-tpl > *, .toolbar.sms-log-filter > * { width: auto; }
   .toolbar.sms-vars .btn { min-height: 40px; flex: 1 1 0; }
+  .toolbar.sms-ai__bar, .toolbar.sms-ai__acts { flex-direction: row; flex-wrap: wrap; align-items: center; }
+  .toolbar.sms-ai__bar > *, .toolbar.sms-ai__acts > * { width: auto; }
+  .toolbar.sms-ai__bar .btn, .toolbar.sms-ai__acts .btn { min-height: 40px; }
   .toolbar.sms-tpl .select { flex: 1 1 100%; }
   .toolbar.sms-tpl .input { flex: 1 1 120px; }
   .toolbar.sms-tpl .btn { flex: 0 0 auto; min-height: 44px; }

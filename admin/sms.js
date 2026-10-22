@@ -12,6 +12,7 @@
    여는 곳 — 받는 사람이 미리 채워진다
      · 주간 레포트 → 발송 반 카드 [반 전체 문자] · 학생 ⋯ [사이트에서 문자] → 그 주 수업일 · 「보냄」 표시 칸
      · 「오늘」 반 카드 [문자] · 그 안 학생 줄 [문자] · 학생 → 명단 학생 줄 [문자] (data-sms-cls · data-sms-sid)
+   「AI로 다듬기」 — 내용 칸 글만 text-polish(Claude Haiku 5.5)로 · 길이 짧게/보통/자세히 · 「다듬은 문장」 [이걸로 바꾸기][다시][원래대로] · [되돌리기] (migration-026)
    「문자 보낸 기록」 창 — 반 · 학생 · 날짜로 찾기 (직원, 시각, 받는 사람, 번호 뒤 4자리, 내용 앞부분, 성공 · 실패)
    「오늘」 → [설정] 문자 칸 — 키 세 개(✓/✗) · 단가 · 한 번 · 하루 최대 · 광고 발신처 · 무료수신거부 번호
    ============================================================ */
@@ -42,10 +43,10 @@
     busy: false
   };
 
-  function invoke(body) {
+  function invoke(body, fn) {
     var fns = sb() && sb().functions;
     if (!fns || !fns.invoke) return Promise.resolve({ ok: false, reason: 'nofn', message: '문자 함수(sms-send)를 부를 수 없습니다.' });
-    return fns.invoke(FN, { body: body }).then(function (r) {
+    return fns.invoke(fn || FN, { body: body }).then(function (r) {
       if (!r.error) return r.data;
       var ctx = r.error.context;
       if (ctx && typeof ctx.json === 'function') {
@@ -329,6 +330,69 @@
     });
   }
 
+  /* ---------- AI로 다듬기 (Edge Function text-polish · migration-026) ----------
+     내용 칸 글만 보낸다 (학생 이름 · 번호는 안 보냄). 다듬은 글은 [이걸로 바꾸기]를 눌러야 내용 칸에 들어간다.
+     실패 · 상한이면 안내만 — 보내기는 그대로 된다. */
+
+  var POLISH_FN = 'text-polish';
+  var POLISH_SORRY = '지금은 다듬을 수 없어요. 직접 보내도 됩니다';
+  var ai = { len: 'normal', source: '', result: null, undo: null, busy: false, left: null };
+
+  function aiLeft() {
+    return sb().rpc('polish_status').then(function (r) {
+      ai.left = r.error ? null : Math.max(0, (r.data.cap || 0) - (r.data.used || 0));
+      renderAi();
+    }, function () { ai.left = null; renderAi(); });
+  }
+  function renderAi() {
+    if (!$('#smsAi')) return;
+    $$('[data-polish-len]').forEach(function (b) { var on = b.dataset.polishLen === ai.len; b.classList.toggle('is-on', on); b.setAttribute('aria-pressed', String(on)); });
+    $('#smsAiBtn').disabled = ai.busy;
+    $('#smsAiBtn').textContent = ai.busy ? '다듬는 중…' : 'AI로 다듬기';
+    $('#smsAiLeft').textContent = ai.left == null ? '' : '이번 달 ' + ai.left + '회 남음';
+    $('#smsAiUndo').hidden = ai.undo == null;
+    var res = ai.result;
+    $('#smsAiResult').hidden = !res;
+    if (res) {
+      $('#smsAiText').textContent = res.text;
+      $('#smsAiBytes').textContent = res.bytes + '바이트' + (res.bytes <= 90 ? ' · 단문 크기' : '');
+      $('#smsAiCheckBox').hidden = !(res.check && res.check.length);
+      $('#smsAiCheck').innerHTML = (res.check || []).map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('');
+    }
+  }
+  function aiMsg(m) { $('#smsAiMsg').hidden = !m; $('#smsAiMsg').textContent = m || ''; }
+  function polish(again) {
+    var text = again ? ai.source : $('#smsBody').value;
+    if (ai.busy) return;
+    if (!text.trim()) { toast('다듬을 내용을 먼저 써 주세요', 'bad'); return; }
+    ai.busy = true; ai.source = text; aiMsg(''); renderAi();
+    invoke({ text: text, length: ai.len }, POLISH_FN).then(function (res) {
+      ai.busy = false;
+      if (res && res.cap != null && res.used != null) ai.left = Math.max(0, res.cap - res.used);
+      if (!res || !res.ok) {
+        ai.result = null;
+        aiMsg(res && res.reason === 'input' && res.message ? res.message : POLISH_SORRY);
+      } else {
+        ai.result = { text: res.text, check: res.check || [], bytes: res.bytes || bytes(res.text) };
+      }
+      renderAi();
+    });
+  }
+  function aiUse() {
+    if (!ai.result) return;
+    ai.undo = $('#smsBody').value;
+    $('#smsBody').value = ai.result.text;
+    ai.result = null;
+    renderAi(); renderPreview();
+  }
+  function aiUndo() {
+    if (ai.undo == null) return;
+    $('#smsBody').value = ai.undo;
+    ai.undo = null;
+    renderAi(); renderPreview();
+  }
+  function aiReset() { ai.source = ''; ai.result = null; ai.undo = null; ai.busy = false; aiMsg(''); renderAi(); }
+
   /* ---------- 열기 ---------- */
 
   function loadCfg() {
@@ -361,8 +425,9 @@
     $('#smsLessonHint').textContent = st.week ? Store.dateWithDow(st.week) + ' 주 수업일 (그 주가 휴강이면 다음 수업일)' : '다음 수업일 (휴강 주는 건너뜀)';
     renderPick();
     renderPreview();
+    aiReset();
     $('#smsModal').showModal();
-    Promise.all([loadCfg(), loadTemplates()]).then(function () {
+    Promise.all([loadCfg(), loadTemplates(), aiLeft()]).then(function () {
       $('#smsMissing').hidden = !st.missing;
       $('#smsMissing').textContent = st.missing ? 'migration-023 SQL 을 실행하고 Edge Function sms-send 를 배포하면 사이트에서 문자를 보낼 수 있습니다.' : '';
       /* 주간 레포트 → 발송에서 열었고 내용이 비어 있으면 「레포트 안내」 문구로 */
@@ -544,6 +609,16 @@
           '<p class="field__hint">오늘 ' + esc(c.today || 0) + '건 · [나에게 시험 발송]은 위 알림톡 칸의 「내 시험 번호」로 갑니다' + (c.testPhone ? ' (지금 ' + esc(c.testPhone) + ')' : '') + '.</p>'
         : '<p class="panel__hint">migration-023 SQL 을 실행하면 문자 설정을 바꿀 수 있습니다.</p>');
   }
+  function polishHtml(p) {
+    return '<div class="extra-head" style="margin-top:18px"><span class="extra-head__title">문자 「AI로 다듬기」</span></div>' +
+      (p
+        ? '<div class="toolbar">' +
+            '<label class="field"><span class="field__label">한 달 최대 <span class="field__opt">AI 요약과 따로 셉니다</span></span><input class="input input--num" id="polishCap" type="number" min="0" max="5000" value="' + esc(p.cap) + '"></label>' +
+            '<button class="btn btn--sm" type="button" id="polishCapSave">상한 저장</button>' +
+          '</div>' +
+          '<p class="field__hint">이번 달 ' + esc(p.used) + ' / ' + esc(p.cap) + '회 · Claude Haiku 5.5 · 1번 약 1원 안팎 · 글은 저장하지 않습니다 (Edge Function text-polish).</p>'
+        : '<p class="panel__hint">migration-026 SQL 을 실행하고 Edge Function text-polish 를 배포하면 쓸 수 있습니다.</p>');
+  }
   function loadSettings() {
     var host = $('#smsSettings');
     if (!host) return;
@@ -551,8 +626,9 @@
     host.innerHTML = '<p class="panel__hint">문자 설정을 불러오는 중…</p>';
     Promise.all([
       invoke({ action: 'status' }),
-      sb().rpc('sms_settings_get').then(function (r) { return r.error ? null : r.data; }, function () { return null; })
-    ]).then(function (res) { host.innerHTML = settingsHtml(res[0] || null, res[1]); });
+      sb().rpc('sms_settings_get').then(function (r) { return r.error ? null : r.data; }, function () { return null; }),
+      sb().rpc('polish_status').then(function (r) { return r.error ? null : r.data; }, function () { return null; })
+    ]).then(function (res) { host.innerHTML = settingsHtml(res[0] || null, res[1]) + polishHtml(res[2]); });
   }
   function saveSettings() {
     var p = {
@@ -598,6 +674,12 @@
     $('#smsFind').addEventListener('input', function () { st.find = $('#smsFind').value; renderPick(); });
     $('#smsTplSave').addEventListener('click', saveTemplate);
     $('#smsTplDel').addEventListener('click', deleteTemplate);
+    $('#smsAiBtn').addEventListener('click', function () { polish(false); });
+    $('#smsAiAgain').addEventListener('click', function () { polish(true); });
+    $('#smsAiUse').addEventListener('click', aiUse);
+    $('#smsAiDrop').addEventListener('click', function () { ai.result = null; renderAi(); });
+    $('#smsAiUndo').addEventListener('click', aiUndo);
+    $$('[data-polish-len]').forEach(function (b) { b.addEventListener('click', function () { ai.len = b.dataset.polishLen; renderAi(); }); });
     $('#smsSend').addEventListener('click', function () { send(null); });
     $('#smsTest').addEventListener('click', testSend);
     $('#smsClose').addEventListener('click', function () { $('#smsModal').close(); });
@@ -626,7 +708,16 @@
     var set = $('#smsSettings');
     if (set) {
       $('#tdSettingsBtn').addEventListener('click', loadSettings);
-      set.addEventListener('click', function (e) { if (e.target.id === 'smsSaveCfg') saveSettings(); });
+      set.addEventListener('click', function (e) {
+        if (e.target.id === 'smsSaveCfg') saveSettings();
+        if (e.target.id === 'polishCapSave') {
+          sb().rpc('polish_cap_set', { p_cap: Math.round(Number($('#polishCap').value)) }).then(function (r) {
+            if (r.error) { toast(r.error.message, 'bad'); return; }
+            toast('「AI로 다듬기」 한 달 최대를 저장했습니다', 'good');
+            loadSettings();
+          });
+        }
+      });
     }
   }
   init();

@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" as="style" crossorigin
       href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
-<link rel="stylesheet" href="style.css?v=20261029b">
+<link rel="stylesheet" href="style.css?v=20261029c">
 </head>
 <body class="is-locked">
 
@@ -1474,6 +1474,30 @@
         <button class="btn btn--sm btn--ghost" type="button" data-var="#{수업일}">#{수업일}</button>
       </div>
       <p class="field__hint">#{링크} 학부모에겐 학부모 링크, 학생에겐 학생 링크 · #{수업일} <span id="smsLessonHint">다음 수업일</span></p>
+      <div class="sms-ai" id="smsAi">
+        <div class="toolbar sms-ai__bar">
+          <button class="btn btn--sm" type="button" id="smsAiBtn">AI로 다듬기</button>
+          <span class="sms-ai__len" role="group" aria-label="다듬을 길이">
+            <button class="btn btn--sm btn--ghost" type="button" data-polish-len="short" aria-pressed="false">짧게</button>
+            <button class="btn btn--sm btn--ghost is-on" type="button" data-polish-len="normal" aria-pressed="true">보통</button>
+            <button class="btn btn--sm btn--ghost" type="button" data-polish-len="long" aria-pressed="false">자세히</button>
+          </span>
+          <span class="muted-note" id="smsAiLeft"></span>
+          <button class="btn btn--sm btn--ghost" type="button" id="smsAiUndo" hidden>되돌리기</button>
+        </div>
+        <p class="cp-warn" id="smsAiMsg" hidden></p>
+        <div class="sms-ai__result" id="smsAiResult" hidden>
+          <div class="sms-ai__title">다듬은 문장 <span class="sms-len" id="smsAiBytes"></span></div>
+          <div class="sms-ai__text" id="smsAiText"></div>
+          <div class="sms-ai__check" id="smsAiCheckBox" hidden><b>확인할 것</b><ul id="smsAiCheck"></ul></div>
+          <div class="toolbar sms-ai__acts">
+            <button class="btn btn--sm btn--primary" type="button" id="smsAiUse">이걸로 바꾸기</button>
+            <button class="btn btn--sm" type="button" id="smsAiAgain">다시</button>
+            <button class="btn btn--sm btn--ghost" type="button" id="smsAiDrop">원래대로</button>
+          </div>
+          <p class="field__hint">AI가 고친 글입니다. 보내기 전에 날짜 · 시간 · 금액 · 장소를 한 번 더 확인해 주세요.</p>
+        </div>
+      </div>
       <label class="check-line"><input type="checkbox" id="smsAd"> <span>광고 문자 <span class="field__opt">맨 앞에 (광고)와 발신처, 끝에 무료수신거부 안내가 붙습니다 · 밤 9시 ~ 아침 8시에는 못 보냅니다</span></span></label>
       <p class="cp-warn" id="smsAdWarn" hidden></p>
       <label class="check-line" id="smsMarkLine" hidden><input type="checkbox" id="smsMark" checked> <span>보낸 학생은 주간 레포트 → 발송에 「보냄」으로 표시 <span class="field__opt" id="smsMarkHint"></span></span></label>
@@ -2016,46 +2040,46 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
 <!-- config.js 와 brand.js 가 먼저 와야 한다. 나머지가 이 값을 읽는다. -->
-<script src="../assets/config.js?v=20261029b"></script>
-<script src="../assets/brand.js?v=20261029b"></script>
-<script src="../assets/lesson.js?v=20261029b"></script>
-<script src="supabase.js?v=20261029b"></script>
-<script src="db.js?v=20261029b"></script>
-<script src="store.js?v=20261029b"></script>
-<script src="report.js?v=20261029b"></script>
-<script src="app.js?v=20261029b"></script>
-<script src="import.js?v=20261029b"></script>
-<script src="write.js?v=20261029b"></script>
-<script src="publish.js?v=20261029b"></script>
-<script src="send.js?v=20261029b"></script>
-<script src="kakao.js?v=20261029b"></script>
-<script src="sms.js?v=20261029b"></script>
-<script src="contacts.js?v=20261029b"></script>
-<script src="notice.js?v=20261029b"></script>
-<script src="tb.js?v=20261029b"></script>
-<script src="tb-dash.js?v=20261029b"></script>
-<script src="tb-issue.js?v=20261029b"></script>
-<script src="tb-stock.js?v=20261029b"></script>
-<script src="tb-bill.js?v=20261029b"></script>
-<script src="../assets/dday.js?v=20261029b"></script>
-<script src="../assets/app-week.js?v=20261029b"></script>
-<script src="card.js?v=20261029b"></script>
-<script src="exams.js?v=20261029b"></script>
-<script src="photo.js?v=20261029b"></script>
-<script src="today.js?v=20261029b"></script>
-<script src="staff.js?v=20261029b"></script>
-<script src="classes.js?v=20261029b"></script>
-<script src="weekly.js?v=20261029b"></script>
-<script src="ytbm.js?v=20261029b"></script>
-<script src="summary.js?v=20261029b"></script>
-<script src="weeks.js?v=20261029b"></script>
-<script src="../assets/photos.js?v=20261029b"></script>
-<script src="review.js?v=20261029b"></script>
-<script src="draftguard.js?v=20261029b"></script>
-<script src="preview.js?v=20261029b"></script>
-<script src="rtabs.js?v=20261029b"></script>
-<script src="nav.js?v=20261029b"></script>
-<script src="sync.js?v=20261029b"></script>
-<script src="auth.js?v=20261029b"></script>
+<script src="../assets/config.js?v=20261029c"></script>
+<script src="../assets/brand.js?v=20261029c"></script>
+<script src="../assets/lesson.js?v=20261029c"></script>
+<script src="supabase.js?v=20261029c"></script>
+<script src="db.js?v=20261029c"></script>
+<script src="store.js?v=20261029c"></script>
+<script src="report.js?v=20261029c"></script>
+<script src="app.js?v=20261029c"></script>
+<script src="import.js?v=20261029c"></script>
+<script src="write.js?v=20261029c"></script>
+<script src="publish.js?v=20261029c"></script>
+<script src="send.js?v=20261029c"></script>
+<script src="kakao.js?v=20261029c"></script>
+<script src="sms.js?v=20261029c"></script>
+<script src="contacts.js?v=20261029c"></script>
+<script src="notice.js?v=20261029c"></script>
+<script src="tb.js?v=20261029c"></script>
+<script src="tb-dash.js?v=20261029c"></script>
+<script src="tb-issue.js?v=20261029c"></script>
+<script src="tb-stock.js?v=20261029c"></script>
+<script src="tb-bill.js?v=20261029c"></script>
+<script src="../assets/dday.js?v=20261029c"></script>
+<script src="../assets/app-week.js?v=20261029c"></script>
+<script src="card.js?v=20261029c"></script>
+<script src="exams.js?v=20261029c"></script>
+<script src="photo.js?v=20261029c"></script>
+<script src="today.js?v=20261029c"></script>
+<script src="staff.js?v=20261029c"></script>
+<script src="classes.js?v=20261029c"></script>
+<script src="weekly.js?v=20261029c"></script>
+<script src="ytbm.js?v=20261029c"></script>
+<script src="summary.js?v=20261029c"></script>
+<script src="weeks.js?v=20261029c"></script>
+<script src="../assets/photos.js?v=20261029c"></script>
+<script src="review.js?v=20261029c"></script>
+<script src="draftguard.js?v=20261029c"></script>
+<script src="preview.js?v=20261029c"></script>
+<script src="rtabs.js?v=20261029c"></script>
+<script src="nav.js?v=20261029c"></script>
+<script src="sync.js?v=20261029c"></script>
+<script src="auth.js?v=20261029c"></script>
 </body>
 </html>
