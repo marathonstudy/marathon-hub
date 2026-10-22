@@ -7,6 +7,9 @@
      날짜별 기록으로 그 반 직전 과제 기간의 「제출일 / 과제 있던 날」을 센다 (러닝노트 표와 같은 AppWeek.compute).
      불러온 값은 30분 동안 이 화면 메모리에만 둔다(브라우저에 저장하지 않는다).
    · 조교 금액 숨김이 켜져 있으면 서버가 금액을 보내지 않는다 (이 화면에만 적용).
+   · 머리는 「오늘 · 10/23(금)」 · ⓘ 를 누르면 급함 · 살펴보기 기준 (20261029e).
+   · 맨 위 「오늘 할 일」 — 반마다 주기 순서로 레포트 작성·공개·발송 · 오늘 수업 복습테스트 · 복습 미제출 · 확인 필요 상담 · 교재비 미납(인원만).
+     예전 숫자 카드 5개(재원생 · 레포트 미발송 · 교재비 미납 · 확인 필요 상담 · 필기 미제출)는 이 목록으로 바뀌었다.
    · 첫 화면은 반 카드 — 다음 수업이 가까운 반부터. 카드를 누르면 그 반 학생(급함 → 살펴보기 → 나머지)이 펼쳐진다.
    · 「오늘」 탭 이름 옆 숫자 = 급함 학생 수. 금액은 이 화면에 넣지 않는다.
    ============================================================ */
@@ -318,6 +321,59 @@
     '</div>';
   }
 
+  /* ---------- 「오늘 할 일」 · 반 카드 둘째 줄 (20261029e) ----------
+     반마다 주기 순서(가까운 수업 순 = 반 카드 순서)로:
+       지난 수업일 레포트를 아직 다 안 보냄 → 「고2반 · 10/22 레포트 작성·공개·발송 3/12 [작성하기]」 (수업일부터 · 수업일 +[설정 2]일부터 빨간 급함)
+       오늘 수업 → 「반포반 · 오늘 수업 · 복습테스트 진행 중 3/12 [제출 현황]」
+       마감 지난 복습 미제출 → 「복습테스트 미제출 n명 [확인하기]」 · 확인 필요 상담 n건 [보기] · 교재비 미납 n명 [교재] (금액 없음)
+     할 일이 없으면 「지금 처리할 일이 없습니다 ✓」 */
+  function workLine(c, rows, cd, cy) {
+    var n = rows.length;
+    if (!n) return '학생 없음';
+    var rv = !cd ? '복습테스트 —' : !cd.test ? '복습테스트 없음'
+      : '복습테스트 ' + rows.filter(function (s) { return (cd.by[s.id] || {}).submitted; }).length + '/' + n;
+    var ph = rows.filter(function (s) { var x = cd ? cd.by[s.id] : null; return x ? x.photos_cur : s.photos_week; }).length;
+    var ws = rows.map(function (s) { return appWeekOf(s, cy); }).filter(Boolean);
+    var avg = function (k) { return ws.reduce(function (a, w) { return a + w[k]; }, 0) / ws.length; };
+    var ap = ws.length ? '앱 과제 평균 ' + (Math.round(avg('hwDone') * 10) / 10) + '/' + Math.round(avg('hwDays')) + '일' : '앱 과제 —';
+    return rv + ' · 필기 ' + ph + '/' + n + ' · ' + ap;
+  }
+  function todoHtml(d, classes, why, dv) {
+    var items = [];
+    var add = function (urgent, text, btn, attrs) {
+      items.push('<li class="td-todo__item' + (urgent ? ' is-urgent' : '') + '">' + (urgent ? '<span class="td-todo__tag">급함</span>' : '') +
+        '<span class="td-todo__t">' + esc(text) + '</span>' +
+        (btn ? '<button type="button" class="btn btn--sm td-todo__btn" ' + attrs + '>' + esc(btn) + '</button>' : '') + '</li>');
+    };
+    classes.forEach(function (c) {
+      var rows = c.rows, n = rows.length, cls = c.name, cy = c.cy, cd = st.cycle && st.cycle[cls];
+      var a = ' data-todo-cls="' + esc(cls) + '"';
+      if (n && cls !== '(반 없음)') {
+        if (cy && cy.L && cd) {
+          var sent = rows.filter(function (s) { return (cd.by[s.id] || {}).sent; }).length;
+          if (sent < n) add(cy.since >= dv.grace, cls + ' · ' + Lesson.md(cy.L, false) + ' 레포트 작성·공개·발송 ' + sent + '/' + n, '작성하기', 'data-todo="write"' + a + ' data-todo-week="' + esc(cy.week) + '"');
+        } else if (!cd && !(cy && !cy.L)) {
+          /* 수업 요일을 안 정한 반 · 022 전 — 예전처럼 달력 이번 주 */
+          var sent2 = rows.filter(function (s) { return s.sent; }).length;
+          if (sent2 < n) add(false, cls + ' · 이번 주 레포트 작성·공개·발송 ' + sent2 + '/' + n, '작성하기', 'data-todo="write"' + a + ' data-todo-week="' + esc(d.week.start) + '"');
+        }
+        if (c.next && c.next.dday === 0) {
+          var t = cd && cd.test, live = t && DDay.today() <= String(t.lesson_date).slice(0, 10);
+          if (live) add(false, cls + ' · 오늘 수업 · 복습테스트 진행 중 ' + rows.filter(function (s) { return (cd.by[s.id] || {}).submitted; }).length + '/' + n, '제출 현황', 'data-todo="review"' + a + ' data-todo-week="' + esc(cy && cy.week || '') + '"');
+          else add(false, cls + ' · 오늘 수업', '', '');
+        }
+      }
+      var rv = rows.filter(function (s) { return why[s.id].urgent.some(function (x) { return x.k === 'review'; }); }).length;
+      if (rv) add(true, cls + ' · 복습테스트 미제출 ' + rv + '명', '확인하기', 'data-todo="open"' + a);
+      var fo = rows.reduce(function (s0, s) { return s0 + (s.follow_n || 0); }, 0);
+      if (fo) add(false, cls + ' · 확인 필요 상담 ' + fo + '건', '보기', 'data-todo="open"' + a);
+      var up = rows.filter(function (s) { return s.unpaid_n; }).length;
+      if (up) add(false, cls + ' · 교재비 미납 ' + up + '명', '교재', 'data-todo="book"' + a);
+    });
+    return '<div class="td-todo"><div class="td-todo__title">오늘 할 일</div>' +
+      (items.length ? '<ul class="td-todo__list">' + items.join('') + '</ul>' : '<p class="td-todo__none">지금 처리할 일이 없습니다 ✓</p>') + '</div>';
+  }
+
   function render() {
     var d = st.data;
     if (!d) return;
@@ -342,25 +398,14 @@
     /* 주간 레포트 탭 옆 숫자 = 아직 발송 안 된 학생 수 (반마다 지난 수업일 레포트 · rtabs.js 20261029a) */
     var rb = $('#reportBadge');
     if (rb) { rb.hidden = !unsent; rb.textContent = unsent; rb.title = '레포트 아직 발송 안 된 학생 ' + unsent + '명'; }
-    var unpaidN = list.filter(function (s) { return s.unpaid_n; }).length;
-    var follow = list.reduce(function (a, s) { return a + s.follow_n; }, 0);
-    var noPhoto = list.filter(function (s) { var x = rowOf(s); return x ? !x.photos_cur : !s.photos_week; }).length;
-    var summary = [
-      ['재원생', list.length + '명'],
-      ['레포트 미발송', unsent + '명'],
-      ['교재비 미납', unpaidN + '명'],
-      ['확인 필요 상담', follow + '건'],
-      ['필기 미제출', noPhoto + '명']
-    ];
-    $('#tdWeek').textContent = '이번 주 ' + Store.dateWithDow(d.week.start) + ' ~ ' + Store.dateWithDow(d.week.end);
+    $('#tdTitle').textContent = '오늘 · ' + Store.dateWithDow(DDay.today());
+    $('#tdInfo').setAttribute('aria-expanded', String(!!st.rulesOpen));
 
     $('#tdBody').innerHTML = transitionHtml() +
-      '<div class="tb-cards td-summary">' + summary.map(function (c) {
-        return '<div class="tb-card"><div class="tb-card__label">' + c[0] + '</div><div class="tb-card__val num">' + esc(c[1]) + '</div></div>';
-      }).join('') + '</div>' +
       (st.cycleMissing ? '<p class="panel__hint tdc-rule">migration-022 를 실행하면 반마다 수업 주기(지난 수업일 ~ 다음 수업 전날)로 셉니다. 지금은 달력 주 기준입니다.</p>' : '') +
-      '<p class="panel__hint tdc-rule">급함 — 레포트 미발송(수업일 +' + dv.grace + '일부터) · 복습테스트 미제출(마감 뒤) · 최근 ' + set.absentWeeks + '주 결석 ' + set.absentMin + '회 이상 · 확인 필요 상담 &nbsp;|&nbsp; 살펴보기 — 앱 과제 제출 ' + dv.appLow + '% 미만(직전 과제 기간)' +
-        (dv.photoWatch ? ' · 필기 2주기 연속 없음' : '') + '</p>' +
+      '<div class="td-rules" id="tdRules"' + (st.rulesOpen ? '' : ' hidden') + '><p class="panel__hint tdc-rule">급함 — 레포트 미발송(수업일 +' + dv.grace + '일부터) · 복습테스트 미제출(마감 뒤) · 최근 ' + set.absentWeeks + '주 결석 ' + set.absentMin + '회 이상 · 확인 필요 상담 &nbsp;|&nbsp; 살펴보기 — 앱 과제 제출 ' + dv.appLow + '% 미만(직전 과제 기간)' +
+        (dv.photoWatch ? ' · 필기 2주기 연속 없음' : '') + '</p></div>' +
+      todoHtml(d, classes, why, dv) +
       '<div class="tdc-list-wrap">' + classes.map(function (c) {
         var rows = c.rows, n = rows.length;
         var urgent = rows.filter(function (s) { return why[s.id].urgent.length; });
@@ -369,14 +414,14 @@
         var written = rows.filter(function (s) { return s.written; }).length;
         var pub = rows.filter(function (s) { return s.published; }).length;
         var cy = c.cy, cd = st.cycle && st.cycle[c.name];
-        var meta = n + '명 · 작성 ' + written + '/' + n + ' · 공개 ' + pub + '/' + n;
+        var meta = '작성 ' + written + '/' + n + ' · 공개 ' + pub + '/' + n;
         var status = '';
         if (cy && !cy.L) status = '<span class="tdc-status">첫 수업 전</span>';
         else if (cy && cd && n) {
           /* 그 반 상태 한마디 — 레포트 미발송(급함) → 복습테스트 진행 중 → 작성 중 → 발송 완료 */
           var cpub = rows.filter(function (s) { return (cd.by[s.id] || {}).published; }).length;
           var csent = rows.filter(function (s) { return (cd.by[s.id] || {}).sent; }).length;
-          meta = n + '명 · ' + Lesson.md(cy.L, false) + ' 레포트 공개 ' + cpub + '/' + n + ' · 발송 ' + csent + '/' + n;
+          meta = '지난 레포트 공개 ' + cpub + '/' + n + ' · 발송 ' + csent + '/' + n;
           var t = cd.test, open2 = t && DDay.today() <= String(t.lesson_date).slice(0, 10);
           if (cy.since >= dv.grace && csent < n) status = '<span class="tdc-status tdc-status--bad">' + esc(Lesson.md(cy.L, false)) + ' 수업 레포트 미발송 ' + (n - csent) + '명</span>';
           else if (open2) status = '<span class="tdc-status tdc-status--live">복습테스트 진행 중 ' + rows.filter(function (s) { return (cd.by[s.id] || {}).submitted; }).length + '/' + n + ' 제출</span>';
@@ -393,9 +438,10 @@
           '<div class="tdc-head">' +
             '<button type="button" class="tdc-toggle" data-toggle aria-expanded="' + open + '">' +
               '<span class="tdc-title"><span class="tdc-name">' + esc(c.name) + '</span>' + (c.academy ? '<span class="muted-note">' + esc(c.academy) + '</span>' : '') +
-                '<span class="class-head__caret" aria-hidden="true">▾</span></span>' +
+                '<span class="muted-note num tdc-n">' + n + '명</span><span class="class-head__caret" aria-hidden="true">▾</span></span>' +
               '<span class="tdc-row">' + nextTxt + (status ? '<span class="tdc-dot" aria-hidden="true">·</span>' + status : '') + '</span>' +
               '<span class="tdc-row"><span class="tdc-meta num">' + esc(meta) + '</span></span>' +
+              '<span class="tdc-row"><span class="tdc-meta tdc-meta--work num">' + esc(workLine(c, rows, cd, cy)) + '</span></span>' +
               '<span class="tdc-row">' +
                 '<span class="tdc-flag tdc-flag--urgent' + (urgent.length ? '' : ' is-zero') + '">급함 <b class="num">' + urgent.length + '</b></span>' +
                 '<span class="tdc-flag tdc-flag--watch' + (watch.length ? '' : ' is-zero') + '">살펴보기 <b class="num">' + watch.length + '</b></span>' +
@@ -417,6 +463,8 @@
   }
 
   $('#tdBody').addEventListener('click', function (e) {
+    var td = e.target.closest('[data-todo]');
+    if (td) { todoGo(td.dataset.todo, td.dataset.todoCls, td.dataset.todoWeek); return; }
     var c = e.target.closest('[data-card]');
     if (c) { if (window.Card) Card.open(c.dataset.card); return; }
     var w = e.target.closest('[data-write]');
@@ -439,12 +487,38 @@
   $('#tdRefresh').addEventListener('click', function () { app = {}; load(true); loadLinks(); });
 
   /* [이번 주 작성하기] — 주간 레포트 → 작성에서 그 반 이번 주 작성 화면 */
-  function writeWeek(cls) {
+  function writeWeek(cls, week) {
     if (!window.Writer) return;
     UI.selectTab(1);
     Writer.selectClass(cls);
-    Writer.openWeek(Store.thisWeek().start);
+    Writer.openWeek(week || Store.thisWeek().start);
   }
+
+  /* 「오늘 할 일」 버튼 — [작성하기] 그 반 그 주 작성 · [제출 현황] 그 반 지금 제출 현황 · [확인하기] [보기] 그 반 카드 펼치기 · [교재] 교재 탭 */
+  function todoGo(kind, cls, week) {
+    if (kind === 'write') { writeWeek(cls, week); return; }
+    if (kind === 'review') {
+      writeWeek(cls, week);
+      if (window.Review && week) { Review.render(cls, week); Review.openLive(); }
+      return;
+    }
+    if (kind === 'book') { UI.selectTab(5); return; }
+    if (kind === 'open') {
+      var opening = !st.open[cls];
+      st.open[cls] = true;
+      saveOpen();
+      if (opening) setTimeout(function () { window.dispatchEvent(new CustomEvent('jt:write-nav')); }, 0);
+      render();
+      var card = Array.prototype.find.call(document.querySelectorAll('#tdBody .tdc-card'), function (x) { return x.dataset.cls === cls; });
+      if (card) card.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    }
+  }
+  $('#tdInfo').addEventListener('click', function () {
+    st.rulesOpen = !st.rulesOpen;
+    $('#tdInfo').setAttribute('aria-expanded', String(st.rulesOpen));
+    var r = $('#tdRules');
+    if (r) r.hidden = !st.rulesOpen;
+  });
   $('#tdBody').addEventListener('click', function (e) { if (e.target.id === 'tdTransitionOpen') $('#tdSettingsBtn').click(); });
 
   /* ---------- 설정 (teacher 만 바꿀 수 있다) ---------- */

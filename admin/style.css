@@ -2599,3 +2599,18 @@ body:not(.report-step-write) #classPanel { display: none; }
 @media (max-width: 720px) {
   #previewPanel { display: none !important; }
 }
+
+/* 「오늘」 위쪽 — 오늘 할 일 · ⓘ 기준 (today.js · 20261029e) */
+.td-info { border: 0; background: none; color: var(--ink-light); font-size: 15px; line-height: 1; padding: 4px 6px; cursor: pointer; border-radius: 999px; }
+.td-info:hover, .td-info[aria-expanded="true"] { color: var(--ink-deep); background: #EEF0F7; }
+.td-rules .tdc-rule { margin: 0 0 10px; }
+.td-todo { margin: 0 0 14px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; background: #FCFCFF; }
+.td-todo__title { font-size: 13.5px; font-weight: 800; color: var(--ink-deep); margin-bottom: 6px; }
+.td-todo__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.td-todo__item { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 8px; border-radius: 10px; font-size: 13.5px; color: var(--ink-deep); }
+.td-todo__item.is-urgent { background: #FFF4F6; color: #B03A55; }
+.td-todo__tag { padding: 1px 7px; border-radius: 999px; font-size: 11.5px; font-weight: 800; background: #F7D6DE; color: #B03A55; }
+.td-todo__t { flex: 1 1 200px; min-width: 0; }
+.td-todo__btn { flex: none; }
+.td-todo__none { margin: 2px 0; font-size: 13.5px; color: #35806A; font-weight: 700; }
+.tdc-n { margin-left: 2px; }
