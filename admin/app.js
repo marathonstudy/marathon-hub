@@ -1,5 +1,5 @@
 /* ============================================================
-   app.js — 공용 화면 도구 · ① 명단 탭
+   app.js — 공용 화면 도구 · 학생 → 명단
 
    100명까지 느려지지 않도록
      · 목록은 DocumentFragment 로 한 번에 붙인다
@@ -594,7 +594,7 @@
     if (!name) { classHint('새 반 이름을 적어 주세요.', true); return; }
     if (name.length > 30) { classHint('반 이름은 30자까지 적을 수 있습니다.', true); return; }
     if (Store.isArchivedClass(name)) {
-      classHint('‘' + name + '’ 은 보관된 반입니다. ① 명단 → [반 관리] → 보관된 반 보기에서 되살릴 수 있습니다.', true);
+      classHint('‘' + name + '’ 은 보관된 반입니다. 학생 → 명단 → [반 관리] → 보관된 반 보기에서 되살릴 수 있습니다.', true);
       return;
     }
     var same = Store.getClasses().some(function (c) { return c.name === name; });

@@ -1,5 +1,5 @@
 /* ============================================================
-   summary.js — ② 작성 「반 공통」 → [자막으로 AI 요약] (migration-012 · Edge Function lesson-summary)
+   summary.js — 주간 레포트 → 작성 「반 공통」 → [자막으로 AI 요약] (migration-012 · Edge Function lesson-summary)
 
    · 자막 파일(.srt · .vtt · .txt)을 끌어다 놓거나, 스크립트를 붙여 넣는다
      [붙여 넣기] = 클립보드 글을 바로 (즐겨찾기 버튼 「마라톤 자막 가져오기」 ytbm.js 로 복사한 것)

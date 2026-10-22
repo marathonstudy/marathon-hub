@@ -1,5 +1,5 @@
 /* ============================================================
-   publish.js — ③ 공개 탭
+   publish.js — 주간 레포트 → 공개
 
    깃허브에 파일을 올리지 않는다. 학생 정보가 공개 저장소에 남으면 안 되기 때문이다.
    '공개' 는 그 순간의 레포트 내용을 Supabase(published)에 고정해 두고
@@ -59,7 +59,7 @@
 
     if (!state.week) {
       $('#pubWeekHint').textContent = '';
-      host.innerHTML = '<div class="empty-state">② 작성 탭에서 주차를 먼저 정해 주세요.</div>';
+      host.innerHTML = '<div class="empty-state">주간 레포트 → 작성에서 주차를 먼저 정해 주세요.</div>';
       refreshButton();
       return;
     }
@@ -114,7 +114,7 @@
           '<span class="pub-row__name"></span>' +
           '<span class="entry__badge entry__badge--' + r.status.state + '">' + Report.statusLabel(r.status.state) + '</span>' +
           tag +
-          (noLink ? '<span class="pub-tag pub-tag--warn" title="① 명단에서 개인 링크를 발급해야 학부모가 볼 수 있습니다">링크 없음</span>' : '') +
+          (noLink ? '<span class="pub-tag pub-tag--warn" title="학생 → 명단에서 개인 링크를 발급해야 학부모가 볼 수 있습니다">링크 없음</span>' : '') +
           '<span class="spacer"></span>' +
           (r.pub
             ? '<button class="btn btn--sm btn--ghost" type="button" data-vis="' + (r.pub.visible ? '0' : '1') + '">' +
@@ -227,7 +227,7 @@
         all[state.week] = all[state.week] || {};
         rows.forEach(function (r) { all[state.week][r.studentId] = { visible: true, publishedAt: new Date().toISOString() }; });
         Store.writeLocal(Store.KEYS.published, all);
-        toast(rows.length + '명 공개했습니다. ④ 발송 탭에서 링크를 보내세요', 'good');
+        toast(rows.length + '명 공개했습니다. 주간 레포트 → 발송에서 링크를 보내세요', 'good');
         return load();
       }).catch(function (e) {
         showError('공개하지 못했습니다 — ' + e.message);
@@ -247,6 +247,11 @@
 
   document.addEventListener('jt:tab', function (e) {
     if (e.detail.index === 2) load();
+  });
+
+  /* 주간 레포트 주차 띠에서 주를 바꾸면 (rtabs.js · 20261029a) */
+  window.addEventListener('jt:report-week', function () {
+    if (!$('#panel-publish').hidden) load();
   });
 
   window.addEventListener('jt:loaded', function () {

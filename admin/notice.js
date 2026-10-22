@@ -1,5 +1,5 @@
 /* ============================================================
-   notice.js — ⑤ 반 공지 탭
+   notice.js — 더보기 → 반 공지
 
    · 반과 주차를 고르고 커리큘럼·문학·독서·과제·특이사항·자료·영상·특별 공지를 적는다
    · 여러 반을 고르면 같은 공지가 한 번에 올라간다 → 같은 '묶음'(bundle_id)
@@ -74,7 +74,7 @@
     host.textContent = '';
     var names = allClasses();
     if (!names.length) {
-      host.innerHTML = '<p class="panel__hint">아직 반이 없습니다. ① 명단 → 학생 추가 → 반 고르기의 [+ 새 반 만들기]로 만들 수 있습니다.</p>';
+      host.innerHTML = '<p class="panel__hint">아직 반이 없습니다. 학생 → 명단 → 학생 추가 → 반 고르기의 [+ 새 반 만들기]로 만들 수 있습니다.</p>';
       return;
     }
     var counts = {};
@@ -186,7 +186,7 @@
     state.files = ((!opts.noLinks && src && src.materials) || []).map(function (m) { return { name: m.name || '', url: m.url || '' }; });
     state.videos = ((!opts.noLinks && src && src.videos) || []).map(function (v) { return { title: v.title || '', url: v.url || '' }; });
     /* 예전 「자료 · 다시보기」 링크 칸 — 이미 링크를 넣어 올린 공지를 고칠 때만 보인다.
-       새 공지의 영상 · 자료 파일은 ② 작성 → 반 공통 (weekly.js) */
+       새 공지의 영상 · 자료 파일은 주간 레포트 → 작성 → 반 공통 (weekly.js) */
     $('#ntFileSub').hidden = !state.files.length;
     $('#ntVideoSub').hidden = !state.videos.length;
     $('#ntVisible').checked = !src || src.visible !== false;

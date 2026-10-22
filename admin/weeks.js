@@ -1,5 +1,5 @@
 /* ============================================================
-   weeks.js — ② 작성 → 반을 고르면 처음 나오는 「주차 현황」 (migration-018)
+   weeks.js — 주간 레포트 → 작성 → 반을 고르면 처음 나오는 「주차 현황」 (migration-018)
 
    · 그 반의 첫 주부터 다음 주까지 모든 주차 — 최신 주가 위. 최근 8주만 펼치고 나머지는 [이전 주 더 보기]
    · 주차마다: 수업일(휴강 · 바뀐 날), 레포트(빈칸 · 작성 중 n/전체 · 보냄), 수업 내용 첫 줄 · 초안,
@@ -175,7 +175,7 @@
         Writer.openWeek(e.target.dataset.wo);
       }
     });
-    /* ② 작성 탭을 열 때 · 주차 현황으로 오거나 반을 바꾸면 새로 */
+    /* 주간 레포트 → 작성을 열 때 · 주차 현황으로 오거나 반을 바꾸면 새로 */
     document.addEventListener('jt:tab', function (e) {
       if (e.detail.index === 1 && Writer.mode() === 'weeks') load(Writer.currentClass());
     });

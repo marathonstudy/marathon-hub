@@ -2,7 +2,7 @@
    today.js — 마라톤 코치룸 「오늘」 총괄 (로그인 첫 화면)
 
    · 서버 함수 coach_today() 한 번으로 반·학생별 숫자를 받는다 (새 표 없음).
-   · '작성 완료' 는 ② 작성 탭과 같은 규칙(report.js Report.entryStatus)으로 센다.
+   · '작성 완료' 는 주간 레포트 → 작성과 같은 규칙(report.js Report.entryStatus)으로 센다.
    · 앱 과제는 바깥 앱 서버 자료라 화면이 뜬 뒤 app-report 함수로 4명씩 차례로 불러온다.
      날짜별 기록으로 그 반 직전 과제 기간의 「제출일 / 과제 있던 날」을 센다 (러닝노트 표와 같은 AppWeek.compute).
      불러온 값은 30분 동안 이 화면 메모리에만 둔다(브라우저에 저장하지 않는다).
@@ -39,7 +39,7 @@
   function transitionHtml() {
     if (!st.links || st.links.parentWrite === false) return '';
     return '<div class="td-transition">🔁 <b>전환 기간</b> — 학부모 링크로도 복습테스트 · 필기 사진 입력이 됩니다. ' +
-      '① 명단에서 반마다 [학생 링크 모두 복사]로 학생 링크를 다 보내면 <b>끄세요</b>.' +
+      '학생 → 명단에서 반마다 [학생 링크 모두 복사]로 학생 링크를 다 보내면 <b>끄세요</b>.' +
       (st.role ? ' <button type="button" class="btn btn--sm" id="tdTransitionOpen">설정에서 끄기</button>' : ' (「설정」에서 끕니다)') +
       '</div>';
   }
@@ -339,6 +339,9 @@
     /* 반마다 지난 수업일 레포트 · 지금 주기 필기로 센 값의 합 (022 전에는 예전 이번 주 값) */
     function rowOf(s) { return st.cycle ? cycleRow(s.class_name, s.id) : null; }
     var unsent = list.filter(function (s) { var x = rowOf(s); return x ? !x.sent : !s.sent; }).length;
+    /* 주간 레포트 탭 옆 숫자 = 아직 발송 안 된 학생 수 (반마다 지난 수업일 레포트 · rtabs.js 20261029a) */
+    var rb = $('#reportBadge');
+    if (rb) { rb.hidden = !unsent; rb.textContent = unsent; rb.title = '레포트 아직 발송 안 된 학생 ' + unsent + '명'; }
     var unpaidN = list.filter(function (s) { return s.unpaid_n; }).length;
     var follow = list.reduce(function (a, s) { return a + s.follow_n; }, 0);
     var noPhoto = list.filter(function (s) { var x = rowOf(s); return x ? !x.photos_cur : !s.photos_week; }).length;
@@ -402,7 +405,7 @@
             (c.name === '(반 없음)' ? '' : '<button type="button" class="btn btn--sm tdc-write" data-write="' + esc(c.name) + '">이번 주 작성하기</button>') +
           '</div>' +
           (open ? '<div class="tdc-list">' +
-            (!n ? '<p class="panel__hint">아직 학생이 없습니다. ① 명단 → 학생 추가에서 이 반을 고르세요.</p>' :
+            (!n ? '<p class="panel__hint">아직 학생이 없습니다. 학생 → 명단 → 학생 추가에서 이 반을 고르세요.</p>' :
               urgent.sort(byName).map(function (s) { return studentRow(s, why[s.id]); }).join('') +
               watch.sort(byName).map(function (s) { return studentRow(s, why[s.id]); }).join('') +
               (rest.length ? (st.rest[c.name]
@@ -435,7 +438,7 @@
   });
   $('#tdRefresh').addEventListener('click', function () { app = {}; load(true); loadLinks(); });
 
-  /* [이번 주 작성하기] — ② 작성 탭에서 그 반 이번 주 작성 화면 */
+  /* [이번 주 작성하기] — 주간 레포트 → 작성에서 그 반 이번 주 작성 화면 */
   function writeWeek(cls) {
     if (!window.Writer) return;
     UI.selectTab(1);
@@ -519,7 +522,7 @@
 
   /* 뒤로가기 · 새로고침 (nav.js) — 펼친 반 목록 */
   window.TodayView = {
-    /* ④ 발송 · 문자 보내기도 같은 반 순서 — 오늘 수업 → 가까운 날 → 같은 날은 이름 순 → 수업일 미정 맨 아래 */
+    /* 주간 레포트 → 발송 · 문자 보내기도 같은 반 순서 — 오늘 수업 → 가까운 날 → 같은 날은 이름 순 → 수업일 미정 맨 아래 */
     orderClasses: function (names) {
       return names.map(function (n) { return { name: n, next: n === '(반 없음)' ? null : nextLesson(n) }; })
         .sort(function (x, y) {

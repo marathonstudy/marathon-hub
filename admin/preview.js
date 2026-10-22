@@ -6,7 +6,7 @@
        staff_hub_get 등 직원 전용 함수로 대신 받아 넘긴다 (hub.js 의 HUB_PREVIEW).
      · 아무것도 바뀌지 않는다 — 제출 · 사진 올리기 · 지우기는 눌러도 「미리보기에서는 바뀌지 않습니다」.
      · 학생 · 학부모 쪽 열람 기록은 남지 않는다 (그런 기록 자체가 없고, 직원 함수도 남기지 않는다).
-     · 공개 전 이번 주 레포트는 「공개하면 이렇게 보입니다」로 함께 (② 작성 내용으로 만든다).
+     · 공개 전 이번 주 레포트는 「공개하면 이렇게 보입니다」로 함께 (주간 레포트 → 작성 내용으로 만든다).
      · [휴대폰 크기로 보기]
    ============================================================ */
 
@@ -28,7 +28,7 @@
   function student() { return Store.getStudents().find(function (x) { return x.id === cur.sid; }) || null; }
   function today() { return DDay.today(); }
 
-  /* 공개 전 이번 주 레포트 — ② 작성 내용으로 (그 학생 입력이나 반 공통이 있을 때만) */
+  /* 공개 전 이번 주 레포트 — 주간 레포트 → 작성 내용으로 (그 학생 입력이나 반 공통이 있을 때만) */
   function draftReport() {
     var d = window.Writer && Writer.current();
     var s = student();
@@ -204,7 +204,7 @@
     document.body.classList.remove('pv-open');
   }
 
-  /* 명단 · ② 작성 · ④ 발송의 [학부모 화면] [학생 화면] 단추 */
+  /* 명단 · 주간 레포트 → 작성 · 주간 레포트 → 발송의 [학부모 화면] [학생 화면] 단추 */
   document.addEventListener('click', function (e) {
     var b = e.target.closest('[data-pv]');
     if (!b) return;

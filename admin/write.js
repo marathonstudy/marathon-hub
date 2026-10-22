@@ -1,5 +1,5 @@
 /* ============================================================
-   write.js — ② 작성 탭
+   write.js — 주간 레포트 → 작성
 
    주차 선택 · 반 공통 입력 · 학생별 입력 · 실시간 미리보기
    자동 저장 · 지난주 불러오기 · 코멘트 상용구 · 맞춤법 경고
@@ -180,7 +180,7 @@
   }
 
   /* 이 학생의 작성 상태. 규칙은 report.js 한 곳에 있다.
-     ③ 공개 탭도 같은 함수를 쓰므로 둘이 어긋날 수 없다. */
+     주간 레포트 → 공개도 같은 함수를 쓰므로 둘이 어긋날 수 없다. */
   function statusOf(id) {
     var s = students().find(function (x) { return x.id === id; });
     return Report.entryStatus(commonOf((s && s.className) || '_'), entryOf(id));
@@ -284,7 +284,7 @@
     host.textContent = '';
 
     if (!classes.length) {
-      host.innerHTML = '<p class="panel__hint">아직 반이 없습니다. ① 명단 → 학생 추가 → 반 고르기의 [+ 새 반 만들기]로 만들 수 있습니다.</p>';
+      host.innerHTML = '<p class="panel__hint">아직 반이 없습니다. 학생 → 명단 → 학생 추가 → 반 고르기의 [+ 새 반 만들기]로 만들 수 있습니다.</p>';
       currentClass = '';
       return;
     }
@@ -389,8 +389,10 @@
     var wrap = $('#writeBarWrap'), bar = $('#writeBar'), top = $('#topbar');
     if (!wrap || !bar) return;
     var topH = top && !top.hidden ? top.offsetHeight : 0;
-    var r = wrap.getBoundingClientRect(), main = $('#writeMain').getBoundingClientRect();
-    var on = mode === 'edit' && r.height > 0 && r.top < topH && main.bottom > topH + bar.offsetHeight;
+    /* 띠는 주간 레포트 머리에 있고 작성 · 공개 · 발송이 함께 쓴다 (20261029a) — 지금 보이는 단계 화면 끝까지 붙어 있다 */
+    var panel = ['#panel-write', '#panel-publish', '#panel-send'].map(function (id) { return $(id); }).filter(function (el) { return el && !el.hidden; })[0];
+    var r = wrap.getBoundingClientRect(), main = panel ? panel.getBoundingClientRect() : { bottom: 0 };
+    var on = !!panel && r.height > 0 && r.top < topH && main.bottom > topH + bar.offsetHeight;
     wrap.style.height = on ? bar.offsetHeight + 'px' : '';
     bar.classList.toggle('is-stuck', on);
     bar.style.top = on ? topH + 'px' : '';
@@ -1025,7 +1027,7 @@
       : '';
 
     $('#queueInfo').textContent = n.done
-      ? n.done + '명 작성 완료 · ③ 공개 탭에 올라갑니다' +
+      ? n.done + '명 작성 완료 · 주간 레포트 → 공개에 올라갑니다' +
         (n.partial ? ' (작성 중 ' + n.partial + '명은 빠집니다)' : '')
       : '필수 항목을 다 채우면 공개 목록에 올라갑니다';
 
@@ -1557,7 +1559,7 @@
   }
 
   /* ============================================================
-     ③ 공개 탭으로 — 맞춤법만 확인하고 넘겨준다
+     공개 단계로 — 맞춤법만 확인하고 넘겨준다
      ============================================================ */
 
   var spellModal = $('#spellModal');
@@ -1742,7 +1744,7 @@
     if (!$('#panel-write').hidden) refreshAll();
   });
 
-  /* ③ 공개 탭이 목록을 만들기 전에 마지막 입력까지 저장해 둔다 */
+  /* 주간 레포트 → 공개이 목록을 만들기 전에 마지막 입력까지 저장해 둔다 */
   window.Writer = {
     flush: flushDraft,
     switchWeek: switchWeek,

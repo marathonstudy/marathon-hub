@@ -506,7 +506,7 @@
       });
   }
 
-  /* ④ 발송 — 그 주차에 공개한 학생 + 보냄 표시 + 종료일 */
+  /* 주간 레포트 → 발송 — 그 주차에 공개한 학생 + 보냄 표시 + 종료일 */
   function weekSendData(weekStart) {
     var c = sb();
     return Promise.all([

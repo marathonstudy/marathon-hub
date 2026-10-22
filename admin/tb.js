@@ -1,5 +1,5 @@
 /* ============================================================
-   tb.js — ⑥ 교재 탭의 뼈대 · 설정 · 일정
+   tb.js — 교재의 뼈대 · 설정 · 일정
 
    하위 화면: 대시보드 / 지급 / 일정 / 재고·주문 / 청구·수납 / 환불 / 설정
    각 하위 화면은 tb-*.js 가 TB.register(이름, { show }) 로 붙인다.
@@ -328,7 +328,7 @@
     var host = $('#tbClassLinks');
     var list = classes();
     if (!list.length) {
-      host.innerHTML = '<div class="empty-state">아직 반이 없습니다. ① 명단에서 학생의 반을 적으면 여기에 나옵니다.</div>';
+      host.innerHTML = '<div class="empty-state">아직 반이 없습니다. 학생 → 명단에서 학생의 반을 적으면 여기에 나옵니다.</div>';
       return;
     }
     var active = state.books.filter(function (b) { return b.active; });

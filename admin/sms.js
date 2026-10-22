@@ -10,8 +10,8 @@
      · 보내기 전 「n명 · 예상 약 n원」 확인 · [나에게 시험 발송] · 한 번 · 하루 상한(설정) · 실패 이유 · [실패만 다시 보내기]
      · 화면은 학생 id 와 보낼 곳만 함수에 넘긴다. 번호는 함수가 DB 에서 찾는다 (화면의 번호는 미리보기 · 셈에만 쓴다)
    여는 곳 — 받는 사람이 미리 채워진다
-     · ④ 발송 반 카드 [반 전체 문자] · 학생 ⋯ [사이트에서 문자] → 그 주 수업일 · 「보냄」 표시 칸
-     · 「오늘」 반 카드 [문자] · 그 안 학생 줄 [문자] · ① 명단 학생 줄 [문자] (data-sms-cls · data-sms-sid)
+     · 주간 레포트 → 발송 반 카드 [반 전체 문자] · 학생 ⋯ [사이트에서 문자] → 그 주 수업일 · 「보냄」 표시 칸
+     · 「오늘」 반 카드 [문자] · 그 안 학생 줄 [문자] · 학생 → 명단 학생 줄 [문자] (data-sms-cls · data-sms-sid)
    「문자 보낸 기록」 창 — 반 · 학생 · 날짜로 찾기 (직원, 시각, 받는 사람, 번호 뒤 4자리, 내용 앞부분, 성공 · 실패)
    「오늘」 → [설정] 문자 칸 — 키 세 개(✓/✗) · 단가 · 한 번 · 하루 최대 · 광고 발신처 · 무료수신거부 번호
    ============================================================ */
@@ -102,7 +102,7 @@
     var d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
     return (+m[2]) + '월 ' + (+m[3]) + '일(' + DOW[d.getUTCDay()] + ')';
   }
-  /* #{수업일} — ④ 발송에서 열면 그 주 수업일, 아니면 다음 수업일 (휴강은 건너뛴다) */
+  /* #{수업일} — 주간 레포트 → 발송에서 열면 그 주 수업일, 아니면 다음 수업일 (휴강은 건너뛴다) */
   function lessonText(cls) {
     if (cls === NOCLS) return '';
     if (st.week) {
@@ -235,7 +235,7 @@
       (plan.items.length ? ' (단문 ' + plan.sms + ' · 장문 ' + plan.lms + ')' : '') +
       ' · 예상 약 <b class="num">' + plan.won.toLocaleString() + '</b>원 <span class="muted-note">단문 ' + c.smsWon + '원 · 장문 ' + c.lmsWon + '원</span></p>';
     if (plan.noPhone.length) html += '<p class="cp-warn">번호 없음 ' + plan.noPhone.length + '명: ' + esc(plan.noPhone.slice(0, 20).map(function (s) { return s.name; }).join(', ')) + (plan.noPhone.length > 20 ? ' 외' : '') + '</p>';
-    if (plan.noLink.length) html += '<p class="cp-warn">링크가 없어 빼는 줄 ' + plan.noLink.length + '개: ' + esc(plan.noLink.slice(0, 10).map(function (x) { return x.s.name + '(' + labelOf(x.s, x.t) + ')'; }).join(', ')) + ' — ① 명단에서 링크를 발급해 주세요</p>';
+    if (plan.noLink.length) html += '<p class="cp-warn">링크가 없어 빼는 줄 ' + plan.noLink.length + '개: ' + esc(plan.noLink.slice(0, 10).map(function (x) { return x.s.name + '(' + labelOf(x.s, x.t) + ')'; }).join(', ')) + ' — 학생 → 명단에서 링크를 발급해 주세요</p>';
     if (plan.tooLong.length) html += '<p class="cp-warn">2000바이트가 넘어 빼는 줄 ' + plan.tooLong.length + '개</p>';
     if (plan.sib.length) {
       html += '<label class="check-line sms-sib"><input type="checkbox" id="smsSib"' + (sibOn ? ' checked' : '') + '> <span>같은 번호를 쓰는 형제 ' + plan.sib.length + '명에게도 따로 보내기 <span class="field__opt">' +
@@ -365,7 +365,7 @@
     Promise.all([loadCfg(), loadTemplates()]).then(function () {
       $('#smsMissing').hidden = !st.missing;
       $('#smsMissing').textContent = st.missing ? 'migration-023 SQL 을 실행하고 Edge Function sms-send 를 배포하면 사이트에서 문자를 보낼 수 있습니다.' : '';
-      /* ④ 발송에서 열었고 내용이 비어 있으면 「레포트 안내」 문구로 */
+      /* 주간 레포트 → 발송에서 열었고 내용이 비어 있으면 「레포트 안내」 문구로 */
       if (st.from === 'send' && !$('#smsBody').value.trim()) {
         var t = st.templates.find(function (x) { return /레포트/.test(x.title || ''); });
         if (t) { $('#smsBody').value = t.body || ''; $('#smsTplName').value = t.title || ''; $('#smsTpl').value = t.id; $('#smsTplDel').disabled = false; }
@@ -400,7 +400,7 @@
     var desc = p.people + '명 · 문자 ' + p.items.length + '건 (단문 ' + p.sms + ' · 장문 ' + p.lms + ') · 예상 약 ' + p.won.toLocaleString() + '원을 보냅니다.' +
       ($('#smsAd').checked ? ' 광고 문자입니다 — (광고) · 발신처 · 무료수신거부 안내가 붙습니다.' : '') +
       (!retryList && p.sib.length ? (sibOn ? ' 같은 번호를 쓰는 형제 ' + p.sib.length + '명에게도 따로 보냅니다.' : ' 같은 번호를 쓰는 형제 ' + p.sib.length + '명은 번호마다 한 번만 보냅니다.') : '') +
-      (payload(p.items).markWeek ? ' 보낸 학생은 ④ 발송에 「보냄」으로 표시합니다.' : '') +
+      (payload(p.items).markWeek ? ' 보낸 학생은 주간 레포트 → 발송에 「보냄」으로 표시합니다.' : '') +
       ' 오늘 ' + ((st.cfg && st.cfg.today) || 0) + ' / ' + cfg().dailyMax + '건.';
     UI.confirmAsk(retryList ? '실패만 다시 보내기' : '문자 보내기', desc, '보내기').then(function (yes) {
       if (!yes) return;
@@ -604,7 +604,7 @@
     $('#smsLogFind').addEventListener('click', findLog);
     $('#smsLogClose').addEventListener('click', function () { $('#smsLogModal').close(); });
 
-    /* [문자] 단추 — 「오늘」 반 카드(data-sms-cls) · 학생 줄 · ① 명단(data-sms-sid, 비어 있으면 줄의 data-id) · ④ 발송 [반 전체 문자] */
+    /* [문자] 단추 — 「오늘」 반 카드(data-sms-cls) · 학생 줄 · 학생 → 명단(data-sms-sid, 비어 있으면 줄의 data-id) · 주간 레포트 → 발송 [반 전체 문자] */
     document.addEventListener('click', function (e) {
       var b = e.target.closest('[data-sms-cls], [data-sms-sid]');
       if (!b || b.disabled) return;

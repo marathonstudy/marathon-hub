@@ -1,5 +1,5 @@
 /* ============================================================
-   send.js — ④ 발송 탭 (20261028a — 반마다 카드)
+   send.js — 주간 레포트 → 발송 (20261028a — 반마다 카드)
 
    공개한 레포트를 학부모에게 알린다.
    문자에 들어가는 주소는 학생 개인 페이지(/me/#코드/report)다.
@@ -242,7 +242,7 @@
           main +
           '<button class="btn btn--sm btn--ghost snd-more" type="button" data-more aria-label="' + esc(s.name || '') + ' 더 보기">⋯</button>' +
         '</div>' +
-        (open ? '<div class="snd-row__phones num">' + esc(phones.length ? phones.map(function (p) { return p.label + ' ' + Store.phoneMask(p.number); }).join(' · ') : '번호 없음 — ① 명단에서 넣어 주세요') + '</div>' : '') +
+        (open ? '<div class="snd-row__phones num">' + esc(phones.length ? phones.map(function (p) { return p.label + ' ' + Store.phoneMask(p.number); }).join(' · ') : '번호 없음 — 학생 → 명단에서 넣어 주세요') + '</div>' : '') +
       '</div>';
   }
 
@@ -291,7 +291,7 @@
 
     if (!state.loaded) { host.innerHTML = '<div class="empty-state">불러오는 중…</div>'; return; }
     if (!state.week) {
-      host.innerHTML = '<div class="empty-state">아직 공개한 레포트가 없습니다.<br>③ 공개 탭에서 먼저 공개해 주세요.</div>';
+      host.innerHTML = '<div class="empty-state">아직 공개한 레포트가 없습니다.<br>주간 레포트 → 공개에서 먼저 공개해 주세요.</div>';
       return;
     }
     if (!gs.length) { host.innerHTML = '<div class="empty-state">다니는 학생이 없습니다.</div>'; return; }
@@ -367,8 +367,8 @@
       return;
     }
 
-    if (!state.published[sid]) { toast('아직 공개 전입니다. ③ 공개에서 먼저 공개해 주세요', 'bad'); return; }
-    if (!url) { toast('개인 링크가 없습니다. ① 명단에서 발급해 주세요', 'bad'); return; }
+    if (!state.published[sid]) { toast('아직 공개 전입니다. 주간 레포트 → 공개에서 먼저 공개해 주세요', 'bad'); return; }
+    if (!url) { toast('개인 링크가 없습니다. 학생 → 명단에서 발급해 주세요', 'bad'); return; }
 
     if (act === 'copymsg' || act === 'copykakao') {
       copyText(msg).then(function () {
@@ -464,7 +464,7 @@
     setTimeout(function () { if (opening) window.dispatchEvent(new CustomEvent('jt:write-nav')); else if (window.Nav) Nav.replace(); }, 0);
   }
 
-  /* [공개하러 가기] — ③ 공개는 ② 작성의 주차를 쓴다. 이 주로 맞춘 뒤 연다 */
+  /* [공개하러 가기] — 주간 레포트 → 공개는 주간 레포트 → 작성의 주차를 쓴다. 이 주로 맞춘 뒤 연다 */
   function goPublish() {
     var w = state.week;
     var p = (window.Writer && Writer.current && Writer.current() && Writer.current().weekStart !== w && Writer.switchWeek)
@@ -610,11 +610,13 @@
       state.greetingAt = (res[1] && res[1].updated_at) || '';
       state.greeting = (g && (g.sms || g.kakao)) || DEFAULT_GREETING;
 
-      if (!state.week || stepList().indexOf(state.week) === -1) {
-        /* 작성 중인 주차가 공개돼 있으면 그걸, 아니면 가장 최근 것 */
-        var draft = Store.read(Store.KEYS.draft, null);
-        var prefer = draft && draft.weekStart;
-        state.week = (prefer && state.weeks.indexOf(prefer) !== -1) ? prefer : (state.weeks[0] || '');
+      /* 주간 레포트의 주차 띠와 같은 주 (20261029a — 작성 · 공개 · 발송이 같은 주를 본다) */
+      var wk = writerWeek();
+      if (wk) {
+        if (wk !== state.week) { state.open = null; state.defOpen = {}; state.rowOpen = {}; }
+        state.week = wk;
+      } else if (!state.week || stepList().indexOf(state.week) === -1) {
+        state.week = state.weeks[0] || '';
       }
       return loadWeek();
     }).catch(function (e) {
@@ -622,8 +624,33 @@
     });
   }
 
+  function writerWeek() {
+    var d = window.Writer && Writer.current && Writer.current();
+    return (d && d.weekStart) || '';
+  }
+
+  /* 띠에서 고른 반을 먼저 — 펼치고 그 카드로 */
+  function focusClass(cls) {
+    if (!cls) return;
+    var gs = groups();
+    if (!gs.some(function (g) { return g.name === cls; })) return;
+    if (!state.open) {
+      state.open = {};
+      gs.forEach(function (g) { if (state.defOpen[g.name]) state.open[g.name] = true; });
+    }
+    state.open[cls] = true;
+    render();
+    var card = $('#sendList .snd-card[data-cls="' + (window.CSS && CSS.escape ? CSS.escape(cls) : cls) + '"]');
+    if (card && card.scrollIntoView) card.scrollIntoView({ block: 'nearest' });
+  }
+
   document.addEventListener('jt:tab', function (e) {
-    if (e.detail.index === 3) refresh();
+    if (e.detail.index === 3) refresh().then(function () { focusClass(window.Writer && Writer.currentClass ? Writer.currentClass() : ''); });
+  });
+
+  /* 띠에서 주를 바꾸면 (rtabs.js) */
+  window.addEventListener('jt:report-week', function () {
+    if (!$('#panel-send').hidden) refresh();
   });
 
   window.addEventListener('jt:loaded', function () {
@@ -653,6 +680,8 @@
     },
     apply: function (week, open) {
       var weekChanged = !!week && week !== state.week;
+      /* 주소에 적힌 주 — 주차 띠(작성 · 공개)도 같은 주로 */
+      if (week && window.Writer && Writer.switchWeek && writerWeek() && writerWeek() !== week) Writer.switchWeek(week, 0);
       if (week) state.week = week;
       if (open === undefined) state.open = null;
       else { state.open = {}; open.forEach(function (n) { if (n) state.open[n] = true; }); }
