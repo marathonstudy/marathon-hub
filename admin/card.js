@@ -776,21 +776,19 @@
      주간 레포트 → 작성 — 고른 학생의 최근 기록
      ============================================================ */
 
-  var side = { sid: null };
-
-  function renderSide(sid) {
-    var host = $('#notesSide');
+  /* 학생별 작성의 학생 줄 [상담 기록 ▾] 안 (20261029b — 예전 오른쪽 「최근 상담·관찰 기록」 칸) */
+  function renderInline(host, sid) {
     if (!host) return;
-    side.sid = sid;
-    var s = student(sid);
-    if (!s) { host.innerHTML = '<p class="panel__hint">학생 카드를 누르면 그 학생의 최근 기록이 보입니다.</p>'; return; }
-    $('#notesSideWho').textContent = s.name + ' · 최근 상담·관찰 기록';
+    host.dataset.sid = sid;
+    host.innerHTML = '<p class="panel__hint">불러오는 중…</p>';
     sb().from('student_notes').select('*').eq('student_id', sid).is('deleted_at', null)
       .order('note_date', { ascending: false }).order('created_at', { ascending: false }).limit(30)
       .then(function (r) {
-        if (side.sid !== sid) return;
+        if (host.dataset.sid !== sid) return;
+        var acts = '<div class="ns-acts"><button class="btn btn--sm" type="button" data-ns="add">기록 추가</button>' +
+                   '<button class="btn btn--sm btn--ghost" type="button" data-ns="card">상담 카드 열기</button></div>';
         if (r.error) {
-          host.innerHTML = '<p class="panel__hint">' + (isMissing(r.error) ? '상담 기록용 표가 아직 없습니다 (SQL 004).' : esc(r.error.message)) + '</p>';
+          host.innerHTML = '<p class="panel__hint">' + (isMissing(r.error) ? '상담 기록용 표가 아직 없습니다 (SQL 004).' : esc(r.error.message)) + '</p>' + acts;
           return;
         }
         var pins = openFollow(r.data);
@@ -805,15 +803,22 @@
           (pins.length ? '<div class="ns-sub">다음 상담 때 확인 ' + pins.length + '건</div><ul class="ns-list">' + pins.map(function (n) { return line(n, true); }).join('') + '</ul>' : '') +
           '<div class="ns-sub">최근 기록</div>' +
           (recent.length ? '<ul class="ns-list">' + recent.map(function (n) { return line(n, false); }).join('') + '</ul>'
-                         : '<p class="panel__hint">아직 기록이 없습니다.</p>');
+                         : '<p class="panel__hint">아직 기록이 없습니다.</p>') + acts;
       });
   }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('.entry__notes [data-ns]');
+    if (!b) return;
+    var sid = b.closest('.entry__notes').dataset.sid;
+    if (!sid) return;
+    if (b.dataset.ns === 'add') open(sid, { compose: true });
+    else open(sid);
+  });
 
-  function afterNotesChanged(sid) { if (side.sid === sid) renderSide(sid); }
-
-  window.addEventListener('jt:student-selected', function (e) { renderSide(e.detail.id); });
-  $('#btnNotesSideCard').addEventListener('click', function () { if (side.sid) open(side.sid); });
-  $('#btnNotesSideAdd').addEventListener('click', function () { if (side.sid) open(side.sid, { compose: true }); });
+  /* 기록을 고치면 열려 있는 그 학생 [상담 기록] 칸도 새로 */
+  function afterNotesChanged(sid) {
+    Array.prototype.forEach.call(document.querySelectorAll('.entry__notes:not([hidden])'), function (h) { if (h.dataset.sid === sid) renderInline(h, sid); });
+  }
 
   /* ============================================================
      시작 · 다른 기기에서 바뀌었을 때
@@ -833,7 +838,7 @@
     remoteTimer = setTimeout(function () {
       if (t === '*' || t === 'student_notes') {
         loadFollow();
-        if (side.sid) renderSide(side.sid);
+        Array.prototype.forEach.call(document.querySelectorAll('.entry__notes:not([hidden])'), function (h) { if (h.dataset.sid) renderInline(h, h.dataset.sid); });
         if (C) reloadNotes();
       }
       if (C && (t === '*' || t === 'student_grades')) reloadGrades();
@@ -851,6 +856,7 @@
   window.addEventListener('jt:refreshed', function () { if (ready) loadFollow(); });
 
   window.Card = {
+    renderInline: renderInline,
     open: open,
     followCount: function (sid) { return follow[sid] || 0; }
   };

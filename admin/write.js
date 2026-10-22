@@ -732,8 +732,14 @@
               '<span class="comment-btn__count num"></span>' +
             '</button>' +
           '</div>' +
+          '<div class="fieldline fieldline--notes">' +
+            '<span class="fieldline__label">상담</span>' +
+            '<button type="button" class="btn btn--sm btn--ghost entry__notes-btn" data-act="notes" aria-expanded="false">상담 기록 ▾</button>' +
+            '<div class="entry__notes" data-role="notes" hidden></div>' +
+          '</div>' +
           '<div class="fieldline fieldline--pv">' +
             '<span class="fieldline__label">미리보기</span>' +
+            '<button type="button" class="btn btn--sm" data-act="preview">미리보기</button>' +
             '<button type="button" class="btn btn--sm btn--ghost" data-pv="parent">학부모 화면 보기</button>' +
             '<button type="button" class="btn btn--sm btn--ghost" data-pv="student">학생 화면 보기</button>' +
           '</div>' +
@@ -921,6 +927,24 @@
       return;
     }
 
+    /* [상담 기록 ▾] — 그 학생 최근 기록 · [기록 추가] · [상담 카드 열기] (card.js 가 그린다 · 20261029b) */
+    if (act === 'notes') {
+      var box = card.querySelector('[data-role="notes"]');
+      var opening = box.hidden;
+      box.hidden = !opening;
+      btn.setAttribute('aria-expanded', String(opening));
+      btn.textContent = opening ? '상담 기록 ▴' : '상담 기록 ▾';
+      if (opening && window.Card && Card.renderInline) Card.renderInline(box, id);
+      return;
+    }
+
+    /* [미리보기] — 그 학생으로. 휴대폰 폭에서는 창으로 */
+    if (act === 'preview') {
+      selectStudent(id, true);
+      if (phoneWide()) openPreviewSheet(id);
+      return;
+    }
+
     if (act === 'status') {
       var was = e.attendStatus;
       e.attendStatus = (shownStatus(e) === btn.dataset.v) ? '' : btn.dataset.v;
@@ -1083,9 +1107,26 @@
       '</body></html>';
   }
 
+  /* 휴대폰 폭 — 오른쪽(아래) 미리보기 칸 대신 [미리보기] 창 */
+  function phoneWide() { return !!(window.matchMedia && window.matchMedia('(max-width: 720px)').matches); }
+  function openPreviewSheet(id) {
+    var s = students().find(function (x) { return x.id === id; });
+    if (!s) return;
+    var data = Report.toReportData(s, commonOf(currentClass), entryOf(s.id), { start: draft.weekStart, end: draft.weekEnd });
+    $('#previewSheetWho').textContent = s.name + ' 학생 · 레포트 미리보기';
+    $('#previewSheetFrame').srcdoc = previewHtml(data);
+    $('#previewSheet').showModal();
+  }
+  $('#previewSheetClose').addEventListener('click', function () { $('#previewSheet').close(); });
+
   function renderPreview() {
     var s = students().find(function (x) { return x.id === selectedId; });
-    if (!s) { $('#previewWho').textContent = '학생 카드를 누르면 그 학생 레포트가 보입니다'; return; }
+    if (!s) {
+      /* 처음에는 안내만 — 학생 줄을 누르거나 [미리보기]를 누르면 그 학생으로 (20261029b) */
+      $('#previewWho').textContent = '학생을 누르면 그 학생 레포트 미리보기가 나옵니다';
+      $('#previewFrame').srcdoc = '<!DOCTYPE html><html><body style="font-family:sans-serif;color:#8A90AC;display:grid;place-items:center;height:90vh;margin:0;text-align:center;font-size:14px">학생을 누르면 그 학생 레포트<br>미리보기가 나옵니다</body></html>';
+      return;
+    }
 
     $('#previewWho').textContent = s.name + ' 학생';
     var data = Report.toReportData(s, commonOf(currentClass), entryOf(s.id),
@@ -1631,13 +1672,8 @@
     renderCommon();
     renderEntries();
 
-    if (!selectedId) {
-      var first = studentsOfClass(currentClass)[0];
-      if (first) selectedId = first.id;
-    }
+    /* 미리보기는 학생을 누르기 전에는 안내만 (예전처럼 첫 학생을 저절로 고르지 않는다 · 20261029b) */
     schedulePreview();
-    /* 오른쪽 '최근 상담·관찰 기록' 상자도 지금 고른 학생으로 (card.js) */
-    if (selectedId) window.dispatchEvent(new CustomEvent('jt:student-selected', { detail: { id: selectedId } }));
   }
 
   /* 작성 탭이 열릴 때마다 최신 명단으로 다시 그린다 */

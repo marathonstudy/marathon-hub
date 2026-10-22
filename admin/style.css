@@ -1187,9 +1187,6 @@ body.report-step-write.write-weeks #writeBarWrap { display: none; }
     grid-template-areas:
       "restore preview"
       "notes   preview"
-      "week    preview"
-      "class   preview"
-      "bar     preview"
       "common  preview"
       "entries preview";
     gap: 0 16px;
@@ -1198,9 +1195,6 @@ body.report-step-write.write-weeks #writeBarWrap { display: none; }
   /* 자리는 이름으로 — 위에 알림 줄이 더 들어와도 순서가 밀리지 않게 */
   #draftRestore { grid-area: restore; }
   #draftNotes { grid-area: notes; }
-  #weekPanel { grid-area: week; }
-  #classPanel { grid-area: class; }
-  #writeBarWrap { grid-area: bar; }
   #commonPanel { grid-area: common; }
   #entryPanel { grid-area: entries; }
   #previewPanel {
@@ -2577,4 +2571,17 @@ body.pv-open { overflow: hidden; }
   .rsteps { gap: 4px; padding: 5px; }
   .rstep { padding: 7px 9px; gap: 4px; }
   .rstep__line { min-width: 4px; }
+}
+
+/* 작성 화면 순서 (20261029b) — 반 고르기 → 주차 띠 → 반 공통 → 학생별 작성 · 반 고르기는 작성 단계에서만 */
+.rhead__class { margin-bottom: 8px; }
+body:not(.report-step-write) #classPanel { display: none; }
+.fieldline--notes { flex-wrap: wrap; }
+.entry__notes { flex: 1 1 100%; margin-top: 6px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
+.entry__notes .ns-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.pv-sheet .modal__body { padding: 0; }
+.pv-sheet__frame { display: block; width: 100%; height: 72vh; border: 0; }
+/* 휴대폰 폭 — 오른쪽(아래) 미리보기 칸 대신 학생 줄 [미리보기] 창 */
+@media (max-width: 720px) {
+  #previewPanel { display: none !important; }
 }
