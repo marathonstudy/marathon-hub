@@ -1533,10 +1533,16 @@
         att: counted ? Math.round(present / counted * 100) : null,
         focus: focus,
         review: w.review == null ? null : Number(w.review),
+        reviews: w.reviews || null,
         hw: w.hw == null ? null : Math.round(Number(w.hw))
       };
     });
-    return { rows: rows, present: present, counted: counted };
+    /* 시험별 점수 (migration-025 — 「복습 TEST」 · 「화작문 TEST」 …) — 시험마다 따로 선을 그린다 */
+    var names = [];
+    rows.forEach(function (x) { Object.keys(x.reviews || {}).forEach(function (n) { if (names.indexOf(n) === -1) names.push(n); }); });
+    names.sort(function (a, b) { return (a === '복습 TEST' ? 0 : 1) - (b === '복습 TEST' ? 0 : 1) || a.localeCompare(b, 'ko'); });
+    rows.forEach(function (x) { names.forEach(function (n) { var v = x.reviews ? x.reviews[n] : null; x['rv:' + n] = v == null ? null : Number(v); }); });
+    return { rows: rows, present: present, counted: counted, reviewNames: names };
   }
 
   function trendHtml(weeks) {
@@ -1555,9 +1561,12 @@
     var charts = [
       { key: 'att',    name: '출석률',    max: 100, fmt: function (v) { return v + '%'; } },
       { key: 'focus',  name: '집중도',    max: 5,   fmt: function (v) { return round1(v).toFixed(1); } },
-      { key: 'review', name: '복습 점수', max: 100, fmt: function (v) { return Math.round(v) + '점'; } },
+    ].concat(S.reviewNames.length
+      ? S.reviewNames.map(function (n) { return { key: 'rv:' + n, name: esc(n.replace(/ TEST$/, '')) + ' 점수', max: 100, fmt: function (v) { return Math.round(v) + '점'; } }; })
+      : [{ key: 'review', name: '복습 점수', max: 100, fmt: function (v) { return Math.round(v) + '점'; } }]
+    ).concat([
       { key: 'hw',     name: '과제 완료', max: 100, fmt: function (v) { return v + '%'; } }
-    ].filter(function (c) { return rows.some(function (x) { return x[c.key] != null; }); });
+    ]).filter(function (c) { return rows.some(function (x) { return x[c.key] != null; }); });
 
     return '<div class="card tr-card">' + head +
       (summary.length ? '<p class="tr-sum num">' + esc(summary.join(' · ')) + '</p>' : '') +

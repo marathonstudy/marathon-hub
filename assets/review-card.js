@@ -199,7 +199,7 @@
     var anySub = list.some(function (t) { return t.submission; });
     host.innerHTML =
       '<div class="card rv-card">' + head +
-        '<p class="rv-step"><b>1</b> 시험마다 <b>전체 문항 수</b>와 <b>틀린 개수</b> <span class="rv-muted">(하나만 먼저 내도 돼요)</span></p>' +
+        '<p class="rv-step"><b>1</b> 시험마다 전체 문항 수와 틀린 개수 <span class="rv-muted">(하나만 먼저 내도 돼요)</span></p>' +
         rows +
         '<p class="rv-step"><b>2</b> 시험지 사진 <span class="rv-muted">(필수 · 여러 장 · 두 시험을 한 장에 찍어도 돼요)</span></p>' +
         '<div class="rv-thumbs">' + thumbs(urls) + '</div>' +
