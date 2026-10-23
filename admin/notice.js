@@ -103,12 +103,13 @@
     var name = chip.dataset.cls;
     if (state.classes[name]) delete state.classes[name]; else state.classes[name] = true;
     renderClassChips();
+    renderWeekSummary();           /* 고른 반의 수업일로 (20261030b) */
   });
 
   function renderWeekSummary() {
     var w = $('#ntWeek').value;
     var end = w ? (Store.weekEndOf(w) || Store.autoEnd(w)) : '';
-    $('#ntWeekSummary').textContent = w ? Store.dateWithDow(w) + ' ~ ' + Store.dateWithDow(end) + ' 주차' : '';
+    $('#ntWeekSummary').textContent = w ? Store.lessonLabel(Object.keys(state.classes), w) : '';
   }
   $('#ntWeek').addEventListener('change', renderWeekSummary);
 
@@ -328,7 +329,7 @@
         });
         if (!changed.length) return 'go';
         return UI.conflictAsk(changed.map(function (r) { return r.class_name; }).join(', ') + ' 반 ' +
-                              Store.shortDate(week) + ' 주차 공지');
+                              Store.lessonLabel(classes, week) + ' 공지');
       });
     }).then(function (choice) {
       if (!choice || choice === 'cancel') return;
@@ -420,7 +421,7 @@
         h.className = 'pub-group';
         var end = Store.weekEndOf(b.week);
         h.innerHTML = '<span class="pub-group__name"></span>';
-        h.firstChild.textContent = Store.dateWithDow(b.week) + (end ? ' ~ ' + Store.dateWithDow(end) : '') + ' 주차';
+        h.firstChild.textContent = Store.lessonLabel(list.filter(function (x) { return x.week === b.week; }).reduce(function (a, x) { return a.concat((x.rows || []).map(function (r) { return r.className; })); }, []), b.week) + ' 공지';
         frag.appendChild(h);
       }
 
@@ -505,8 +506,8 @@
 
     if (act === 'del') {
       UI.confirmAsk('공지 삭제',
-        rows.map(function (r) { return r.className; }).join(', ') + ' 반의 ' + Store.shortDate(rows[0].weekStart) +
-        ' 주차 공지를 지웁니다. 되돌릴 수 없습니다. 잠깐 감추려면 [숨기기]를 쓰세요.', '삭제').then(function (ok) {
+        rows.map(function (r) { return r.className; }).join(', ') + ' 반의 ' + Store.lessonLabel(rows.map(function (r) { return r.className; }), rows[0].weekStart) +
+        ' 공지를 지웁니다. 되돌릴 수 없습니다. 잠깐 감추려면 [숨기기]를 쓰세요.', '삭제').then(function (ok) {
         if (!ok) return;
         DB.deleteNotices(rows.map(function (r) { return r.id; })).then(function () {
           if (state.editing && state.editing.bundleId === bundleId) startNew();

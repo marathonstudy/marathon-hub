@@ -1514,7 +1514,7 @@
        공개된 레포트의 출결 · 집중도 · 필수과제율, 낸 복습 점수만. 상담 · 성적 · 금액은 없다.
        출석률 = (출석 + 지각) / 기록이 있는 주 — 그래프는 그 주까지의 누적
        집중도 평균은 결석한 주(0)를 뺀다. 과제는 필수과제 완료율 — 앱이 연결된 학생은 그 주 과제 기간의 앱 제출일 비율(app-week.js).
-       점을 누르면 그 주 레포트가 열린다. 2주가 안 되면 "2주차부터 추이가 보입니다".
+       점을 누르면 그 수업 레포트가 열린다. 레포트가 하나뿐이면 "레포트가 두 번 쌓이면 추이가 보입니다".
      ============================================================ */
   var TREND_INK = '#7858E8';
 
@@ -1560,7 +1560,7 @@
 
   function trendHtml(weeks) {
     var head = '<h2 class="card-title">📈 누적 추이</h2>';
-    if (weeks.length < 2) return '<div class="card tr-card">' + head + '<p class="hub-muted">2주차부터 추이가 보입니다.</p></div>';
+    if (weeks.length < 2) return '<div class="card tr-card">' + head + '<p class="hub-muted">레포트가 두 번 쌓이면 추이가 보입니다.</p></div>';
     var S = trendSeries(weeks), rows = S.rows;
     var fAvg = avg(rows.map(function (x) { return x.focus; }));
     var rAvg = avg(rows.map(function (x) { return x.review; }));
@@ -1584,7 +1584,7 @@
     return '<div class="card tr-card">' + head +
       (summary.length ? '<p class="tr-sum num">' + esc(summary.join(' · ')) + '</p>' : '') +
       '<div class="tr-grid">' + charts.map(function (c) { return miniChart(c, rows); }).join('') + '</div>' +
-      '<p class="tr-hint">점을 누르면 그 주 레포트가 열립니다</p>' +
+      '<p class="tr-hint">점을 누르면 그 수업 레포트가 열립니다</p>' +
       tableHtml(rows, charts) +
     '</div>';
   }

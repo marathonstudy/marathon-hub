@@ -214,7 +214,7 @@
       renderWeek();
       refreshAll();
       window.dispatchEvent(new CustomEvent('jt:write-nav'));   /* 뒤로가기 기록 (nav.js) */
-      toast(Store.shortDate(newStart) + ' 주차를 열었습니다');
+      toast(Store.lessonLabel(currentClass, newStart) + '을 열었습니다');
     }).catch(function (e) {
       switching = false;
       renderWeek();
@@ -370,7 +370,7 @@
     var L = s ? Lesson.of(s, start) : null;
     var n = s && s.first ? Math.floor(daysFrom(monOf(start), monOf(s.first)) / 7) + 1 : 0;
     /* 휴강 주는 「9주차」 + 휴강 표시만 (주차 번호가 없으면 시작일) */
-    var when = L && L.date ? Lesson.md(L.date) : (L && L.canceled && n >= 1) ? '' : Store.dateWithDow(start) + ' 주';
+    var when = L && L.date ? Lesson.md(L.date) + ' 수업' : (L && L.canceled && n >= 1) ? '' : Store.lessonLabel(currentClass, start);
     now.innerHTML = '<span class="wbar__cls">' + escapeHtml(currentClass || '반 없음') + ' · </span>' +
       '<b>' + escapeHtml(((n >= 1 ? n + '주차 ' : '') + when).trim()) + '</b>' +
       (L && L.canceled ? ' <span class="wbar__off">휴강</span>' : '');
@@ -523,12 +523,12 @@
         c.lessons = (h.lessons || ['']).slice();
         if (!c.lessons.length) c.lessons = [''];
         saveDraft(); renderCommon(); renderEntries(); schedulePreview();
-        toast(Store.shortDate(h.weekStart) + ' 주차를 불러왔습니다', 'good');
+        toast(Store.lessonLabel(currentClass, h.weekStart) + ' 내용을 불러왔습니다', 'good');
       }
 
       if (!hasContent) { apply(); return; }
       UI.confirmAsk('지난주 불러오기',
-        Store.shortDate(h.weekStart) + ' 주차 내용으로 바꿉니다. 지금 입력한 수업 내용은 사라집니다.',
+        Store.lessonLabel(currentClass, h.weekStart) + ' 내용으로 바꿉니다. 지금 입력한 수업 내용은 사라집니다.',
         '바꾸기').then(function (ok) { if (ok) apply(); });
 
     }).catch(function (e) {

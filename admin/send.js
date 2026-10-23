@@ -206,7 +206,7 @@
     if (!state.week) return '발송';
     if (ds.length === 1) return '발송 · ' + Store.dateWithDow(ds[0]) + ' 수업 레포트';
     if (ds.length > 1) return '발송 · ' + Store.shortDate(ds[0]) + '~' + Store.shortDate(ds[ds.length - 1]) + ' 수업 레포트';
-    return '발송 · ' + Store.dateWithDow(state.week) + ' 주 레포트';
+    return '발송 · ' + Store.lessonLabel([], state.week) + ' 레포트';
   }
 
   function renderBar(gs) {

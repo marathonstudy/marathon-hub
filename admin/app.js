@@ -22,6 +22,7 @@
     el.className = 'toast' + (kind ? ' toast--' + kind : '');
     el.textContent = msg;
     /* 창(showModal)이 열려 있으면 그 창 안에 — 본문에 붙이면 창이 맨 위 층이라 알림이 창 뒤에 숨는다 (20261030b) */
+    /* 코치룸 창은 모두 showModal() 로 연다 — 열린 창이 곧 맨 위 층 */
     var dlgs = Array.prototype.filter.call(document.querySelectorAll('dialog'), function (d) { return d.open; });
     var act = document.activeElement && document.activeElement.closest ? document.activeElement.closest('dialog') : null;
     var dlg = act && act.open ? act : dlgs.length ? dlgs[dlgs.length - 1] : null, host = $('#toastHost');

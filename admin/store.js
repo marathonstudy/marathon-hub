@@ -1183,6 +1183,23 @@
     return s ? global.Lesson.of(s, weekStart) : null;
   }
 
+  /* 「10/22(목) 수업」 — 주(시작일)를 그 반 수업일로 부른다 (20261030b · 코치룸 어디서나 주 시작일 대신)
+     cls 는 반 이름 하나나 여러 개. 날이 여럿이면 「10/20~10/22 수업」, 수업 요일이 없으면 「10/12~10/18」, 그 주가 휴강이면 「… 휴강」 */
+  function lessonLabel(cls, weekStart) {
+    var list = [].concat(cls || []).map(function (c) { return String(c || '').trim(); }).filter(Boolean);
+    var ds = [], off = false;
+    list.forEach(function (c) {
+      var L = lessonOf(c, weekStart);
+      if (L && L.canceled) off = true;
+      else if (L && L.date && ds.indexOf(L.date) === -1) ds.push(L.date);
+    });
+    ds.sort();
+    if (ds.length === 1) return dateWithDow(ds[0]) + ' 수업';
+    if (ds.length > 1) return shortDate(ds[0]) + '~' + shortDate(ds[ds.length - 1]) + ' 수업';
+    var end = global.Lesson ? global.Lesson.addDays(weekStart, 6) : '';
+    return shortDate(weekStart) + (end ? '~' + shortDate(end) : '') + (off ? ' 휴강' : '');
+  }
+
   function classWeekOf(cls, weekStart) {
     return (read(KEYS.classWeeks, []) || []).find(function (w) { return w.class_name === cls && w.week_start === weekStart; }) || null;
   }
@@ -1592,6 +1609,7 @@
     reviewOf: reviewOf,
     reviewsOf: reviewsOf,
     lessonOf: lessonOf,
+    lessonLabel: lessonLabel,
     classWeekOf: classWeekOf,
     setSchedule: setSchedule,
     setClassWeek: setClassWeek,

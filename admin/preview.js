@@ -190,7 +190,7 @@
   function bandText(dr) {
     var who = cur.role === 'student' ? '학생' : '학부모';
     if (cur.mode === 'week' && dr) {
-      var day = dr.lessonDate ? Lesson.md(dr.lessonDate) + ' 수업' : Store.dateWithDow(dr.startDate) + ' 주';
+      var day = dr.lessonDate ? Lesson.md(dr.lessonDate) + ' 수업' : Store.lessonLabel((student() || {}).className, dr.startDate);
       return cur.published
         ? '미리보기 — 조교 화면 · ' + day + ' — 이미 공개한 주의 지금 입력 내용입니다 · 고친 내용은 다시 공개해야 ' + who + '에게 반영됩니다'
         : '미리보기 — 조교 화면 · ' + day + ' — 아직 공개 전입니다 · 공개하면 ' + who + '에게 이렇게 보입니다';
@@ -212,7 +212,7 @@
       '<div class="pv-bar">' +
         '<div class="pv-bar__title" id="pvTitle"></div>' +
         '<div class="pv-seg" role="group" aria-label="어느 주를 볼지">' +
-          '<button type="button" class="btn btn--sm" data-pvmode="week">이 주차</button>' +
+          '<button type="button" class="btn btn--sm" data-pvmode="week">이 수업 레포트</button>' +
           '<button type="button" class="btn btn--sm" data-pvmode="live">지금 학부모가 보는 화면</button>' +
         '</div>' +
         '<div class="pv-seg" role="group" aria-label="어느 링크로 볼지">' +

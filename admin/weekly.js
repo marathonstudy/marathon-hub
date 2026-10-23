@@ -227,7 +227,7 @@
     box.dataset.key = st.key;
     box.innerHTML =
       '<div class="wk-edit">' +
-        '<p class="panel__hint">' + esc(st.cls) + ' · ' + Lesson.md(st.week) + ' ~ ' + Lesson.md(end) + ' 주차만 바꿉니다. 다음 주부터는 원래 요일로 계산합니다.</p>' +
+        '<p class="panel__hint">' + esc(st.cls) + ' · ' + (L && L.date ? Lesson.md(L.date) + ' 수업' : Lesson.md(st.week, false) + '~' + Lesson.md(end, false)) + ' 한 번만 바꿉니다. 다음 수업부터는 원래 요일로 계산합니다.</p>' +
         '<label class="chk-inline"><input type="radio" name="wkOv" value="move"' + (!ov || !ov.canceled ? ' checked' : '') + '> 수업일을 다른 날로</label>' +
         '<input class="input wk-ovdate" type="date" id="wkOvDate" value="' + esc((ov && ov.lesson_date) || (L && L.date) || '') + '">' +
         '<label class="chk-inline"><input type="radio" name="wkOv" value="cancel"' + (ov && ov.canceled ? ' checked' : '') + '> 휴강</label>' +
@@ -250,7 +250,7 @@
     }
     Store.setClassWeek(st.cls, st.week, row).then(function () {
       $('#wkWeekEdit').hidden = true;
-      toast(reset ? '원래 요일로 되돌렸습니다' : '이 주 수업일을 바꿨습니다', 'good');
+      toast(reset ? '원래 요일로 되돌렸습니다' : '이번 수업일을 바꿨습니다', 'good');
     }).catch(function (e) { toast(e.message, 'bad'); });
   }
 
@@ -702,7 +702,7 @@
         var l = by[c], bytes = l.reduce(function (n, f) { return n + (f.bytes || 0); }, 0);
         return '<label class="wk-clean__row"><input type="checkbox" data-clean="' + esc(c) + '" checked> ' +
           '<b>' + esc(c) + '</b> <span class="num">' + l.length + '개 · ' + sizeText(bytes) + '</span>' +
-          '<span class="muted-note"> · ' + Lesson.md(l[0].week_start) + ' ~ ' + Lesson.md(l[l.length - 1].week_start) + ' 주차</span></label>';
+          '<span class="muted-note"> · ' + esc(Store.lessonLabel(c, l[0].week_start)) + ' ~ ' + esc(Store.lessonLabel(c, l[l.length - 1].week_start)) + '</span></label>';
       }).join('') + '</div>';
       $('#btnWkCleanGo').disabled = false;
     });

@@ -143,8 +143,8 @@
     var other = pending.week !== week();
     bar.hidden = false;
     bar.innerHTML = '<span class="dr__msg">💾 저장 안 된 내용이 있습니다 — ' + pending.n + '칸 · ' + fmtDT(pending.at) +
-      (other ? ' · ' + esc(Lesson.md(pending.week)) + ' 주차' : '') + '</span>' +
-      '<button class="btn btn--sm btn--primary" type="button" data-dr="restore">' + (other ? '그 주차 열고 복구' : '복구') + '</button>' +
+      (other ? ' · ' + esc(Store.lessonLabel(window.Writer && Writer.currentClass ? Writer.currentClass() : '', pending.week)) : '') + '</span>' +
+      '<button class="btn btn--sm btn--primary" type="button" data-dr="restore">' + (other ? '그 수업 열고 복구' : '복구') + '</button>' +
       '<button class="btn btn--sm btn--ghost" type="button" data-dr="discard">버리기</button>';
   }
 

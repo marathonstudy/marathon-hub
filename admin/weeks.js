@@ -101,9 +101,11 @@
     var rvText = !rv ? '복습 —' : rv.off ? '복습 없음' :
       '복습 ' + (rv.avg != null ? '평균 <b class="num">' + rv.avg + '</b>' : '평균 —') + ' · 제출 <span class="num">' + rv.submitted + '/' + total + '</span>';
     var miss = missingOf(w, L, d);
-    return '<div class="wkv-row' + (isNow ? ' is-now' : '') + (isNext ? ' is-next' : '') + '" role="button" tabindex="0" data-wo="' + esc(w.open_start) + '" aria-label="' + esc(Lesson.md(w.week_start, false)) + ' 주 작성 화면 열기">' +
+    /* 줄 이름 = 수업일 「10/22(목) 수업」 (주 시작일 대신 · 수업 요일이 없으면 「10/12~10/18」 · 20261030b) */
+    var nm = L && L.date && !L.canceled ? Lesson.md(L.date) + ' 수업' : Lesson.md(w.week_start, false) + '~' + Lesson.md(Lesson.addDays(w.week_start, 6), false);
+    return '<div class="wkv-row' + (isNow ? ' is-now' : '') + (isNext ? ' is-next' : '') + '" role="button" tabindex="0" data-wo="' + esc(w.open_start) + '" aria-label="' + esc(nm) + ' 작성 화면 열기">' +
       '<div class="wkv-wk">' +
-        '<div class="wkv-wk__name"><b>' + esc(Lesson.md(w.week_start, false)) + ' 주</b>' +
+        '<div class="wkv-wk__name"><b>' + esc(nm) + '</b>' +
           (isNow ? ' <span class="wkv-tag wkv-tag--now">이번 주</span>' : isNext ? ' <span class="wkv-tag">다음 주</span>' : '') + '</div>' +
         '<div class="wkv-wk__date">' + dateHtml(L) + '</div>' +
       '</div>' +
@@ -119,7 +121,7 @@
         (miss.length ? '<div class="wkv-miss">' + miss.map(function (m) { return '<span class="wkv-miss__i">' + esc(m) + '</span>'; }).join('') + '</div>' : '') +
       '</div>' +
       '<div class="wkv-act"><button class="btn btn--sm" type="button" data-wv="' + esc(w.pub_week || '') + '" data-sid="' + esc(w.pub_sid || '') + '"' +
-        (w.pub_sid ? ' title="이 주 레포트를 학부모 화면으로 미리보기"' : ' disabled title="공개된 레포트가 없습니다"') + '>보기</button></div>' +
+        (w.pub_sid ? ' title="이 수업 레포트를 학부모 화면으로 미리보기"' : ' disabled title="공개된 레포트가 없습니다"') + '>보기</button></div>' +
     '</div>';
   }
 
