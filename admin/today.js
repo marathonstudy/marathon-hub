@@ -276,7 +276,8 @@
     var w = appWeekOf(s, cy);
     if (w && w.hwDone / w.hwDays * 100 < dv.appLow) {
       out.push({ k: 'app', t: '앱 과제 ' + w.hwDone + '/' + w.hwDays + '일', sid: s.id,
-        detail: md(w.from) + '~' + md(w.to) + ' · 정시 ' + w.hwOnTime + '일 · 늦게 ' + (w.hwDone - w.hwOnTime) + '일 · 미제출 ' + (w.hwDays - w.hwDone) + '일' });
+        detail: md(w.from) + '~' + md(w.to) + ' · 정시 ' + w.hwOnTime + '일 · 늦게 ' + (w.hwDone - w.hwOnTime) + '일 · 미제출 ' + (w.hwDays - w.hwDone) + '일' +
+                (w.wkDays ? ' · 토·일 주중 복습' + (w.wkDone ? ' ✓' + w.wkDone + '일' : '') : '') });
     }
     if (dv.photoWatch) {
       var row = st.cycle ? cycleRow(s.class_name, s.id) : null;
@@ -503,7 +504,9 @@
     var D = lessonDate || (cy && cy.L) || '';
     var w = appWeekOf(s, cy, D);
     if (!w) return null;
+    /* 과제있던날 · 제출한날은 평일만 (토 · 일 주중 복습은 AppWeek.compute 가 뺀다 · 20261030d) */
     var out = { 기간: md(w.from) + '~' + md(w.to), 과제있던날: w.hwDays, 제출한날: w.hwDone, 정시제출: w.hwOnTime };
+    if (w.wkDone) out.주말주중복습제출 = w.wkDone;
     var a = app[s.id];
     if (a && a.data && window.AppWeek) {
       var pf = Lesson.addDays(D, -14), pt = Lesson.addDays(D, -8);

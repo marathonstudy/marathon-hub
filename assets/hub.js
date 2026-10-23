@@ -567,11 +567,18 @@
     ((b.data && b.data.calendar) || []).forEach(function (c) { if (c && String(c.date || '').slice(0, 7) === ym) byDay[c.date] = c; });
     var y = +ym.slice(0, 4), m = +ym.slice(5, 7);
     var first = new Date(Date.UTC(y, m - 1, 1)).getUTCDay(), last = new Date(Date.UTC(y, m, 0)).getUTCDate();
-    var cells = '';
+    var cells = '', subs = AppWeek.subDaysOf(b.data), t = todayISO();
     for (var i = 0; i < first; i++) cells += '<span class="cal-cell cal-cell--blank"></span>';
     for (var dd = 1; dd <= last; dd++) {
       var key = ym + '-' + String(dd).padStart(2, '0'), info = byDay[key];
       var inR = b.range && key >= b.range.from && key <= b.range.to;
+      if (AppWeek.isWeekend(key)) {
+        /* 토 · 일 = 늘 「주중 복습」(옅은 색 · 미제출로 치지 않음) · 앱에 제출한 기록이 있으면 ✓ (20261030d) */
+        var wkd = key <= t && ((info && (info.status === 'onTime' || info.status === 'late')) || !!subs[key]);
+        cells += '<span class="cal-cell cal-cell--wk' + (wkd ? ' cal-cell--wkdone' : '') + (inR ? ' cal-cell--range' : '') + '" title="' +
+                 esc(dd + '일 · 주중 복습' + (wkd ? ' · 제출함' : '')) + '"><b>' + dd + '</b><small>주중 복습' + (wkd ? ' ✓' : '') + '</small></span>';
+        continue;
+      }
       cells += '<span class="cal-cell' + (info ? ' cal-cell--' + info.status : '') + (inR ? ' cal-cell--range' : '') + '"' +
                (info ? ' title="' + esc(dd + '일 · ' + CAL_LABEL[info.status]) + '"' : '') + '>' + dd + '</span>';
     }
@@ -582,6 +589,7 @@
         '<div class="cal-grid">' + ['일', '월', '화', '수', '목', '금', '토'].map(function (w) { return '<span class="cal-dow">' + w + '</span>'; }).join('') + cells + '</div>' +
       '</div>' +
       '<div class="cal-legend"><span><i class="cal-key cal-cell--onTime"></i>정시 제출</span><span><i class="cal-key cal-cell--late"></i>늦게 제출</span><span><i class="cal-key cal-cell--none"></i>미제출</span>' +
+        '<span><i class="cal-key cal-cell--wk"></i>주중 복습(토 · 일)</span>' +
         (b.range ? '<span><i class="cal-key cal-cell--range"></i>이 레포트 기간</span>' : '') + '</div>';
   }
   /* opt: { title, sub, month('YYYY-MM'), pending(진행 중 기간), card(false 면 겉 카드 없이),
@@ -604,7 +612,8 @@
           (w.lecDays ? ring(pctOf(w.lecDone, w.lecDays), '강의 시청') : dashRing('강의 시청')) +
         '</div>' +
         '<p class="app-counts num">' + w.hwDone + '/' + w.hwDays + '일 제출 · 정시 ' + w.hwOnTime + '일 · 강의 ' + w.lecDone + '/' + w.lecDays + '일</p>';
-    var tt = opt.total;
+    /* 전체 누적은 날짜별 기록으로 직접 센다 (토 · 일 주중 복습은 빼고 · 20261030d) — 날짜별 기록이 없을 때만 앱 값 그대로 */
+    var tt = opt.total || ((data && data.calendar && data.calendar.length && AppWeek.cumulative) ? AppWeek.cumulative(data, todayISO(), todayISO()) : null);
     var total = tt
       ? '<p class="awb-total">전체 누적(시작일부터): 과제 ' + tt.hw + '% · 정시 ' + tt.onTime + '% · 강의 ' + (tt.lec == null ? '—' : tt.lec + '%') + '</p>'
       : '<p class="awb-total">전체 누적(시작일부터): 과제 ' + Math.round(Number(s.submissionRate) || 0) + '% · 정시 ' +
@@ -1711,20 +1720,27 @@
     return { from: first || t, to: t };
   }
 
-  /* 과제 날짜마다 — 앱 달력의 그날 상태 · 그날 차시(강의 영상) · 그 차시 과제 기록 */
+  /* 과제 날짜마다 — 앱 달력의 그날 상태 · 그날 차시(강의 영상) · 그 차시 과제 기록
+     토 · 일은 앱 기록이 없어도 늘 「주중 복습」 줄 (weekend · 제출 기록이 있으면 ✓ · 요약 칸에서는 세지 않는다 · 20261030d) */
   function appDays(d, from, to) {
     var t = todayISO(), lec = {}, byOrder = {}, days = {};
+    for (var wd = from, k = 0; wd <= to && wd <= t && k < 400; wd = plusDays(wd, 1), k++) {
+      if (AppWeek.isWeekend(wd)) days[wd] = { date: wd, status: 'wk', weekend: true, lecture: null, items: [] };
+    }
     (d.lectures || []).forEach(function (l) { if (l && l.order) lec[l.order] = l; });
     (d.calendar || []).forEach(function (c) {
       if (!c || !isDay(c.date) || c.date < from || c.date > to || c.date > t) return;
-      days[c.date] = { date: c.date, status: c.status, lecture: c.order ? lec[c.order] || null : null, items: [] };
+      var we = AppWeek.isWeekend(c.date);
+      days[c.date] = { date: c.date, status: we ? (c.status === 'onTime' || c.status === 'late' ? 'wkDone' : 'wk') : c.status, weekend: we,
+                       lecture: c.order ? lec[c.order] || null : null, items: [] };
       if (c.order) byOrder[c.order] = c.date;
     });
     (d.history || d.recent || []).forEach(function (h) {
       if (!h) return;
       var day = (h.order && byOrder[h.order]) || String(h.submittedAt || '').slice(0, 10);
       if (!isDay(day) || day < from || day > to) return;
-      if (!days[day]) days[day] = { date: day, status: h.late ? 'late' : 'onTime', lecture: h.order ? lec[h.order] || null : null, items: [] };
+      if (!days[day]) days[day] = { date: day, status: h.late ? 'late' : 'onTime', weekend: false, lecture: h.order ? lec[h.order] || null : null, items: [] };
+      if (days[day].weekend) days[day].status = 'wkDone';
       days[day].items.push(h);
     });
     return Object.keys(days).sort().reverse().map(function (k) { return days[k]; });
@@ -1741,11 +1757,13 @@
 
   /* 기간 요약 칸 — 과제 제출 · 정시 · 늦게 · 미제출 · 평균 정답률 · 강의 시청 */
   function apSumHtml(list) {
-    var n = list.length, on = 0, late = 0, none = 0, lecN = 0, lecDone = 0, items = [];
+    var all = list, on = 0, late = 0, none = 0, lecN = 0, lecDone = 0, items = [];
+    all.forEach(function (x) { items = items.concat(x.items); });
+    list = list.filter(function (x) { return !x.weekend; });      /* 토 · 일(주중 복습)은 제출 · 정시 · 강의 수에 넣지 않는다 */
+    var n = list.length;
     list.forEach(function (x) {
       if (x.status === 'onTime') on++; else if (x.status === 'late') late++; else none++;
       if (x.lecture && x.lecture.videosTotal > 0) { lecN++; if (x.lecture.videosDone >= x.lecture.videosTotal) lecDone++; }
-      items = items.concat(x.items);
     });
     if (!n) return '<p class="awb-wait">이 기간에는 앱 과제가 없었습니다</p>';
     var avg = rateAvg(items);
@@ -1769,14 +1787,18 @@
       categoriesHtml(cats) + '</div>';
   }
 
-  var AP_ST = { onTime: ['정시', 'app-tag'], late: ['늦게', 'app-tag app-tag--late'], none: ['미제출', 'app-tag app-tag--none'] };
+  var AP_ST = { onTime: ['정시', 'app-tag'], late: ['늦게', 'app-tag app-tag--late'], none: ['미제출', 'app-tag app-tag--none'],
+                wk: ['주중 복습', 'app-tag app-tag--wk'], wkDone: ['주중 복습 ✓', 'app-tag app-tag--wk app-tag--wkdone'] };
   /* 날짜별 과제 — 펼치면 그날 과제마다 제목 · 제출 시각 · 정답률, 그날 강의 영상 */
   function apDaysHtml(list) {
     if (!list.length) return '';
-    return '<div class="card ap-days"><h2 class="card-title">📅 날짜별 과제<span class="card-note">' + list.length + '일</span></h2>' +
+    var nWeek = list.filter(function (x) { return !x.weekend; }).length;
+    /* 처음 펼치는 줄 = 가장 최근 평일 과제 (없으면 맨 위) */
+    var openAt = Math.max(0, list.findIndex(function (x) { return !x.weekend || x.items.length; }));
+    return '<div class="card ap-days"><h2 class="card-title">📅 날짜별 과제<span class="card-note">' + (nWeek ? '과제 ' + nWeek + '일' : '') + '</span></h2>' +
       list.map(function (x, i) {
         var st = AP_ST[x.status] || AP_ST.none, avg = rateAvg(x.items), L = x.lecture;
-        return '<details class="ap-day"' + (i === 0 ? ' open' : '') + '><summary>' +
+        return '<details class="ap-day' + (x.weekend ? ' ap-day--wk' : '') + '"' + (i === openAt ? ' open' : '') + '><summary>' +
             '<span class="ap-day__d num">' + esc(Lesson.md(x.date)) + '</span>' +
             '<span class="' + st[1] + '">' + st[0] + '</span>' +
             (x.items.length ? '<span class="ap-muted">과제 ' + x.items.length + '개</span>' : '') +
@@ -1791,7 +1813,7 @@
                 (h.late ? '<span class="app-tag app-tag--late">지각</span>' : '<span class="app-tag">정시</span>') +
                 (h.correctRate == null ? '' : '<span class="app-recent__rate num">' + h.correctRate + '%</span>') +
               '</li>';
-            }).join('') + '</ul>' : '<p class="ap-muted">' + (x.status === 'none' ? '제출한 과제가 없습니다' : '과제 기록이 없습니다') + '</p>') +
+            }).join('') + '</ul>' : '<p class="ap-muted">' + (x.weekend ? '토 · 일은 주중 복습 날입니다 (제출 수에 넣지 않아요)' : x.status === 'none' ? '제출한 과제가 없습니다' : '과제 기록이 없습니다') + '</p>') +
           '</div></details>';
       }).join('') + '</div>';
   }

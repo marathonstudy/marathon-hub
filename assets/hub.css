@@ -356,7 +356,7 @@ button.nt-file {
 }
 .cal-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 5px;
 }
 .cal-dow {
@@ -391,6 +391,13 @@ button.nt-file {
 }
 .cal-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .cal-key { display: inline-block; width: 13px; height: 13px; border-radius: 4px; }
+/* 토 · 일 = 주중 복습 — 옅은 색으로 평일 과제 칸과 구분 · 제출 기록이 있으면 ✓ (20261030d) */
+.cal-cell--wk { display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; padding: 0 1px;
+  background: #F7F6FB; color: #B6B3C9; font-weight: 600; text-align: center; }
+.cal-cell--wk b { font-size: 11px; line-height: 1.1; font-weight: 600; }
+.cal-cell--wk small { font-size: 11px; line-height: 1; letter-spacing: -0.06em; word-break: keep-all; color: #A9A6BE; }
+.cal-cell--wkdone small { color: #7B6CC4; font-weight: 700; }
+.cal-key.cal-cell--wk { display: inline-block; padding: 0; box-shadow: inset 0 0 0 1px #E4E2EF; }
 
 .app-recent { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
 .app-recent__row {
@@ -836,6 +843,9 @@ label.hub-btn { cursor: pointer; text-align: center; }
 .aw-lec--done { color: #2F8F6E; font-weight: 900; } .aw-lec--todo { color: #B4B8CC; }
 .aw-cell[class*="--future"] { color: #C9CCDC; background: #FAFAFD; }
 .aw-cell[class*="--off"] { background: transparent; }
+.aw-cell.aw-wk { grid-row: span 2; align-self: stretch; height: auto; display: flex; align-items: center; justify-content: center; flex-direction: column;
+  font-size: 11px; line-height: 1.15; font-weight: 700; letter-spacing: -0.04em; color: #ADAAC2; background: #F9F8FC; box-shadow: inset 0 0 0 1px #EEEDF5; }
+.aw-cell.aw-wk b { color: #7B6CC4; font-weight: 900; }
 .aw-sum { padding-left: 6px; font-size: 12px; font-weight: 800; color: var(--ink-deep); white-space: nowrap; text-align: right; line-height: 1.25; }
 .aw-sum small { display: block; font-size: 10.5px; font-weight: 700; color: var(--ink-light); }
 .aw-legend { margin: 6px 0 0; font-size: 11px; line-height: 1.5; color: var(--ink-light); }
@@ -1026,3 +1036,8 @@ label.hub-btn { cursor: pointer; text-align: center; }
 .ap-table td.num { white-space: nowrap; }
 .ap-shape > summary { cursor: pointer; list-style: none; }
 .ap-shape ul { margin: 8px 0 0; padding-left: 18px; font-size: 12.5px; color: var(--ink-mid); word-break: break-all; }
+
+/* 과제 상세 날짜 목록 — 토 · 일 주중 복습 줄은 옅게 (20261030d) */
+.app-tag--wk { background: #F4F3F9; color: #9C99B3; }
+.app-tag--wkdone { color: #6E5FC0; }
+.ap-day--wk > summary { color: var(--ink-light); }
