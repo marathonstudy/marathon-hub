@@ -265,11 +265,15 @@
      반 이름 · 인원 / 최근 3번 수업 레포트 발송 칩 / 「수업일 10/29(목)」 · 「수업까지 D-3!」 / [문자] [이번 주 작성하기]
      수업일이 없으면 [수업일 미정 · 수업 요일 정하기] · 학생 목록은 접어 두고 「학생 11명 보기 ▾」 (펼친 반은 이 기기에 기억) */
   /* 최근 3번 수업 (오늘 포함 · 휴강 빼고) — 옛날 → 최근 */
+  /* 「오늘 수업 D-day!」 · 「수업까지 D-3!」 (20261031c) */
+  function ddayText(n) { return n === 0 ? '오늘 수업 D-day!' : '수업까지 D-' + n + '!'; }
+  /* 최근 수업 — 그 반이 사이트를 쓰기 시작한 날(수업 요일 정하기의 첫 수업일)부터만 (그 앞 수업이 「0%」 빨간 칩으로 보이지 않게 · 20261031c)
+     칩 · 「오늘 할 일」 · 탭 배지 · 과정 카드가 모두 이것으로 센다 */
   function recentLessons(cls, k) {
     var ds = lessonDates(cls);
     if (!ds) return [];
-    var today = DDay.today();
-    return ds.filter(function (d) { return d <= today; }).slice(-(k || 3));
+    var today = DDay.today(), s = Store.schedOf(cls), first = (s && s.first) || '';
+    return ds.filter(function (d) { return d <= today && (!first || d >= first); }).slice(-(k || 3));
   }
   function weekOfDate(d) { return Lesson.addDays(d, -((Lesson.dowOf(d) + 6) % 7)); }
   /* 칩 하나 — { date, week, n, sent, pct, kind: ok | part | none | wip } */
@@ -401,7 +405,7 @@
     var nx = c.next;
     if (!nx) return c.name === '(반 없음)' ? '' : '<button type="button" class="btn btn--sm tdc-sched" data-sched="' + esc(c.name) + '">수업일 미정 · 수업 요일 정하기</button>';
     return '<span class="tdc-when"><span class="tdc-when__d">수업일 ' + esc(Store.dateWithDow(nx.date)) + '</span>' +
-      '<b class="tdc-when__dd' + (nx.dday === 0 ? ' is-today' : '') + '">수업까지 D-' + (nx.dday === 0 ? 'day' : nx.dday) + '!</b></span>';
+      '<b class="tdc-when__dd' + (nx.dday === 0 ? ' is-today' : '') + '">' + ddayText(nx.dday) + '</b></span>';
   }
   function byName(x, y) { return (x.name || '').localeCompare(y.name || '', 'ko'); }
   function courseCardHtml(co, cls) {
