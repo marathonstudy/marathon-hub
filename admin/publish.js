@@ -27,21 +27,35 @@
     return Store.read(Store.KEYS.draft, null);
   }
 
-  /* 「작성 중 / 작성 완료」 구분 없이 반 학생 전원 (20261030a) — 비어 있는 칸은 레포트에서 숨는다 */
+  /* 지금 고른 반 (주간 레포트 → 작성의 반 고르기) — 공개 화면은 이 반 학생만 (20261030b) */
+  function curClass() { return (window.Writer && Writer.currentClass && Writer.currentClass()) || ''; }
+  function grpOf(s) { return (s.className || '').trim() || '(반 없음)'; }
+
+  /* 「작성 중 / 작성 완료」 구분 없이 반 학생 전원 (20261030a) — 비어 있는 칸은 레포트에서 숨는다
+     미리 체크는 지금 고른 반의 아직 공개 안 한 학생만 (다른 반은 맨 아래 「다른 반도 함께 공개」에서 직접 고른다) */
   function buildRows(d) {
+    var cur = curClass();
     return UI.activeStudents().map(function (s) {
       var common = (d.common || {})[s.className || ''] || { lessons: [], tests: [] };
       var pub = state.published[s.id] || null;
       return {
         student: s, common: common, entry: (d.entries || {})[s.id] || {},
         pub: pub, eligible: true,
-        /* 아직 공개 안 한 학생은 미리 체크해 둔다 */
-        checked: !pub
+        /* 아직 공개 안 한 학생은 미리 체크해 둔다 (지금 고른 반만) */
+        checked: !pub && (!cur || grpOf(s) === cur)
       };
     }).sort(function (a, b) {
       var c = (a.student.className || '').localeCompare(b.student.className || '', 'ko');
       return c !== 0 ? c : (a.student.name || '').localeCompare(b.student.name || '', 'ko');
     });
+  }
+
+  /* 「10/22(목) 수업」 — 주 시작일 대신 그 반 수업일 (반을 안 골랐거나 수업 요일이 없으면 「10/12~10/18」 · 20261030b) */
+  function whenText() {
+    var cls = curClass(), L = cls && Store.lessonOf ? Store.lessonOf(cls, state.week) : null;
+    if (L && L.date && !L.canceled) return Store.dateWithDow(L.date) + ' 수업 레포트';
+    if (L && L.canceled) return Store.shortDate(state.week) + '~' + Store.shortDate(state.weekEnd) + ' (휴강 주) 레포트';
+    return Store.shortDate(state.week) + '~' + Store.shortDate(state.weekEnd) + ' 레포트';
   }
 
   function fmtTime(iso) {
@@ -62,7 +76,7 @@
       return;
     }
 
-    $('#pubWeekHint').textContent = Store.dateWithDow(state.week) + ' ~ ' + Store.dateWithDow(state.weekEnd) + ' 주차';
+    $('#pubWeekHint').textContent = whenText() + (curClass() ? ' · ' + curClass() : '');
 
     if (!state.rows.length) {
       host.innerHTML = '<div class="empty-state">다니는 학생이 없습니다.</div>';
@@ -78,7 +92,16 @@
     });
 
     var frag = document.createDocumentFragment();
-    groups.forEach(function (g) {
+    var cur = curClass();
+    var mine = cur ? groups.filter(function (g) { return g.name === cur; }) : groups;
+    var others = cur ? groups.filter(function (g) { return g.name !== cur; }) : [];
+    if (cur && !mine.length) {
+      var em = document.createElement('div');
+      em.className = 'empty-state';
+      em.textContent = cur + ' 반에 다니는 학생이 없습니다.';
+      frag.appendChild(em);
+    }
+    function groupInto(target, g) {
       var head = document.createElement('div');
       head.className = 'pub-group';
       var eligible = g.rows.filter(function (r) { return r.eligible; });
@@ -91,17 +114,16 @@
       head.querySelector('.pub-group__name').textContent = g.name;
       head.querySelector('.pub-group__count').textContent =
         g.rows.filter(function (r) { return r.pub && r.pub.visible; }).length + ' / ' + g.rows.length + '명 공개';
-      frag.appendChild(head);
+      target.appendChild(head);
 
       g.rows.forEach(function (r) {
         var row = document.createElement('div');
         row.className = 'pub-row';
         row.dataset.id = r.student.id;
 
-        var tag = r.pub
-          ? (r.pub.visible
-              ? '<span class="pub-tag pub-tag--on">공개됨 ' + fmtTime(r.pub.publishedAt) + '</span>'
-              : '<span class="pub-tag pub-tag--hidden">숨김</span>')
+        /* 학생 줄 상태는 「공개 전 / 공개됨」 두 가지만 (숨긴 레포트는 공개 전으로 · 언제 공개했는지는 마우스를 올리면) */
+        var tag = r.pub && r.pub.visible
+          ? '<span class="pub-tag pub-tag--on" title="' + fmtTime(r.pub.publishedAt) + ' 공개">공개됨</span>'
           : '<span class="pub-tag">공개 전</span>';
 
         var noLink = !Store.linkOf(r.student.id).hubCode;
@@ -120,9 +142,20 @@
         row.querySelector('.pub-row__name').textContent = r.student.name;
         var gaps = Report.gapsOf(r.common, r.entry);
         if (gaps.length) row.title = '비어 있는 칸 — ' + gaps.join(', ') + ' (레포트에서 숨습니다)';
-        frag.appendChild(row);
+        target.appendChild(row);
       });
-    });
+    }
+    mine.forEach(function (g) { groupInto(frag, g); });
+    /* 여러 반을 한 번에 — 맨 아래 접힌 메뉴에서만 */
+    if (others.length) {
+      var box = document.createElement('details');
+      box.className = 'pub-others';
+      box.open = others.some(function (g) { return g.rows.some(function (r) { return r.checked; }); }) || !!state.othersOpen;
+      box.innerHTML = '<summary>다른 반도 함께 공개 <span class="muted-note">' + others.length + '개 반</span></summary>';
+      box.addEventListener('toggle', function () { state.othersOpen = box.open; });
+      others.forEach(function (g) { groupInto(box, g); });
+      frag.appendChild(box);
+    }
     host.appendChild(frag);
     refreshButton();
   }
@@ -205,8 +238,7 @@
     /* 정말 빠진 것만 한 줄 (막지는 않는다 · 개별 코멘트는 넣지 않는다) */
     var gap = Report.gapLine(picked.map(function (r) { return { name: r.student.name, common: r.common, entry: r.entry }; }));
     UI.confirmAsk('학부모에게 공개',
-      picked.length + '명의 ' + Store.shortDate(state.week) + '~' + Store.shortDate(state.weekEnd) +
-      ' 레포트를 공개합니다. 공개하면 바로 학생 개인 페이지에서 보입니다.' +
+      picked.length + '명의 ' + whenText() + '를 공개합니다. 공개하면 바로 학생 개인 페이지에서 보입니다.' +
       (gap ? '\n\n' + gap + ' — 비어 있는 칸은 레포트에서 숨습니다.' : ''), '공개').then(function (ok) {
       if (!ok) return;
       var btn = $('#btnPublish');
