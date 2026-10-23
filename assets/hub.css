@@ -377,6 +377,9 @@ button.nt-file {
 .cal-cell--onTime { background: var(--grad-strong); color: #fff; font-weight: 800; }
 .cal-cell--late   { background: #F6D9BF; color: #8A5A2E; font-weight: 800; }
 .cal-cell--none   { background: #fff; color: #B9707F; font-weight: 800; box-shadow: inset 0 0 0 2px #EBC6CF; }
+/* 레포트 「지난 일주일」(D-7 ~ D-1) — 달력은 그대로 두고 그 7일만 테두리로 강조 (20261029h) */
+.cal-cell--range { outline: 2px solid #7858E8; outline-offset: -1px; }
+.cal-cell--range:not(.cal-cell--onTime):not(.cal-cell--late):not(.cal-cell--none) { color: var(--ink-mid); }
 .cal-legend {
   display: flex;
   flex-wrap: wrap;
@@ -637,6 +640,8 @@ button.nt-file {
 .rv-done__wrong { font-size: 13px; color: var(--ink-mid); }
 .rv-badge { display: inline-block; font-size: 11.5px; font-weight: 800; color: #9A5B12; background: #FCEBD3; border-radius: 999px; padding: 2px 8px; }
 .rv-badge--ok { color: #2F7D63; background: #DDF1E8; }
+.rv-badge--abs { color: #5D6278; background: #ECEDF2; }   /* 미응시 · 결석 (migration-028) */
+.rv-done--abs .rv-done__mark { background: #ECEDF2; color: #5D6278; }
 .rv-hist__sum { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 14px; color: var(--ink-mid); margin-bottom: 6px; }
 .rv-hist__sum b { color: var(--ink-deep); }
 .rv-graph-wrap { position: relative; }
@@ -774,6 +779,7 @@ label.hub-btn { cursor: pointer; text-align: center; }
 .tw-yet { font-size: 13px; font-weight: 700; color: var(--muted); }
 .tw-att--attend { color: #3F8CB8; } .tw-att--late { color: #C07A3E; } .tw-att--absent { color: #A05C6C; }
 .tw-ok { color: #2F8F6E; }
+.tw-abs { color: #6B7086; font-weight: 800; }   /* 미응시 · 결석 (migration-028) */
 .tw-up { color: #2F8F6E; font-size: 13px; } .tw-down { color: #C4566F; font-size: 13px; } .tw-same { color: var(--ink-light); font-size: 13px; }
 .tw-stars { letter-spacing: 1px; font-size: 15px; }
 .tw-star { color: var(--track); } .tw-star.is-on { color: #F4B63F; }

@@ -2639,3 +2639,15 @@ body:not(.report-step-write) #classPanel { display: none; }
 .aip-check ul { margin: 4px 0 0 18px; padding: 0; }
 .aip-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 @media (max-width: 720px) { .aip-cols { grid-template-columns: 1fr; } }
+
+/* 복습테스트 미응시 (review.js · migration-028 · 20261029h) — 회색 「미응시 · 결석」 · 사유 고르기 */
+.rv-cell.is-absent { background: #F4F4F7; }
+.rv-absent { border: 1px solid #D5D7E2; background: #ECEDF2; color: #5D6278; font: inherit; font-size: 13px; font-weight: 800; padding: 2px 10px; border-radius: 999px; cursor: pointer; }
+.rv-absent:hover { background: #E2E4EC; }
+.rv-absent__memo { margin-top: 2px; color: var(--ink-mid); }
+.rv-allabs { margin-left: 6px; font-size: 11.5px; padding: 2px 8px; }
+.rv-reasons { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.rv-reason.is-on { background: #5D6278; border-color: #5D6278; color: #fff; }
+.rv-memo { max-width: 360px; }
+.rv-live__t.is-absent { background: #ECEDF2; color: #5D6278; }
+.rv-live__cell.is-absent { background: #F4F4F7; }

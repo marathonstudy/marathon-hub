@@ -5,6 +5,7 @@
      · 수업일 당일: 맨 위 카드 — 시험마다 전체 문항 수 · 틀린 개수 → 시험지 사진(필수 · 여러 장) → 제출 (migration-025)
        마감 = 수업일 밤 12시. 마감 전 · 선생님 확인 전에는 고칠 수 있다.
      · 제출한 뒤: 「학생 입력 · 확인 전」 → 선생님이 확인하면 「선생님 확인 ✓」
+     · 선생님이 미응시로 둔 시험은 입력 칸 없이 「미응시 · 결석」만 (사유 이름만 · migration-028 · 20261029h)
      · 내 레포트 탭 위: 확인된 점수만 그래프로, 최근 기록은 확인 전도 「확인 전」 표시와 함께
    서버: Edge Function(review-test) — 링크 코드 · 오늘 날짜 · 마감을 서버가 확인한다.
    ============================================================ */
@@ -69,6 +70,14 @@
 
   function tests() { return (st.data && st.data.tests) || []; }
   function locked(t) { return !!(t.submission && t.submission.status === 'confirmed'); }
+  /* 선생님이 미응시로 둔 시험 (아직 안 낸 것만) — 입력하라고 띄우지 않는다 */
+  function absent(t) { return !t.submission && !!t.absent; }
+  function absentBadge(t) {
+    var r = (t.absent && t.absent.label) || '';
+    return '<span class="rv-badge rv-badge--abs">' + esc(r ? '미응시 · ' + r : '미응시') + '</span>';
+  }
+  /* 아직 낼 시험 (안 냈고 미응시도 아닌 것) — hub.js 가 [복습테스트 입력하기]를 띄울지 본다 */
+  function pendingOf(d) { return ((d && d.tests) || []).filter(function (t) { return !t.submission && !t.absent; }); }
 
   function refresh() {
     return status(st.code).then(function (d) {
@@ -125,7 +134,7 @@
   function plan() {
     var items = [], bad = '';
     tests().forEach(function (t) {
-      if (locked(t)) return;
+      if (locked(t) || absent(t)) return;
       var c = check(t);
       if (c.empty) return;
       if (!c.ok) { bad = bad || (t.test_name + ' — ' + c.msg); return; }
@@ -153,14 +162,20 @@
     if (!st.data || !list.length) { host.innerHTML = ''; return; }
     var day = md(list[0].lesson_date);
     var head = '<h2 class="card-title">📝 오늘 복습테스트 기록하기<span class="card-note">' + esc(day) + ' · ' + list.length + '개</span></h2>';
-    var allDone = list.every(function (t) { return t.submission; });
+    var allDone = list.every(function (t) { return t.submission || absent(t); });
 
     if (allDone && !st.editing) {
-      var canEdit = list.some(function (t) { return !locked(t); });
+      var canEdit = list.some(function (t) { return t.submission && !locked(t); });
       host.innerHTML =
         '<div class="card rv-card rv-card--done">' + head +
           list.map(function (t) {
             var s = t.submission;
+            if (!s) {
+              return '<div class="rv-done rv-done--abs">' +
+                '<div class="rv-done__mark" aria-hidden="true">–</div>' +
+                '<div><div class="rv-done__title">' + esc(t.label) + ' ' + absentBadge(t) + '</div></div>' +
+              '</div>';
+            }
             return '<div class="rv-done">' +
               '<div class="rv-done__mark" aria-hidden="true">✓</div>' +
               '<div><div class="rv-done__title">' + esc(t.label) + ' ' + badge(s) + '</div>' +
@@ -180,6 +195,9 @@
     var photoOk = hasPhotos();
     var rows = list.map(function (t) {
       var s = t.submission;
+      if (absent(t)) {
+        return '<div class="rv-test is-locked is-absent"><div class="rv-test__name">' + esc(t.label) + ' ' + absentBadge(t) + '</div></div>';
+      }
       if (locked(t)) {
         return '<div class="rv-test is-locked"><div class="rv-test__name">' + esc(t.label) + ' ' + badge(s) + '</div>' +
           '<div class="rv-test__score num">' + esc(scoreText(s.correct, s.q_count, s.score)) + '</div></div>';
@@ -408,6 +426,6 @@
     if (wrap) wrap.onmouseleave = function () { if (tip) tip.hidden = true; };
   }
 
-  global.ReviewCard = { mount: mount, bind: bind, refresh: refresh, history: history, scoreText: scoreText, labelOf: labelOf };
+  global.ReviewCard = { mount: mount, bind: bind, refresh: refresh, history: history, scoreText: scoreText, labelOf: labelOf, pendingOf: pendingOf };
 
 })(window);

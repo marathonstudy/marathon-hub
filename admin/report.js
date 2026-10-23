@@ -22,13 +22,15 @@
     entry = entry || {};
     /* 복습테스트 (migration-013 · 025 · 027) — 시험마다 「10/22(목) 복습 TEST」처럼 날짜 이름으로.
        선생님이 확인한 것만 점수, 학생이 냈지만 아직 확인 전이면 「제출 완료」만 (학부모 화면에 확인 전 점수는 안 나간다).
-       예전 수기 「리뷰테스트」 점수(common.tests · entry.scores)는 지우지 않고 레포트에서만 뺀다 (20261029g) */
+       예전 수기 「리뷰테스트」 점수(common.tests · entry.scores)는 지우지 않고 레포트에서만 뺀다 (20261029g)
+       미응시면 「미응시 · 결석」 사유 이름만 (메모는 넣지 않는다 · migration-028 · 20261029h) */
     var tests = [];
     var rvs = global.Store && global.Store.reviewsOf ? global.Store.reviewsOf(student.id, week.start) : [];
     rvs.forEach(function (rv) {
       var rvName = rv.label || ('복습테스트 ' + rv.round_no + '회');
       if (tests.some(function (t) { return t.name === rvName; })) return;
-      if (rv.status && rv.status !== 'confirmed') tests.push({ name: rvName, kind: 'review', submitted: true });
+      if (rv.status === 'absent') tests.push({ name: rvName, kind: 'review', absent: String(rv.reason_label || '').trim() || '미응시' });
+      else if (rv.status && rv.status !== 'confirmed') tests.push({ name: rvName, kind: 'review', submitted: true });
       else tests.push({ name: rvName, score: clampPct(rv.score), correct: rv.correct, total: rv.q_count, kind: 'review', confirmed: true });
     });
 

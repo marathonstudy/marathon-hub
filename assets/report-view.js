@@ -10,7 +10,7 @@
      school · grade · studentName · startDate · endDate
      attendance {status: attend|late|absent (예전 makeup 은 출석으로 보임), note}
      lessons ["1차시 내용", …]  focusScore 0~5
-     tests [{name, score}] — 복습테스트(kind: review)만 보인다. 확인 전이면 {submitted: true} → 「제출 완료」
+     tests [{name, score}] — 복습테스트(kind: review)만 보인다. 확인 전이면 {submitted: true} → 「제출 완료」 · 미응시면 {absent: 사유 이름} → 「미응시 · 결석」
      (예전 레포트의 수기 리뷰테스트 점수 · homework · requiredRate 는 남아 있어도 그리지 않는다 · 20261029g)
      comment
      lessonDate · lessonDays[] · hwFrom · hwTo  (반 수업 요일을 정한 뒤 공개한 레포트만 · migration-011)
@@ -203,11 +203,19 @@
   }
 
   /* 복습테스트 — 학생 QR 기록만 (수기 리뷰테스트 점수는 그리지 않는다 · 20261029g).
-     선생님이 확인한 시험은 점수, 아직 확인 전이면 「제출 완료」만 */
+     선생님이 확인한 시험은 점수, 아직 확인 전이면 「제출 완료」만, 미응시면 「미응시 · 결석」(사유 이름만 · 20261029h) */
   function testsHtml(d) {
     var list = (d.tests || []).filter(function (t) { return t && t.kind === 'review' && String(t.name || '').trim(); });
     if (!list.length) return '';
     var body = list.map(function (t) {
+      if (t.absent) {
+        return '<div class="test-item test-item--abs">' +
+                 '<div class="test-header">' +
+                   '<span class="test-name">' + esc(t.name) + '</span>' +
+                   '<span class="test-badge test-badge--abs">' + esc(absentText(t.absent)) + '</span>' +
+                 '</div>' +
+               '</div>';
+      }
       if (t.submitted) {
         return '<div class="test-item test-item--sub">' +
                  '<div class="test-header">' +
@@ -226,6 +234,12 @@
              '</div>';
     }).join('');
     return card('📝 복습테스트', body);
+  }
+
+  /* 「미응시 · 결석」 — 사유 이름이 없으면 「미응시」 */
+  function absentText(reason) {
+    var r = String(reason === true ? '' : reason || '').trim();
+    return r && r !== '미응시' ? '미응시 · ' + r : '미응시';
   }
 
   /* ---------- 종합 코멘트 ---------- */
@@ -291,6 +305,7 @@
     render: render,
     esc: esc,
     mdHtml: mdHtml,
+    absentText: absentText,
     shortPeriod: shortPeriod,
     shortDate: shortDate,
     dowDate: dowDate,

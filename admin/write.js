@@ -1555,7 +1555,8 @@
     if (L && L.lessonDate) f.수업일 = Lesson.md(L.lessonDate);
     var ls = lessonsOfClass();
     if (ls.length) f.수업내용 = ls;
-    var app = window.Today && Today.classApp ? Today.classApp(cls) : null;
+    /* 앱 과제 — 이 레포트 수업일 D 기준 D-7 ~ D-1 (러닝노트 레포트와 같은 기간 · 20261029h) */
+    var app = window.Today && Today.classApp ? Today.classApp(cls, (L && L.lessonDate) || '') : null;
     if (app) f.앱과제 = app;
     var rv = window.Review && Review.classFacts ? Review.classFacts(cls, draft.weekStart) : null;
     if (rv && rv.length) f.복습테스트 = rv;
@@ -1572,7 +1573,8 @@
     var f = {};
     f.출결 = (ATT_LABEL[e.attendStatus] || '기록 없음') + (e.attendStatus === 'late' && String(e.attendNote || '').trim() ? ' (' + String(e.attendNote).trim() + ')' : '');
     if (e.attendStatus !== 'absent') f.집중도 = (Number(e.focusScore) || 0) + '/5';
-    var t = window.Today && Today.studentFacts ? Today.studentFacts(id) : null;
+    var L = window.Lesson && Store.lessonOf ? Lesson.reportFields(Store.lessonOf(currentClass, draft.weekStart)) : {};
+    var t = window.Today && Today.studentFacts ? Today.studentFacts(id, (L && L.lessonDate) || '') : null;
     if (t) Object.keys(t).forEach(function (k) { f[k] = t[k]; });
     var rv = window.Review && Review.studentFacts ? Review.studentFacts(currentClass, draft.weekStart, id) : null;
     if (rv && rv.length) f.복습테스트 = rv;
@@ -1624,6 +1626,20 @@
     refresh: function () { if (!$('#panel-write').hidden) refreshAll(); },
     commonOf: function (cls) { return commonOf(cls); },
     entryOf: function (id) { return entryOf(id); },
+    /* 복습테스트 「미응시 · 결석」 (review.js · 20261029h) — 지금 쓰는 주가 그 주일 때만 출결 ('' = 비어 있음, null = 다른 주) */
+    attendOf: function (id, week) {
+      if (!draft || !week || !window.Lesson) return null;
+      var mon = function (d) { return Lesson.addDays(d, -((Lesson.dowOf(d) + 6) % 7)); };
+      if (mon(String(draft.weekStart).slice(0, 10)) !== mon(String(week).slice(0, 10))) return null;
+      return entryOf(id).attendStatus || '';
+    },
+    setAbsent: function (id) {
+      var e = entryOf(id);
+      e.attendStatus = 'absent'; e.attendNote = ''; e.focusScore = 0;
+      rePub.edited[rePubKey()] = true; showRePub();
+      saveDraft(); flushDraft();
+      replaceCard(id); updateCounts(); renderClassPicker();
+    },
     save: function () { saveDraft(); return flushDraft(); },
     renderCommon: function () { renderCommon(); renderEntries(); },
     replaceCard: function (id) { replaceCard(id); },

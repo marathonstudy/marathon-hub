@@ -2,7 +2,9 @@
    app-week.js — 앱 과제 · 강의를 레포트 주차의 과제 기간만 잘라 보여 준다
    (러닝노트 「이번 주」 카드 · 각 주차 레포트 · 앱 과제 탭 · 누적 추이 · 코치룸 미리보기가 같이 쓴다)
 
-   과제 기간 = 지난 수업일 ~ 이번 수업일 전날 (assets/lesson.js 계산 그대로 — 레포트에는 hwFrom · hwTo 로 저장돼 있다)
+   레포트(수업일 D)의 앱 과제 = 그 수업 전 일주일 D-7 ~ D-1 (lastWeek · forLesson — 열어 보는 날과 상관없이 · 20261029h)
+     예: 10/22(목) 수업 레포트 → 10/15(목) ~ 10/21(수). 전체 누적도 시작일 ~ D-1. 앱 기록이 D-1 뒤에 시작했으면 first(「첫 주라 지난 기록이 없습니다」)
+     러닝노트 · 코치룸(「오늘」 · AI 초안)이 모두 이 함수를 쓴다. 지금 진행 중인 주(D ~ 다음 수업 전날)는 러닝노트 「앱 과제」 탭에서만
    app-report 함수가 넘기는 것만 쓴다:
      calendar [{ date, order(강 번호), status: onTime | late | none }]
      lectures [{ order, videosDone, videosTotal }]
@@ -67,6 +69,49 @@
              any: hwDays > 0 || lecDays > 0 };
   }
 
+  /* 그 수업 전 일주일 — 수업일 D → { from: D-7, to: D-1, lesson: D } */
+  function lastWeek(lessonDate) {
+    var d = String(lessonDate || '').slice(0, 10);
+    if (!valid(d)) return null;
+    return { from: addDays(d, -7), to: addDays(d, -1), lesson: d };
+  }
+
+  /* 앱 기록의 첫 날 (날짜별 기록 중 가장 이른 날) — 없으면 '' */
+  function startOf(data) {
+    var first = '';
+    ((data && data.calendar) || []).forEach(function (c) { if (c && valid(c.date) && (!first || c.date < first)) first = c.date; });
+    return first;
+  }
+
+  /* 전체 누적 — 시작일 ~ to (과제 제출 · 정시 · 강의 시청 %, 강의가 있던 날이 없으면 lec = null) */
+  function cumulative(data, to, today) {
+    if (!data || !valid(to)) return null;
+    var lec = {};
+    (data.lectures || []).forEach(function (l) { if (l && l.order) lec[l.order] = l; });
+    var days = 0, done = 0, onTime = 0, lDays = 0, lDone = 0;
+    (data.calendar || []).forEach(function (c) {
+      if (!c || !valid(c.date) || c.date > to || (today && c.date > today)) return;
+      days++;
+      if (c.status === 'onTime' || c.status === 'late') done++;
+      if (c.status === 'onTime') onTime++;
+      var L = c.order ? lec[c.order] : null;
+      if (L) { lDays++; if (L.videosTotal > 0 && L.videosDone >= L.videosTotal) lDone++; }
+    });
+    var pct = function (a, b) { return b ? Math.round(a / b * 100) : 0; };
+    return { hw: pct(done, days), onTime: pct(onTime, days), lec: lDays ? pct(lDone, lDays) : null, days: days };
+  }
+
+  /* 레포트 한 편의 앱 과제 — 수업일 D 기준 D-7 ~ D-1 표(w) · 전체 누적(total, 시작일 ~ D-1) · 첫 주(first) */
+  function forLesson(data, lessonDate, today) {
+    var p = lastWeek(lessonDate);
+    if (!p || !data) return null;
+    var start = startOf(data);
+    p.first = !start || start > p.to;
+    p.w = p.first ? null : compute(data, p.from, p.to, today);
+    p.total = p.first ? null : cumulative(data, p.to, today);
+    return p;
+  }
+
   /* 누적 추이용 — 제출한 날 / 과제가 있던 날 (%) */
   function hwRate(w) { return w && w.hwDays ? Math.round(w.hwDone / w.hwDays * 100) : null; }
 
@@ -105,6 +150,7 @@
     '</div>';
   }
 
-  global.AppWeek = { compute: compute, tableHtml: tableHtml, hwRate: hwRate, LEGEND: LEGEND };
+  global.AppWeek = { compute: compute, tableHtml: tableHtml, hwRate: hwRate, LEGEND: LEGEND,
+                     lastWeek: lastWeek, startOf: startOf, cumulative: cumulative, forLesson: forLesson };
 
 })(window);

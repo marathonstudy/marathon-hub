@@ -716,3 +716,6 @@ body {
 .test-badge--ok { background: #DDF1E8; color: #2F7D63; }
 .test-badge--sub { background: #EAE6FB; color: #5B42D6; margin-left: auto; }
 .test-item--sub .test-header { align-items: center; }
+/* 미응시 — 회색 「미응시 · 결석」 (사유 이름만 · migration-028) */
+.test-badge--abs { background: #ECEDF2; color: #5D6278; margin-left: auto; }
+.test-item--abs .test-header { align-items: center; }

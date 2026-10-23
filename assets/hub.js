@@ -565,6 +565,7 @@
        큰 동그라미 3개 = 그 기간(주간) 기준 — 아래 표(app-week.js)와 같은 날짜 계산
          과제 제출 = 제출일 / 과제 있던 날 · 정시 제출 = 정시 제출일 / 과제 있던 날 · 강의 시청 = ✓ 날 / 강의 있던 날
        아래 작은 줄 = 앱이 주는 전체 누적 그대로 · 「날짜별 제출」 달력은 한 달씩 (◀ ▶ 는 앱 기록이 있는 달 사이만)
+       레포트(수업일 D)에서는 모두 「지난 일주일」 D-7 ~ D-1 — 전체 누적도 시작일 ~ D-1, 달력은 그 7일만 강조 (reportAppHtml · 20261029h)
      ============================================================ */
   var AWB = { n: 0, list: {} };
   function pctOf(a, b) { return b ? Math.round(a / b * 100) : 0; }
@@ -589,7 +590,8 @@
     for (var i = 0; i < first; i++) cells += '<span class="cal-cell cal-cell--blank"></span>';
     for (var dd = 1; dd <= last; dd++) {
       var key = ym + '-' + String(dd).padStart(2, '0'), info = byDay[key];
-      cells += '<span class="cal-cell' + (info ? ' cal-cell--' + info.status : '') + '"' +
+      var inR = b.range && key >= b.range.from && key <= b.range.to;
+      cells += '<span class="cal-cell' + (info ? ' cal-cell--' + info.status : '') + (inR ? ' cal-cell--range' : '') + '"' +
                (info ? ' title="' + esc(dd + '일 · ' + CAL_LABEL[info.status]) + '"' : '') + '>' + dd + '</span>';
     }
     return '<div class="cal">' +
@@ -598,24 +600,34 @@
           '<button type="button" class="cal-step" data-awb="' + id + '" data-cal-step="1" aria-label="다음 달"' + (b.i < b.months.length - 1 ? '' : ' disabled') + '>▶</button></div>' +
         '<div class="cal-grid">' + ['일', '월', '화', '수', '목', '금', '토'].map(function (w) { return '<span class="cal-dow">' + w + '</span>'; }).join('') + cells + '</div>' +
       '</div>' +
-      '<div class="cal-legend"><span><i class="cal-key cal-cell--onTime"></i>정시 제출</span><span><i class="cal-key cal-cell--late"></i>늦게 제출</span><span><i class="cal-key cal-cell--none"></i>미제출</span></div>';
+      '<div class="cal-legend"><span><i class="cal-key cal-cell--onTime"></i>정시 제출</span><span><i class="cal-key cal-cell--late"></i>늦게 제출</span><span><i class="cal-key cal-cell--none"></i>미제출</span>' +
+        (b.range ? '<span><i class="cal-key cal-cell--range"></i>이 레포트 기간</span>' : '') + '</div>';
   }
-  /* opt: { title, sub, month('YYYY-MM'), pending(진행 중 기간), card(false 면 겉 카드 없이) } */
+  /* opt: { title, sub, month('YYYY-MM'), pending(진행 중 기간), card(false 면 겉 카드 없이),
+           total(전체 누적을 앱 값 대신 · AppWeek.cumulative), range({from,to} 달력에서 강조), first(첫 주 — 지난 기록 없음) } */
   function appBlockHtml(data, w, opt) {
     opt = opt || {};
     var id = 'awb' + (++AWB.n);
     var months = calMonths(data, opt.month || '');
-    AWB.list[id] = { data: data, months: months, i: Math.max(0, months.indexOf(opt.month || '')) };
+    AWB.list[id] = { data: data, months: months, i: Math.max(0, months.indexOf(opt.month || '')), range: opt.range || null };
     var s = (data && data.stats) || {};
+    if (opt.first) {
+      var fin = '<h2 class="card-title">📱 ' + esc(opt.title || '앱 과제 요약') + '</h2>' +
+        (opt.sub ? '<p class="awb-sub">' + opt.sub + '</p>' : '') + '<p class="awb-wait">첫 주라 지난 기록이 없습니다</p>';
+      return opt.card === false ? '<div class="awb" id="' + id + '">' + fin + '</div>' : '<div class="card awb aw-card" id="' + id + '">' + fin + '</div>';
+    }
     var body = !w || !w.hwDays
-      ? '<p class="awb-wait">아직 과제 시작 전</p>'
+      ? '<p class="awb-wait">' + (opt.range ? '이 기간에는 과제가 없었습니다' : '아직 과제 시작 전') + '</p>'
       : '<div class="rate-grid rate-grid--three">' +
           ring(pctOf(w.hwDone, w.hwDays), '과제 제출') + ring(pctOf(w.hwOnTime, w.hwDays), '정시 제출') +
           (w.lecDays ? ring(pctOf(w.lecDone, w.lecDays), '강의 시청') : dashRing('강의 시청')) +
         '</div>' +
         '<p class="app-counts num">' + w.hwDone + '/' + w.hwDays + '일 제출 · 정시 ' + w.hwOnTime + '일 · 강의 ' + w.lecDone + '/' + w.lecDays + '일</p>';
-    var total = '<p class="awb-total">전체 누적(시작일부터): 과제 ' + Math.round(Number(s.submissionRate) || 0) + '% · 정시 ' +
-      Math.round(Number(s.onTimeRate) || 0) + '% · 강의 ' + Math.round(Number(s.lectureRate) || 0) + '%</p>';
+    var tt = opt.total;
+    var total = tt
+      ? '<p class="awb-total">전체 누적(시작일부터): 과제 ' + tt.hw + '% · 정시 ' + tt.onTime + '% · 강의 ' + (tt.lec == null ? '—' : tt.lec + '%') + '</p>'
+      : '<p class="awb-total">전체 누적(시작일부터): 과제 ' + Math.round(Number(s.submissionRate) || 0) + '% · 정시 ' +
+        Math.round(Number(s.onTimeRate) || 0) + '% · 강의 ' + Math.round(Number(s.lectureRate) || 0) + '%</p>';
     var inner = '<h2 class="card-title">📱 ' + esc(opt.title || '앱 과제 요약') + '</h2>' +
       (opt.sub ? '<p class="awb-sub">' + opt.sub + '</p>' : '') +
       body + total +
@@ -624,6 +636,14 @@
     return opt.card === false ? '<div class="awb" id="' + id + '">' + inner + '</div>' : '<div class="card awb aw-card" id="' + id + '">' + inner + '</div>';
   }
   function periodTitle(label, from, to) { return '앱 과제 요약 · ' + label + ' (' + Lesson.md(from, false) + '~' + Lesson.md(to, false) + ')'; }
+  /* 레포트(수업일 D)의 앱 과제 요약 — 「앱 과제 요약 · 지난 일주일 (10/15~10/21)」 · 「10/22 수업 전까지 한 것」 (20261029h)
+     원형 3개 · n/n일 제출 · 날짜 칸(7칸) · 전체 누적(시작일 ~ D-1)이 모두 같은 기간. 앱 기록이 그 뒤에 시작했으면 「첫 주라 지난 기록이 없습니다」 */
+  function reportAppHtml(data, lessonDate, card) {
+    var p = data && global.AppWeek ? AppWeek.forLesson(data, lessonDate, todayISO()) : null;
+    if (!p || (!p.first && !(p.w && p.w.any))) return '';      /* 그 일주일에 과제 · 강의가 하나도 없던 주는 그리지 않는다 (예전 그대로) */
+    return appBlockHtml(data, p.w, { title: periodTitle('지난 일주일', p.from, p.to), sub: esc(Lesson.md(p.lesson, false)) + ' 수업 전까지 한 것',
+                                     month: p.to.slice(0, 7), total: p.total, range: { from: p.from, to: p.to }, first: p.first, card: card });
+  }
   function animateRings(root) {
     requestAnimationFrame(function () {
       requestAnimationFrame(function () {
@@ -655,9 +675,11 @@
   function appAdjust(weeks, data) {
     if (!data || !global.AppWeek) return weeks;
     return weeks.map(function (w) {
+      /* 그 레포트 수업 전 일주일 (D-7 ~ D-1 · 레포트 앱 과제 요약과 같은 기간 · 20261029h) */
       var L = lessonOf(w.week_start);
-      if (!L || !L.hwFrom || !L.hwTo) return w;
-      var r = AppWeek.hwRate(AppWeek.compute(data, L.hwFrom, L.hwTo, todayISO()));
+      var p = AppWeek.lastWeek(/^\d{4}-\d{2}-\d{2}/.test(w.lesson_date || '') ? w.lesson_date : (L && !L.canceled ? L.date : ''));
+      if (!p) return w;
+      var r = AppWeek.hwRate(AppWeek.compute(data, p.from, p.to, todayISO()));
       var x = {}; Object.keys(w).forEach(function (k) { x[k] = w[k]; });
       x.hw = r;
       return x;
@@ -667,9 +689,9 @@
   /* ============================================================
      「이번 주」 — 링크를 열면 처음 보이는 화면 (#코드 · 예전 #코드/notice 도 여기로)
        기준 = 이 학생에게 가장 최근에 공개된 레포트의 주 (달력 주가 아니다). 다음 레포트를 공개하면 그때 넘어간다.
-       카드 제목 「10/15(목) 수업 레포트」, 카드 안 앱 표 = 그 레포트의 과제 기간(「과제 기간 10/8~10/14」).
-       카드 아래 「다음 수업(10/22 목)까지 진행 중」 — 그 레포트 수업일 ~ 다음 수업일 전날 (오지 않은 날은 흐리게).
-       공개된 레포트가 없으면 카드 자리에 「첫 레포트는 첫 수업 날 올라옵니다」 (진행 중 줄은 오늘 기준 다음 수업까지).
+       카드 제목 「10/15(목) 수업 레포트」, 카드 아래 「앱 과제 요약 · 지난 일주일 (10/8~10/14)」 — 그 레포트 수업일 D 기준 D-7 ~ D-1 (20261029h).
+       지금 진행 중인 주(D ~ 다음 수업 전날)는 「앱 과제」 탭에서만 보여 준다.
+       공개된 레포트가 없으면 카드 자리에 「첫 레포트는 첫 수업 날 올라옵니다」.
        [복습테스트 입력하기](학생 링크 · 제출 기간) → 이번 주 카드 → 오늘 배운 것 → 이번 주 과제 · 자료
        → 수업 영상 → 누적 추이 한 줄 → 선생님 공지(작게)
        공개된 레포트 · 선생님이 확인한 복습 점수 · 확정된 요약 · 앱 기록만. 상담 · 성적 · 금액 · 다른 학생 정보는 넣지 않는다.
@@ -714,22 +736,21 @@
     var rv = YET;
     var conf = TW.review || [];
     var done = rvSubmittedNames(r).filter(function (n) { return !conf.some(function (x) { return x.name === n; }); });
-    if (conf.length || done.length) {
-      var many = conf.length + done.length > 1;
+    /* 미응시 — 「미응시 · 결석」 사유 이름만 (migration-028 · 20261029h) */
+    var abs = rvAbsentList(r).filter(function (a) { return !conf.some(function (x) { return x.name === a.name; }) && done.indexOf(a.name) === -1; });
+    if (conf.length || done.length || abs.length) {
+      var many = conf.length + done.length + abs.length > 1;
       rv = '<span class="tw-rvs">' + conf.map(function (x) {
         var df = x.diff;
         return '<span>' + (many ? '<small>' + esc(x.name.replace(/ TEST$/, '')) + '</small> ' : '') + '<b class="num">' + x.score + '점</b>' +
           (df > 0 ? ' <span class="tw-up num">▲' + df + '</span>' : df < 0 ? ' <span class="tw-down num">▼' + (-df) + '</span>' : df === 0 ? ' <span class="tw-same">–</span>' : '') + '</span>';
       }).concat(done.map(function (n) {
         return '<span>' + (many ? '<small>' + esc(n.replace(/ TEST$/, '')) + '</small> ' : '') + '<b class="tw-ok">제출 완료</b></span>';
+      })).concat(abs.map(function (a) {
+        return '<span>' + (many ? '<small>' + esc(a.name.replace(/ TEST$/, '')) + '</small> ' : '') + '<b class="tw-abs">' + esc(ReportView.absentText(a.reason)) + '</b></span>';
       })).join('') + '</span>';
     }
-    var app = '';
-    var per = reportPeriod();
-    var aw = TW.app && TW.app !== 'loading' && TW.app !== 'none' && per ? AppWeek.compute(TW.app, per.from, per.to, todayISO()) : null;
-    if (TW.app === 'loading') app = '<p class="tw-loading">앱 과제 기록을 불러오는 중…</p>';
-    else if (aw && aw.any) app = '<p class="aw-period">과제 기간 <b class="num">' + esc(Lesson.md(per.from, false) + '~' + Lesson.md(per.to, false)) + '</b></p>' + AppWeek.tableHtml(aw);
-    else if (TW.app !== 'none') app = '<p class="tw-row"><span class="tw-tile__k">앱 과제 · 강의</span> ' + YET + '</p>';
+    /* 앱 과제는 카드 아래 「앱 과제 요약 · 지난 일주일」 한 덩어리로 (drawProgress · 20261029h) */
     var cm = r ? String(r.comment == null ? '' : r.comment).trim() : '';
     var ld = reportLessonDate();
     var title = ld ? Lesson.md(ld) + ' 수업 레포트'
@@ -738,7 +759,6 @@
       '<h2 class="card-title">📅 ' + esc(title) + '<span class="card-note">이번 주</span></h2>' +
       /* 출결 · 집중도 · 복습테스트 세 칸 (수기 「필수 과제」 칸은 뺐다 — 과제는 아래 앱 표로 · 20261029g) */
       '<div class="tw-tiles tw-tiles--3">' + tile('출결', att) + tile('집중도', focus) + tile('복습테스트', rv) + '</div>' +
-      app +
       '<div class="tw-say"><div class="tw-tile__k">선생님 한마디</div>' +
         (cm ? '<p class="tw-comment" tabindex="0" role="button" aria-label="선생님 한마디 펼치기">' + ReportView.mdHtml(cm) + '</p>' : YET) + '</div>';
   }
@@ -754,6 +774,21 @@
       if (!t || t.kind !== 'review' || !t.submitted) return;
       var n = String(t.name || '').replace(/^\d+\/\d+(\([^)]*\))?\s*/, '');
       if (n && out.indexOf(n) === -1) out.push(n);
+    });
+    return out;
+  }
+
+  /* 그 주 미응시 시험 — [{ name, reason(사유 이름) }] · hub_review_week(migration-028), 없으면 레포트에 담긴 「미응시」 */
+  function rvAbsentList(r) {
+    var out = [];
+    if (TW.rvStatus) {
+      TW.rvStatus.forEach(function (x) { if (x && x.status === 'absent' && !out.some(function (a) { return a.name === x.test_name; })) out.push({ name: x.test_name, reason: x.reason_label || '' }); });
+      return out;
+    }
+    ((r && r.tests) || []).forEach(function (t) {
+      if (!t || t.kind !== 'review' || !t.absent) return;
+      var n = String(t.name || '').replace(/^\d+\/\d+(\([^)]*\))?\s*/, '');
+      if (n && !out.some(function (a) { return a.name === n; })) out.push({ name: n, reason: t.absent });
     });
     return out;
   }
@@ -885,29 +920,25 @@
     }
     return null;
   }
-  /* 진행 중인 과제 기간 — 레포트 수업일 ~ 다음 수업일 전날 (레포트가 없으면 오늘 기준 다음 수업의 과제 기간) */
-  function progressPeriod() { return currentPeriod(TW.rep, TW.rep ? reportLessonDate() : ''); }
-  function mdDow(iso) {
-    var m = Lesson.md(iso);                         /* 10/22(목) → 10/22 목 */
-    return m.replace('(', ' ').replace(')', '');
-  }
+  /* 이번 주 레포트의 앱 과제 요약 — 그 레포트 수업일 D 기준 「지난 일주일」 D-7 ~ D-1 (20261029h).
+     지금 진행 중인 주(D ~ 다음 수업 전날)는 「앱 과제」 탭에서만 보여 준다 (예전 「다음 수업까지 진행 중」 카드는 뺐다).
+     수업일이 없는 예전 레포트는 저장된 과제 기간으로 */
   function drawProgress() {
     var box = $('#twProg');
     if (!box || !TW) return;
-    var p = progressPeriod();
-    if (!p) { box.innerHTML = ''; return; }
-    var data = TW.app && TW.app !== 'loading' && TW.app !== 'none' ? TW.app : null;
-    var aw = p.from && data ? AppWeek.compute(data, p.from, p.to, todayISO()) : null;
-    var line = '다음 수업(' + esc(mdDow(p.next)) + ')까지 진행 중';
-    if (aw) {
-      box.innerHTML = '<div class="card tw-prog">' + appBlockHtml(data, aw, { title: periodTitle('이번 주', p.from, p.to), sub: line, month: todayISO().slice(0, 7), pending: true, card: false }) + '</div>';
-      animateRings(box);
-      return;
+    if (!TW.rep || TW.app === 'none') { box.innerHTML = ''; return; }
+    if (TW.app === 'loading') { box.innerHTML = '<div class="card tw-prog"><p class="tw-loading">앱 과제 기록을 불러오는 중…</p></div>'; return; }
+    var data = TW.app || null;
+    var ld = reportLessonDate();
+    if (ld) {
+      /* 앱 기록을 못 불러오면 「앱 과제 · 강의 아직 입력 전」 */
+      box.innerHTML = data ? reportAppHtml(data, ld) : '<div class="card tw-prog"><p class="tw-row"><span class="tw-tile__k">앱 과제 · 강의</span> ' + YET + '</p></div>';
+    } else {
+      var per = reportPeriod();
+      var aw = data && per ? AppWeek.compute(data, per.from, per.to, todayISO()) : null;
+      box.innerHTML = aw && aw.any ? appBlockHtml(data, aw, { title: periodTitle('과제 기간', per.from, per.to), month: per.to.slice(0, 7) }) : '';
     }
-    box.innerHTML = '<div class="card tw-prog">' +
-      '<p class="tw-prog__t">' + line + (p.from ? '<span class="tw-prog__d num">과제 기간 ' + esc(Lesson.md(p.from, false) + '~' + Lesson.md(p.to, false)) + '</span>' : '') + '</p>' +
-      (TW.app === 'loading' && p.from ? '<p class="tw-loading">앱 과제 기록을 불러오는 중…</p>' : '') +
-    '</div>';
+    animateRings(box);
   }
 
   function renderWeek(code, d) {
@@ -939,7 +970,7 @@
     }
     if (TW.app === 'loading') {
       appData(code).then(function (data) {
-        TW.app = data || null;            /* 앱 기록 그대로 — 카드 · 진행 중 줄이 각자 기간만 잘라 쓴다 */
+        TW.app = data || null;            /* 앱 기록 그대로 — 레포트 수업일 기준 지난 일주일만 잘라 쓴다 */
         if (TW.rep) drawWeekCard();
         drawProgress();
       });
@@ -1095,7 +1126,10 @@
             var open = !!(rv && ((rv.tests && rv.tests.length) || rv.test));
             if (!open) { btn.hidden = true; card.hidden = true; return; }
             var anySub = !!rv.submission || (rv.tests || []).some(function (t) { return t.submission; });
+            /* 선생님이 미응시로 둔 시험만 남았으면 입력하라고 띄우지 않는다 (migration-028) */
+            var left = rv.tests ? ReviewCard.pendingOf(rv).length : (rv.submission ? 0 : 1);
             if (anySub) { btn.hidden = true; card.hidden = false; }
+            else if (!left) { btn.hidden = true; card.hidden = true; }
             else if (card.hidden) btn.hidden = false;
           });
         }
@@ -1486,14 +1520,18 @@
     });
   }
 
-  /* 레포트 아래 — 그 주 과제 기간의 앱 과제 · 강의 표, 그 주 과제 · 자료 */
+  /* 레포트 아래 — 그 레포트 수업 전 일주일(D-7 ~ D-1)의 앱 과제 요약, 그 주 과제 · 자료 (수업일이 없는 예전 레포트는 저장된 과제 기간) */
   function reportExtras(body, r, data, code) {
     if (!r.week_start) return;
     var L = lessonOf(r.week_start) || {};
-    var from = data.hwFrom || L.hwFrom, to = data.hwTo || L.hwTo;
     var box = document.createElement('div');
     body.appendChild(box);
-    appWeekInto(box, code, from, to, '과제 기간');
+    var ld = /^\d{4}-\d{2}-\d{2}/.test(data.lessonDate || '') ? String(data.lessonDate).slice(0, 10) : (!L.canceled && L.date ? L.date : '');
+    if (ld && global.AppWeek && APP.info && APP.info.linked) {
+      appData(code).then(function (dd) { box.innerHTML = dd ? reportAppHtml(dd, ld) : ''; animateRings(box); });
+    } else {
+      appWeekInto(box, code, data.hwFrom || L.hwFrom, data.hwTo || L.hwTo, '과제 기간');
+    }
     var w = r.draft ? null : weekOf(mondayOf(r.week_start));
     var files = filesOf(w);
     if (files) {

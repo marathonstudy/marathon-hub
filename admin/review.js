@@ -4,7 +4,12 @@
    반 수업일마다 기본 시험들(「복습 TEST」 · 「화작문 TEST」, 반 관리에서 바꿈)이 서버에서 저절로 생긴다.
    모든 곳에서 「10/22(목) 복습 TEST」처럼 수업일 + 시험 이름으로 부른다 (회차는 쓰지 않는다).
    · 그 주 시험 줄: [+ 시험 추가](그 주만) · [이번 주 시험 빼기](제출이 있는 시험은 뺄 수 없음) · 뺀 시험은 요약 줄에 「… 이번 주 안 봄 · 되돌리기」 (20261029g)
-   · 확인 표: 학생 한 줄 — 시험마다 점수 · 상태(미제출/제출/확인) · [확인] [고치기] [대신 입력], 사진(여러 장)
+   · 확인 표: 학생 한 줄 — 시험마다 점수 · 상태(미제출/제출/확인) · [확인] [고치기] [대신 입력] [미응시], 사진(여러 장)
+   · 미응시 (migration-028 · 20261029h): 사유 결석 · 지각 · 상담 중 · 다른 시험으로 대체 · 기타 (뒤의 둘은 짧은 메모 — 코치룸에서만 보임).
+     이름 옆 [이번 주 전부 미응시]는 그 주 안 낸 시험 모두에 같은 사유. 회색 「미응시 · 결석」을 누르면 사유 바꾸기 · [미응시 취소].
+     학생이 내거나 [대신 입력]하면 서버가 미응시를 저절로 푼다. 제출 현황은 「제출 9 · 미응시 1 / 11」처럼 따로 센다.
+     「결석」을 고르면 그 주 작성 화면 출결이 비어 있거나 처음 채워진 「출석」 그대로일 때만 「출결도 결석으로 바꿀까요?」를 한 번 묻는다
+     (이번 주를 열면 모두 「출석」으로 미리 채워지므로 출석은 아직 안 고친 것으로 본다 · 지각 · 결석이면 묻지 않는다)
      고치기 · 대신 입력은 시험마다 「전체 문항 수」 · 「틀린 개수」. 누가 · 언제 했는지 서버(review_log)에 남는다
      예전 기록(틀린 번호 방식)은 「복습 TEST」로 그대로 보인다
    · [지금 제출 현황]: 교실 화면용 — 이름 옆에 시험별 제출 여부만 (점수는 아예 불러오지 않는다)
@@ -24,6 +29,11 @@
   }
   function isMissing(e) { return /does not exist|Could not find the|schema cache/i.test((e && e.message) || ''); }
   var NEED_SQL = 'migration-025 SQL 을 먼저 실행해 주세요 (README 5-22).';
+  var NEED_028 = '미응시는 migration-028 SQL 을 먼저 실행해 주세요 (README 5-25).';
+  /* 미응시 사유 — 서버(migration-028)와 같은 이름 · 메모는 대체 · 기타에만 */
+  var REASONS = [['absent', '결석'], ['late', '지각'], ['counsel', '상담 중'], ['replaced', '다른 시험으로 대체'], ['other', '기타']];
+  function reasonLabel(k) { var r = REASONS.filter(function (x) { return x[0] === k; })[0]; return r ? r[1] : ''; }
+  function memoOk(k) { return k === 'replaced' || k === 'other'; }
   var BUCKET = 'review-photos';
   var SHRINK = { maxSide: 1280, target: 150 * 1024 };
 
@@ -94,14 +104,14 @@
       return;
     }
     var rows = d.rows || [];
-    var allDone = rows.filter(function (x) { return on.length && on.every(function (t) { return x.subs && x.subs[t.id]; }); }).length;
     var ok = 0;
     rows.forEach(function (x) { on.forEach(function (t) { var s = x.subs && x.subs[t.id]; if (s && s.status === 'confirmed') ok++; }); });
     var day = all[0].lesson_date;
-    /* 요약 줄 — 보는 시험은 굵게, 뺀 시험은 「복습 TEST 이번 주 안 봄 · 되돌리기」 (20261029g) */
+    /* 요약 줄 — 보는 시험은 굵게, 뺀 시험은 「복습 TEST 이번 주 안 봄 · 되돌리기」 (20261029g)
+       시험마다 「복습 TEST 제출 9 · 미응시 1 / 11」 — 미응시는 제출과 따로 센다 (20261029h) */
     line.innerHTML = '<b>' + esc(Lesson.md(String(day).slice(0, 10))) + '</b> · ' + (on.length ? on.map(function (t) { return '<b>' + esc(t.test_name) + '</b>'; }).join(' · ') : '시험 없음') +
       ' · 마감 ' + esc(Lesson.md(String(day).slice(0, 10))) + ' 밤 12시' +
-      ' <span class="muted-note">모두 제출 ' + allDone + ' / ' + rows.length + ' · 확인 ' + ok + '</span>' +
+      (on.length ? ' <span class="muted-note rv-count">' + on.map(function (t) { return esc(countText(t, rows)); }).join(' · ') + ' · 확인 ' + ok + '</span>' : '') +
       all.filter(function (t) { return t.off; }).map(function (t) {
         return ' <span class="rv-off">' + esc(t.test_name) + ' 이번 주 안 봄 · <button type="button" class="link-btn" data-rv="on" data-tid="' + esc(t.id) + '">되돌리기</button></span>';
       }).join('');
@@ -115,6 +125,14 @@
       '<th>학생</th>' + on.map(function (t) { return '<th>' + esc(label(t)) + '</th>'; }).join('') + '<th>사진</th></tr></thead><tbody>' +
       rows.map(function (x) { return rowHtml(x, on); }).join('') + '</tbody></table></div>';
   }
+
+  /* 「복습 TEST 제출 9 · 미응시 1 / 11」 (미응시가 없으면 「복습 TEST 제출 9 / 11」) */
+  function countText(t, rows) {
+    var sub = rows.filter(function (x) { return x.subs && x.subs[t.id]; }).length;
+    var ab = rows.filter(function (x) { return absentOf(x, t); }).length;
+    return t.test_name + ' 제출 ' + sub + (ab ? ' · 미응시 ' + ab : '') + ' / ' + rows.length;
+  }
+  function absentOf(x, t) { return (x && !(x.subs && x.subs[t.id]) && x.absent && x.absent[t.id]) || null; }
 
   function cleanBtn() { return '<button class="btn btn--sm btn--ghost" type="button" data-rv="clean">지난 시험지 사진 정리</button>'; }
 
@@ -137,8 +155,18 @@
 
   function cellHtml(x, t) {
     var s = x.subs && x.subs[t.id];
+    var ab = absentOf(x, t);
+    /* 미응시 — 회색 「미응시 · 결석」(누르면 사유 바꾸기 · 미응시 취소) · 메모는 여기(코치룸)에서만 */
+    if (ab) {
+      return '<td class="rv-cell is-absent">' +
+        '<button type="button" class="rv-absent" data-rv="absent" data-tid="' + esc(t.id) + '" title="사유 바꾸기 · 미응시 취소">미응시 · ' + esc(ab.label || reasonLabel(ab.reason)) + '</button>' +
+        (ab.memo ? '<div class="muted-note rv-absent__memo">' + esc(ab.memo) + '</div>' : '') +
+        '<div class="muted-note">' + esc(ab.set_by || '') + ' ' + fmtDT(ab.set_at) + '</div>' +
+        '<div class="tb-acts"><button class="btn btn--sm btn--ghost" type="button" data-rv="entry" data-tid="' + esc(t.id) + '">대신 입력</button></div></td>';
+    }
     var acts = !s
-      ? '<button class="btn btn--sm" type="button" data-rv="entry" data-tid="' + esc(t.id) + '">대신 입력</button>'
+      ? '<button class="btn btn--sm" type="button" data-rv="entry" data-tid="' + esc(t.id) + '">대신 입력</button>' +
+        '<button class="btn btn--sm btn--ghost" type="button" data-rv="absent" data-tid="' + esc(t.id) + '">미응시</button>'
       : (s.status === 'confirmed'
           ? '<button class="btn btn--sm btn--ghost" type="button" data-rv="edit" data-tid="' + esc(t.id) + '">고치기</button>'
           : '<button class="btn btn--sm btn--primary" type="button" data-rv="confirm" data-tid="' + esc(t.id) + '">확인</button>' +
@@ -153,8 +181,10 @@
   function rowHtml(x, on) {
     var editing = st.edit && st.edit.sid === x.student_id;
     var ph = photosOf(x);
+    var left = on.filter(function (t) { return !(x.subs && x.subs[t.id]); });
     var tr = '<tr data-sid="' + esc(x.student_id) + '">' +
-      '<td><span class="roster__name">' + esc(x.name) + '</span></td>' +
+      '<td><span class="roster__name">' + esc(x.name) + '</span>' +
+        (left.length ? ' <button class="btn btn--sm btn--ghost rv-allabs" type="button" data-rv="absent-all" title="이번 주 아직 안 낸 시험 ' + left.length + '개에 같은 사유">이번 주 전부 미응시</button>' : '') + '</td>' +
       on.map(function (t) { return cellHtml(x, t); }).join('') +
       '<td>' + (ph.length ? '<button class="btn btn--sm btn--ghost" type="button" data-rv="photo">사진 ' + ph.length + '장</button>' : '<span class="muted-note">없음</span>') + '</td></tr>';
     if (editing) tr += '<tr class="rv-edit-row" data-sid="' + esc(x.student_id) + '"><td colspan="' + (on.length + 2) + '">' + editorHtml() + '</td></tr>';
@@ -171,6 +201,7 @@
 
   function editorHtml() {
     var e = st.edit;
+    if (e.mode === 'absent') return absentEditorHtml(e);
     var t = tests().find(function (x) { return x.id === e.tid; }) || {};
     var c = editCheck(e);
     return '<div class="rv-editor">' +
@@ -186,6 +217,27 @@
         : '<span class="muted-note">저장하면 확인까지 함께 됩니다. 고치기 전 값과 고친 사람이 기록됩니다.</span>') +
       '<div class="wk-edit__btns"><button class="btn btn--sm btn--primary" type="button" data-rv="save">저장</button>' +
       '<button class="btn btn--sm btn--ghost" type="button" data-rv="cancel">취소</button></div>' +
+    '</div>';
+  }
+
+  /* 미응시 사유 고르기 — 결석 · 지각 · 상담 중 · 다른 시험으로 대체 · 기타 (뒤의 둘은 짧은 메모) */
+  function absentEditorHtml(e) {
+    var x = rowOf(e.sid) || {};
+    var name = e.all ? '이번 주 시험 전부 (' + e.tids.length + '개)' : label(testOf(e.tids[0]) || {});
+    return '<div class="rv-editor rv-absent-ed">' +
+      '<div class="rv-editor__head"><b>' + esc(x.name || '') + ' · ' + esc(name) + ' — 미응시 사유</b></div>' +
+      '<div class="rv-reasons" role="radiogroup" aria-label="미응시 사유">' + REASONS.map(function (r) {
+        var on = e.reason === r[0];
+        return '<button type="button" class="btn btn--sm rv-reason' + (on ? ' is-on' : '') + '" role="radio" aria-checked="' + on + '" data-rv="reason" data-v="' + r[0] + '">' + r[1] + '</button>';
+      }).join('') + '</div>' +
+      (memoOk(e.reason)
+        ? '<label class="field rv-memo"><span class="field__label">메모 (선택 · 60자 · 코치룸에서만 보임)</span>' +
+            '<input class="input" type="text" maxlength="60" data-rv-memo value="' + esc(e.memo || '') + '" placeholder="' + (e.reason === 'replaced' ? '예: 10/23 재시험으로 대체' : '예: 병원 진료') + '"></label>'
+        : '') +
+      '<span class="muted-note">학부모 · 학생 화면에는 「미응시 · 결석」처럼 사유 이름만 나갑니다. 나중에 학생이 직접 내거나 대신 입력하면 미응시는 저절로 풀립니다.</span>' +
+      '<div class="wk-edit__btns"><button class="btn btn--sm btn--primary" type="button" data-rv="absent-save"' + (e.reason ? '' : ' disabled') + '>저장</button>' +
+        (e.had ? '<button class="btn btn--sm" type="button" data-rv="absent-clear">미응시 취소</button>' : '') +
+        '<button class="btn btn--sm btn--ghost" type="button" data-rv="cancel">닫기</button></div>' +
     '</div>';
   }
 
@@ -225,6 +277,21 @@
     if (act === 'confirm' && s) call('review_confirm', { p_sub: s.id }, x.name + ' ' + t.test_name + ' 확인했습니다');
     if (act === 'edit' && s) { st.edit = { sid: x.student_id, tid: t.id, mode: 'edit', q: String(s.q_count), w: String(wrongN(s)), blobs: [] }; draw(); focusEditor(); }
     if (act === 'entry' && x && t) { st.edit = { sid: x.student_id, tid: t.id, mode: 'entry', q: '', w: '', blobs: [] }; draw(); focusEditor(); }
+    if (act === 'absent' && x && t) {
+      var ab = absentOf(x, t);
+      st.edit = { sid: x.student_id, tids: [t.id], mode: 'absent', all: false, reason: ab ? ab.reason : '', memo: ab ? ab.memo || '' : '', had: !!ab };
+      draw(); return;
+    }
+    if (act === 'absent-all' && x) {
+      var left = onTests().filter(function (tt) { return !(x.subs && x.subs[tt.id]); });
+      if (!left.length) return;
+      var first = left.map(function (tt) { return absentOf(x, tt); }).filter(Boolean)[0];
+      st.edit = { sid: x.student_id, tids: left.map(function (tt) { return tt.id; }), mode: 'absent', all: true, reason: first ? first.reason : '', memo: first ? first.memo || '' : '', had: false };
+      draw(); return;
+    }
+    if (act === 'reason' && st.edit && st.edit.mode === 'absent') { st.edit.reason = b.dataset.v; draw(); return; }
+    if (act === 'absent-save') { saveAbsent(); return; }
+    if (act === 'absent-clear') { clearAbsent(); return; }
     if (act === 'cancel') { st.edit = null; draw(); }
     if (act === 'save') save();
     if (act === 'photo' && x) showPhotos(photosOf(x));
@@ -251,6 +318,7 @@
 
   function onInput(e) {
     if (!st.edit) return;
+    if (e.target.hasAttribute('data-rv-memo')) { st.edit.memo = e.target.value; return; }
     if (e.target.hasAttribute('data-rv-eq')) st.edit.q = e.target.value;
     else if (e.target.hasAttribute('data-rv-ew')) st.edit.w = e.target.value;
     else return;
@@ -259,9 +327,9 @@
     if (sc) sc.textContent = c.ok ? c.text : c.msg;
   }
 
-  function call(fn, args, okMsg) {
+  function call(fn, args, okMsg, need) {
     return sb().rpc(fn, args).then(function (r) {
-      if (r.error) { toast(isMissing(r.error) ? NEED_SQL : r.error.message, 'bad'); return null; }
+      if (r.error) { toast(isMissing(r.error) ? (need || NEED_SQL) : r.error.message, 'bad'); return null; }
       if (okMsg) toast(okMsg, 'good');
       st.edit = null;
       return load().then(function () { return r.data; });
@@ -287,6 +355,29 @@
     Promise.all(ups).then(function (photos) {
       return call('review_staff_entry2', { p_test: t.id, p_student: x.student_id, p_q: c.q, p_wrong: c.w, p_photos: photos }, x.name + ' ' + t.test_name + ' 대신 입력했습니다 (조교 입력)');
     }).catch(function (err) { toast(err.message, 'bad'); });
+  }
+
+  /* 미응시 저장 — 「결석」이면 그 주 작성 화면 출결이 비어 있거나 「출석」(미리 채운 값)일 때만 「출결도 결석으로 바꿀까요?」 한 번 */
+  function attendOpen(a) { return a === '' || a === 'attend'; }
+  function saveAbsent() {
+    var e = st.edit, x = rowOf(e.sid);
+    if (!x || !e.reason) return;
+    var memo = memoOk(e.reason) ? String(e.memo || '').trim().slice(0, 60) : '';
+    var what = e.all ? '이번 주 시험 ' + e.tids.length + '개' : ((testOf(e.tids[0]) || {}).test_name || '');
+    var sid = x.student_id, name = x.name, reason = e.reason, mon = st.mon;
+    call('review_absent_set', { p_tests: e.tids, p_student: sid, p_reason: reason, p_memo: memo },
+         name + ' ' + what + ' 미응시(' + reasonLabel(reason) + ')로 넣었습니다', NEED_028).then(function (res) {
+      if (!res || reason !== 'absent' || !window.Writer || !Writer.attendOf) return;
+      if (!attendOpen(Writer.attendOf(sid, mon))) return;      /* 지각 · 결석을 넣었거나 다른 주를 쓰는 중이면 묻지 않는다 */
+      UI.confirmAsk('출결', name + ' — 출결도 결석으로 바꿀까요?', '결석으로 바꾸기').then(function (yes) {
+        if (yes && attendOpen(Writer.attendOf(sid, mon))) Writer.setAbsent(sid);
+      });
+    });
+  }
+  function clearAbsent() {
+    var e = st.edit, x = rowOf(e.sid), t = testOf(e.tids[0]);
+    if (!x || !t) return;
+    call('review_absent_clear', { p_test: t.id, p_student: x.student_id }, x.name + ' ' + t.test_name + ' 미응시를 취소했습니다', NEED_028);
   }
 
   function onChange(e) {
@@ -388,17 +479,20 @@
       }
       var rows = d.rows || [];
       var n = rows.filter(function (x) { return x.submitted; }).length;
+      /* 미응시 — 안 낸 시험이 모두 미응시인 학생 (제출과 따로 센다 · migration-028) */
+      var settled = function (x) { var dn = x.done || {}, ab = x.absent || {}; return ts.every(function (t) { return dn[t.id] || ab[t.id]; }); };
+      var abN = rows.filter(function (x) { return !x.submitted && settled(x); }).length;
       $('#rvLiveTitle').textContent = (d.class_name || L.cls) + ' · ' + Lesson.md(String(ts[0].lesson_date).slice(0, 10)) + ' ' + ts.map(function (t) { return t.test_name; }).join(' · ');
-      $('#rvLiveCount').textContent = '모두 제출 ' + n + ' / ' + rows.length;
+      $('#rvLiveCount').textContent = '모두 제출 ' + n + (abN ? ' · 미응시 ' + abN : '') + ' / ' + rows.length;
       $('#rvLiveGrid').innerHTML = rows.map(function (x) {
-        var done = x.done || {};
-        return '<div class="rv-live__cell' + (x.submitted ? ' is-done' : '') + '">' +
+        var done = x.done || {}, ab = x.absent || {};
+        return '<div class="rv-live__cell' + (x.submitted ? ' is-done' : settled(x) ? ' is-absent' : '') + '">' +
           '<span class="rv-live__name">' + esc(x.name) + '</span>' +
           '<span class="rv-live__tests">' + ts.map(function (t) {
-            var ok = !!done[t.id];
-            return '<span class="rv-live__t' + (ok ? ' is-ok' : '') + '">' + esc(t.test_name.replace(/ TEST$/, '')) + ' ' + (ok ? '✓' : '·') + '</span>';
+            var ok = !!done[t.id], no = !ok && !!ab[t.id];
+            return '<span class="rv-live__t' + (ok ? ' is-ok' : no ? ' is-absent' : '') + '">' + esc(t.test_name.replace(/ TEST$/, '')) + ' ' + (ok ? '✓' : no ? '미응시' : '·') + '</span>';
           }).join('') + '</span>' +
-          '<span class="sr-only">' + ts.map(function (t) { return t.test_name + (done[t.id] ? ' 제출' : ' 아직'); }).join(', ') + '</span></div>';
+          '<span class="sr-only">' + ts.map(function (t) { return t.test_name + (done[t.id] ? ' 제출' : ab[t.id] ? ' 미응시 ' + ab[t.id] : ' 아직'); }).join(', ') + '</span></div>';
       }).join('');
     });
   }
@@ -449,7 +543,7 @@
     /* 학생이 내면 실시간 (sync.js) — 현황 화면은 바로, 표는 고치는 중이 아닐 때 */
     window.addEventListener('jt:remote', function (e) {
       var t = e.detail && e.detail.table;
-      if (t !== 'review_submissions' && t !== 'review_tests') return;
+      if (t !== 'review_submissions' && t !== 'review_tests' && t !== 'review_absences') return;
       if (st.live) loadLive();
       if (st.key && !st.edit) load();
     });
@@ -471,15 +565,17 @@
     if (!on.length) return '이번 주 복습테스트 없음';
     var x = rowOf(sid);
     var subs = (x && x.subs) || {};
-    if (!on.some(function (t) { return subs[t.id]; })) return '아직 제출 안 함';
+    var anySub = on.some(function (t) { return subs[t.id]; });
+    if (!anySub && !on.some(function (t) { return absentOf(x, t); })) return '아직 제출 안 함';
     var pending = false;
+    /* 미응시 — 「복습 TEST 미응시(결석)」 (migration-028) */
     var parts = on.map(function (t) {
-      var s = subs[t.id];
-      if (!s) return t.test_name + ' 미제출';
+      var s = subs[t.id], ab = absentOf(x, t);
+      if (!s) return t.test_name + (ab ? ' 미응시(' + (ab.label || reasonLabel(ab.reason)) + ')' : ' 미제출');
       if (s.status !== 'confirmed') pending = true;
       return t.test_name + ' ' + s.correct + '/' + s.q_count;
     });
-    return parts.join(' · ') + ' · ' + (pending ? '확인 전' : '확인 완료');
+    return parts.join(' · ') + (anySub ? ' · ' + (pending ? '확인 전' : '확인 완료') : '');
   }
 
   /* 학생 카드 [고치기] — 복습테스트 화면으로 가서 그 학생 줄을 잠깐 표시 */
@@ -501,13 +597,20 @@
     if (!ready(cls, week)) return null;
     var rows = st.data.rows || [];
     return onTests().map(function (t) {
-      return { 시험: t.test_name, 제출: rows.filter(function (x) { return x.subs && x.subs[t.id]; }).length, 전체: rows.length };
+      var f = { 시험: t.test_name, 제출: rows.filter(function (x) { return x.subs && x.subs[t.id]; }).length, 전체: rows.length };
+      var ab = rows.filter(function (x) { return absentOf(x, t); }).length;
+      if (ab) f.미응시 = ab;
+      return f;
     });
   }
+  /* 미응시는 「미응시(결석)」 사유 이름까지만 — 메모는 넘기지 않는다 (20261029h) */
   function studentFacts(cls, week, sid) {
     if (!ready(cls, week)) return null;
-    var x = rowOf(sid), subs = (x && x.subs) || {};
-    return onTests().map(function (t) { return { 시험: t.test_name, 제출: subs[t.id] ? '냄' : '안 냄' }; });
+    var x = rowOf(sid) || {}, subs = x.subs || {};
+    return onTests().map(function (t) {
+      var ab = absentOf(x, t);
+      return { 시험: t.test_name, 제출: subs[t.id] ? '냄' : ab ? '미응시(' + (ab.label || reasonLabel(ab.reason)) + ')' : '안 냄' };
+    });
   }
 
   window.Review = { render: render, reload: load, openLive: openLive, lineOf: lineOf, focusStudent: focusStudent,

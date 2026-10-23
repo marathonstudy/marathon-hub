@@ -4,7 +4,7 @@
    · 서버 함수 coach_today() 한 번으로 반·학생별 숫자를 받는다 (새 표 없음).
    · '작성 완료' 는 주간 레포트 → 작성과 같은 규칙(report.js Report.entryStatus)으로 센다.
    · 앱 과제는 바깥 앱 서버 자료라 화면이 뜬 뒤 app-report 함수로 4명씩 차례로 불러온다.
-     날짜별 기록으로 그 반 직전 과제 기간의 「제출일 / 과제 있던 날」을 센다 (러닝노트 표와 같은 AppWeek.compute).
+     날짜별 기록으로 그 반 지난 수업(L) 전 일주일 L-7 ~ L-1 의 「제출일 / 과제 있던 날」을 센다 (러닝노트 레포트와 같은 AppWeek.lastWeek · 20261029h).
      불러온 값은 30분 동안 이 화면 메모리에만 둔다(브라우저에 저장하지 않는다).
    · 조교 금액 숨김이 켜져 있으면 서버가 금액을 보내지 않는다 (이 화면에만 적용).
    · 머리는 「오늘 · 10/23(금)」 · ⓘ 를 누르면 급함 · 살펴보기 기준 (20261029e).
@@ -129,7 +129,7 @@
       return fetch(url, { headers: { apikey: CFG.supabase.key } })
         .then(function (r) { return r.json(); })
         .then(function (res) {
-          /* 날짜별 기록만 남긴다 — 반마다 직전 과제 기간을 그릴 때 AppWeek.compute 로 센다 (러닝노트 「이번 주 과제·강의」 표와 같은 계산) */
+          /* 날짜별 기록만 남긴다 — 반마다 지난 수업 전 일주일(D-7 ~ D-1)을 AppWeek.compute 로 센다 (러닝노트 레포트 앱 과제 요약과 같은 계산) */
           var dt = res && res.ok && res.data ? res.data : null;
           app[s.id] = { ok: !!dt, data: dt ? { calendar: dt.calendar || [], lectures: dt.lectures || [], history: dt.history || dt.recent || [] } : null, at: Date.now() };
         }, function () { app[s.id] = { ok: false, data: null, at: Date.now() }; })
@@ -160,7 +160,7 @@
      급함 n · 살펴보기 n · [이번 주 작성하기]. 순서 = 다음 수업이 가까운 반부터 (오늘 수업 맨 위, 같은 날은 이름 순, 수업일 미정은 맨 아래).
      카드를 누르면 그 반 학생 목록이 펼쳐진다 (여러 반 함께 · 펼친 반은 이 기기에만 기억).
        급함     최근 결석 기준 이상 · 복습테스트 미제출 · 확인 필요 상담
-       살펴보기 앱 과제 제출 기준(기본 50%) 미만 — 그 반 직전 과제 기간(지난 수업일 ~ 이번 수업일 전날)의 제출일 / 과제 있던 날 (20261028b)
+       살펴보기 앱 과제 제출 기준(기본 50%) 미만 — 그 반 지난 수업일 L 의 레포트와 같은 기간(L-7 ~ L-1)의 제출일 / 과제 있던 날 (20261029h)
                 · 필기 2주 연속 없음(설정에서 켰을 때만, 기본 끔)
      금액은 이 화면에 넣지 않는다. */
   var OPEN_KEY = 'mhub.today.open';
@@ -262,11 +262,12 @@
     if (s.follow_n) out.push({ k: 'follow', t: '확인 필요 상담 ' + s.follow_n });
     return out;
   }
-  /* 앱 과제 — 그 반 직전 과제 기간 (주기의 pfrom ~ pto · 오늘이 수업일이면 막 끝난 기간). 과제 있던 날이 없으면 null */
-  function appWeekOf(s, cy) {
+  /* 앱 과제 — 수업일 D 레포트와 같은 기간 D-7 ~ D-1 (D = 그 반 지난 수업일 L · 오늘이 수업일이면 오늘). 과제 있던 날이 없으면 null (20261029h) */
+  function appWeekOf(s, cy, lessonDate) {
     var a = app[s.id];
-    if (!s.app || !a || !a.ok || !a.data || !cy || !cy.L || !window.AppWeek) return null;
-    var w = AppWeek.compute(a.data, cy.pfrom, cy.pto, DDay.today());
+    var p = window.AppWeek && AppWeek.lastWeek ? AppWeek.lastWeek(lessonDate || (cy && cy.L)) : null;
+    if (!s.app || !a || !a.ok || !a.data || !p) return null;
+    var w = AppWeek.compute(a.data, p.from, p.to, DDay.today());
     return w && w.hwDays ? w : null;
   }
   function md(iso) { return (+iso.slice(5, 7)) + '/' + (+iso.slice(8, 10)); }
@@ -328,11 +329,21 @@
        오늘 수업 → 「반포반 · 오늘 수업 · 복습테스트 진행 중 3/12 [제출 현황]」
        마감 지난 복습 미제출 → 「복습테스트 미제출 n명 [확인하기]」 · 확인 필요 상담 n건 [보기] · 교재비 미납 n명 [교재] (금액 없음)
      할 일이 없으면 「지금 처리할 일이 없습니다 ✓」 */
+  /* 「9/11」 · 미응시가 있으면 「9/11 · 미응시 1」 — 미응시는 제출과 따로 센다 (coach_cycle 의 absent · migration-028) */
+  function rvCount(rows, cd, unit) {
+    var sub = 0, ab = 0;
+    rows.forEach(function (s) {
+      var x = cd.by[s.id] || {};
+      if (!x.submitted) return;
+      if (x.absent && x.absent.length) ab++; else sub++;
+    });
+    return sub + '/' + rows.length + (unit || '') + (ab ? ' · 미응시 ' + ab : '');
+  }
   function workLine(c, rows, cd, cy) {
     var n = rows.length;
     if (!n) return '학생 없음';
     var rv = !cd ? '복습테스트 —' : !cd.test ? '복습테스트 없음'
-      : '복습테스트 ' + rows.filter(function (s) { return (cd.by[s.id] || {}).submitted; }).length + '/' + n;
+      : '복습테스트 ' + rvCount(rows, cd);
     var ph = rows.filter(function (s) { var x = cd ? cd.by[s.id] : null; return x ? x.photos_cur : s.photos_week; }).length;
     var ws = rows.map(function (s) { return appWeekOf(s, cy); }).filter(Boolean);
     var avg = function (k) { return ws.reduce(function (a, w) { return a + w[k]; }, 0) / ws.length; };
@@ -360,7 +371,7 @@
         }
         if (c.next && c.next.dday === 0) {
           var t = cd && cd.test, live = t && DDay.today() <= String(t.lesson_date).slice(0, 10);
-          if (live) add(false, cls + ' · 오늘 수업 · 복습테스트 진행 중 ' + rows.filter(function (s) { return (cd.by[s.id] || {}).submitted; }).length + '/' + n, '제출 현황', 'data-todo="review"' + a + ' data-todo-week="' + esc(cy && cy.week || '') + '"');
+          if (live) add(false, cls + ' · 오늘 수업 · 복습테스트 진행 중 ' + rvCount(rows, cd), '제출 현황', 'data-todo="review"' + a + ' data-todo-week="' + esc(cy && cy.week || '') + '"');
           else add(false, cls + ' · 오늘 수업', '', '');
         }
       }
@@ -420,7 +431,7 @@
 
     $('#tdBody').innerHTML = transitionHtml() +
       (st.cycleMissing ? '<p class="panel__hint tdc-rule">migration-022 를 실행하면 반마다 수업 주기(지난 수업일 ~ 다음 수업 전날)로 셉니다. 지금은 달력 주 기준입니다.</p>' : '') +
-      '<div class="td-rules" id="tdRules"' + (st.rulesOpen ? '' : ' hidden') + '><p class="panel__hint tdc-rule">급함 — 레포트 미발송(수업일 +' + dv.grace + '일부터) · 복습테스트 미제출(마감 뒤) · 최근 ' + set.absentWeeks + '주 결석 ' + set.absentMin + '회 이상 · 확인 필요 상담 &nbsp;|&nbsp; 살펴보기 — 앱 과제 제출 ' + dv.appLow + '% 미만(직전 과제 기간)' +
+      '<div class="td-rules" id="tdRules"' + (st.rulesOpen ? '' : ' hidden') + '><p class="panel__hint tdc-rule">급함 — 레포트 미발송(수업일 +' + dv.grace + '일부터) · 복습테스트 미제출(마감 뒤 · 미응시는 빼고) · 최근 ' + set.absentWeeks + '주 결석 ' + set.absentMin + '회 이상 · 확인 필요 상담 &nbsp;|&nbsp; 살펴보기 — 앱 과제 제출 ' + dv.appLow + '% 미만(지난 수업 전 일주일)' +
         (dv.photoWatch ? ' · 필기 2주기 연속 없음' : '') + '</p></div>' +
       todoHtml(d, classes, why, dv) +
       '<div class="tdc-list-wrap">' + classes.map(function (c) {
@@ -441,7 +452,7 @@
           meta = '지난 레포트 공개 ' + cpub + '/' + n + ' · 발송 ' + csent + '/' + n;
           var t = cd.test, open2 = t && DDay.today() <= String(t.lesson_date).slice(0, 10);
           if (cy.since >= dv.grace && csent < n) status = '<span class="tdc-status tdc-status--bad">' + esc(Lesson.md(cy.L, false)) + ' 수업 레포트 미발송 ' + (n - csent) + '명</span>';
-          else if (open2) status = '<span class="tdc-status tdc-status--live">복습테스트 진행 중 ' + rows.filter(function (s) { return (cd.by[s.id] || {}).submitted; }).length + '/' + n + ' 제출</span>';
+          else if (open2) status = '<span class="tdc-status tdc-status--live">복습테스트 진행 중 ' + rvCount(rows, cd, ' 제출') + '</span>';
           else if (csent < n) status = '<span class="tdc-status">' + esc(Lesson.md(cy.L, false)) + ' 레포트 작성 중</span>';
           else status = '<span class="tdc-status tdc-status--ok">' + esc(Lesson.md(cy.L, false)) + ' 레포트 발송 완료 ✓</span>';
         }
@@ -480,17 +491,18 @@
   }
 
   /* ---------- 코멘트 「AI로 초안 쓰기」 자료 (write.js · 20261029g) ----------
-     앱 과제 — 그 반 직전 과제 기간(오늘 화면과 같은 계산)과 그 앞 기간. 앱 기록을 아직 못 불러왔으면 null */
-  function appFactsOf(s) {
+     앱 과제 — 그 레포트 수업일 D 기준 D-7 ~ D-1 (레포트 앱 과제 요약과 같은 기간)과 그 앞 일주일 D-14 ~ D-8 (20261029h).
+     D 를 안 주면 그 반 지난 수업일. 앱 기록을 아직 못 불러왔으면 null */
+  function appFactsOf(s, lessonDate) {
     if (!s) return null;
     var cy = cycleOf(s.class_name || '');
-    var w = appWeekOf(s, cy);
+    var D = lessonDate || (cy && cy.L) || '';
+    var w = appWeekOf(s, cy, D);
     if (!w) return null;
     var out = { 기간: md(w.from) + '~' + md(w.to), 과제있던날: w.hwDays, 제출한날: w.hwDone, 정시제출: w.hwOnTime };
     var a = app[s.id];
-    if (cy && cy.pfrom && cy.pto && a && a.data && window.AppWeek) {
-      var len = Math.round((Date.parse(cy.pto) - Date.parse(cy.pfrom)) / 86400000) + 1;
-      var pf = Lesson.addDays(cy.pfrom, -len), pt = Lesson.addDays(cy.pfrom, -1);
+    if (a && a.data && window.AppWeek) {
+      var pf = Lesson.addDays(D, -14), pt = Lesson.addDays(D, -8);
       var p = AppWeek.compute(a.data, pf, pt, DDay.today());
       if (p && p.hwDays) out.지난기간 = { 기간: md(pf) + '~' + md(pt), 과제있던날: p.hwDays, 제출한날: p.hwDone };
     }
@@ -498,19 +510,19 @@
   }
   function rowById(sid) { return st.data ? st.data.students.find(function (x) { return x.id === sid; }) || null : null; }
   window.Today = {
-    studentFacts: function (sid) {
+    studentFacts: function (sid, lessonDate) {
       var s = rowById(sid);
       if (!s) return null;
       var set = st.data.settings || {};
       var out = {};
-      var a = appFactsOf(s);
+      var a = appFactsOf(s, lessonDate);
       if (a) out.앱과제 = a;
       out.최근결석 = '최근 ' + (set.absentWeeks || 4) + '주 ' + (s.absent_n || 0) + '회';
       return out;
     },
-    classApp: function (cls) {
+    classApp: function (cls, lessonDate) {
       if (!st.data) return null;
-      var ws = st.data.students.filter(function (s) { return (s.class_name || '') === cls; }).map(appFactsOf).filter(Boolean);
+      var ws = st.data.students.filter(function (s) { return (s.class_name || '') === cls; }).map(function (s) { return appFactsOf(s, lessonDate); }).filter(Boolean);
       if (!ws.length) return null;
       var avg = function (k) { return Math.round(ws.reduce(function (x, w) { return x + w[k]; }, 0) / ws.length * 10) / 10; };
       return { 기간: ws[0].기간, 앱연결학생: ws.length, 평균제출한날: avg('제출한날'), 평균과제있던날: avg('과제있던날') };
