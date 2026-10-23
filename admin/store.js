@@ -725,12 +725,18 @@
     return (s && String(s.parentTitle || '').trim()) || '어머님';
   }
 
+  /* 번호 목록 — 학부모 번호는 「학부모 1 · 2」로 나누지 않고 같은 이름(어머님)으로 · 학생 번호가 학부모 번호와 같으면 same (20261030b) */
   function phonesOf(s) {
     var out = [];
     if (s && s.parentPhone) out.push({ who: 'parent', label: parentTitleOf(s), number: s.parentPhone });
-    if (s && s.parentPhone2 && phoneDigits(s.parentPhone2) !== phoneDigits(s.parentPhone)) out.push({ who: 'parent2', label: parentTitleOf(s) + ' 2', number: s.parentPhone2 });
-    if (s && s.studentPhone) out.push({ who: 'student', label: '학생 본인', number: s.studentPhone });
+    if (s && s.parentPhone2 && phoneDigits(s.parentPhone2) !== phoneDigits(s.parentPhone)) out.push({ who: 'parent2', label: parentTitleOf(s), number: s.parentPhone2 });
+    if (s && s.studentPhone) out.push({ who: 'student', label: '학생 본인', number: s.studentPhone, same: samePhone(s) });
     return out;
+  }
+  /* 학생 번호가 학부모 번호(둘 중 하나)와 같은가 */
+  function samePhone(s) {
+    var d = phoneDigits(s && s.studentPhone);
+    return !!d && (d === phoneDigits(s.parentPhone) || d === phoneDigits(s.parentPhone2));
   }
 
   /* ---------- 아이디 · 랜덤 코드 ---------- */
@@ -1600,6 +1606,7 @@
     phoneValid: phoneValid,
     parentTitleOf: parentTitleOf,
     phonesOf: phonesOf,
+    samePhone: samePhone,
 
     exportEncrypted: exportEncrypted,
     importEncrypted: importEncrypted,

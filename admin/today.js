@@ -85,6 +85,13 @@
     });
   }
 
+  /* 보낸 시각 — 오늘이면 18:09, 아니면 10/22 18:09 */
+  function sentAt(iso) {
+    var d = new Date(iso), now = new Date();
+    var hm = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    return d.toDateString() === now.toDateString() ? hm : (d.getMonth() + 1) + '/' + d.getDate() + ' ' + hm;
+  }
+
   /* 서버 값 그대로 (작성 완료 판정은 없앴다 · 20261030a) */
   function prepare(d) {
     return d;
@@ -446,8 +453,12 @@
           var t = cd.test, open2 = t && DDay.today() <= String(t.lesson_date).slice(0, 10);
           if (cy.since >= dv.grace && csent < n) status = '<span class="tdc-status tdc-status--bad">' + esc(Lesson.md(cy.L, false)) + ' 수업 레포트 미발송 ' + (n - csent) + '명</span>';
           else if (open2) status = '<span class="tdc-status tdc-status--live">복습테스트 진행 중 ' + rvCount(rows, cd, ' 제출') + '</span>';
-          else if (csent < n) status = '<span class="tdc-status">' + esc(Lesson.md(cy.L, false)) + ' 레포트 발송 전 ' + (n - csent) + '명</span>';
-          else status = '<span class="tdc-status tdc-status--ok">' + esc(Lesson.md(cy.L, false)) + ' 레포트 발송 완료 ✓</span>';
+          else if (csent < n) status = '<span class="tdc-status">' + esc(Lesson.md(cy.L, false)) + ' 레포트 발송 ' + csent + '/' + n + ' · 안 보냄 ' + (n - csent) + '명</span>';
+          else {
+            /* 「10/22 레포트 발송 완료 11/11 · 18:09」 — 마지막으로 보낸 시각 (migration-031 · 그 전에는 시각 없이) */
+            var last = rows.map(function (s) { return (cd.by[s.id] || {}).sent_at || ''; }).sort().pop();
+            status = '<span class="tdc-status tdc-status--ok">' + esc(Lesson.md(cy.L, false)) + ' 레포트 발송 완료 ' + csent + '/' + n + (last ? ' · ' + esc(sentAt(last)) : '') + ' ✓</span>';
+          }
         }
         var nx = c.next;
         var nextTxt = !nx ? '<span class="tdc-next tdc-next--none">수업일 미정</span>'

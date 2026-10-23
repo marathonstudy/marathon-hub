@@ -1421,6 +1421,7 @@
     <p class="modal__desc" id="smsDesc">사이트에서 바로 보냅니다. 화면은 학생과 보낼 곳만 넘기고, 번호는 서버가 찾습니다.</p>
   </div>
   <div class="modal__body">
+    <div class="sms-banner" id="smsBanner" role="status" aria-live="polite" hidden></div>
     <p class="cp-warn" id="smsMissing" hidden></p>
     <div class="sms-sec">
       <div class="sms-sec__title">받는 사람</div>
@@ -1438,9 +1439,8 @@
     <div class="sms-sec">
       <div class="sms-sec__title">보낼 곳</div>
       <div class="sms-to">
-        <label class="check-line"><input type="checkbox" id="smsToP1" checked> <span>학부모 1</span></label>
-        <label class="check-line"><input type="checkbox" id="smsToP2" checked> <span>학부모 2</span></label>
-        <label class="check-line"><input type="checkbox" id="smsToSt"> <span>학생 본인</span></label>
+        <label class="check-line"><input type="checkbox" id="smsToPa" checked> <span>학부모 <span class="field__opt">등록된 학부모 번호 모두</span></span></label>
+        <label class="check-line"><input type="checkbox" id="smsToSt" checked> <span>학생 <span class="field__opt">학부모 번호와 같으면 학부모 링크로 한 통만</span></span></label>
       </div>
     </div>
     <div class="sms-sec">
@@ -1473,6 +1473,7 @@
     <button class="btn" type="button" id="smsTest">나에게 시험 발송</button>
     <div class="spacer"></div>
     <button class="btn" type="button" id="smsClose">닫기</button>
+    <button class="btn" type="button" id="smsResend" hidden>다시 보내기</button>
     <button class="btn btn--primary" type="button" id="smsSend">보내기</button>
   </div>
 </dialog>

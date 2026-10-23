@@ -158,7 +158,8 @@
     }
     return { cls: k, text: LABEL[k], title: '' };
   }
-  var LABEL = { unpublished: '공개 전', ready: '보낼 수 있음', nolink: '링크 없음', nophone: '번호 없음' };
+  /* 안 보낸 학생은 회색 「안 보냄」 · 보낸 학생은 초록 「보냄 18:09」 (20261030b) */
+  var LABEL = { unpublished: '공개 전', ready: '안 보냄', nolink: '링크 없음', nophone: '번호 없음' };
   var VIA = { kakao: '알림톡', sms: '내 폰 문자', sitesms: '사이트 문자', copy: '문구 복사', share: '공유' };
 
   /* 반 순서 — 「오늘」과 같다 (오늘 수업 → 가까운 날 → 같은 날은 이름 순 → 수업일 미정 맨 아래) */
@@ -259,7 +260,7 @@
         var targets = kakaoOn() ? g.rows.filter(function (s) { var k = rowState(s); return k === 'ready' || k === 'failed'; }) : [];
         body = '<div class="snd-acts">' +
             (kakaoOn() ? '<button class="btn btn--sm btn--primary" type="button" data-kk-class' + (targets.length && !Kakao.busy() ? '' : ' disabled') + '>알림톡 ' + targets.length + '명 보내기</button>' : '') +
-            (g.name === NOCLS ? '' : '<button class="btn btn--sm" type="button" data-sms-cls="' + esc(g.name) + '" data-sms-week="' + esc(state.week) + '">반 전체 문자</button>') +
+            (g.name === NOCLS ? '' : '<button class="btn btn--sm" type="button" data-sms-cls="' + esc(g.name) + '" data-sms-week="' + esc(state.week) + '" title="문자 창 — 보낼 표 · 이 수업 레포트를 누구에게 언제 보냈는지도 표에 나옵니다">반 전체 문자 · 보낸 표</button>') +
           '</div>' +
           g.rows.map(rowHtml).join('');
       }

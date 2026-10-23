@@ -21,7 +21,15 @@
     var el = document.createElement('div');
     el.className = 'toast' + (kind ? ' toast--' + kind : '');
     el.textContent = msg;
-    $('#toastHost').appendChild(el);
+    /* 창(showModal)이 열려 있으면 그 창 안에 — 본문에 붙이면 창이 맨 위 층이라 알림이 창 뒤에 숨는다 (20261030b) */
+    var dlgs = Array.prototype.filter.call(document.querySelectorAll('dialog'), function (d) { return d.open; });
+    var act = document.activeElement && document.activeElement.closest ? document.activeElement.closest('dialog') : null;
+    var dlg = act && act.open ? act : dlgs.length ? dlgs[dlgs.length - 1] : null, host = $('#toastHost');
+    if (dlg) {
+      host = Array.prototype.filter.call(dlg.children, function (c) { return c.classList.contains('toast-host'); })[0];
+      if (!host) { host = document.createElement('div'); host.className = 'toast-host'; host.setAttribute('aria-live', 'polite'); dlg.appendChild(host); }
+    }
+    host.appendChild(el);
     setTimeout(function () {
       el.style.transition = 'opacity .2s';
       el.style.opacity = '0';
@@ -342,6 +350,14 @@
         line.innerHTML = '<span class="phone-line__title"></span><span class="phone-line__num"></span>';
         line.firstChild.textContent = p.label;
         line.lastChild.textContent = Store.phoneMask(p.number);
+        /* 학생 번호가 학부모 번호와 같으면 작게 표시 — 문자는 학부모 링크로 한 통만 간다 (20261030b) */
+        if (p.same) {
+          var tg = document.createElement('span');
+          tg.className = 'phone-same';
+          tg.textContent = '번호 같음';
+          tg.title = '학생 번호가 학부모 번호와 같습니다 — 문자는 학부모 링크로 한 통만 갑니다. 다르면 [수정]에서 고쳐 주세요';
+          line.appendChild(tg);
+        }
         box.appendChild(line);
       });
     }

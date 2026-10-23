@@ -116,7 +116,9 @@
       var pub = list.filter(function (s) { return x.published[s.id]; }).length;
       var sent = list.filter(function (s) { return x.published[s.id] && x.sent[s.id]; }).length;
       $('#rstepPublish').textContent = n ? pub + '/' + n : '';
-      $('#rstepSend').textContent = n ? sent + '/' + n : '';
+      /* 다 보냈으면 「11/11 ✓」 초록 (20261030b) */
+      $('#rstepSend').textContent = n ? sent + '/' + n + (sent === n ? ' ✓' : '') : '';
+      $('#rstepSend').classList.toggle('is-done', !!n && sent === n);
     }, function () {});
   }
 
