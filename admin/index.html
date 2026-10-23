@@ -255,6 +255,8 @@
         <button class="btn btn--sm" id="btnEntryNotice" type="button">단톡방 안내 문구 복사</button>
         <span class="panel__hint" id="entryHint"></span>
       </div>
+      <!-- 학생이 채운 「내 정보」 · 얼굴 사진 (profile.js · migration-035 · 20261031c) -->
+      <div class="profile-hint" id="profileHint" hidden></div>
 
       <div class="notice notice--info" id="linkBulkNotice" hidden>
         <span class="notice__icon" aria-hidden="true">🔗</span>
@@ -280,6 +282,7 @@
           <input type="checkbox" id="showArchived"> 퇴원생도 보기
         </label>
         <button class="btn btn--sm" id="btnExpandAll" type="button">모두 펼치기</button>
+        <button class="btn btn--sm" id="btnFaceView" type="button" aria-pressed="false">얼굴 사진으로 보기</button>
       </div>
 
       <div id="rosterList" aria-live="polite"></div>
@@ -1787,6 +1790,7 @@
 <!-- 학생 상담 카드 (card.js) -->
 <dialog class="modal modal--card" id="cardModal">
   <div class="modal__head cd-head">
+    <span class="cd-avatar" id="cardAvatar" aria-hidden="true"></span>
     <div class="cd-head__text">
       <h2 class="modal__title" id="cardTitle">상담 카드</h2>
       <p class="modal__desc" id="cardDesc"></p>
@@ -2066,6 +2070,7 @@
 <script src="app.js?v=20261031c"></script>
 <script src="import.js?v=20261031c"></script>
 <script src="appfetch.js?v=20261031c"></script>
+<script src="profile.js?v=20261031c"></script>
 <script src="course.js?v=20261031c"></script>
 <script src="write.js?v=20261031c"></script>
 <script src="publish.js?v=20261031c"></script>

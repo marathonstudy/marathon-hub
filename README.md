@@ -107,6 +107,8 @@ supabase/
   migration-031-sent-time.sql       「오늘」 반 카드에 레포트 보낸 시각 (coach_cycle 학생마다 sent_at)
   migration-032-report-unit.sql     레포트를 반 + 수업일 단위로 (published · sent 에 class_name · lesson_date · 채우기 트리거) · 고친 레포트 알림 횟수(notify_n · report_notified)
   migration-033-course.sql          과정 + 회차 (courses · course_members · course_sync 가 과정 공통 내용을 반마다 복사) · 담당 조교 · 「이 반만 한 줄 추가」
+  migration-034-exams.sql           D-day 시험 여러 개 · 시험마다 전체 반 / 반 · 과정 (_exam_for_class 가 가장 가까운 시험 + 목록)
+  migration-035-student-profile.sql 학생이 채우는 「내 정보」 · 얼굴 사진 (student_profile · me_info_get · me_info_save · me_photo_save)
   check-data.sql                    데이터 점검 (읽기 전용 · 숫자만) — 반마다 번호 없음 · 번호 같음 · 수업 요일 · 이번 주 공개 · 발송
   migration-028-review-absent.sql   복습테스트 미응시 사유 (review_absences 표 · review_absent_set / clear · 제출하면 저절로 풀림 · 「오늘」 미제출에서 빠짐 · 학부모에게는 사유 이름만)
   migration-024-student-login.sql   학생 공용 입구 — 반 · 이름 목록 · 휴대폰 번호 로그인(맞음/틀림 + 학생 링크 코드만) · 로그인 기록(직원만)
@@ -451,6 +453,18 @@ delete from public.staff where email = '조교이메일@example.com';
   러닝노트 · 미리보기 레포트 과제 요약 · 「과제 상세」도 같은 표시(실패하면 칸을 숨기지 않고 다시 시도).
 - 코치룸 · 러닝노트의 「앱 과제」 「앱 n/5일」 → 「과제」 「과제 n/5일」 · 「과제 요약」 (「과제 상세」 탭 이름 · 앱 공유 링크 · 앱 리포트 열기는 그대로).
 - 수업 요일 정하는 칸 안내 — 「이 반이 처음 수업한 날을 고르세요. 그 요일이 매주 수업 요일이 됩니다.」
+
+### 5-34. 20261031c — 오늘 수업 D-day · 첫 수업일부터 칩 · 학생 「내 정보」 · 얼굴 사진 · 명단 정리 · D-day 시험 등록 (migration-034 · 035)
+1. 033 다음에 SQL Editor → **New query** → `supabase/migration-034-exams.sql` 전체 → **Run** (한 줄 `true`)
+2. 이어서 `supabase/migration-035-student-profile.sql` 전체 → **Run** (세 줄 모두 `true`) — Storage 설정 · 함수 배포는 필요 없다
+- 「오늘」 · 과정 카드 — 수업 당일 「오늘 수업 D-day!」 · 발송 칩 · 오늘 할 일 · 탭 배지는 반의 첫 수업일(수업 요일 정하기)부터의 수업만.
+- 학생 「내 정보」(학생 링크 · /s/ 로그인만) — 학교 · 학년 · 휴대폰 · 목표 대학·학과 · 선택과목 · 최근 모의고사 등급 · 다니는 학원 · 하고 싶은 말 · 얼굴 사진.
+  이름 · 반은 못 바꿈 · 번호를 바꾸면 「로그인 비밀번호도 바뀝니다」. 사진은 정사각 400px · 96px JPEG 를 student_profile 에 data: 글자로 (공개 주소 없음 · 본인 · 직원만).
+  코치룸 — 상담 카드 사진 · 「학생이 채운 내 정보」(「학생이 10/24 수정」) · 「오늘」 · 발송 · 명단의 동그란 사진(없으면 첫 글자) · 「얼굴 사진으로 보기」 바둑판 ·
+  「내 정보 안 채운 학생 n명」 · 「사진 없는 학생 n명」 [문자로 알리기](학생 번호 · /s/ 주소). 상담 기록 · 특이사항 · 성적 · 결석은 학생 화면에 안 나감.
+- 학생 명단 — 반마다 「학생 링크 모두 복사」 없앰 · 반 현황 칸 숨김(레포트 · 러닝노트 · 반 공지 어디에도 안 쓰임 · class_info 데이터 그대로) · 단톡방 안내 문구 새로.
+- D-day 시험 등록(더보기) — 줄마다 시험 이름 · 날짜 · 대상(전체 반 / 반 · 과정 여러 개) · 지우기 · [+ 줄 추가]. 띠 「6월 모의평가 D-42」(당일 D-day · 지나면 다음) · 누르면 전체 날짜순(지난 시험 회색) · 없으면 숨김.
+  예전 「반마다 고른 시험 · 고정」은 쓰지 않는다(저장된 값은 그대로 · 저장하면 비워짐).
 
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.

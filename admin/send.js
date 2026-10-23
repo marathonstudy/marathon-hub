@@ -256,6 +256,7 @@
     var phones = Store.phonesOf(s);
     return '<div class="snd-row snd-row--' + k + (open ? ' is-expanded' : '') + '" data-id="' + esc(s.id) + '">' +
         '<div class="snd-row__line">' +
+          (window.Profile ? Profile.avatar(s, 's') : '') +
           '<button class="snd-row__name" type="button" data-expand aria-expanded="' + open + '">' + esc(s.name || '') + '</button>' +
           '<span class="snd-tag snd-tag--' + t.cls + '"' + (t.title ? ' title="' + esc(t.title) + '"' : '') + '>' + esc(t.text) + '</span>' +
           notifyTag(s) +
@@ -690,6 +691,7 @@
   });
 
   window.addEventListener('jt:kakao', function () { if (state.loaded) render(); });
+  window.addEventListener('jt:profiles', function () { if (state.loaded) render(); });
   /* 수업 요일 · 반이 바뀌면 제목 · 순서도 */
   window.addEventListener('jt:schedule-changed', function () { if (state.loaded) render(); });
   window.addEventListener('jt:roster-changed', function () { if (state.loaded && !$('#panel-send').hidden) render(); });

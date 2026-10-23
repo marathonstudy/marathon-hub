@@ -1060,3 +1060,27 @@ label.hub-btn { cursor: pointer; text-align: center; }
 .dd-item { display: flex; justify-content: space-between; gap: 10px; }
 .dd-item.is-cur { font-weight: 800; }
 .dd-item.is-past { color: #9A9DB0; text-decoration: line-through; text-decoration-thickness: 1px; }
+
+/* 학생 「내 정보」 (me-info.js · 20261031c) */
+.mi-card { display: grid; gap: 10px; }
+.mi-sub, .mi-consent { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--ink-mid); }
+.mi-consent { padding: 8px 10px; border-radius: 10px; background: #F5F2FF; color: #4A34B8; font-weight: 700; }
+.mi-fixed { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 14px; }
+.mi-muted { font-size: 12.5px; color: var(--ink-light); }
+.mi-form { display: grid; gap: 10px; }
+.mi-field { display: grid; gap: 4px; }
+.mi-label { font-size: 13.5px; font-weight: 800; color: var(--ink-deep); }
+.mi-label small { font-weight: 600; color: var(--ink-light); font-size: 11.5px; }
+.mi-input { width: 100%; box-sizing: border-box; font: inherit; font-size: 15px; padding: 10px 12px; border: 1px solid #D9D6EA; border-radius: 10px; background: #fff; color: var(--ink-deep); }
+textarea.mi-input { resize: vertical; min-height: 80px; }
+.mi-input:focus { outline: 2px solid #9F8FE8; border-color: transparent; }
+.mi-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.mi-warn { padding: 9px 11px; border-radius: 10px; background: #FFF4E5; color: #8A5A10; font-size: 13.5px; line-height: 1.55; }
+.mi-warn .hub-btn { margin: 4px 4px 0 0; }
+.mi-ok { margin: 0; font-size: 13.5px; font-weight: 800; color: #1F8A5B; }
+.mi-photo { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.mi-photo__img, .mi-photo__none { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; flex: none; }
+.mi-photo__none { display: grid; place-items: center; background: #EFEBFD; color: #4A34B8; font-size: 34px; font-weight: 900; }
+.mi-photo__btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.mi-file { cursor: pointer; }
+.hub-btn--ghost { background: #fff; color: #4A34B8; border: 1px solid #CFC8F3; }

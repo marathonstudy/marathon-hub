@@ -58,6 +58,8 @@
     <button class="hub-tab" id="tabApp"    role="tab" type="button" aria-selected="false">과제 상세</button>
     <button class="hub-tab" id="tabPhoto"  role="tab" type="button" aria-selected="false">내 필기</button>
     <button class="hub-tab" id="tabBook"   role="tab" type="button" aria-selected="false" hidden>교재비</button>
+    <!-- 내 정보 — 학생 링크(/s/ 로그인)에서만 · 학부모 링크에는 없다 (me-info.js · migration-035 · 20261031c) -->
+    <button class="hub-tab" id="tabInfo"   role="tab" type="button" aria-selected="false" hidden>내 정보</button>
   </nav>
 
   <main id="hubRoot">
@@ -89,6 +91,7 @@
 <script src="../assets/review-card.js?v=20261031c"></script>
 <script src="../assets/app-week.js?v=20261031c"></script>
 <script src="../assets/entry.js?v=20261031c"></script>
+<script src="../assets/me-info.js?v=20261031c"></script>
 <script src="../assets/hub.js?v=20261031c"></script>
 <script>Hub.bootMe();</script>
 </body>

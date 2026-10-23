@@ -318,7 +318,7 @@
   }
   function studentRow(s, cy) {
     return '<div class="tdc-st" data-id="' + esc(s.id) + '">' +
-      '<div class="tdc-st__main"><button type="button" class="roster__name roster__name-btn" data-card="' + esc(s.id) + '">' + esc(s.name) + '</button><span class="tdc-app-slot">' + appCell(s, cy) + '</span></div>' +
+      '<div class="tdc-st__main">' + (window.Profile ? Profile.avatar({ id: s.id, name: s.name }, 's') : '') + '<button type="button" class="roster__name roster__name-btn" data-card="' + esc(s.id) + '">' + esc(s.name) + '</button><span class="tdc-app-slot">' + appCell(s, cy) + '</span></div>' +
       '<div class="tdc-st__acts"><button type="button" class="btn btn--sm" data-card="' + esc(s.id) + '">상담 카드</button>' +
         '<button type="button" class="btn btn--sm" data-sms-sid="' + esc(s.id) + '">문자</button>' +
         '<button type="button" class="btn btn--sm btn--ghost" data-pv="parent" data-sid="' + esc(s.id) + '">학부모 화면 미리보기</button>' +
@@ -708,6 +708,8 @@
   window.addEventListener('jt:roster-changed', function () { if (st.data && !$('#appRoot').hidden) render(); });
   /* 과정 · 담당 조교를 불러오면 카드 묶음 · 차례를 다시 (course.js) */
   window.addEventListener('jt:courses', function () { if (st.data && !$('#appRoot').hidden) render(); });
+  /* 학생 얼굴 사진을 불러오면 학생 줄 동그라미를 다시 (profile.js) */
+  window.addEventListener('jt:profiles', function () { if (st.data && !$('#appRoot').hidden) render(); });
 
   /* 뒤로가기 · 새로고침 (nav.js) — 펼친 반 목록 */
   window.TodayView = {

@@ -334,6 +334,8 @@
     tr.classList.toggle('is-archived', !!s.archived);
     var tds = tr.children;
     tds[0].querySelector('.roster__name').textContent = s.name || '';
+    /* 이름 옆 작은 얼굴 사진 (없으면 첫 글자 · profile.js · 20261031c) */
+    if (window.Profile) tds[0].insertAdjacentHTML('afterbegin', Profile.avatar(s, 's'));
     var nf = window.Card ? Card.followCount(s.id) : 0;
     var nb = tds[0].querySelector('.note-badge');
     nb.hidden = !nf;
@@ -459,6 +461,20 @@
       wrap.appendChild(head);
       /* 반마다 「학생 링크 모두 복사」 줄은 없앴다 — 학생은 /s/ 입구 주소 하나로 로그인한다 (위쪽 「학생 입구 주소 복사」 · 「단톡방 안내 문구 복사」 · 20261031c) */
 
+      /* 얼굴 사진으로 보기 — 사진과 이름 바둑판 (누르면 상담 카드) */
+      if (faceView) {
+        var grid = document.createElement('div');
+        grid.className = 'face-grid';
+        grid.innerHTML = g.rows.map(function (s) {
+          return '<button type="button" class="face-tile" data-face="' + s.id + '">' + (window.Profile ? Profile.avatar(s, 'xl') : '') +
+            '<span class="face-tile__name"></span></button>';
+        }).join('');
+        Array.prototype.forEach.call(grid.querySelectorAll('.face-tile__name'), function (el, i) { el.textContent = g.rows[i].name || ''; });
+        wrap.appendChild(grid);
+        frag.appendChild(wrap);
+        return;
+      }
+
       var table = document.createElement('table');
       table.className = 'roster';
       table.innerHTML = '<thead><tr><th>이름</th><th>학교</th><th>학년</th><th>연락처</th>' +
@@ -485,7 +501,50 @@
     refreshClassOptions();
     syncExpandButton();
     renderClassInfo();
+    renderProfileHint();
   }
+
+  /* ---------- 학생이 채운 내 정보 · 얼굴 사진 (profile.js · 20261031c) ----------
+     「내 정보 안 채운 학생 n명 [문자로 알리기] · 사진 없는 학생 n명 [문자로 알리기]」 — 문자 창이 그 학생들 · 학생 번호 · 안내 문구로 열린다 */
+  var faceView = false;
+  function profileGaps() {
+    var act = students.filter(function (s) { return !s.archived; });
+    return {
+      info: act.filter(function (s) { return !Profile.hasInfo(s.id); }).map(function (s) { return s.id; }),
+      photo: act.filter(function (s) { return !Profile.hasPhoto(s.id); }).map(function (s) { return s.id; })
+    };
+  }
+  function renderProfileHint() {
+    var el = $('#profileHint');
+    if (!el) return;
+    if (!window.Profile || !Profile.loaded() || Profile.missing() || !students.length) { el.hidden = true; return; }
+    var g = profileGaps();
+    el.hidden = !g.info.length && !g.photo.length;
+    el.innerHTML = (g.info.length ? '<span>내 정보 안 채운 학생 <b class="num">' + g.info.length + '</b>명</span> <button type="button" class="btn btn--sm btn--ghost" data-prof-sms="info">문자로 알리기</button>' : '') +
+      (g.info.length && g.photo.length ? '<span class="profile-hint__dot">·</span>' : '') +
+      (g.photo.length ? '<span>사진 없는 학생 <b class="num">' + g.photo.length + '</b>명</span> <button type="button" class="btn btn--sm btn--ghost" data-prof-sms="photo">문자로 알리기</button>' : '');
+  }
+  var PROFILE_SMS = {
+    info: '#{이름} 학생, 러닝노트 「내 정보」를 채워 주세요.\n학생 입구: {주소}\n반과 이름을 고르고 휴대폰 번호에서 010을 뺀 8자리로 로그인 → 「내 정보」 탭',
+    photo: '#{이름} 학생, 러닝노트 「내 정보」에서 얼굴 사진을 올려 주세요. 선생님이 얼굴을 기억하는 데만 써요.\n학생 입구: {주소}\n반과 이름을 고르고 휴대폰 번호 8자리로 로그인 → 「내 정보」 탭'
+  };
+  if ($('#profileHint')) $('#profileHint').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-prof-sms]');
+    if (!b || !window.Sms) return;
+    var g = profileGaps(), k = b.dataset.profSms;
+    Sms.open({ students: g[k], from: 'roster', to: 'student', body: PROFILE_SMS[k].split('{주소}').join(entryUrl()) });
+  });
+  if ($('#btnFaceView')) $('#btnFaceView').addEventListener('click', function () {
+    faceView = !faceView;
+    this.setAttribute('aria-pressed', String(faceView));
+    this.textContent = faceView ? '명단으로 보기' : '얼굴 사진으로 보기';
+    render();
+  });
+  rosterList.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-face]');
+    if (t && window.Card) Card.open(t.dataset.face);
+  });
+  window.addEventListener('jt:profiles', function () { if (!$('#panel-roster').hidden || faceView) render(); else renderProfileHint(); });
 
   function missingLinkIds() {
     return students.filter(function (s) {

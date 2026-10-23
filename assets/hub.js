@@ -1113,7 +1113,8 @@
         '<section class="hub-panel" id="panelVideo" role="tabpanel" hidden></section>' +
         '<section class="hub-panel" id="panelApp" role="tabpanel" hidden></section>' +
         '<section class="hub-panel" id="panelBook" role="tabpanel" hidden></section>' +
-        '<section class="hub-panel" id="panelPhoto" role="tabpanel" hidden></section>';
+        '<section class="hub-panel" id="panelPhoto" role="tabpanel" hidden></section>' +
+        '<section class="hub-panel" id="panelInfo" role="tabpanel" hidden></section>';
 
       WEEKLY = d.weekly || null;
       APP.info = d.app || null;
@@ -1177,6 +1178,17 @@
         Photos.renderTab(host, h.code, { readOnly: !canWrite, focus: date || '' });
       }
 
+      /* 내 정보 — 학생 링크(/s/ 로그인)에서만 (학부모 링크 · 반 공용 링크 · 코치룸 미리보기에는 없다 · 20261031c) */
+      var tabInfo = $('#tabInfo');
+      var infoOn = !PV && d.role === 'student' && !!global.MeInfo;
+      if (tabInfo) tabInfo.hidden = !infoOn;
+      var infoOpened = false;
+      function openInfo() {
+        if (infoOpened || !infoOn) return;
+        infoOpened = true;
+        MeInfo.render($('#panelInfo'), h.code, rpc);
+      }
+
       /* 탭 수에 맞춰 칸을 나눈다 (교재비 탭은 청구서가 있을 때만) */
       function layoutTabs() {
         var n = Array.prototype.filter.call(tabs.querySelectorAll('.hub-tab'), function (b) { return !b.hidden; }).length;
@@ -1194,7 +1206,9 @@
          ['video',  '#tabVideo',  '#panelVideo'],
          ['app',    '#tabApp',    '#panelApp'],
          ['photo',  '#tabPhoto',  '#panelPhoto'],
-         ['book',   '#tabBook',   '#panelBook']].forEach(function (t) {
+         ['book',   '#tabBook',   '#panelBook'],
+         ['info',   '#tabInfo',   '#panelInfo']].forEach(function (t) {
+          if (!$(t[1]) || !$(t[2])) return;
           var on = t[0] === which;
           $(t[1]).setAttribute('aria-selected', on ? 'true' : 'false');
           $(t[2]).hidden = !on;
@@ -1202,6 +1216,7 @@
         if (which === 'app') openApp();
         if (which === 'photo') openPhoto('');
         if (which === 'video') openVideos();
+        if (which === 'info') openInfo();
       }
 
       /* 레포트 — 가장 최근 수업 레포트를 바로 연다 (위 한 줄 ◀ ▶ · 수업일 목록으로 다른 수업) */
@@ -1213,6 +1228,7 @@
       $('#tabApp').onclick    = function () { select('app'); navPush('app'); };
       $('#tabBook').onclick   = function () { select('book'); navPush('book'); };
       $('#tabPhoto').onclick  = function () { select('photo'); navPush('photo'); };
+      if (tabInfo) tabInfo.onclick = function () { select('info'); navPush('info'); };
       /* 레포트 「오늘 수업 필기」의 「내 필기에서 전체 보기」 → 내 필기 탭의 그 날짜 */
       $('#panelReport').addEventListener('click', function (e) {
         var g = e.target.closest('[data-photo-go]');
@@ -1235,6 +1251,7 @@
         else if (v === 'app') select('app');
         else if (v === 'photo') { select('photo'); if (arg) openPhoto(arg); }
         else if (v === 'book' && !$('#tabBook').hidden) select('book');
+        else if (v === 'info' && infoOn) select('info');
         else { select('report'); showLatest(); }
       };
       if (/^(notice|week|this-week|thisweek)$/.test(h.view)) { h.view = ''; h.arg = ''; if (nav.on) history.replaceState(null, '', navHash('week')); }

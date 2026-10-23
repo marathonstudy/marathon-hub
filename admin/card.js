@@ -84,6 +84,14 @@
       filter: { cats: {}, from: '', to: '', author: '', consult: false }
     };
     $('#cardTitle').textContent = s.name + ' 상담 카드';
+    /* 맨 위 얼굴 사진 — 학생이 「내 정보」에서 올린 사진 (없으면 이름 첫 글자 · migration-035 · 20261031c) */
+    var av = $('#cardAvatar');
+    if (av) {
+      av.innerHTML = window.Profile ? Profile.avatar(s, 'l') : '';
+      if (window.Profile && Profile.hasPhoto(sid)) Profile.photo(sid).then(function (src) {
+        if (src && C && C.sid === sid) av.innerHTML = '<img class="av av--l" src="' + src.replace(/"/g, '') + '" alt="' + esc(s.name) + ' 얼굴 사진">';
+      });
+    }
     $('#cardDesc').textContent = [s.className, s.school, s.grade].filter(Boolean).join(' · ') +
       ' — 선생님·조교만 봅니다. 학부모 화면에는 나가지 않습니다';
     $('#cardBody').innerHTML = '<p class="panel__hint">불러오는 중…</p>';
@@ -123,12 +131,14 @@
     $('#cardBody').innerHTML =
       '<div id="cdPinned"></div>' +
       '<section class="cd-sec" id="cdBasic"></section>' +
+      '<section class="cd-sec" id="cdMine"></section>' +
       '<section class="cd-sec" id="cdLogin"></section>' +
       '<section class="cd-sec" id="cdGrades-school"></section>' +
       '<section class="cd-sec" id="cdGrades-mock"></section>' +
       '<section class="cd-sec" id="cdNotes"></section>';
     renderPinned();
     renderBasic();
+    renderMine();
     loadLogin();
     renderGrades('school');
     renderGrades('mock');
@@ -178,6 +188,21 @@
         '</details>';
     }, function () {});
   }
+
+  /* ---------- 학생이 채운 「내 정보」 (학생 화면 /s/ 로그인 → 내 정보 · 읽기만 · 20261031c) ----------
+     학교 · 학년 · 학생 연락처는 위 기본 정보 · 명단과 같은 칸이다. 이 칸은 학생 화면에 보이지만,
+     특이사항 · 성적 · 상담 기록은 학생 화면에 절대 나가지 않는다. */
+  function renderMine() {
+    var host = $('#cdMine');
+    if (!host || !window.Profile) return;
+    if (Profile.missing()) { host.innerHTML = ''; return; }
+    var p = Profile.of(C.sid), info = (p && p.info) || {};
+    var rows = Profile.INFO.filter(function (f) { return String(info[f[0]] || '').trim(); });
+    host.innerHTML = '<h3 class="cd-title">학생이 채운 내 정보 ' + (Profile.editedText(C.sid) ? '<span class="cd-mine-tag">' + esc(Profile.editedText(C.sid)) + '</span>' : '') + '</h3>' +
+      (rows.length ? '<dl class="cd-mine">' + rows.map(function (f) { return '<dt>' + esc(f[1]) + '</dt><dd>' + esc(info[f[0]]) + '</dd>'; }).join('') + '</dl>'
+        : '<p class="panel__hint">아직 비어 있습니다. 학생이 학생 입구(/s/)로 로그인해 「내 정보」에서 직접 채웁니다 (학교 · 학년 · 연락처도 학생이 고칠 수 있음).</p>');
+  }
+  window.addEventListener('jt:profiles', function () { if (C && modal.open) renderMine(); });
 
   /* ---------- 기본 정보 ---------- */
 

@@ -515,7 +515,11 @@
     st.notify = opts.notify || null;
     $('#smsTitle').textContent = st.notify ? '바뀐 내용 알리기' : '문자 보내기';
     $('#smsVarChange').hidden = !st.notify;
-    if (st.notify && opts.body) $('#smsBody').value = opts.body;
+    if (opts.body) $('#smsBody').value = opts.body;
+    /* 보낼 곳을 정해서 열기 — 'student' 면 학생만 (「내 정보를 채워 주세요」 · 20261031c) */
+    if (opts.to === 'student') { $('#smsToPa').checked = false; $('#smsToSt').checked = true; }
+    else if (opts.to === 'parent') { $('#smsToPa').checked = true; $('#smsToSt').checked = false; }
+    else { $('#smsToPa').checked = true; $('#smsToSt').checked = true; }
     $('#smsFind').value = '';
     $('#smsResult').innerHTML = '';
     banner('', '');

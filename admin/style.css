@@ -2857,3 +2857,27 @@ dialog > .toast-host { position: fixed; }
   #exList .ex-row .ex-scope { grid-column: 1 / -1; }
   #exList .ex-row .ex-badge { padding-top: 0; text-align: left; }
 }
+
+/* 얼굴 사진 동그라미 · 바둑판 · 내 정보 (profile.js · 20261031c) */
+.av { display: inline-block; flex: none; border-radius: 50%; object-fit: cover; vertical-align: middle; background: #EFEBFD; }
+.av--s { width: 24px; height: 24px; margin-right: 6px; }
+.av--m { width: 36px; height: 36px; }
+.av--l { width: 56px; height: 56px; }
+.av--xl { width: 72px; height: 72px; }
+.av--none { display: inline-grid; place-items: center; color: #4A34B8; font-weight: 900; font-size: 12px; line-height: 1; }
+.av--l.av--none { font-size: 22px; }
+.av--xl.av--none { font-size: 28px; }
+.cd-head { align-items: center; }
+.cd-avatar { flex: none; display: inline-flex; margin-right: 8px; }
+.cd-mine { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; margin: 0; font-size: 14px; }
+.cd-mine dt { color: var(--ink-light); font-weight: 700; }
+.cd-mine dd { margin: 0; color: var(--ink-deep); white-space: pre-wrap; word-break: break-word; }
+.cd-mine-tag { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; background: #EFEBFD; color: #4A34B8; font-size: 12px; font-weight: 800; vertical-align: middle; }
+.profile-hint { margin: 0 0 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 13px; color: var(--ink-mid); }
+.profile-hint__dot { color: var(--ink-light); }
+.face-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 10px; padding: 10px 4px; }
+.face-tile { appearance: none; border: 1px solid var(--line-soft); background: var(--surface); border-radius: 12px; padding: 10px 4px; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; font: inherit; }
+.face-tile:hover { background: #F5F2FF; }
+.face-tile__name { font-size: 13.5px; font-weight: 800; color: var(--ink-deep); text-align: center; word-break: keep-all; }
+.tdc-st__main .av, .snd-row__line .av { margin-right: 2px; }
+td .av--s { margin-right: 6px; }
