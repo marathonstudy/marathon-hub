@@ -672,7 +672,7 @@
        열면 가장 최근에 공개된 수업 레포트. 위 한 줄 「◀ 지난주 · 10/22(목) 수업 ▾ · 다음주 ▶ · 누적 추이」로 다른 수업.
        차례: 머리(수업일) → 출결 · 집중도 · 복습테스트 → 오늘 수업 필기 → 앱 과제 요약 · 지난 일주일
              → 수업 내용(레포트에 담긴 것 · 없으면 확정된 요약 「오늘 배운 것」) → 종합 코멘트(선생님 한마디)
-             → 이 수업 과제 · 자료(카드) → 수업 영상 → 선생님 공지 → 학생 정보
+             → 수업 영상(20261030b — 선생님 한마디 바로 아래) → 이 수업 과제 · 자료(카드) → 선생님 공지 → 학생 정보
        예전 「이번 주」에만 있던 것도 빠뜨리지 않는다 — 가장 최근 레포트에는 「다른 주 과제 · 자료」(접어서) · 지난 공지까지.
        [복습테스트 입력하기](학생 링크 · 제출 기간)는 탭 맨 위, 홈 화면 추가 안내는 맨 아래.
        공개된 레포트 · 낸 복습 점수 · 확정된 요약 · 앱 기록 · 학생이 올린 필기만. 상담 · 성적 · 금액 · 다른 학생 정보는 넣지 않는다.
@@ -951,9 +951,9 @@
       '<div id="rwApp"></div>' +
       (hasLessons ? ReportView.partsHtml(d2, ['lessons']) : learnHtml(w)) +
       ReportView.partsHtml(d2, ['comment']) +
+      weekVideosHtml(w) +                         /* 이 수업 영상 — 선생님 한마디 바로 아래 (영상이 없으면 칸 없음 · 20261030b) */
       (files ? '<div class="card tw-files rw-files"><h2 class="card-title">✏️ 이 수업 과제 · 자료</h2>' + files + '</div>' : '') +
       (latest ? otherFilesHtml(mon) : '') +
-      weekVideosHtml(w) +
       (latest ? teacherNoticeHtml(noticeItems()) : weekNoticeHtml(mon)) +
       ReportView.partsHtml(d2, ['student']);
   }
