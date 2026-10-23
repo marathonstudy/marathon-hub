@@ -2546,8 +2546,11 @@ body.pv-open { overflow: hidden; }
   .tabs#mainTabs .tab { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 6px 2px 5px; border-bottom: 0; border-radius: 10px; font-size: 11.5px; position: relative; }
   .tabs#mainTabs .tab[aria-selected="true"] { background: #EFEBFD; color: #4A34B8; }
   .tabs#mainTabs .tab__ico { display: block; font-size: 19px; line-height: 1.1; }
-  .tabs#mainTabs .tab__badge { position: absolute; top: 2px; left: calc(50% + 6px); margin: 0; min-width: 16px; height: 16px; font-size: 10px; }
+  .tabs#mainTabs .tab__badge { position: absolute; top: 2px; left: calc(50% + 6px); margin: 0; min-width: 17px; height: 17px; font-size: 11px; }
+  .field__opt { font-size: 11.5px; }          /* 휴대폰에서 보조 설명이 10.5px 로 너무 작았다 */
   .topbar__inner { padding-bottom: 8px; }
+  /* 머리의 흐림(backdrop-filter)은 그 안의 fixed 탭 줄을 머리 상자에 붙여 버린다 (크롬 · 안드로이드) — 탭 줄이 머리를 덮던 것 (20261030b) */
+  .topbar { backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(250, 251, 255, .98); }
   body.is-app { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
   .rsteps { gap: 4px; padding: 5px; }
   .rstep { padding: 7px 9px; gap: 4px; }
@@ -2673,3 +2676,14 @@ dialog > .toast-host { position: fixed; }
 /* 단계 표시 — 다 보냈으면 「발송 11/11 ✓」 초록 */
 .rstep__n.is-done { background: #E3F4EC; color: #1F6E52; opacity: 1; padding: 1px 7px; border-radius: 999px; font-weight: 800; }
 .rstep[aria-selected="true"] .rstep__n.is-done { background: #fff; }
+/* 문자 표 — 휴대폰에서도 네 칸이 한 화면에 (번호 · 상태는 줄바꿈) */
+.sms-table { table-layout: fixed; }
+.sms-table th:first-child, .sms-table td.sms-c--chk { width: 26px; padding-left: 4px; padding-right: 2px; }
+.sms-num { flex-wrap: wrap; white-space: normal; row-gap: 0; }
+.sms-num .num { white-space: nowrap; }
+@media (max-width: 480px) {
+  .sms-table { font-size: 12px; }
+  .sms-table th, .sms-table td { padding: 3px 4px; }
+  .sms-c--name { white-space: normal; width: 22%; }
+  .sms-st { font-size: 11px; padding: 0 4px; margin-left: 0; }
+}
