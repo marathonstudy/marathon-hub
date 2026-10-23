@@ -114,8 +114,13 @@
     }
     /* AI 수업 요약 (summary.js · migration-012) */
     if (window.Summary) Summary.render(st.cls, st.week);
-    /* 복습테스트 (review.js · migration-013) */
-    if (window.Review) Review.render(st.cls, st.week);
+    /* 복습테스트 (review.js · migration-013) — 과정이면 그 회차 첫 반 시험 목록이 기준 (다른 반에 맞춰진다 · 마감은 반마다 그 반 수업일) */
+    if (window.Review) {
+      if (isCourseKey()) {
+        var c = Course.byKey(st.cls), ms = Course.membersAt(c, Course.roundOfWeek(c, st.week)).filter(function (m) { return m.date; });
+        if (ms.length) Review.render(ms[0].cls, ms[0].week, { course: c, members: ms });
+      } else Review.render(st.cls, st.week);
+    }
   }
 
   function load() {
@@ -151,8 +156,24 @@
     }).join('');
   }
 
+  /* 과정 칸(§과정)이 바뀌면 반마다 복사하도록 알린다 (course.js · 20261031a) */
+  function changed() { window.dispatchEvent(new CustomEvent('jt:weekly-changed', { detail: { cls: st.cls, week: st.week } })); }
+  function isCourseKey() { return !!(window.Course && Course.isKey(st.cls)); }
+
   function renderLesson() {
     var line = $('#wkLessonLine');
+    /* 과정 — 반마다 그 회차 수업일 (반만 바꾸려면 그 반을 골라서) */
+    if (isCourseKey()) {
+      var c = Course.byKey(st.cls), no = Course.roundOfWeek(c, st.week);
+      line.className = 'wk-line';
+      line.textContent = Course.label(c, no) + ' — ' + Course.membersAt(c, no).map(function (m) {
+        return Course.shortName(m.cls) + ' ' + (m.date ? Store.dateWithDow(m.date) : m.canceled ? '휴강' : '수업 요일 없음');
+      }).join(' · ') + ' (한 반만 수업일을 바꾸려면 그 반을 골라서)';
+      $('#btnWkSched').hidden = true; $('#btnWkWeek').hidden = true;
+      $('#wkSchedEdit').hidden = true; $('#wkWeekEdit').hidden = true;
+      return;
+    }
+    $('#btnWkSched').hidden = false;
     var sched = st.cls ? Store.schedOf(st.cls) : null;
     var L = st.cls ? Store.lessonOf(st.cls, st.week) : null;
     var ov = st.cls ? Store.classWeekOf(st.cls, st.week) : null;
@@ -272,6 +293,12 @@
       var key = v.id || v.tmp;
       var who = v.student_ids || [];
       var whoText = who.length ? who.length + '명만' : '반 전체';
+      /* 과정에서 복사된 영상은 과정 화면에서만 고치고 지운다 (20261031a) */
+      if (v.course_src) {
+        return '<div class="wk-video is-course" data-v="' + esc(key) + '"><div class="wk-video__row wk-video__row--course">' +
+          '<span class="wk-tag wk-tag--course">과정 공통</span><span class="wk-video__ro">' + esc((PARTS.find(function (p) { return p[0] === v.part; }) || ['', ''])[1] + ' · ' + (v.title || defaultTitle(v.part))) + '</span>' +
+          '<span class="muted-note">과정 화면에서 고칩니다</span></div></div>';
+      }
       return '<div class="wk-video" data-v="' + esc(key) + '">' +
         '<div class="wk-video__row">' +
           '<select class="input wk-video__part" data-wk="part" aria-label="차시">' + PARTS.map(function (p) {
@@ -360,6 +387,7 @@
       refreshRow(oldKey, v);
       if (v._again) { v._again = false; return saveVideo(v); }
       toast('수업 영상을 저장했습니다', 'good');
+      changed();
     }).catch(function (e) {
       v._saving = false; v._again = false; v._err = '저장하지 못했습니다 — ' + e.message; refreshRow(oldKey, v);
     });
@@ -404,6 +432,7 @@
           if (r.error) { toast(r.error.message, 'bad'); return; }
           drop();
           toast('영상을 지웠습니다');
+          changed();
         });
       });
     }
@@ -427,13 +456,14 @@
       var fresh = st.fresh[f.id];
       return '<div class="wk-file' + (fresh ? ' is-fresh' : '') + '" data-f="' + esc(f.id) + '">' +
         '<span class="wk-file__ext">' + esc(String(f.ext).toUpperCase()) + '</span>' +
-        '<input class="input wk-file__name" data-wk="fname" maxlength="120" value="' + esc(f.name) + '" aria-label="보이는 이름">' +
-        '<select class="input wk-file__kind wk-kind--' + esc(f.kind) + '" data-wk="kind" aria-label="학생에게 보이는 분류" title="학생에게 보이는 분류 — 필수 과제 · 선택 과제 · 배부 자료">' + KINDS.map(function (k) {
+        '<input class="input wk-file__name" data-wk="fname" maxlength="120" value="' + esc(f.name) + '" aria-label="보이는 이름"' + (f.course_src ? ' disabled' : '') + '>' +
+        '<select class="input wk-file__kind wk-kind--' + esc(f.kind) + '" data-wk="kind" aria-label="학생에게 보이는 분류" title="학생에게 보이는 분류 — 필수 과제 · 선택 과제 · 배부 자료"' + (f.course_src ? ' disabled' : '') + '>' + KINDS.map(function (k) {
           return '<option value="' + k[0] + '"' + (f.kind === k[0] ? ' selected' : '') + '>' + k[1] + '</option>';
         }).join('') + '</select>' +
         '<span class="wk-file__size num">' + sizeText(f.bytes) + (f.thumb_path ? ' <span class="wk-file__th" title="학생 화면 카드에 첫 페이지 그림이 보입니다">🖼</span>' : '') + '</span>' +
         '<button class="btn btn--sm btn--ghost" type="button" data-wk-act="fget">열기</button>' +
-        (canDelete(f) ? '<button class="btn btn--sm btn--ghost" type="button" data-wk-act="fdel" aria-label="파일 지우기">삭제</button>' : '<span></span>') +
+        (f.course_src ? '<span class="wk-tag wk-tag--course" title="과정 화면에서 고치고 지웁니다">과정 공통</span>'
+          : canDelete(f) ? '<button class="btn btn--sm btn--ghost" type="button" data-wk-act="fdel" aria-label="파일 지우기">삭제</button>' : '<span></span>') +
         (fresh ? '<span class="wk-tag">방금 올림 · 자동 분류: ' + esc(KIND_LABEL[fresh]) + '</span>' : '') +
       '</div>';
     }).join('');
@@ -524,6 +554,7 @@
     chain.then(function () {
       st.busy = false;
       if (key === st.key) Object.assign(st.fresh, freshNow);
+      if (done) changed();
       var counts = { material: 0, required: 0, optional: 0 };
       Object.keys(freshNow).forEach(function (id) { counts[freshNow[id]]++; });
       note.innerHTML =
@@ -537,7 +568,7 @@
       if (thumbQ.length) {
         thumbQ.reduce(function (p, x) {
           return p.then(function () { return makeThumb(x.row, x.blob).catch(function () { return null; }); });
-        }, Promise.resolve()).then(function () { if (key === st.key) renderFiles(); loadUsage(); });
+        }, Promise.resolve()).then(function () { if (key === st.key) renderFiles(); loadUsage(); changed(); });
       }
     });
   }
@@ -619,6 +650,7 @@
       Object.assign(f, (r.data && r.data[0]) || patch);
       if (patch.kind) { delete st.fresh[f.id]; renderFiles(); }
       toast(patch.kind ? KIND_LABEL[patch.kind] + '(으)로 바꿨습니다' : '이름을 바꿨습니다', 'good');
+      changed();
     });
   }
 
@@ -642,6 +674,7 @@
           st.files = st.files.filter(function (x) { return x.id !== f.id; });
           renderFiles(); loadUsage();
           toast('파일을 지웠습니다');
+          changed();
         }).catch(function (err) { toast(err.message, 'bad'); });
       });
     }
@@ -655,9 +688,10 @@
     return chunks.reduce(function (p, part) {
       return p.then(function () {
         /* 첫 페이지 그림도 같이 (migration-029) */
+        /* 과정에서 복사된 줄(course_src)은 원본과 같은 파일을 가리킨다 — 줄만 지우고 파일은 그대로 (20261031a) */
         var paths = [];
-        part.forEach(function (f) { paths.push(f.path); if (f.thumb_path) paths.push(f.thumb_path); });
-        return sb().storage.from(BUCKET).remove(paths).then(function (r) {
+        part.forEach(function (f) { if (f.course_src) return; paths.push(f.path); if (f.thumb_path) paths.push(f.thumb_path); });
+        return (paths.length ? sb().storage.from(BUCKET).remove(paths) : Promise.resolve({})).then(function (r) {
           if (r.error) throw new Error('보관함에서 지우지 못했습니다 — ' + r.error.message);
           return sb().from('class_files').delete().in('id', part.map(function (f) { return f.id; })).select('id');
         }).then(function (r) {
@@ -688,7 +722,9 @@
     var before = $('#wkCleanBefore').value;
     if (!before) { toast('날짜를 골라 주세요', 'bad'); return; }
     $('#wkCleanList').innerHTML = '<p class="panel__hint">찾는 중…</p>';
-    sb().from('class_files').select('*').lt('week_start', before).order('week_start').then(function (r) {
+    var q0 = sb().from('class_files').select('*').lt('week_start', before);
+    if (!(window.Course && Course.missing())) q0 = q0.is('course_src', null);      /* 과정 복사 줄은 원본과 함께 지워진다 (033) */
+    q0.order('week_start').then(function (r) {
       if (r.error) { $('#wkCleanList').innerHTML = '<p class="panel__hint">' + esc(isMissing(r.error) ? NEED_SQL : r.error.message) + '</p>'; return; }
       clean.rows = r.data || [];
       if (!clean.rows.length) {

@@ -248,7 +248,9 @@
       lessons: (r.lessons && r.lessons.length) ? r.lessons : [''],
       tests: (r.tests && r.tests.length) ? r.tests : [''],
       comment: r.comment || '',
-      homework: Array.isArray(r.homework) ? r.homework : []
+      homework: Array.isArray(r.homework) ? r.homework : [],
+      extra: r.extra || '',                               /* 「이 반만 한 줄 추가」 (과정 · migration-033) */
+      local: Array.isArray(r.local) ? r.local : []         /* 과정 내용을 이 반에서 직접 고친 칸 */
     };
   }
 

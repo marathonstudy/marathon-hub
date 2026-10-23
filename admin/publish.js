@@ -42,25 +42,39 @@
 
   /* 고른 반 학생 전원 (반 하나 + 수업 하나 · 다른 반은 보이지 않는다 · 20261030e) — 비어 있는 칸은 레포트에서 숨는다
      미리 체크는 아직 공개 안 한 학생만 */
+  /* 과정 (course.js · 20261031a) — 그 회차에 같은 주로 쓰는 반들 · 반마다 수업일 · 마감(그 반 수업일 밤 12시) */
+  function isCourse() { return !!(window.Course && Course.isKey(curClass())); }
+  function memberOf(cls) {
+    if (!isCourse()) return null;
+    return Course.split(curClass(), state.week).same.find(function (m) { return m.cls === cls; }) || null;
+  }
+  /* 마감이 지났나 — 수업일 다음 날부터 (개별 반은 늘 지난 것으로 · 지금 흐름 그대로) */
+  function closed(cls) {
+    var m = memberOf(cls);
+    return !m || (!!m.date && DDay.today() > m.date);
+  }
   function buildRows(d) {
-    var cur = curClass();
-    return UI.activeStudents().filter(function (s) { return !cur || grpOf(s) === cur; }).map(function (s) {
-      var common = (d.common || {})[s.className || ''] || { lessons: [], tests: [] };
+    var cur = curClass(), order = {};
+    if (isCourse()) Course.split(cur, state.week).same.forEach(function (m, i) { order[m.cls] = i; });
+    var commonOf = function (k) { return (d.common || {})[k] || null; };
+    return UI.activeStudents().filter(function (s) { return !cur || (isCourse() ? grpOf(s) in order : grpOf(s) === cur); }).map(function (s) {
+      var common = (window.Course ? Course.effectiveCommon(s.className || '', state.week, commonOf) : null) || (d.common || {})[s.className || ''] || { lessons: [], tests: [] };
       var pub = state.published[s.id] || null;
       return {
         student: s, common: common, entry: (d.entries || {})[s.id] || {},
         pub: pub, eligible: true,
-        /* 아직 공개 안 한 학생은 미리 체크해 둔다 */
-        checked: !pub
+        /* 아직 공개 안 한 학생은 미리 체크해 둔다 — 과정은 마감이 지난 반만 */
+        checked: !pub && closed(grpOf(s))
       };
     }).sort(function (a, b) {
-      var c = (a.student.className || '').localeCompare(b.student.className || '', 'ko');
+      var c = isCourse() ? order[grpOf(a.student)] - order[grpOf(b.student)] : (a.student.className || '').localeCompare(b.student.className || '', 'ko');
       return c !== 0 ? c : (a.student.name || '').localeCompare(b.student.name || '', 'ko');
     });
   }
 
   /* 「10/22(목) 수업」 — 주 시작일 대신 그 반 수업일 (반을 안 골랐거나 수업 요일이 없으면 「10/12~10/18」 · 20261030b) */
   function whenText() {
+    if (isCourse()) { var co = Course.byKey(curClass()); return co.name + ' ' + Course.label(co, Course.roundOfWeek(co, state.week)) + ' 레포트'; }
     var cls = curClass(), L = cls && Store.lessonOf ? Store.lessonOf(cls, state.week) : null;
     if (L && L.date && !L.canceled) return Store.dateWithDow(L.date) + ' 수업 레포트';
     if (L && L.canceled) return Store.shortDate(state.week) + '~' + Store.shortDate(state.weekEnd) + ' (휴강 주) 레포트';
@@ -85,7 +99,7 @@
       return;
     }
 
-    $('#pubWeekHint').textContent = whenText() + (curClass() ? ' · ' + curClass() : '');
+    $('#pubWeekHint').textContent = whenText() + (curClass() && !isCourse() ? ' · ' + curClass() : '');
 
     if (!state.rows.length) {
       host.innerHTML = '<div class="empty-state">다니는 학생이 없습니다.</div>';
@@ -122,6 +136,13 @@
       var basis = grpBasis(eligible);
       head.querySelector('[data-grp]').checked = basis.length > 0 && basis.every(function (r) { return r.checked; });
       head.querySelector('.pub-group__name').textContent = g.name;
+      var mm = memberOf(g.name);
+      if (mm) {
+        var dl = document.createElement('span');
+        dl.className = 'pub-group__dl' + (closed(g.name) ? ' is-closed' : ' is-open');
+        dl.textContent = (mm.date ? Store.dateWithDow(mm.date) + ' 수업 · ' : '') + (closed(g.name) ? '마감 지남' : '마감 전 (' + Lesson.md(mm.date, false) + ' 밤 12시)');
+        head.querySelector('.pub-group__name').after(dl);
+      }
       head.querySelector('.pub-group__count').textContent =
         g.rows.filter(function (r) { return r.pub && r.pub.visible; }).length + ' / ' + g.rows.length + '명 공개';
       target.appendChild(head);
@@ -234,15 +255,57 @@
 
   /* ---------- 공개 ---------- */
 
+  /* 과정 — 마감 전인 반을 체크했으면 누른 사람에게만 묻는다: [마감 끝난 반만 공개](기본) · [그래도 공개] · [취소] (20261031a) */
+  function askOpen(picked) {
+    var open = [];
+    picked.forEach(function (r) { var g = grpOf(r.student); if (!closed(g) && open.indexOf(g) === -1) open.push(g); });
+    if (!open.length) return Promise.resolve(picked);
+    var names = open.map(function (g) { return Course.shortName(g); }).join(' · ');
+    $('#pubWarnDesc').textContent = names + '은(는) 아직 마감 전입니다. 지금 공개하면 안 낸 학생이 「미응시」로 나갑니다.';
+    var onlyClosed = picked.filter(function (r) { return closed(grpOf(r.student)); });
+    $('#pubWarnClosed').disabled = !onlyClosed.length;
+    $('#pubWarnClosed').textContent = onlyClosed.length ? '마감 끝난 반만 공개 (' + onlyClosed.length + '명)' : '마감 끝난 반이 없습니다';
+    return new Promise(function (resolve) {
+      var m = $('#pubWarnModal');
+      function done(v) { m.close(); ['pubWarnClosed', 'pubWarnAll', 'pubWarnCancel'].forEach(function (id) { $('#' + id).onclick = null; }); resolve(v); }
+      $('#pubWarnClosed').onclick = function () { done(onlyClosed); };
+      $('#pubWarnAll').onclick = function () { done(picked); };
+      $('#pubWarnCancel').onclick = function () { done(null); };
+      m.onclose = function () { if (m.returnValue !== 'x') resolve(null); };
+      m.showModal();
+      setTimeout(function () { $('#pubWarnClosed').focus(); }, 0);
+    });
+  }
+  /* 「미응시로 나갈 학생 — 목동 2명 · 반포 5명」 (반별) */
+  function absentLine(rows) {
+    var by = {}, order = [];
+    rows.forEach(function (r) {
+      if (!(r.data.tests || []).some(function (t) { return t.absent === '미응시'; })) return;
+      var g = grpOf(r.student);
+      if (!(g in by)) { by[g] = 0; order.push(g); }
+      by[g]++;
+    });
+    if (!order.length) return '';
+    return '미응시로 나갈 학생 — ' + order.map(function (g) { return (isCourse() ? Course.shortName(g) : g) + ' ' + by[g] + '명'; }).join(' · ');
+  }
+
   $('#btnPublish').addEventListener('click', function () {
     var picked = state.rows.filter(function (r) { return r.checked; });
     if (!picked.length) return;
+    (isCourse() ? askOpen(picked) : Promise.resolve(picked)).then(function (list) {
+      if (list && list.length) confirmPublish(list);
+    });
+  });
+
+  function confirmPublish(picked) {
 
     /* 정말 빠진 것만 한 줄 (막지는 않는다 · 개별 코멘트는 넣지 않는다) */
     var gap = Report.gapLine(picked.map(function (r) { return { name: r.student.name, common: r.common, entry: r.entry }; }));
+    var ab = absentLine(picked.map(function (r) { return { student: r.student, data: Report.toReportData(r.student, r.common, r.entry, { start: state.week, end: state.weekEnd }) }; }));
     UI.confirmAsk('학부모에게 공개',
       picked.length + '명의 ' + whenText() + '를 공개합니다. 공개하면 바로 학생 개인 페이지에서 보입니다.' +
-      (gap ? '\n\n' + gap + ' — 비어 있는 칸은 레포트에서 숨습니다.' : ''), '공개').then(function (ok) {
+      (gap ? '\n\n' + gap + ' — 비어 있는 칸은 레포트에서 숨습니다.' : '') +
+      (ab ? '\n\n' + ab : ''), '공개').then(function (ok) {
       if (!ok) return;
       var btn = $('#btnPublish');
       btn.disabled = true;
@@ -259,7 +322,8 @@
       var changed = [];
 
       /* 다시 공개 — 지금 공개된 내용과 견줘 바뀐 것을 레포트 위에 「10/24 업데이트 · 복습테스트 결과 추가」로 남긴다 (20261030e) */
-      DB.publishedDataOf(state.week, again).then(function (old) {
+      /* 과정 — 기다리는 공통 내용 복사(영상 · 자료)를 먼저 (course.js) */
+      (isCourse() ? Course.flush(curClass(), state.week) : Promise.resolve()).then(function () { return DB.publishedDataOf(state.week, again); }).then(function (old) {
         rows.forEach(function (r) {
           var o = old[r.studentId];
           if (!o) return;
@@ -283,7 +347,7 @@
         refreshButton();
       });
     });
-  });
+    }
 
   /* ---------- 바뀐 내용 알리기 (20261030e) ----------
      이미 보낸 학생 중 다시 공개로 내용이 실제로 바뀐 학생만 — 학생마다 바뀐 것 한 줄 · 체크로 일부만

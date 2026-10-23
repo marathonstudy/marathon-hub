@@ -63,7 +63,9 @@
   function commentFor(common, entry) {
     var own = ((entry && entry.comment) || '').trim();
     if (own) return own;
-    return ((common && common.comment) || '').trim();
+    /* 과정에 든 반 — 반 공통 코멘트 뒤에 「이 반만 한 줄 추가」 (migration-033 · 20261031a) */
+    var base = ((common && common.comment) || '').trim(), extra = ((common && common.extra) || '').trim();
+    return base && extra ? base + String.fromCharCode(10) + extra : (base || extra);
   }
 
   /* ============================================================

@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" as="style" crossorigin
       href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
-<link rel="stylesheet" href="style.css?v=20261030e">
+<link rel="stylesheet" href="style.css?v=20261031a">
 </head>
 <body class="is-locked">
 
@@ -196,6 +196,8 @@
       </div>
 
     </div>
+    <!-- 과정 — 반별 현황 한 줄 (write.js · 20261031a) -->
+    <p class="rstatus" id="rStatus" hidden></p>
     <nav class="rsteps" aria-label="레포트 발송 단계">
       <!-- 단계 버튼 (20261030e) — 「1 작성」 → 「2 공개 11/11 ✓」 → 「3 발송 11/11 ✓」 · 지금 단계는 진한 보라 · 끝난 단계는 초록 ✓ -->
       <button class="rstep" role="tab" id="tab-write"   aria-controls="panel-write"   aria-selected="false"><span class="rstep__no num">1</span><span class="rstep__t">작성</span><span class="rstep__n num" id="rstepWrite"></span></button>
@@ -371,6 +373,8 @@
           <div class="spacer"></div>
           <button class="btn btn--sm" id="btnLoadLast" type="button">지난주 불러오기</button>
         </div>
+        <!-- 과정 안내 (write.js · 20261031a) — 과정 화면: 「한 번 쓰면 이 회차 모든 반에」 · 과정에 든 반 화면: 「여기서 고치면 이 반만 바뀝니다」 -->
+        <div class="course-note" id="courseNote" hidden></div>
 
         <div class="sub wk-sub" id="wkLessonSub">
           <div class="sub__head">
@@ -467,6 +471,8 @@
             <span id="commonCommentCount">0자</span>
             <span class="sub__hint" id="commonCommentUse"></span>
           </div>
+          <!-- 「이 반만 한 줄 추가」 — 과정에 든 반마다 (반 공통 코멘트 뒤에 붙는다 · 20261031a) -->
+          <div class="course-extra" id="courseExtra" hidden></div>
         </div>
       </div>
 
@@ -1396,12 +1402,36 @@
 
 
 <!-- 더보기 (rtabs.js) -->
+<!-- 과정 관리 (course.js · 20261031a) — 과정 만들기 · 들어갈 반 · 「10월 4주」 표기 · 반마다 담당 조교 -->
+<dialog class="modal modal--wide" id="courseModal">
+  <div class="modal__head">
+    <h2 class="modal__title">과정 관리</h2>
+    <p class="modal__desc">여러 반이 같은 회차 수업을 요일만 다르게 들으면 과정으로 묶습니다 (예: 고3 수능국어 — 토 목동반 · 일 반포반). 과정에 안 든 반은 지금처럼 반 하나씩 씁니다.</p>
+  </div>
+  <div class="modal__body">
+    <div id="courseList"></div>
+    <div class="cm-form">
+      <div class="cm-sub" id="cmFormTitle">새 과정 만들기</div>
+      <label class="field"><span class="field__label">과정 이름</span><input class="input" id="cmName" type="text" maxlength="40" placeholder="예) 고3 수능국어"></label>
+      <div class="cm-row">
+        <label class="field"><span class="field__label">첫 회차 시작일 <span class="field__opt">이날부터 7일이 한 회차</span></span><input class="input" id="cmStart" type="date"></label>
+        <label class="field"><span class="field__label">그 회차 번호</span><input class="input" id="cmStartNo" type="number" min="1" max="999" value="1"></label>
+      </div>
+      <p class="field__hint">예) 7회차 수업을 10/24(토)에 시작하면 시작일 10/24 · 번호 7. 반마다 수업일은 그 반 수업 요일로 저절로 붙습니다.</p>
+      <p class="modal__error is-on" id="cmError"></p>
+      <div class="toolbar"><button class="btn btn--primary" type="button" id="cmSave">저장</button><button class="btn btn--ghost" type="button" id="cmNew">새로 쓰기</button></div>
+    </div>
+  </div>
+  <div class="modal__foot"><button class="btn" type="button" id="courseClose">닫기</button></div>
+</dialog>
+
 <dialog class="modal sheet" id="moreMenu">
   <div class="modal__head"><h2 class="modal__title">더보기</h2></div>
   <div class="modal__body sheet__list">
     <button class="btn sheet__btn" role="tab" id="tab-notice" aria-controls="panel-notice" aria-selected="false"><span>반 공지</span><span class="sheet__hint">반 단톡방 공지 올리기</span></button>
     <button class="btn sheet__btn" type="button" data-more="exams"><span>시험 관리</span><span class="sheet__hint">D-day 띠의 시험</span></button>
-    <button class="btn sheet__btn" type="button" data-more="settings"><span>설정</span><span class="sheet__hint">급함 기준 · 알림톡 · 문자 · 직원 관리</span></button>
+    <button class="btn sheet__btn" type="button" data-more="course"><span>과정 관리</span><span class="sheet__hint">여러 반이 같은 회차를 요일만 다르게 듣는 과정 · 담당 조교</span></button>
+    <button class="btn sheet__btn" type="button" data-more="settings"><span>설정</span><span class="sheet__hint">결석 기준 · 알림톡 · 문자 · 직원 관리</span></button>
     <a class="btn sheet__btn" href="../guide/" target="_blank" rel="noopener" data-more="guide"><span>사용 설명서</span><span class="sheet__hint">새 창</span></a>
   </div>
   <div class="modal__foot"><div class="spacer"></div><button class="btn" type="button" id="moreMenuClose">닫기</button></div>
@@ -1418,6 +1448,19 @@
 </dialog>
 
 <!-- 문자 보내기 (sms.js · Edge Function sms-send · migration-023) -->
+<!-- 과정 공개 — 마감 전 반을 체크했을 때 (publish.js · 20261031a) -->
+<dialog class="modal" id="pubWarnModal">
+  <div class="modal__head">
+    <h2 class="modal__title">아직 마감 전인 반이 있습니다</h2>
+    <p class="modal__desc" id="pubWarnDesc"></p>
+  </div>
+  <div class="modal__foot modal__foot--stack">
+    <button class="btn btn--primary" type="button" id="pubWarnClosed">마감 끝난 반만 공개</button>
+    <button class="btn" type="button" id="pubWarnAll">그래도 공개</button>
+    <button class="btn btn--ghost" type="button" id="pubWarnCancel">취소</button>
+  </div>
+</dialog>
+
 <!-- 바뀐 내용 알리기 (publish.js · 20261030e) — 이미 보낸 레포트를 고쳐 다시 공개했을 때, 내용이 바뀐 학생만 -->
 <dialog class="modal" id="notifyModal">
   <div class="modal__head">
@@ -2022,48 +2065,49 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
 <!-- config.js 와 brand.js 가 먼저 와야 한다. 나머지가 이 값을 읽는다. -->
-<script src="../assets/config.js?v=20261030e"></script>
-<script src="../assets/brand.js?v=20261030e"></script>
-<script src="../assets/lesson.js?v=20261030e"></script>
-<script src="supabase.js?v=20261030e"></script>
-<script src="db.js?v=20261030e"></script>
-<script src="store.js?v=20261030e"></script>
-<script src="report.js?v=20261030e"></script>
-<script src="aipolish.js?v=20261030e"></script>
-<script src="app.js?v=20261030e"></script>
-<script src="import.js?v=20261030e"></script>
-<script src="write.js?v=20261030e"></script>
-<script src="publish.js?v=20261030e"></script>
-<script src="send.js?v=20261030e"></script>
-<script src="kakao.js?v=20261030e"></script>
-<script src="sms.js?v=20261030e"></script>
-<script src="contacts.js?v=20261030e"></script>
-<script src="notice.js?v=20261030e"></script>
-<script src="tb.js?v=20261030e"></script>
-<script src="tb-dash.js?v=20261030e"></script>
-<script src="tb-issue.js?v=20261030e"></script>
-<script src="tb-stock.js?v=20261030e"></script>
-<script src="tb-bill.js?v=20261030e"></script>
-<script src="../assets/dday.js?v=20261030e"></script>
-<script src="../assets/app-week.js?v=20261030e"></script>
-<script src="card.js?v=20261030e"></script>
-<script src="exams.js?v=20261030e"></script>
-<script src="photo.js?v=20261030e"></script>
-<script src="today.js?v=20261030e"></script>
-<script src="staff.js?v=20261030e"></script>
-<script src="classes.js?v=20261030e"></script>
-<script src="weekly.js?v=20261030e"></script>
-<script src="filethumb.js?v=20261030e"></script>
-<script src="ytbm.js?v=20261030e"></script>
-<script src="summary.js?v=20261030e"></script>
-<script src="weeks.js?v=20261030e"></script>
-<script src="../assets/photos.js?v=20261030e"></script>
-<script src="review.js?v=20261030e"></script>
-<script src="draftguard.js?v=20261030e"></script>
-<script src="preview.js?v=20261030e"></script>
-<script src="rtabs.js?v=20261030e"></script>
-<script src="nav.js?v=20261030e"></script>
-<script src="sync.js?v=20261030e"></script>
-<script src="auth.js?v=20261030e"></script>
+<script src="../assets/config.js?v=20261031a"></script>
+<script src="../assets/brand.js?v=20261031a"></script>
+<script src="../assets/lesson.js?v=20261031a"></script>
+<script src="supabase.js?v=20261031a"></script>
+<script src="db.js?v=20261031a"></script>
+<script src="store.js?v=20261031a"></script>
+<script src="report.js?v=20261031a"></script>
+<script src="aipolish.js?v=20261031a"></script>
+<script src="app.js?v=20261031a"></script>
+<script src="import.js?v=20261031a"></script>
+<script src="course.js?v=20261031a"></script>
+<script src="write.js?v=20261031a"></script>
+<script src="publish.js?v=20261031a"></script>
+<script src="send.js?v=20261031a"></script>
+<script src="kakao.js?v=20261031a"></script>
+<script src="sms.js?v=20261031a"></script>
+<script src="contacts.js?v=20261031a"></script>
+<script src="notice.js?v=20261031a"></script>
+<script src="tb.js?v=20261031a"></script>
+<script src="tb-dash.js?v=20261031a"></script>
+<script src="tb-issue.js?v=20261031a"></script>
+<script src="tb-stock.js?v=20261031a"></script>
+<script src="tb-bill.js?v=20261031a"></script>
+<script src="../assets/dday.js?v=20261031a"></script>
+<script src="../assets/app-week.js?v=20261031a"></script>
+<script src="card.js?v=20261031a"></script>
+<script src="exams.js?v=20261031a"></script>
+<script src="photo.js?v=20261031a"></script>
+<script src="today.js?v=20261031a"></script>
+<script src="staff.js?v=20261031a"></script>
+<script src="classes.js?v=20261031a"></script>
+<script src="weekly.js?v=20261031a"></script>
+<script src="filethumb.js?v=20261031a"></script>
+<script src="ytbm.js?v=20261031a"></script>
+<script src="summary.js?v=20261031a"></script>
+<script src="weeks.js?v=20261031a"></script>
+<script src="../assets/photos.js?v=20261031a"></script>
+<script src="review.js?v=20261031a"></script>
+<script src="draftguard.js?v=20261031a"></script>
+<script src="preview.js?v=20261031a"></script>
+<script src="rtabs.js?v=20261031a"></script>
+<script src="nav.js?v=20261031a"></script>
+<script src="sync.js?v=20261031a"></script>
+<script src="auth.js?v=20261031a"></script>
 </body>
 </html>

@@ -58,9 +58,11 @@
      불러오기 · 그리기 — weekly.js 의 render 가 부른다
      ============================================================ */
 
-  function render(cls, week) {
+  /* opts.course — 과정 작성 화면: 그 회차 첫 반 시험 목록이 기준이고 다른 반에 맞춰진다 (마감은 반마다 그 반 수업일 · 20261031a) */
+  function render(cls, week, opts) {
     if (!$('#rvSub')) return;
-    var key = (cls || '') + '|' + monday(week);
+    var key = (cls || '') + '|' + monday(week) + (opts && opts.course ? '|c' : '');
+    st.course = (opts && opts.course) ? opts : null;
     st.cls = cls || ''; st.week = week || ''; st.mon = monday(week);
     if (key !== st.key) { st.key = key; st.data = null; st.edit = null; draw(); load(); }
   }
@@ -109,7 +111,8 @@
     /* 요약 줄 — 보는 시험은 굵게, 뺀 시험은 「복습 TEST 이번 주 안 봄 · 되돌리기」 (20261029g)
        시험마다 「복습 TEST 제출 9 · 미응시 1 / 11」 — 미응시는 제출과 따로 센다 (20261029h) */
     line.innerHTML = '<b>' + esc(Lesson.md(String(day).slice(0, 10))) + '</b> · ' + (on.length ? on.map(function (t) { return '<b>' + esc(t.test_name) + '</b>'; }).join(' · ') : '시험 없음') +
-      ' · 마감 ' + esc(Lesson.md(String(day).slice(0, 10))) + ' 밤 12시' +
+      (st.course ? ' · <span class="rv-course">과정 모든 반에 같은 시험 · 마감 ' + esc(st.course.members.map(function (m) { return Course.shortName(m.cls) + ' ' + Lesson.md(m.date); }).join(' · ')) + ' 밤 12시</span>'
+        : ' · 마감 ' + esc(Lesson.md(String(day).slice(0, 10))) + ' 밤 12시') +
       (on.length ? ' <span class="muted-note rv-count">' + on.map(function (t) { return esc(countText(t, rows)); }).join(' · ') + '</span>' : '') +
       all.filter(function (t) { return t.off; }).map(function (t) {
         return ' <span class="rv-off">' + esc(t.test_name) + ' 이번 주 안 봄 · <button type="button" class="link-btn" data-rv="on" data-tid="' + esc(t.id) + '">되돌리기</button></span>';
@@ -327,6 +330,7 @@
       if (r.error) { toast(isMissing(r.error) ? (need || NEED_SQL) : r.error.message, 'bad'); return null; }
       if (okMsg) toast(okMsg, 'good');
       st.edit = null;
+      if (/^review_test_/.test(fn)) window.dispatchEvent(new CustomEvent('jt:review-changed', { detail: { cls: st.cls, week: st.mon } }));
       return load().then(function () { return r.data; });
     });
   }

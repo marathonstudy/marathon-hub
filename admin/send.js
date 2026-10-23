@@ -181,11 +181,17 @@
 
   /* 고른 반 하나만 (반 하나 + 수업 하나 · 다른 반은 보이지 않는다 · 20261030e) — 반을 안 골랐으면 예전처럼 모든 반 */
   function curClass() { return (window.Writer && Writer.currentClass && Writer.currentClass()) || ''; }
+  /* 과정이면 그 회차에 같은 주로 쓰는 반들 — 수업일 순 (course.js · 20261031a) */
+  function isCourse() { return !!(window.Course && Course.isKey(curClass())); }
   function groups() {
-    var by = {}, cur = curClass();
-    students().forEach(function (s) { if (!cur || clsOf(s) === cur) (by[clsOf(s)] = by[clsOf(s)] || []).push(s); });
+    var by = {}, cur = curClass(), course = isCourse();
+    students().forEach(function (s) { if (!cur || (course ? Course.inScope(cur, clsOf(s), state.week) : clsOf(s) === cur)) (by[clsOf(s)] = by[clsOf(s)] || []).push(s); });
     var names = Object.keys(by).filter(function (n) { return n === NOCLS || !Store.isArchivedClass(n); });
-    return orderClasses(names).map(function (n) {
+    if (course) {
+      var order = Course.split(cur, state.week).same.map(function (m) { return m.cls; });
+      names.sort(function (a, b) { return order.indexOf(a) - order.indexOf(b); });
+    } else names = orderClasses(names);
+    return names.map(function (n) {
       var rows = by[n].slice().sort(byName);
       var pub = rows.filter(function (s) { return state.published[s.id]; }).length;
       var sent = rows.filter(function (s) { return state.published[s.id] && state.sent[s.id]; }).length;
@@ -211,6 +217,7 @@
      ============================================================ */
 
   function titleText(gs) {
+    if (isCourse() && state.week) { var co = Course.byKey(curClass()); return '발송 · ' + co.name + ' ' + Course.label(co, Course.roundOfWeek(co, state.week)) + ' 레포트'; }
     var ds = [];
     gs.forEach(function (g) { if (g.lesson && g.lesson.date && !g.lesson.canceled && ds.indexOf(g.lesson.date) === -1) ds.push(g.lesson.date); });
     ds.sort();
@@ -267,7 +274,9 @@
     var body = '';
     if (open) {
       if (!g.pub) {
-        body = '<div class="snd-unpub">아직 공개 전입니다 <button class="btn btn--sm" type="button" data-gopub>공개하러 가기</button></div>';
+        body = isCourse()
+          ? '<div class="snd-unpub snd-unpub--course">' + esc(Course.shortName(g.name)) + ' 공개 전 · 발송 불가 <button class="btn btn--sm" type="button" data-gopub>공개하러 가기</button></div>'
+          : '<div class="snd-unpub">아직 공개 전입니다 <button class="btn btn--sm" type="button" data-gopub>공개하러 가기</button></div>';
       } else {
         var targets = kakaoOn() ? g.rows.filter(function (s) { var k = rowState(s); return k === 'ready' || k === 'failed'; }) : [];
         body = '<div class="snd-acts">' +
@@ -300,7 +309,10 @@
     var pub = gs.reduce(function (a, g) { return a + g.pub; }, 0);
     var sent = gs.reduce(function (a, g) { return a + g.sent; }, 0);
     var kk = kakaoOn() ? ' · 알림톡 오늘 ' + Kakao.today() + ' / ' + (Kakao.cfg().dailyMax || 300) + '건' : '';
-    $('#sendProgress').textContent = state.week && total ? '전체 공개 ' + pub + '/' + total + ' · 보냄 ' + sent + '/' + total + kk : '';
+    $('#sendProgress').textContent = state.week && total ? (isCourse()
+      /* 과정 — 반별 「목동 100% · 반포 92%」 (보낸 학생 / 반 학생 · 공개 전 반은 「공개 전」) */
+      ? gs.map(function (g) { return Course.shortName(g.name) + ' ' + (!g.pub ? '공개 전' : Math.round(g.sent / Math.max(1, g.rows.length) * 100) + '%'); }).join(' · ') + kk
+      : '전체 공개 ' + pub + '/' + total + ' · 보냄 ' + sent + '/' + total + kk) : '';
 
     if (!state.loaded) { host.innerHTML = '<div class="empty-state">불러오는 중…</div>'; return; }
     if (!state.week) {

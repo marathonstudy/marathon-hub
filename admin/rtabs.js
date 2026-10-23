@@ -70,6 +70,7 @@
     if (k === 'guide') { closeMore(); return; }                         /* 새 창으로 링크가 열린다 */
     if (k === 'exams') closeMore(function () { $('#btnExams').click(); });
     if (k === 'settings') closeMore(function () { $('#tdSettingsBtn').click(); });
+    if (k === 'course') closeMore(function () { if (window.Course) Course.openManage(); });
   });
   $('#moreMenuClose').addEventListener('click', function () { $('#moreMenu').close(); });
 
@@ -100,6 +101,8 @@
   function classStudents() {
     var cls = window.Writer && Writer.currentClass ? Writer.currentClass() : '';
     var list = (window.UI ? UI.activeStudents() : Store.activeStudents()) || [];
+    /* 과정이면 그 회차에 같은 주로 쓰는 반들 (course.js · 20261031a) */
+    if (cls && window.Course && Course.isKey(cls)) return list.filter(function (s) { return Course.inScope(cls, (s.className || '').trim(), weekNow()); });
     return cls ? list.filter(function (s) { return (s.className || '').trim() === cls; }) : list;
   }
   function updateCounts() {

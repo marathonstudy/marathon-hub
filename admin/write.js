@@ -65,7 +65,7 @@
     var s = students().find(function (x) { return x.id === studentId; });
     var own = (entryOf(studentId).comment || '').trim();
     if (own) return { text: own, shared: false };
-    var shared = ((commonOf((s && s.className) || '_').comment) || '').trim();
+    var shared = Report.commentFor(effCommon((s && s.className) || '_'), {});
     return { text: shared, shared: true };
   }
 
@@ -158,10 +158,22 @@
     return draft.entries[id];
   }
 
+  /* 과정(§과정 이름)이면 이 주에 같이 쓰는 반들의 학생 — 반 순서(수업일) · 이름 순 (20261031a) */
+  function isCourse(cls) { return !!(window.Course && Course.isKey(cls)); }
   function studentsOfClass(cls) {
+    if (isCourse(cls)) {
+      var sp = Course.split(cls, draft.weekStart), order = {};
+      sp.same.forEach(function (m, i) { order[m.cls] = i; });
+      return students().filter(function (s) { return (s.className || '') in order; })
+        .sort(function (a, b) { return (order[a.className] - order[b.className]) || (a.name || '').localeCompare(b.name || '', 'ko'); });
+    }
     return students()
       .filter(function (s) { return (s.className || '') === cls; })
       .sort(function (a, b) { return (a.name || '').localeCompare(b.name || '', 'ko'); });
+  }
+  /* 반 레포트에 들어갈 반 공통 — 과정에 든 반이면 과정 내용 + 이 반 것 (course.js) */
+  function effCommon(cls) {
+    return window.Course ? Course.effectiveCommon(cls, draft.weekStart, function (k) { return draft.common[k] || null; }) || commonOf(cls) : commonOf(cls);
   }
 
   /* ============================================================
@@ -259,11 +271,30 @@
       return;
     }
 
-    if (!classes.some(function (c) { return c.name === currentClass; })) {
+    var courses = window.Course ? Course.list() : [];
+    /* 담당 조교의 반(과정)을 맨 앞에 (course.js · 20261031a) */
+    if (window.Course) {
+      classes = Course.mineFirst(classes, function (c) { return c.name; });
+      var mineC = function (co) { return co.members.some(function (m) { return m.to == null && Course.mine(m.cls); }); };
+      courses = courses.filter(mineC).concat(courses.filter(function (co) { return !mineC(co); }));
+    }
+    if (!classes.some(function (c) { return c.name === currentClass; }) && !(isCourse(currentClass) && Course.byKey(currentClass))) {
       currentClass = classes[0].name;
     }
 
     var frag = document.createDocumentFragment();
+    /* 과정 — 반 고르기 맨 앞 (「📚 고3 수능국어 · 2반」) · 고르면 회차 고르기(달력) → 1 작성 · 2 공개 · 3 발송 (20261031a) */
+    courses.forEach(function (co) {
+      var k = Course.keyOf(co), ms = Course.membersAt(co, Course.roundNow(co));
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'chip chip--course' + (k === currentClass ? ' is-on' : '');
+      b.dataset.cls = k;
+      b.innerHTML = '<span class="chip__name"></span><span class="chip__count num">' + ms.length + '반</span>';
+      b.querySelector('.chip__name').textContent = '📚 ' + co.name;
+      b.title = ms.map(function (m) { return m.cls; }).join(' · ');
+      frag.appendChild(b);
+    });
     classes.forEach(function (c) {
       var list = studentsOfClass(c.name);
 
@@ -358,6 +389,7 @@
   function stepOk(start, dir) {
     var to = monOf(Lesson.addDays(start, 7 * dir));
     if (dir > 0) return to <= Lesson.addDays(Store.thisWeek().start, 7);
+    if (isCourse(currentClass)) { var co = Course.byKey(currentClass); return !co || Course.roundOfWeek(co, to) >= co.startNo; }
     var s = Store.schedOf(currentClass);
     return !(s && s.first && to < monOf(s.first));
   }
@@ -369,13 +401,37 @@
     var L = s ? Lesson.of(s, start) : null;
     /* 작성 · 공개 · 발송 맨 위에 늘 크게 「고2 선수능반 · 10/22(목) 수업」 — 반 하나 + 수업 하나 (20261030e) */
     var when = L && L.date && !L.canceled ? Store.dateWithDow(L.date) + ' 수업' : Store.lessonLabel(currentClass, start);
-    now.innerHTML = '<span class="wbar__cls">' + escapeHtml(currentClass || '반 없음') + ' · </span>' +
+    /* 과정 — 「고3 수능국어 · 7회차 · 10/24(토) ~ 10/25(일)」 */
+    var co = isCourse(currentClass) ? Course.byKey(currentClass) : null;
+    if (co) when = Course.label(co, Course.roundOfWeek(co, start));
+    now.innerHTML = '<span class="wbar__cls">' + escapeHtml(co ? '📚 ' + co.name : (currentClass || '반 없음')) + ' · </span>' +
       '<b>' + escapeHtml(when) + '</b>' +
       (L && L.canceled ? ' <span class="wbar__off">휴강</span>' : '');
+    renderStatus();
     $('#btnWbarPrev').disabled = !stepOk(start, -1);
     $('#btnWbarNext').disabled = !stepOk(start, 1);
     stickBar();
   }
+  /* 과정 — 반별 현황 한 줄 「목동 10/24(토) 제출 11/12 · 반포 10/25(일) 수업 전」 (작성 · 공개 · 발송 위 · 20261031a) */
+  function renderStatus() {
+    var el = $('#rStatus');
+    if (!el) return;
+    if (!isCourse(currentClass) || !draft || !draft.weekStart) { el.hidden = true; el.textContent = ''; return; }
+    var co = Course.byKey(currentClass);
+    if (!co) { el.hidden = true; return; }
+    var t = DDay.today(), ms = Course.membersAt(co, Course.roundOfWeek(co, draft.weekStart));
+    el.hidden = !ms.length;
+    el.innerHTML = ms.map(function (m) {
+      var head = '<b>' + escapeHtml(Course.shortName(m.cls)) + '</b> ' + escapeHtml(m.date ? Store.dateWithDow(m.date) : m.canceled ? '휴강' : '수업일 없음');
+      if (!m.date || m.date > t) return '<span class="rstatus__i">' + head + ' 수업 전</span>';
+      var list = students().filter(function (s) { return s.className === m.cls; });
+      var sub = list.filter(function (s) { return Store.reviewsOf(s.id, m.week).some(function (x) { return x.status === 'submitted' || x.status === 'confirmed'; }); }).length;
+      return '<span class="rstatus__i">' + head + ' 제출 <span class="num">' + sub + '/' + list.length + '</span>' + (m.week !== draft.weekStart ? ' <span class="muted-note">(다른 주 · 반을 골라 따로)</span>' : '') + '</span>';
+    }).join('<span class="rstatus__dot">·</span>');
+  }
+  window.addEventListener('jt:review-scores', function () { renderStatus(); });
+  window.addEventListener('jt:courses', function () { if (!$('#panel-write').hidden || $('#reportHead') && !$('#reportHead').hidden) { renderClassPicker(); renderBar(); } });
+
   function step(dir) {
     if (!draft || !draft.weekStart || !stepOk(draft.weekStart, dir)) return;
     openWeek(Lesson.addDays(draft.weekStart, 7 * dir));     /* switchWeek 가 지금 주를 먼저 저장(flushDraft)한 뒤 넘어간다 */
@@ -426,9 +482,69 @@
               : '비어 있으면 코멘트 칸이 레포트에 안 나옵니다');
   }
 
+  /* 과정 안내 · 「이 반만 한 줄 추가」 (20261031a) */
+  function renderCourseBits() {
+    var note = $('#courseNote'), ex = $('#courseExtra');
+    if (!note || !ex) return;
+    var co = isCourse(currentClass) ? Course.byKey(currentClass) : null;
+    var r = !co && window.Course && draft.weekStart ? Course.roundOfClassWeek(currentClass, draft.weekStart) : null;
+    if (co) {
+      var sp = Course.split(currentClass, draft.weekStart);
+      note.hidden = false;
+      note.innerHTML = '📚 <b>' + escapeHtml(co.name) + ' ' + escapeHtml(Course.label(co, sp.no)) + '</b> — 여기 쓰는 수업 내용 · 반 공통 코멘트 · 수업 영상 · 자료 · 복습테스트는 <b>이 회차 모든 반</b>(' +
+        escapeHtml(sp.same.concat(sp.other).map(function (m) { return Course.shortName(m.cls); }).join(' · ') || '들어간 반 없음') + ') 레포트에 들어갑니다. 학생 카드는 아래 반마다 따로입니다.' +
+        (sp.other.length ? '<br><span class="course-note__warn">' + escapeHtml(sp.other.map(function (m) { return m.cls + '(' + Store.dateWithDow(m.date) + ')'; }).join(' · ')) + '은 수업일이 다른 주라 학생 카드 · 공개 · 발송은 그 반을 골라 따로 엽니다.</span>' : '');
+      ex.hidden = !sp.same.length;
+      ex.innerHTML = '<div class="course-extra__t">반마다 한 줄 추가 <span class="sub__hint">반 공통 코멘트 뒤에 그 반에만 붙습니다 (선택)</span></div>' + sp.same.map(function (m) {
+        return '<label class="course-extra__row"><span>' + escapeHtml(Course.shortName(m.cls)) + '</span><input class="input" data-extra="' + escapeHtml(m.cls) + '" maxlength="300" placeholder="예) 반포반은 다음 주 보강이 있습니다" value="' + escapeHtml((commonOf(m.cls).extra) || '') + '"></label>';
+      }).join('');
+      return;
+    }
+    if (r) {
+      var local = commonOf(currentClass).local || [];
+      note.hidden = false;
+      note.innerHTML = '📚 이 반은 <b>' + escapeHtml(r.course.name) + ' ' + escapeHtml(Course.label(r.course, r.no)) + '</b>입니다. 수업 내용 · 코멘트 · 영상 · 자료 · 복습테스트는 과정에서 한 번에 씁니다 — <b>여기서 고치면 이 반만 바뀝니다</b>.' +
+        (local.length ? ' <span class="course-note__warn">이 반만 바꾼 칸: ' + local.map(function (k) { return k === 'lessons' ? '수업 내용' : '반 공통 코멘트'; }).join(' · ') + '</span>' : '') +
+        ' <button type="button" class="btn btn--sm" data-open-course="' + escapeHtml(Course.keyOf(r.course)) + '">과정으로 열기</button>';
+      ex.hidden = false;
+      ex.innerHTML = '<label class="course-extra__row"><span>이 반만 한 줄 추가</span><input class="input" data-extra="' + escapeHtml(currentClass) + '" maxlength="300" placeholder="반 공통 코멘트 뒤에 이 반에만 붙습니다 (선택)" value="' + escapeHtml(commonOf(currentClass).extra || '') + '"></label>';
+      return;
+    }
+    note.hidden = true; ex.hidden = true; note.innerHTML = ''; ex.innerHTML = '';
+  }
+  /* 과정에 든 반 화면에서 과정 내용을 고치면 그 칸은 이 반 것으로 (다음 과정 복사에 덮이지 않는다) */
+  var localTold = {};
+  function markLocal(field) {
+    if (isCourse(currentClass) || !window.Course || !draft.weekStart) return;
+    if (!Course.roundOfClassWeek(currentClass, draft.weekStart)) return;
+    var c = commonOf(currentClass);
+    c.local = (c.local || []).slice();
+    if (c.local.indexOf(field) === -1) c.local.push(field);
+    var k = currentClass + '|' + draft.weekStart + '|' + field;
+    if (!localTold[k]) { localTold[k] = true; toast('이 반만 바뀝니다 — 과정의 다른 반은 그대로입니다', 'good'); renderCourseBits(); }
+  }
+  $('#commonPanel').addEventListener('input', function (e) {
+    var t = e.target;
+    if (!t.dataset || !t.dataset.extra) return;
+    commonOf(t.dataset.extra).extra = t.value;
+    saveDraft(); schedulePreview();
+    showState('common', t.dataset.extra, 'saving');
+  });
+  /* [과정으로 열기] — 이 반이 든 회차를 과정 화면으로 */
+  $('#commonPanel').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-open-course]');
+    if (!b) return;
+    var r = Course.roundOfClassWeek(currentClass, draft.weekStart);
+    flushDraft();
+    currentClass = b.dataset.openCourse;
+    selectedId = '';
+    openWeek(r ? Course.weekOfRound(r.course, r.no) : draft.weekStart).then(refreshAll);
+  });
+
   function renderCommon() {
-    $('#commonTitle').textContent = currentClass ? currentClass + ' 공통' : '반 공통';
+    $('#commonTitle').textContent = isCourse(currentClass) ? Course.byKey(currentClass).name + ' 공통 (이 회차 모든 반)' : currentClass ? currentClass + ' 공통' : '반 공통';
     var c = commonOf(currentClass || '_');
+    renderCourseBits();
 
     var lessons = $('#lessonList');
     lessons.textContent = '';
@@ -455,6 +571,7 @@
     var el = e.target;
     if (el.dataset.kind === 'lesson') {
       showState('common', currentClass, 'saving');
+      markLocal('lessons');
       commonOf(currentClass).lessons[+el.dataset.i] = el.value;
       saveDraft(); schedulePreview();
     }
@@ -479,6 +596,7 @@
     if (e.target.id !== 'commonComment') return;
     /* 읽는 쪽(renderCommonComment)과 같은 자리를 써야 한다.
        반이 아직 안 골라졌으면 양쪽 다 '_' 를 쓴다. */
+    markLocal('comment');
     commonOf(currentClass || '_').comment = e.target.value;
     renderCommonComment();
     renderEntries();          /* 공통을 쓰는 학생 카드의 미리보기가 같이 바뀐다 */
@@ -640,7 +758,14 @@
   function fillReview(el, id) {
     var host = el.querySelector('[data-role="rv"]');
     if (!host) return;
-    var line = window.Review && Review.lineOf ? Review.lineOf(currentClass, draft.weekStart, id) : null;
+    var rvCls = currentClass;
+    if (isCourse(currentClass)) { var stu = students().find(function (x) { return x.id === id; }); rvCls = stu ? stu.className : ''; }
+    var line = window.Review && Review.lineOf ? Review.lineOf(rvCls, draft.weekStart, id) : null;
+    /* 과정 화면 — 반마다 그 반 시험 (불러 둔 점수로) */
+    if (line == null && isCourse(currentClass)) {
+      var rows = Store.reviewsOf(id, draft.weekStart);
+      line = rows.length ? rows.map(function (x) { return (x.label || x.test_name || '복습 TEST').replace(/^\d+\/\d+\([^)]*\)\s*/, '') + ' ' + (x.status === 'absent' || x.status === 'missing' ? '미응시' : x.correct != null ? x.correct + '/' + x.q_count : '제출'); }).join(' · ') : '아직 제출 안 함';
+    }
     host.textContent = line == null ? '불러오는 중…' : line;
     host.classList.toggle('is-none', line === '아직 제출 안 함');
   }
@@ -658,7 +783,29 @@
     host.textContent = '';
 
     if (!list.length) {
-      host.innerHTML = '<div class="empty-state">이 반에 등록된 학생이 없습니다.</div>';
+      host.innerHTML = '<div class="empty-state">' + (isCourse(currentClass) ? '이 회차에 같이 쓰는 반 학생이 없습니다. 더보기 → 과정 관리에서 반을 넣으세요.' : '이 반에 등록된 학생이 없습니다.') + '</div>';
+    } else if (isCourse(currentClass)) {
+      /* 과정 — 반마다 접힌 칸 (담당 조교 반은 펼친 채로 · 누르면 펼치기/접기 · 20261031a) */
+      var sp = Course.split(currentClass, draft.weekStart), fragC = document.createDocumentFragment();
+      sp.same.forEach(function (m) {
+        var mine = list.filter(function (s) { return s.className === m.cls; });
+        if (!(m.cls in openGroup)) openGroup[m.cls] = Course.mine(m.cls);
+        var box = document.createElement('section');
+        box.className = 'entry-group' + (openGroup[m.cls] ? ' is-open' : '');
+        box.dataset.grp = m.cls;
+        box.innerHTML = '<button type="button" class="entry-group__head" data-grp-toggle aria-expanded="' + !!openGroup[m.cls] + '">' +
+          '<b>' + escapeHtml(m.cls) + '</b> <span class="muted-note">' + escapeHtml(m.date ? Store.dateWithDow(m.date) + ' 수업' : '') + ' · ' + mine.length + '명' +
+          (Course.mine(m.cls) ? ' · 내 반' : '') + '</span><span class="class-head__caret" aria-hidden="true">▾</span></button>';
+        if (openGroup[m.cls]) mine.forEach(function (s) {
+          var wrap = document.createElement('div');
+          wrap.innerHTML = entryCardHtml(s, tests);
+          var card = wrap.firstElementChild;
+          fillEntryCard(card, s, tests);
+          box.appendChild(card);
+        });
+        fragC.appendChild(box);
+      });
+      host.appendChild(fragC);
     } else {
       var frag = document.createDocumentFragment();
       shown.forEach(function (s) {
@@ -676,7 +823,10 @@
 
   /* ---------- 입력 반응 (이벤트 위임) ---------- */
 
+  var openGroup = {};
   $('#entryList').addEventListener('click', function (ev) {
+    var gh = ev.target.closest('[data-grp-toggle]');
+    if (gh) { var g = gh.closest('[data-grp]').dataset.grp; openGroup[g] = !openGroup[g]; renderEntries(); return; }
     var card = ev.target.closest('.entry');
     if (!card) return;
     var id = card.dataset.id;
@@ -842,7 +992,7 @@
     }
 
     $('#previewWho').textContent = s.name + ' 학생';
-    var data = Report.toReportData(s, commonOf(currentClass), entryOf(s.id),
+    var data = Report.toReportData(s, effCommon(s.className || ''), entryOf(s.id),
                                    { start: draft.weekStart, end: draft.weekEnd });
     $('#previewFrame').srcdoc = previewHtml(data);
   }
@@ -1617,7 +1767,7 @@
     /* 뒤로가기 · 새로고침으로 반을 되돌릴 때 (nav.js) */
     selectClass: function (cls) {
       if (!cls || cls === currentClass) return;
-      if (!Store.getClasses().some(function (c) { return c.name === cls; })) return;
+      if (!Store.getClasses().some(function (c) { return c.name === cls; }) && !(isCourse(cls) && Course.byKey(cls))) return;
       currentClass = cls;
       selectedId = '';
       if (!$('#panel-write').hidden) refreshAll();

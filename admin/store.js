@@ -402,10 +402,10 @@
     return target;
   }
 
-  var COMMON_KEYS = ['lessons', 'tests', 'homework', 'comment'];
+  var COMMON_KEYS = ['lessons', 'tests', 'homework', 'comment', 'extra', 'local'];
   function rawCommon(r) {
-    return r ? { lessons: r.lessons || [], tests: r.tests || [], homework: r.homework || [], comment: r.comment || '' }
-             : { lessons: [], tests: [], homework: [], comment: '' };
+    return r ? { lessons: r.lessons || [], tests: r.tests || [], homework: r.homework || [], comment: r.comment || '', extra: r.extra || '', local: r.local || [] }
+             : { lessons: [], tests: [], homework: [], comment: '', extra: '', local: [] };
   }
   function normCommon(c) { return global.DB.fromDbCommon(rawCommon(c)); }
 
@@ -631,7 +631,7 @@
       var set = {}, bs = {}, any = false;
       COMMON_KEYS.forEach(function (k) {
         if (same(normCommon(curN)[k], bn[k])) return;
-        set[k] = curN[k] == null ? (k === 'comment' ? '' : []) : curN[k];
+        set[k] = curN[k] == null ? (k === 'comment' || k === 'extra' ? '' : []) : curN[k];
         bs[k] = braw[k];
         any = true;
       });
@@ -647,6 +647,7 @@
           if (mergeCommon(cls, res.row, sent, clash)) emit('jt:draft-remote', { common: [cls] });
           if (res.conflicts && res.conflicts.length) clashes.push({ kind: 'common', id: cls, keys: res.conflicts, row: res.row });
           setSaveState('common', cls, res.conflicts && res.conflicts.length ? 'conflict' : 'saved');
+          emit('jt:common-saved', { cls: cls, week: week });     /* 과정 칸이면 반마다 복사 (course.js) */
         }, function (e) { setSaveState('common', cls, 'failed'); throw e; });
       });
     });
@@ -1401,8 +1402,10 @@
       var end = w.weekEnd || '';
       var touched = !!end && end >= week;
       if (!touched) end = autoEnd(week);
+      /* 화면 쪽은 따로 복사한다 — 서버에서 온 「수업 내용」 배열을 '마지막 저장 값'(base)과 같이 쓰면
+         그 줄을 고쳐도 둘이 함께 바뀌어 '바뀐 것 없음'으로 보고 저장하지 않았다 (20261031a) */
       var draft = { weekStart: week, weekEnd: end, weekEndTouched: touched,
-                    common: w.common || {}, entries: w.entries || {} };
+                    common: copyVal(w.common || {}), entries: copyVal(w.entries || {}) };
       var bw = { weekStart: week, weekEnd: w.weekEnd || '', entries: {}, common: {}, at: { entry: {}, common: {} } };
       Object.keys(w.rawEntries || {}).forEach(function (sid) { bw.entries[sid] = flatRaw(w.rawEntries[sid]); bw.at.entry[sid] = w.rawEntries[sid].updated_at || ''; });
       Object.keys(w.rawCommon || {}).forEach(function (cls) { bw.common[cls] = rawCommon(w.rawCommon[cls]); bw.at.common[cls] = w.rawCommon[cls].updated_at || ''; });

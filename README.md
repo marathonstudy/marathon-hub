@@ -106,6 +106,7 @@ supabase/
   migration-030-review-no-confirm.sql  복습테스트 「확인」 단계 없애기 — 평균 · 그래프 · 누적 추이 · 주차 현황이 낸 점수 그대로 · 사유 없는 미제출은 레포트에 「미응시」(status missing)
   migration-031-sent-time.sql       「오늘」 반 카드에 레포트 보낸 시각 (coach_cycle 학생마다 sent_at)
   migration-032-report-unit.sql     레포트를 반 + 수업일 단위로 (published · sent 에 class_name · lesson_date · 채우기 트리거) · 고친 레포트 알림 횟수(notify_n · report_notified)
+  migration-033-course.sql          과정 + 회차 (courses · course_members · course_sync 가 과정 공통 내용을 반마다 복사) · 담당 조교 · 「이 반만 한 줄 추가」
   check-data.sql                    데이터 점검 (읽기 전용 · 숫자만) — 반마다 번호 없음 · 번호 같음 · 수업 요일 · 이번 주 공개 · 발송
   migration-028-review-absent.sql   복습테스트 미응시 사유 (review_absences 표 · review_absent_set / clear · 제출하면 저절로 풀림 · 「오늘」 미제출에서 빠짐 · 학부모에게는 사유 이름만)
   migration-024-student-login.sql   학생 공용 입구 — 반 · 이름 목록 · 휴대폰 번호 로그인(맞음/틀림 + 학생 링크 코드만) · 로그인 기록(직원만)
@@ -429,6 +430,18 @@ delete from public.staff where email = '조교이메일@example.com';
   [알리지 않고 공개만]. 러닝노트 레포트 위 「10/24 업데이트 · 복습테스트 결과 추가」(report_data._upd). 3 발송 표 「알림 2회 · 마지막 10/24 10:12」(032 뒤).
 - 저장 — published · sent 에 반 · 수업일 칸(트리거가 채움 · 예전 기록도 채움 · 지우지 않음). 화면은 지금처럼 반 + 그 수업이 든 주로 다룬다(반마다 한 주에 레포트 한 편).
   주 2회 반을 수업마다 따로 쓰려면 작성(entries · week_common) · 영상 · 자료 · 복습테스트 열쇠도 수업일로 바꿔야 해서 이번에는 하지 않았다.
+
+### 5-32. 20261031a — 과정 + 회차 · 「오늘」 챙길 학생 (migration-033)
+1. 032 다음에 SQL Editor → **New query** → `supabase/migration-033-course.sql` 전체 → **Run** (다섯 줄 모두 `true`)
+- 과정(courses) = 여러 반이 같은 회차를 요일만 다르게 듣는 묶음. 회차 = 첫 회차 시작일부터 7일씩. 반의 그 회차 수업일 = 그 7일 안의 반 수업 요일(그 반만 바꾼 날 · 휴강 그대로).
+  course_members — 반은 과정 하나에만 · 넣은 회차부터(from_no) · 뺀 회차 앞까지(to_no). 기존 레포트는 옮기지 않는다.
+- 과정 공통 내용 = 「§과정 이름」 칸의 회차 시작 주(week_common · lesson_videos · class_files · lesson_summaries) → course_sync 가 각 반 그 주 칸으로 복사
+  (영상 · 자료는 course_src 로 원본을 가리킴 · 원본을 지우면 함께 빠짐 · 자료는 같은 보관 파일). 반에서 직접 고친 칸(week_common.local)은 덮지 않음 · 「이 반만 한 줄 추가」 = week_common.extra.
+  복습테스트는 반마다 그 반 수업일(마감)로 — 회차 첫 반의 시험 목록에 다른 반을 맞춘다. 학부모 화면 · 파일 내려받기 · 반 공지 함수는 그대로.
+- 코치룸 — 더보기 → 과정 관리(만들기 · 들어갈 반 · 「10월 4주」 표기 · 반마다 담당 조교). 레포트 발송 반 고르기에 📚 과정 → 회차 고르기 달력 → 1 작성(공통 칸 + 반마다 접힌 학생 카드 · 반별 현황 한 줄) →
+  2 공개(마감 지난 반만 기본 체크 · 마감 전 반은 [마감 끝난 반만 공개]/[그래도 공개]/[취소] · 「미응시로 나갈 학생」 반별) → 3 발송(반별 「목동 100% · 반포 92%」 · 공개 전 반 회색).
+- 「오늘」 — 과정은 한 묶음 카드(회차 · 날짜 범위 · 이번 회차 일주일 한 줄 달력 · 반별 줄) · 담당 조교 반이 맨 위.
+  「챙길 학생」(오늘 할 일 아래 · 배지 제외) — 복습테스트 안 낸 학생(review_missing · 그 수업 레포트를 보내면 사라짐) · 결석 잦은 학생(마지막 결석 뒤 상담 기록이 있으면 사라짐).
 
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.

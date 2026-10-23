@@ -24,10 +24,23 @@
   function host() { return $('#wkvPanel'); }
   function firstLine(s) { return String(s || '').split('\n')[0].trim(); }
 
+  /* 과정 — 회차 고르기 = 작은 달력 (회차마다 같은 색 띠 · 반 수업일에 반 이름 · 오늘 동그라미 · 누르면 그 회차 · 20261031a) */
+  function renderCourse() {
+    var h = host(), co = Course.byKey(st.cls);
+    if (!h || !co) return;
+    var no = Course.roundNow(co);
+    if (!st.month || st.monthCls !== st.cls) { st.month = Course.range(co, no).from.slice(0, 7); st.monthCls = st.cls; }
+    h.innerHTML = '<div class="panel__head wkv-head"><div class="wkv-head__text"><h2 class="panel__title">📚 ' + esc(co.name) + ' · 회차 고르기</h2>' +
+        '<p class="panel__hint">지금 ' + esc(Course.label(co, no)) + ' · ' + esc(Course.membersAt(co, no).map(function (m) { return Course.shortName(m.cls); }).join(' · ')) + '</p></div>' +
+        '<div class="spacer"></div><button class="btn btn--primary" type="button" data-round="' + no + '">이번 회차 작성하기</button></div>' +
+      Course.calendarHtml(co, st.month, no);
+  }
+
   function load(cls) {
     var run = ++st.run;
     st.cls = cls;
     st.err = '';
+    if (window.Course && Course.isKey(cls)) { renderCourse(); return Promise.resolve(); }
     if (!st.data || st.data.class !== cls) { st.data = null; st.more = false; }
     render();
     if (!cls) return Promise.resolve();
@@ -103,6 +116,9 @@
     var miss = missingOf(w, L, d);
     /* 줄 이름 = 수업일 「10/22(목) 수업」 (주 시작일 대신 · 수업 요일이 없으면 「10/12~10/18」 · 20261030b) */
     var nm = L && L.date && !L.canceled ? Lesson.md(L.date) + ' 수업' : Lesson.md(w.week_start, false) + '~' + Lesson.md(Lesson.addDays(w.week_start, 6), false);
+    /* 과정에 든 회차면 「7회차 · 10/24(토) ~ 10/25(일)」를 함께 (20261031a) */
+    var cr = window.Course ? Course.roundOfClassWeek(st.cls, w.open_start) : null;
+    if (cr) nm = Course.label(cr.course, cr.no) + ' · ' + nm;
     return '<div class="wkv-row' + (isNow ? ' is-now' : '') + (isNext ? ' is-next' : '') + '" role="button" tabindex="0" data-wo="' + esc(w.open_start) + '" aria-label="' + esc(nm) + ' 작성 화면 열기">' +
       '<div class="wkv-wk">' +
         '<div class="wkv-wk__name"><b>' + esc(nm) + '</b>' +
@@ -157,6 +173,16 @@
   }
 
   function onClick(e) {
+    var rd = e.target.closest('[data-round]');
+    if (rd && window.Course && Course.isKey(st.cls)) { Writer.openWeek(Course.weekOfRound(Course.byKey(st.cls), +rd.dataset.round)); return; }
+    var mm = e.target.closest('[data-rc-month]');
+    if (mm && st.month) {
+      var y = +st.month.slice(0, 4), m = +st.month.slice(5, 7) + Number(mm.dataset.rcMonth);
+      if (m < 1) { m = 12; y--; } if (m > 12) { m = 1; y++; }
+      st.month = y + '-' + String(m).padStart(2, '0');
+      renderCourse();
+      return;
+    }
     if (e.target.closest('#wkvThisWeek')) { Writer.openWeek(thisWeekStart()); return; }
     if (e.target.closest('#wkvMore')) { st.more = true; render(); return; }
     var v = e.target.closest('[data-wv]');
@@ -184,6 +210,9 @@
     });
     window.addEventListener('jt:write-mode', function () {
       if (Writer.mode() === 'weeks') load(Writer.currentClass());
+    });
+    window.addEventListener('jt:courses', function () {
+      if (window.Writer && Writer.mode() === 'weeks' && !$('#panel-write').hidden) load(Writer.currentClass());
     });
     window.addEventListener('jt:schedule-changed', function () {
       if (Writer.mode() === 'weeks' && !$('#panel-write').hidden) load(Writer.currentClass());

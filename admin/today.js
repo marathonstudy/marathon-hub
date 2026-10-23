@@ -56,7 +56,7 @@
     st.loading = true;
     st.last = Date.now();
     if (!st.data) $('#tdBody').innerHTML = '<p class="panel__hint">불러오는 중…</p>';
-    Promise.all([sb().rpc('coach_today'), DB.getSettingRow('dashboard').catch(function () { return null; }), loadRecentSent()]).then(function (res) {
+    Promise.all([sb().rpc('coach_today'), DB.getSettingRow('dashboard').catch(function () { return null; }), loadRecentSent(), loadCare()]).then(function (res) {
       var r = res[0];
       st.loading = false;
       if (r.error) throw new Error(r.error.message);
@@ -310,6 +310,150 @@
       }).join('') + '</ul>' : '<p class="td-todo__none">오늘 할 일 없음</p>') + '</div>';
   }
 
+  /* ---------- 챙길 학생 (20261031a) — 「오늘 할 일」 바로 아래 · 없으면 숨김 · 탭 배지에는 넣지 않는다 ----------
+     복습테스트 안 낸 학생  마감(그 반 수업일 밤 12시)이 지났는데 제출 · 대신 입력 · 미응시 사유가 모두 없는 학생 (review_missing)
+                           「고2 선수능반 · 10/22 복습테스트 안 낸 학생 2명 · 김가나, 이다라」 → 누르면 복습테스트 화면의 그 학생 줄
+                           그 수업 레포트를 보내고 나면 사라진다
+     결석 잦은 학생        설정의 결석 기준을 넘은 학생 「반포반 · 최근 4번 중 결석 2번 · 박마바」 → 누르면 상담 카드
+                           마지막 결석 뒤에 상담 카드에 기록을 남기면 그 결석 건으로는 다시 뜨지 않는다 */
+  var reviewMiss = [], care = { abs: {}, note: {} };
+  function loadCare() {
+    var from = Lesson.addDays(DDay.today(), -70);
+    return Promise.all([
+      sb().rpc('review_missing').then(function (r) { reviewMiss = r.error ? [] : (r.data || []); }, function () { reviewMiss = []; }),
+      sb().from('entries').select('student_id,week_start').eq('attend_status', 'absent').gte('week_start', from).then(function (r) {
+        care.abs = {};
+        (r.data || []).forEach(function (x) { if (!care.abs[x.student_id] || care.abs[x.student_id] < x.week_start) care.abs[x.student_id] = x.week_start; });
+      }, function () { care.abs = {}; }),
+      sb().from('student_notes').select('student_id,created_at').gte('created_at', from).then(function (r) {
+        care.note = {};
+        (r.data || []).forEach(function (x) { var d = String(x.created_at || '').slice(0, 10); if (!care.note[x.student_id] || care.note[x.student_id] < d) care.note[x.student_id] = d; });
+      }, function () { care.note = {}; })
+    ]);
+  }
+  function careItems(d) {
+    var set = d.settings || {}, byId = {}, out = [];
+    d.students.forEach(function (s) { byId[s.id] = s; });
+    /* 복습테스트 — 반 + 수업일마다 한 줄 (그 수업 레포트를 이미 보낸 학생은 뺀다) */
+    var grp = {}, order = [];
+    reviewMiss.forEach(function (x) {
+      var s = byId[x.student_id];
+      if (!s) return;
+      var day = String(x.lesson_date).slice(0, 10), wk = weekOfDate(day);
+      if ((st.recent[wk] || {})[s.id]) return;
+      var k = (s.class_name || '') + '|' + day;
+      if (!grp[k]) { grp[k] = { cls: s.class_name || '', day: day, week: wk, ids: [] }; order.push(k); }
+      if (grp[k].ids.indexOf(s.id) === -1) grp[k].ids.push(s.id);
+    });
+    order.forEach(function (k) {
+      var g = grp[k];
+      out.push({ kind: 'review', cls: g.cls, week: g.week, sid: g.ids[0], ids: g.ids,
+        text: g.cls + ' · ' + Lesson.md(g.day, false) + ' 복습테스트 안 낸 학생 ' + g.ids.length + '명',
+        names: g.ids.map(function (id) { return byId[id].name; }) });
+    });
+    /* 결석 잦은 학생 */
+    d.students.forEach(function (s) {
+      if (!(s.absent_n >= (set.absentMin || 2))) return;
+      var last = care.abs[s.id];
+      if (last && care.note[s.id] && care.note[s.id] >= last) return;          /* 마지막 결석 뒤에 상담 기록이 있으면 다시 띄우지 않는다 */
+      out.push({ kind: 'absent', cls: s.class_name || '', sid: s.id,
+        text: (s.class_name || '(반 없음)') + ' · 최근 ' + (set.absentWeeks || 4) + '번 중 결석 ' + s.absent_n + '번', names: [s.name] });
+    });
+    return out;
+  }
+  function careHtml(items) {
+    if (!items.length) return '';
+    return '<div class="td-care2"><div class="td-todo__title">챙길 학생</div><ul class="td-todo__list">' + items.map(function (it) {
+      return '<li class="td-care2__item td-care2__item--' + it.kind + '"><button type="button" class="td-care2__btn" data-care="' + it.kind + '" data-care-cls="' + esc(it.cls) + '" data-care-sid="' + esc(it.sid) + '"' +
+        (it.week ? ' data-care-week="' + esc(it.week) + '"' : '') + '>' +
+        '<span class="td-care2__t">' + esc(it.text) + '</span> <span class="td-care2__names">' + esc(it.names.join(', ')) + '</span>' +
+        '<span class="td-care2__go">' + (it.kind === 'review' ? '대신 입력 · 미응시 ›' : '상담 카드 ›') + '</span></button></li>';
+    }).join('') + '</ul></div>';
+  }
+
+  /* ---------- 과정 카드 (20261031a) ----------
+     맨 위 「고3 수능국어 · 7회차 · 10/24(토) ~ 10/25(일)」 / 이번 회차 일주일 한 줄 달력(토 일 월 …) — 수업 있는 날에 반 이름 · ✓ 보냄 / 안 보냄 / 수업 전 · 오늘 강조
+     반마다 한 줄 「목동 · 수업일 10/24(토) · 수업까지 D-1! · 최근 발송 칩 3개」 · 펼치면 반별 학생 목록 */
+  var DOWS = ['일', '월', '화', '수', '목', '금', '토'];
+  function classWhen(c) {
+    var nx = c.next;
+    if (!nx) return c.name === '(반 없음)' ? '' : '<button type="button" class="btn btn--sm tdc-sched" data-sched="' + esc(c.name) + '">수업일 미정 · 수업 요일 정하기</button>';
+    return '<span class="tdc-when"><span class="tdc-when__d">수업일 ' + esc(Store.dateWithDow(nx.date)) + '</span>' +
+      '<b class="tdc-when__dd' + (nx.dday === 0 ? ' is-today' : '') + '">수업까지 D-' + (nx.dday === 0 ? 'day' : nx.dday) + '!</b></span>';
+  }
+  function byName(x, y) { return (x.name || '').localeCompare(y.name || '', 'ko'); }
+  function courseCardHtml(co, cls) {
+    var no = Course.roundNow(co), ms = Course.membersAt(co, no), t = DDay.today();
+    var rs = Course.roundStart(co, no), ckey = '§' + co.name, open = !!st.open[ckey];
+    var sentOf = function (m) {
+      var c = cls.find(function (x) { return x.name === m.cls; }), rows = c ? c.rows : [];
+      var sm = st.recent[m.week] || {};
+      return { n: rows.length, sent: rows.filter(function (s) { return !!sm[s.id]; }).length };
+    };
+    var days = '';
+    for (var i = 0; i < 7; i++) {
+      var day = Lesson.addDays(rs, i), here = ms.filter(function (m) { return m.date === day; });
+      days += '<div class="tdw-day' + (day === t ? ' is-today' : '') + (here.length ? ' has-class' : '') + '"><span class="tdw-dow">' + DOWS[Lesson.dowOf(day)] + ' <span class="num">' + (+day.slice(8, 10)) + '</span></span>' +
+        here.map(function (m) {
+          var x = sentOf(m), stt = m.date > t ? ['wait', '수업 전'] : x.n && x.sent === x.n ? ['ok', '✓ 보냄'] : ['no', '안 보냄'];
+          return '<span class="tdw-cls tdw-cls--' + stt[0] + '"><b>' + esc(Course.shortName(m.cls)) + '</b><small>' + stt[1] + '</small></span>';
+        }).join('') + '</div>';
+    }
+    var n = cls.reduce(function (a, c) { return a + c.rows.length; }, 0);
+    return '<div class="tdc-card tdc-card--course' + (open ? ' is-open' : '') + '" data-cls="' + esc(ckey) + '">' +
+      '<div class="tdc-head"><div class="tdc-main">' +
+        '<div class="tdc-title"><span class="tdc-name">📚 ' + esc(co.name) + '</span><span class="tdc-round">' + esc(Course.label(co, no)) + '</span><span class="muted-note num tdc-n">' + n + '명</span></div>' +
+        '<div class="tdw" aria-label="이번 회차 일주일">' + days + '</div>' +
+        cls.map(function (c) {
+          var chips = chipsOf(c);
+          return '<div class="tdc-crow' + (Course.mine(c.name) ? ' is-mine' : '') + '"><b class="tdc-crow__n">' + esc(Course.shortName(c.name)) + '</b>' + classWhen(c) +
+            (chips.length ? '<span class="tdc-chips">' + chips.map(function (x) { return chipHtml(c, x); }).join('') + '</span>' : '') +
+            (c.rows.length ? '<button type="button" class="btn btn--sm tdc-sms" data-sms-cls="' + esc(c.name) + '" aria-label="' + esc(c.name) + ' 문자 보내기">문자</button>' : '') + '</div>';
+        }).join('') +
+      '</div><div class="tdc-btns"><button type="button" class="btn btn--sm btn--primary tdc-write" data-write-course="' + esc(ckey) + '">이번 회차 작성하기</button></div></div>' +
+      (n ? '<button type="button" class="tdc-toggle" data-toggle aria-expanded="' + open + '">학생 ' + n + '명 ' + (open ? '접기 ▴' : '보기 ▾') + '</button>' : '') +
+      (open ? '<div class="tdc-list">' + cls.map(function (c) {
+        return '<div class="tdc-sub"><div class="tdc-sub__t">' + esc(c.name) + ' · ' + c.rows.length + '명</div>' + c.rows.slice().sort(byName).map(function (s) { return studentRow(s, c.cy); }).join('') + '</div>';
+      }).join('') + '</div>' : '') +
+    '</div>';
+  }
+  function classCardHtml(c) {
+    var rows = c.rows, n = rows.length, nx = c.next;
+    var chips = chipsOf(c);
+    var open = !!st.open[c.name];
+    return '<div class="tdc-card' + (open ? ' is-open' : '') + (nx && nx.dday === 0 ? ' is-today' : '') + (window.Course && Course.mine(c.name) ? ' is-mine' : '') + '" data-cls="' + esc(c.name) + '">' +
+      '<div class="tdc-head">' +
+        '<div class="tdc-main">' +
+          '<div class="tdc-title"><span class="tdc-name">' + esc(c.name) + '</span>' + (c.academy ? '<span class="muted-note">' + esc(c.academy) + '</span>' : '') +
+            '<span class="muted-note num tdc-n">' + n + '명</span></div>' +
+          (chips.length ? '<div class="tdc-chips" aria-label="최근 3번 수업 레포트 발송">' + chips.map(function (x) { return chipHtml(c, x); }).join('') + '</div>' : '') +
+          classWhen(c) +
+        '</div>' +
+        '<div class="tdc-btns">' +
+          (c.name === '(반 없음)' || !n ? '' : '<button type="button" class="btn btn--sm tdc-sms" data-sms-cls="' + esc(c.name) + '" aria-label="' + esc(c.name) + ' 문자 보내기">문자</button>') +
+          (c.name === '(반 없음)' ? '' : '<button type="button" class="btn btn--sm btn--primary tdc-write" data-write="' + esc(c.name) + '">이번 주 작성하기</button>') +
+        '</div>' +
+      '</div>' +
+      (n ? '<button type="button" class="tdc-toggle" data-toggle aria-expanded="' + open + '">학생 ' + n + '명 ' + (open ? '접기 ▴' : '보기 ▾') + '</button>' : '') +
+      (open ? '<div class="tdc-list">' + rows.slice().sort(byName).map(function (s) { return studentRow(s, c.cy); }).join('') + '</div>' : '') +
+    '</div>';
+  }
+  /* 카드 차례 — 과정은 한 묶음 (가장 가까운 반 수업일 자리) · 담당 조교의 반(또는 그 반이 든 과정)이 맨 위 */
+  function cardsOf(classes) {
+    var courses = window.Course ? Course.list() : [], used = {}, items = [];
+    courses.forEach(function (co) {
+      var names = Course.membersAt(co, Course.roundNow(co)).map(function (m) { return m.cls; });
+      var cls = classes.filter(function (c) { return names.indexOf(c.name) !== -1; })
+        .sort(function (a, b) { return names.indexOf(a.name) - names.indexOf(b.name); });
+      if (!cls.length) return;
+      cls.forEach(function (c) { used[c.name] = true; });
+      items.push({ course: co, cls: cls, at: classes.indexOf(cls[0]), mine: cls.some(function (c) { return Course.mine(c.name); }) });
+    });
+    classes.forEach(function (c, i) { if (!used[c.name]) items.push({ c: c, at: i, mine: !!(window.Course && Course.mine(c.name)) }); });
+    items.sort(function (a, b) { return (b.mine - a.mine) || (a.at - b.at); });
+    return items;
+  }
+
   function render() {
     var d = st.data;
     if (!d) return;
@@ -317,7 +461,7 @@
     var unsent = unsentOf(classes);
     var unsentN = unsent.reduce(function (a, u) { return a + u.x.left; }, 0);
 
-    /* 탭 배지 — 「오늘」 · 「레포트 발송」 모두 발송 안 한 레포트(학생 수) 기준. 0 이면 숨김 */
+    /* 탭 배지 — 「오늘」 · 「레포트 발송」 모두 발송 안 한 레포트(학생 수) 기준. 0 이면 숨김 (챙길 학생은 세지 않는다) */
     var tip = unsent.map(function (u) { return u.cls + ' ' + Lesson.md(u.x.date, false) + ' 레포트 안 보냄 ' + u.x.left + '명'; }).join('\n');
     ['#todayBadge', '#reportBadge'].forEach(function (sel) {
       var b = $(sel);
@@ -332,34 +476,11 @@
 
     $('#tdBody').innerHTML = transitionHtml() +
       '<div class="td-rules" id="tdRules"' + (st.rulesOpen ? '' : ' hidden') + '><p class="panel__hint tdc-rule">반 이름 아래 칩 = 최근 3번 수업 레포트를 보낸 학생 비율 (초록 100% · 주황 일부 · 빨강 0% · 회색 수업 당일 작성 중). 칩을 누르면 그 수업 발송 화면으로 갑니다. ' +
-        '학생 줄 「앱 n/5일」 = 지난 수업 레포트 기간(수업 전 일주일) 평일 중 앱 과제를 낸 날 (토 · 일은 세지 않음).</p></div>' +
+        '학생 줄 「앱 n/5일」 = 지난 수업 레포트 기간(수업 전 일주일) 평일 중 앱 과제를 낸 날 (토 · 일은 세지 않음). ' +
+        '챙길 학생 = 마감이 지났는데 복습테스트를 안 낸 학생(그 수업 레포트를 보내면 사라짐) · 결석이 기준(설정)을 넘은 학생(그 뒤 상담 기록을 남기면 사라짐).</p></div>' +
       todoHtml(unsent) +
-      '<div class="tdc-list-wrap">' + classes.map(function (c) {
-        var rows = c.rows, n = rows.length, nx = c.next;
-        var chips = chipsOf(c);
-        var when = !nx
-          ? (c.name === '(반 없음)' ? '' : '<button type="button" class="btn btn--sm tdc-sched" data-sched="' + esc(c.name) + '">수업일 미정 · 수업 요일 정하기</button>')
-          : '<span class="tdc-when"><span class="tdc-when__d">수업일 ' + esc(Store.dateWithDow(nx.date)) + '</span>' +
-            '<b class="tdc-when__dd' + (nx.dday === 0 ? ' is-today' : '') + '">수업까지 D-' + (nx.dday === 0 ? 'day' : nx.dday) + '!</b></span>';
-        var open = !!st.open[c.name];
-        var byName = function (x, y) { return (x.name || '').localeCompare(y.name || '', 'ko'); };
-        return '<div class="tdc-card' + (open ? ' is-open' : '') + (nx && nx.dday === 0 ? ' is-today' : '') + '" data-cls="' + esc(c.name) + '">' +
-          '<div class="tdc-head">' +
-            '<div class="tdc-main">' +
-              '<div class="tdc-title"><span class="tdc-name">' + esc(c.name) + '</span>' + (c.academy ? '<span class="muted-note">' + esc(c.academy) + '</span>' : '') +
-                '<span class="muted-note num tdc-n">' + n + '명</span></div>' +
-              (chips.length ? '<div class="tdc-chips" aria-label="최근 3번 수업 레포트 발송">' + chips.map(function (x) { return chipHtml(c, x); }).join('') + '</div>' : '') +
-              when +
-            '</div>' +
-            '<div class="tdc-btns">' +
-              (c.name === '(반 없음)' || !n ? '' : '<button type="button" class="btn btn--sm tdc-sms" data-sms-cls="' + esc(c.name) + '" aria-label="' + esc(c.name) + ' 문자 보내기">문자</button>') +
-              (c.name === '(반 없음)' ? '' : '<button type="button" class="btn btn--sm btn--primary tdc-write" data-write="' + esc(c.name) + '">이번 주 작성하기</button>') +
-            '</div>' +
-          '</div>' +
-          (n ? '<button type="button" class="tdc-toggle" data-toggle aria-expanded="' + open + '">학생 ' + n + '명 ' + (open ? '접기 ▴' : '보기 ▾') + '</button>' : '') +
-          (open ? '<div class="tdc-list">' + rows.slice().sort(byName).map(function (s) { return studentRow(s, c.cy); }).join('') + '</div>' : '') +
-        '</div>';
-      }).join('') + '</div>';
+      careHtml(careItems(d)) +
+      '<div class="tdc-list-wrap">' + cardsOf(classes).map(function (it) { return it.course ? courseCardHtml(it.course, it.cls) : classCardHtml(it.c); }).join('') + '</div>';
   }
 
 
@@ -405,6 +526,10 @@
   };
 
   $('#tdBody').addEventListener('click', function (e) {
+    var ca = e.target.closest('[data-care]');
+    if (ca) { careGo(ca.dataset.care, ca.dataset.careCls, ca.dataset.careWeek, ca.dataset.careSid); return; }
+    var wc = e.target.closest('[data-write-course]');
+    if (wc) { writeCourse(wc.dataset.writeCourse); return; }
     var gs = e.target.closest('[data-go-send]');
     if (gs) { goSend(gs.dataset.goSend, gs.dataset.week); return; }
     var sc = e.target.closest('[data-sched]');
@@ -434,6 +559,25 @@
     Writer.openWeek(week || Store.thisWeek().start);
   }
 
+  /* 챙길 학생 — 복습테스트: 그 반 그 수업 작성 화면의 복습테스트 그 학생 줄 ([대신 입력] · [미응시]) · 결석: 상담 카드 */
+  function careGo(kind, cls, week, sid) {
+    if (kind === 'absent') { if (window.Card) Card.open(sid); return; }
+    writeWeek(cls, week);
+    /* 복습테스트 표가 다 그려질 때까지 (최대 5초) 기다렸다가 그 학생 줄로 */
+    var tries = 0;
+    (function wait() {
+      if (document.querySelector('#rvTable tr[data-sid="' + sid + '"]')) { if (window.Review && Review.focusStudent) Review.focusStudent(sid); return; }
+      if (++tries < 25) setTimeout(wait, 200);
+    })();
+  }
+  /* 과정 [이번 회차 작성하기] — 과정 화면 그 회차 */
+  function writeCourse(key) {
+    var co = window.Course && Course.byKey(key);
+    if (!co || !window.Writer) return;
+    UI.selectTab(1);
+    Writer.selectClass(key);
+    Writer.openWeek(Course.weekOfRound(co, Course.roundNow(co)));
+  }
   /* 칩 · 「오늘 할 일」 [보내기] — 그 반 그 수업의 레포트 발송 → 3 발송 화면 (20261030e) */
   function goSend(cls, week) {
     if (!window.Writer) return;
@@ -530,18 +674,22 @@
   window.addEventListener('jt:refreshed', function (e) { if (!(e.detail && e.detail.local)) remote(); });
   /* 반이 새로 생기면 (학생 0명 반 카드) 바로 다시 그린다 */
   window.addEventListener('jt:roster-changed', function () { if (st.data && !$('#appRoot').hidden) render(); });
+  /* 과정 · 담당 조교를 불러오면 카드 묶음 · 차례를 다시 (course.js) */
+  window.addEventListener('jt:courses', function () { if (st.data && !$('#appRoot').hidden) render(); });
 
   /* 뒤로가기 · 새로고침 (nav.js) — 펼친 반 목록 */
   window.TodayView = {
     /* 레포트 발송 → 3 발송 · 문자 보내기도 같은 반 순서 — 오늘 수업 → 가까운 날 → 같은 날은 이름 순 → 수업일 미정 맨 아래 */
     orderClasses: function (names) {
-      return names.map(function (n) { return { name: n, next: n === '(반 없음)' ? null : nextLesson(n) }; })
+      var out = names.map(function (n) { return { name: n, next: n === '(반 없음)' ? null : nextLesson(n) }; })
         .sort(function (x, y) {
           if (!!x.next !== !!y.next) return x.next ? -1 : 1;
           if (x.next && y.next && x.next.date !== y.next.date) return x.next.date < y.next.date ? -1 : 1;
           if ((x.name === '(반 없음)') !== (y.name === '(반 없음)')) return x.name === '(반 없음)' ? 1 : -1;
           return x.name.localeCompare(y.name, 'ko');
         }).map(function (x) { return x.name; });
+      /* 담당 조교의 반을 맨 위로 (course.js · 20261031a) */
+      return window.Course ? Course.mineFirst(out) : out;
     },
     nextLesson: nextLesson,
     /* 그 반 가장 최근 수업(오늘 포함)의 주 시작일 — 문자 창 레포트 안내의 「공개 전 · 발송 불가」 (sms.js · 20261030e) */
