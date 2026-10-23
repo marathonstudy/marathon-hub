@@ -30,6 +30,11 @@
   /* 지금 고른 반 (주간 레포트 → 작성의 반 고르기) — 공개 화면은 이 반 학생만 (20261030b) */
   function curClass() { return (window.Writer && Writer.currentClass && Writer.currentClass()) || ''; }
   function grpOf(s) { return (s.className || '').trim() || '(반 없음)'; }
+  /* 반 체크 칸이 기준으로 삼는 학생 — 아직 공개 안 한 학생, 없으면 반 전원 */
+  function grpBasis(rows) {
+    var fresh = rows.filter(function (r) { return !r.pub; });
+    return fresh.length ? fresh : rows;
+  }
 
   /* 「작성 중 / 작성 완료」 구분 없이 반 학생 전원 (20261030a) — 비어 있는 칸은 레포트에서 숨는다
      미리 체크는 지금 고른 반의 아직 공개 안 한 학생만 (다른 반은 맨 아래 「다른 반도 함께 공개」에서 직접 고른다) */
@@ -110,7 +115,9 @@
                        '<span class="pub-group__count"></span>';
       head.querySelector('[data-grp]').dataset.grp = g.name;
       head.querySelector('[data-grp]').disabled = !eligible.length;
-      head.querySelector('[data-grp]').checked = eligible.length && eligible.every(function (r) { return r.checked; });
+      /* 반 체크 칸 = 아직 공개 안 한 학생이 모두 체크돼 있으면 켜짐 (모두 공개한 반은 전원 기준 · 20261030c) */
+      var basis = grpBasis(eligible);
+      head.querySelector('[data-grp]').checked = basis.length > 0 && basis.every(function (r) { return r.checked; });
       head.querySelector('.pub-group__name').textContent = g.name;
       head.querySelector('.pub-group__count').textContent =
         g.rows.filter(function (r) { return r.pub && r.pub.visible; }).length + ' / ' + g.rows.length + '명 공개';
@@ -204,10 +211,13 @@
       render();
     } else if (t.matches('[data-grp]')) {
       var name = t.dataset.grp;
-      state.rows.forEach(function (r) {
-        var g = (r.student.className || '').trim() || '(반 없음)';
-        if (g === name && r.eligible) r.checked = t.checked;
-      });
+      var inGrp = state.rows.filter(function (r) { return grpOf(r.student) === name && r.eligible; });
+      /* 켜면 아직 공개 안 한 학생을 모두 체크 (없으면 전원 · 이미 고른 학생은 그대로) · 끄면 반 전원 해제 */
+      if (t.checked) {
+        grpBasis(inGrp).forEach(function (r) { r.checked = true; });
+      } else {
+        inGrp.forEach(function (r) { r.checked = false; });
+      }
       render();
     }
   });

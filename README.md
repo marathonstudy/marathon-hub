@@ -403,6 +403,10 @@ delete from public.staff where email = '조교이메일@example.com';
 - 레포트 「이 수업 영상」은 선생님 한마디 바로 아래 (학부모 · 학생 · 미리보기 같은 차례).
 - 휴대폰 — 머리(.topbar)의 backdrop-filter 가 아래 고정 탭 줄을 머리 상자에 붙여 머리를 덮던 것 고침 · 작은 글자 키움 · 문자 표 360px 맞춤.
 
+### 5-29. 20261030c — 공개 화면 반 체크 칸 (SQL 없음)
+- 반 머리 체크 칸 = 아직 공개 안 한 학생이 모두 체크돼 있으면 켜짐 (이미 공개한 학생은 따지지 않음 · 반 전원이 공개됐으면 전원 기준).
+  켜면 아직 공개 안 한 학생을 모두 체크(이미 고른 학생은 그대로) · 끄면 반 전원 해제.
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.
