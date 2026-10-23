@@ -1044,3 +1044,11 @@ label.hub-btn { cursor: pointer; text-align: center; }
 
 /* 다시 공개로 바뀐 내용 — 레포트 위에 작게 「10/24 업데이트 · 복습테스트 결과 추가」 (20261030e) */
 .rw-upd { margin: -4px 0 10px; font-size: 12px; font-weight: 700; color: #7B6CC4; text-align: right; }
+
+/* 과제 기록 불러오는 중 · 못 불러옴 (20261031b) */
+.spin { display: inline-block; width: 13px; height: 13px; border: 2px solid #D9D3F5; border-top-color: #6A54D6; border-radius: 50%; vertical-align: -2px; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation-duration: 2.4s; } }
+.app-wait .tw-loading { display: flex; align-items: center; gap: 8px; }
+.app-fail { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: #A3611A; }
+.hub-btn--sm { padding: 6px 12px; font-size: 13px; min-height: 0; }

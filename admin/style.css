@@ -2829,3 +2829,12 @@ dialog > .toast-host { position: fixed; }
   .cm-arow, .cm-row { grid-template-columns: 1fr; }
   .tdc-crow { gap: 3px 6px; }
 }
+
+/* 과제 기록 불러오는 중 · 못 불러옴 (today.js · 20261031b) */
+.spin { display: inline-block; width: 12px; height: 12px; border: 2px solid #D9D3F5; border-top-color: #6A54D6; border-radius: 50%; vertical-align: -2px; margin-right: 4px; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation-duration: 2.4s; } }
+.td-appbar { margin: 0 0 8px; padding: 6px 10px; border-radius: 10px; background: #F5F2FF; color: #4A34B8; font-size: 13px; font-weight: 700; }
+.tdc-app--wait { display: inline-flex; align-items: center; }
+.tdc-app--fail { appearance: none; border: 1px solid #F4D3A8; background: #FFF1E0; color: #A3611A; font: inherit; font-size: 12px; font-weight: 800; padding: 1px 8px; border-radius: 999px; cursor: pointer; }
+.tdc-app--fail:hover { background: #FFE6C7; }

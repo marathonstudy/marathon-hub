@@ -6,8 +6,8 @@
    · 반 카드 (촘촘하게 위아래로) — 반 이름 · 인원 / 최근 3번 수업 레포트 칩(보낸 학생 %) / 「수업일 10/29(목)」 · 「수업까지 D-3!」 / [문자] [이번 주 작성하기]
        칩: 100% 초록 · 1~99% 주황 「64% · 안 보냄 4명」 · 0% 빨강 · 수업 당일 회색 「작성 중」 — 누르면 그 수업 발송 화면
        수업일이 없으면 [수업일 미정 · 수업 요일 정하기] → 그 반 작성 화면의 수업 요일 칸
-     「학생 11명 보기 ▾」 — 누르면 전원 (펼친 반은 이 기기에 기억). 학생 줄 = 이름 · 「앱 n/5일」 · 상담 카드 · 문자 · 미리보기 둘
-   · 앱 과제는 바깥 앱 서버 자료라 화면이 뜬 뒤 app-report 함수로 4명씩 차례로 불러온다.
+     「학생 11명 보기 ▾」 — 누르면 전원 (펼친 반은 이 기기에 기억). 학생 줄 = 이름 · 「과제 n/5일」 · 상담 카드 · 문자 · 미리보기 둘
+   · 과제는 바깥 앱 서버 자료라 화면이 뜬 뒤 app-report 함수로 6명씩 동시에 불러오고, 한 명 받을 때마다 그 학생 칸을 바로 채운다 (appfetch.js · 미리보기와 같은 기록을 같이 씀).
      그 반 지난 수업(L) 전 일주일 L-7 ~ L-1 의 평일 중 제출한 날 (토 · 일 주중 복습은 세지 않는다 · 러닝노트 레포트와 같은 AppWeek).
      불러온 값은 30분 동안 이 화면 메모리에만 둔다(브라우저에 저장하지 않는다).
    · 탭 배지 — 「오늘」 · 「레포트 발송」 모두 발송 안 한 레포트 학생 수 (수업 당일은 빼고). 금액은 이 화면에 넣지 않는다.
@@ -99,45 +99,66 @@
     return d;
   }
 
-  /* ---------- 앱 과제 제출률 (app-report, 4명씩) ---------- */
+  /* ---------- 과제 제출률 (app-report, 4명씩) ---------- */
 
-  function loadApp() {
+  /* 과제 기록 — 학생마다 app-report 를 6명씩 동시에 (앱 서버가 한꺼번에 주는 주소가 없다) · 미리보기와 같은 기록을 같이 쓴다 (appfetch.js)
+     예전에는 4명씩 부르고 마지막 학생이 끝나야 학생 줄을 다시 그려서, 그때까지 모두 「앱 …」이었다 → 한 명 받을 때마다 그 학생 칸만 바로 (20261031b)
+     15초 안에 답이 없거나 실패하면 「과제 기록 못 불러옴 · 다시 시도」 */
+  var appProg = { done: 0, total: 0, start: 0, timer: null };
+  function loadApp(only) {
     var d = st.data;
     if (!d) return;
     var run = ++appRun;
-    var todo = d.students.filter(function (s) {
+    var all = d.students.filter(function (s) { return s.app && s.code; });
+    var todo = all.filter(function (s) {
+      if (only) return s.id === only;
       var a = app[s.id];
-      return s.app && s.code && (!a || Date.now() - a.at > APP_TTL);
+      return !a || a.failed || Date.now() - a.at > APP_TTL;
     });
-    var total = d.students.filter(function (s) { return s.app && s.code; }).length;
-    if (!todo.length) { renderApp(total, total); return; }
-    var i = 0, done = total - todo.length;
+    todo.forEach(function (s) { delete app[s.id]; paintApp(s.id); });
+    appProg.total = all.length;
+    appProg.done = all.length - all.filter(function (s) { return !app[s.id]; }).length;
+    appProg.start = Date.now();
+    clearInterval(appProg.timer);
+    appProg.timer = setInterval(function () { renderApp(); }, 1000);     /* 10초가 넘으면 「조금 오래 걸리고 있습니다」 */
+    renderApp();
+    var i = 0;
     function one() {
       if (run !== appRun || i >= todo.length) return Promise.resolve();
       var s = todo[i++];
-      var url = CFG.supabase.url + '/functions/v1/' + CFG.appFunction + '?code=' + encodeURIComponent(s.code);
-      return fetch(url, { headers: { apikey: CFG.supabase.key } })
-        .then(function (r) { return r.json(); })
-        .then(function (res) {
-          /* 날짜별 기록만 남긴다 — 반마다 지난 수업 전 일주일(D-7 ~ D-1)을 AppWeek.compute 로 센다 (러닝노트 레포트 앱 과제 요약과 같은 계산) */
-          var dt = res && res.ok && res.data ? res.data : null;
-          app[s.id] = { ok: !!dt, data: dt ? { calendar: dt.calendar || [], lectures: dt.lectures || [], history: dt.history || dt.recent || [] } : null, at: Date.now() };
-        }, function () { app[s.id] = { ok: false, data: null, at: Date.now() }; })
-        .then(function () {
-          done++;
-          if (run === appRun) renderApp(done, total);
-          return one();
-        });
+      return AppFetch.get(s.code).then(function (res) {
+        /* 날짜별 기록만 남긴다 — 반마다 지난 수업 전 일주일(D-7 ~ D-1)을 AppWeek.compute 로 센다 (러닝노트 레포트 과제 요약과 같은 계산) */
+        var dt = res && res.ok && res.data ? res.data : null;
+        app[s.id] = dt ? { ok: true, data: { calendar: dt.calendar || [], lectures: dt.lectures || [], history: dt.history || dt.recent || [] }, at: Date.now() }
+                       : { ok: false, failed: true, data: null, at: Date.now() };
+        appProg.done++;
+        paintApp(s.id);
+        renderApp();
+        return one();
+      });
     }
-    renderApp(done, total);
-    Promise.all([one(), one(), one(), one()]).then(function () {
-      if (run === appRun) render();
+    Promise.all([one(), one(), one(), one(), one(), one()]).then(function () {
+      if (run === appRun) { clearInterval(appProg.timer); renderApp(); }
     });
   }
 
-  function renderApp(done, total) {
-    var el = $('#tdAppProgress');
-    if (el) el.textContent = total && done < total ? '앱 과제 불러오는 중 ' + done + '/' + total : '';
+  /* 반 카드 위 「과제 기록 불러오는 중 3/11」 (다 불러오면 사라짐 · 10초가 넘으면 「조금 오래 걸리고 있습니다」) */
+  function renderApp() {
+    var el = $('#tdAppBar');
+    var t = appProg.total, n = Math.min(appProg.done, t);
+    var busy = t && n < t;
+    if (!busy) clearInterval(appProg.timer);
+    if (!el) return;
+    el.hidden = !busy;
+    el.innerHTML = busy ? '<i class="spin" aria-hidden="true"></i> ' + (Date.now() - appProg.start > 10000 ? '조금 오래 걸리고 있습니다 · ' : '') + '과제 기록 불러오는 중 <span class="num">' + n + '/' + t + '</span>' : '';
+  }
+  /* 그 학생 줄의 과제 칸만 다시 */
+  function paintApp(sid) {
+    var s = st.data && st.data.students.find(function (x) { return x.id === sid; });
+    if (!s) return;
+    Array.prototype.forEach.call(document.querySelectorAll('#tdBody .tdc-st[data-id="' + sid + '"] .tdc-app-slot'), function (el) {
+      el.innerHTML = appCell(s, (st.cyBy || {})[s.class_name || '(반 없음)']);
+    });
   }
 
   /* ---------- 그리기 ---------- */
@@ -150,7 +171,7 @@
      급함 n · 살펴보기 n · [이번 주 작성하기]. 순서 = 다음 수업이 가까운 반부터 (오늘 수업 맨 위, 같은 날은 이름 순, 수업일 미정은 맨 아래).
      카드를 누르면 그 반 학생 목록이 펼쳐진다 (여러 반 함께 · 펼친 반은 이 기기에만 기억).
        급함     최근 결석 기준 이상 · 복습테스트 미제출 · 확인 필요 상담
-       살펴보기 앱 과제 제출 기준(기본 50%) 미만 — 그 반 지난 수업일 L 의 레포트와 같은 기간(L-7 ~ L-1)의 제출일 / 과제 있던 날 (20261029h)
+       살펴보기 과제 제출 기준(기본 50%) 미만 — 그 반 지난 수업일 L 의 레포트와 같은 기간(L-7 ~ L-1)의 제출일 / 과제 있던 날 (20261029h)
                 · 필기 2주 연속 없음(설정에서 켰을 때만, 기본 끔)
      금액은 이 화면에 넣지 않는다. */
   var OPEN_KEY = 'mhub.today.open';
@@ -216,7 +237,7 @@
       since: Math.round((Date.parse(today) - Date.parse(L)) / 86400000)
     };
   }
-  /* 앱 과제 — 수업일 D 레포트와 같은 기간 D-7 ~ D-1 (D = 그 반 지난 수업일 L · 오늘이 수업일이면 오늘). 과제 있던 날이 없으면 null (20261029h) */
+  /* 과제 — 수업일 D 레포트와 같은 기간 D-7 ~ D-1 (D = 그 반 지난 수업일 L · 오늘이 수업일이면 오늘). 과제 있던 날이 없으면 null (20261029h) */
   function appWeekOf(s, cy, lessonDate) {
     var a = app[s.id];
     var p = window.AppWeek && AppWeek.lastWeek ? AppWeek.lastWeek(lessonDate || (cy && cy.L)) : null;
@@ -280,19 +301,20 @@
     return out;
   }
 
-  /* 앱 과제 「n/5일」 — 그 반 지난 수업 레포트 기간(D-7 ~ D-1)의 평일 중 제출한 날 (토 · 일은 세지 않는다) */
+  /* 과제 「n/5일」 — 그 반 지난 수업 레포트 기간(D-7 ~ D-1)의 평일 중 제출한 날 (토 · 일은 세지 않는다) */
   function appCell(s, cy) {
     if (!s.app) return '';
     var a = app[s.id];
-    if (!a) return '<span class="tdc-app tdc-app--wait" title="앱 과제 불러오는 중">앱 …</span>';
-    var w = a.ok ? appWeekOf(s, cy) : null;
-    if (!w) return '<span class="tdc-app tdc-app--none" title="이 기간 앱 과제 없음">앱 —</span>';
+    if (!a) return '<span class="tdc-app tdc-app--wait" title="과제 기록 불러오는 중"><i class="spin" aria-hidden="true"></i>과제 불러오는 중</span>';
+    if (a.failed) return '<button type="button" class="tdc-app tdc-app--fail" data-app-retry="' + esc(s.id) + '">과제 기록 못 불러옴 · 다시 시도</button>';
+    var w = appWeekOf(s, cy);
+    if (!w) return '<span class="tdc-app tdc-app--none" title="이 기간 과제 없음">과제 —</span>';
     var k = w.hwDone >= w.hwDays ? 'ok' : w.hwDone >= 3 ? 'mid' : 'low';
-    return '<span class="tdc-app tdc-app--' + k + ' num" title="' + esc(md(w.from) + '~' + md(w.to) + ' 평일 ' + w.hwDays + '일 중 제출 ' + w.hwDone + '일 · 정시 ' + w.hwOnTime + '일') + '">앱 ' + w.hwDone + '/' + w.hwDays + '일</span>';
+    return '<span class="tdc-app tdc-app--' + k + ' num" title="' + esc(md(w.from) + '~' + md(w.to) + ' 평일 ' + w.hwDays + '일 중 제출 ' + w.hwDone + '일 · 정시 ' + w.hwOnTime + '일') + '">과제 ' + w.hwDone + '/' + w.hwDays + '일</span>';
   }
   function studentRow(s, cy) {
     return '<div class="tdc-st" data-id="' + esc(s.id) + '">' +
-      '<div class="tdc-st__main"><button type="button" class="roster__name roster__name-btn" data-card="' + esc(s.id) + '">' + esc(s.name) + '</button>' + appCell(s, cy) + '</div>' +
+      '<div class="tdc-st__main"><button type="button" class="roster__name roster__name-btn" data-card="' + esc(s.id) + '">' + esc(s.name) + '</button><span class="tdc-app-slot">' + appCell(s, cy) + '</span></div>' +
       '<div class="tdc-st__acts"><button type="button" class="btn btn--sm" data-card="' + esc(s.id) + '">상담 카드</button>' +
         '<button type="button" class="btn btn--sm" data-sms-sid="' + esc(s.id) + '">문자</button>' +
         '<button type="button" class="btn btn--sm btn--ghost" data-pv="parent" data-sid="' + esc(s.id) + '">학부모 화면 미리보기</button>' +
@@ -458,6 +480,8 @@
     var d = st.data;
     if (!d) return;
     var classes = classList(d);
+    st.cyBy = {};
+    classes.forEach(function (c) { st.cyBy[c.name] = c.cy; });
     var unsent = unsentOf(classes);
     var unsentN = unsent.reduce(function (a, u) { return a + u.x.left; }, 0);
 
@@ -474,18 +498,20 @@
     $('#tdTitle').textContent = '오늘 · ' + Store.dateWithDow(DDay.today());
     $('#tdInfo').setAttribute('aria-expanded', String(!!st.rulesOpen));
 
+    setTimeout(renderApp, 0);
     $('#tdBody').innerHTML = transitionHtml() +
       '<div class="td-rules" id="tdRules"' + (st.rulesOpen ? '' : ' hidden') + '><p class="panel__hint tdc-rule">반 이름 아래 칩 = 최근 3번 수업 레포트를 보낸 학생 비율 (초록 100% · 주황 일부 · 빨강 0% · 회색 수업 당일 작성 중). 칩을 누르면 그 수업 발송 화면으로 갑니다. ' +
-        '학생 줄 「앱 n/5일」 = 지난 수업 레포트 기간(수업 전 일주일) 평일 중 앱 과제를 낸 날 (토 · 일은 세지 않음). ' +
+        '학생 줄 「과제 n/5일」 = 지난 수업 레포트 기간(수업 전 일주일) 평일 중 과제를 낸 날 (토 · 일은 세지 않음). ' +
         '챙길 학생 = 마감이 지났는데 복습테스트를 안 낸 학생(그 수업 레포트를 보내면 사라짐) · 결석이 기준(설정)을 넘은 학생(그 뒤 상담 기록을 남기면 사라짐).</p></div>' +
       todoHtml(unsent) +
       careHtml(careItems(d)) +
+      '<div class="td-appbar" id="tdAppBar" hidden role="status" aria-live="polite"></div>' +
       '<div class="tdc-list-wrap">' + cardsOf(classes).map(function (it) { return it.course ? courseCardHtml(it.course, it.cls) : classCardHtml(it.c); }).join('') + '</div>';
   }
 
 
   /* ---------- 코멘트 「AI로 초안 쓰기」 자료 (write.js · 20261029g) ----------
-     앱 과제 — 그 레포트 수업일 D 기준 D-7 ~ D-1 (레포트 앱 과제 요약과 같은 기간)과 그 앞 일주일 D-14 ~ D-8 (20261029h).
+     과제 — 그 레포트 수업일 D 기준 D-7 ~ D-1 (레포트 과제 요약과 같은 기간)과 그 앞 일주일 D-14 ~ D-8 (20261029h).
      D 를 안 주면 그 반 지난 수업일. 앱 기록을 아직 못 불러왔으면 null */
   function appFactsOf(s, lessonDate) {
     if (!s) return null;
@@ -526,6 +552,8 @@
   };
 
   $('#tdBody').addEventListener('click', function (e) {
+    var rt = e.target.closest('[data-app-retry]');
+    if (rt) { loadApp(rt.dataset.appRetry); return; }
     var ca = e.target.closest('[data-care]');
     if (ca) { careGo(ca.dataset.care, ca.dataset.careCls, ca.dataset.careWeek, ca.dataset.careSid); return; }
     var wc = e.target.closest('[data-write-course]');
@@ -549,7 +577,7 @@
       render();
     }
   });
-  $('#tdRefresh').addEventListener('click', function () { app = {}; load(true); loadLinks(); });
+  $('#tdRefresh').addEventListener('click', function () { app = {}; if (window.AppFetch) AppFetch.clear(); load(true); loadLinks(); });
 
   /* [이번 주 작성하기] — 레포트 발송 → 1 작성에서 그 반 이번 주 작성 화면 */
   function writeWeek(cls, week) {

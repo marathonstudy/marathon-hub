@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" as="style" crossorigin
       href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
-<link rel="stylesheet" href="style.css?v=20261031a">
+<link rel="stylesheet" href="style.css?v=20261031b">
 </head>
 <body class="is-locked">
 
@@ -224,7 +224,7 @@
     <div class="panel">
       <div class="panel__head">
         <h2 class="panel__title" id="tdTitle">오늘</h2>
-        <button class="td-info" id="tdInfo" type="button" aria-expanded="false" aria-controls="tdRules" title="칩 · 앱 n/5일 뜻" aria-label="칩 · 앱 과제 표시 뜻 보기">ⓘ</button>
+        <button class="td-info" id="tdInfo" type="button" aria-expanded="false" aria-controls="tdRules" title="칩 · 과제 n/5일 뜻" aria-label="칩 · 과제 표시 뜻 보기">ⓘ</button>
         <span class="panel__hint" id="tdAppProgress"></span>
         <div class="spacer"></div>
         <button class="btn btn--sm" id="tdSettingsBtn" type="button">설정</button>
@@ -260,7 +260,7 @@
         <span class="notice__icon" aria-hidden="true">🔗</span>
         <div class="notice__body">
           <b id="linkBulkText">개인 링크가 없는 학생이 있습니다.</b>
-          개인 링크가 있어야 학부모가 반 공지·레포트·앱 과제를 한 페이지에서 봅니다.
+          개인 링크가 있어야 학부모가 반 공지·레포트·과제를 한 페이지에서 봅니다.
           <div style="margin-top:9px">
             <button class="btn btn--sm btn--primary" id="btnIssueAll" type="button">한꺼번에 발급</button>
           </div>
@@ -562,7 +562,7 @@
       <span class="notice__icon" aria-hidden="true">💬</span>
       <div class="notice__body">
         레포트에 들어가는 주소는 <b>학부모 링크</b>입니다. 매주 같은 링크라서 학부모는
-        한 번 받은 링크로 지난 레포트·반 공지·앱 과제를 계속 볼 수 있습니다.
+        한 번 받은 링크로 지난 레포트·반 공지·과제를 계속 볼 수 있습니다.
         학생 줄 <b>⋯</b>의 <b>[내 폰으로 보내기]</b>는 이 기기의 문자 앱을 엽니다. 안 열리면 <b>[문구 복사]</b>로 복사하세요.
       </div>
     </div>
@@ -1083,7 +1083,7 @@
 
       <!-- 개인 링크 · 앱 공유 코드 -->
       <div class="link-box" id="linkBox">
-        <div class="extra-head"><span class="extra-head__title">개인 링크 · 앱 과제</span></div>
+        <div class="extra-head"><span class="extra-head__title">개인 링크 · 과제</span></div>
         <div class="link-box__row">
           <span class="link-box__label">학부모 링크</span>
           <code class="link-box__url" id="fHubUrl">아직 없음</code>
@@ -1961,8 +1961,8 @@
       </div>
       <div class="extra-head" style="margin-top:14px"><span class="extra-head__title">살펴보기 기준</span></div>
       <div class="toolbar">
-        <span>앱 과제 제출(지난 수업 전 일주일 · 제출일 / 과제 있던 날)</span>
-        <input class="input input--num" id="tdSetAppLow" type="number" min="1" max="100" aria-label="앱 과제 기준 퍼센트">
+        <span>과제 제출(지난 수업 전 일주일 · 제출일 / 과제 있던 날)</span>
+        <input class="input input--num" id="tdSetAppLow" type="number" min="1" max="100" aria-label="과제 기준 퍼센트">
         <span>% 미만</span>
       </div>
       <div class="toolbar">
@@ -2065,49 +2065,50 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
 <!-- config.js 와 brand.js 가 먼저 와야 한다. 나머지가 이 값을 읽는다. -->
-<script src="../assets/config.js?v=20261031a"></script>
-<script src="../assets/brand.js?v=20261031a"></script>
-<script src="../assets/lesson.js?v=20261031a"></script>
-<script src="supabase.js?v=20261031a"></script>
-<script src="db.js?v=20261031a"></script>
-<script src="store.js?v=20261031a"></script>
-<script src="report.js?v=20261031a"></script>
-<script src="aipolish.js?v=20261031a"></script>
-<script src="app.js?v=20261031a"></script>
-<script src="import.js?v=20261031a"></script>
-<script src="course.js?v=20261031a"></script>
-<script src="write.js?v=20261031a"></script>
-<script src="publish.js?v=20261031a"></script>
-<script src="send.js?v=20261031a"></script>
-<script src="kakao.js?v=20261031a"></script>
-<script src="sms.js?v=20261031a"></script>
-<script src="contacts.js?v=20261031a"></script>
-<script src="notice.js?v=20261031a"></script>
-<script src="tb.js?v=20261031a"></script>
-<script src="tb-dash.js?v=20261031a"></script>
-<script src="tb-issue.js?v=20261031a"></script>
-<script src="tb-stock.js?v=20261031a"></script>
-<script src="tb-bill.js?v=20261031a"></script>
-<script src="../assets/dday.js?v=20261031a"></script>
-<script src="../assets/app-week.js?v=20261031a"></script>
-<script src="card.js?v=20261031a"></script>
-<script src="exams.js?v=20261031a"></script>
-<script src="photo.js?v=20261031a"></script>
-<script src="today.js?v=20261031a"></script>
-<script src="staff.js?v=20261031a"></script>
-<script src="classes.js?v=20261031a"></script>
-<script src="weekly.js?v=20261031a"></script>
-<script src="filethumb.js?v=20261031a"></script>
-<script src="ytbm.js?v=20261031a"></script>
-<script src="summary.js?v=20261031a"></script>
-<script src="weeks.js?v=20261031a"></script>
-<script src="../assets/photos.js?v=20261031a"></script>
-<script src="review.js?v=20261031a"></script>
-<script src="draftguard.js?v=20261031a"></script>
-<script src="preview.js?v=20261031a"></script>
-<script src="rtabs.js?v=20261031a"></script>
-<script src="nav.js?v=20261031a"></script>
-<script src="sync.js?v=20261031a"></script>
-<script src="auth.js?v=20261031a"></script>
+<script src="../assets/config.js?v=20261031b"></script>
+<script src="../assets/brand.js?v=20261031b"></script>
+<script src="../assets/lesson.js?v=20261031b"></script>
+<script src="supabase.js?v=20261031b"></script>
+<script src="db.js?v=20261031b"></script>
+<script src="store.js?v=20261031b"></script>
+<script src="report.js?v=20261031b"></script>
+<script src="aipolish.js?v=20261031b"></script>
+<script src="app.js?v=20261031b"></script>
+<script src="import.js?v=20261031b"></script>
+<script src="appfetch.js?v=20261031b"></script>
+<script src="course.js?v=20261031b"></script>
+<script src="write.js?v=20261031b"></script>
+<script src="publish.js?v=20261031b"></script>
+<script src="send.js?v=20261031b"></script>
+<script src="kakao.js?v=20261031b"></script>
+<script src="sms.js?v=20261031b"></script>
+<script src="contacts.js?v=20261031b"></script>
+<script src="notice.js?v=20261031b"></script>
+<script src="tb.js?v=20261031b"></script>
+<script src="tb-dash.js?v=20261031b"></script>
+<script src="tb-issue.js?v=20261031b"></script>
+<script src="tb-stock.js?v=20261031b"></script>
+<script src="tb-bill.js?v=20261031b"></script>
+<script src="../assets/dday.js?v=20261031b"></script>
+<script src="../assets/app-week.js?v=20261031b"></script>
+<script src="card.js?v=20261031b"></script>
+<script src="exams.js?v=20261031b"></script>
+<script src="photo.js?v=20261031b"></script>
+<script src="today.js?v=20261031b"></script>
+<script src="staff.js?v=20261031b"></script>
+<script src="classes.js?v=20261031b"></script>
+<script src="weekly.js?v=20261031b"></script>
+<script src="filethumb.js?v=20261031b"></script>
+<script src="ytbm.js?v=20261031b"></script>
+<script src="summary.js?v=20261031b"></script>
+<script src="weeks.js?v=20261031b"></script>
+<script src="../assets/photos.js?v=20261031b"></script>
+<script src="review.js?v=20261031b"></script>
+<script src="draftguard.js?v=20261031b"></script>
+<script src="preview.js?v=20261031b"></script>
+<script src="rtabs.js?v=20261031b"></script>
+<script src="nav.js?v=20261031b"></script>
+<script src="sync.js?v=20261031b"></script>
+<script src="auth.js?v=20261031b"></script>
 </body>
 </html>

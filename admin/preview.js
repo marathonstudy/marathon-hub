@@ -176,11 +176,12 @@
       });
     },
 
-    /* 앱 과제 — 앱 서버는 학부모 링크 코드로만 받는다 (서버 사이에서만 쓰이고 화면 주소에는 안 나온다) */
+    /* 과제 기록 — 앱 서버는 학부모 링크 코드로만 받는다 (서버 사이에서만 쓰이고 화면 주소에는 안 나온다) */
     app: function () {
       var code = Store.linkOf(cur.sid).hubCode;
       if (!code) return Promise.resolve({ ok: false, reason: 'nolink' });
-      return fetch(CONFIG.supabase.url + '/functions/v1/' + CONFIG.appFunction + '?code=' + encodeURIComponent(code), { headers: { apikey: CONFIG.supabase.key } })
+      /* 「오늘」이 이미 불러온 기록이면 그대로 (appfetch.js · 15초 넘으면 실패 · 20261031b) */
+      return window.AppFetch ? AppFetch.get(code) : fetch(CONFIG.supabase.url + '/functions/v1/' + CONFIG.appFunction + '?code=' + encodeURIComponent(code), { headers: { apikey: CONFIG.supabase.key } })
         .then(function (r) { return r.json().catch(function () { return { ok: false }; }); });
     }
   };

@@ -161,7 +161,7 @@
                (mark || '<span class="aw-blank" aria-hidden="true"></span>') + '<span class="sr-only">' + esc(tip) + '</span></span>';
       }).join('');
     }
-    return '<div class="aw" role="group" aria-label="' + esc(md(w.from) + '~' + md(w.to) + ' 앱 과제 · 강의') + '">' +
+    return '<div class="aw" role="group" aria-label="' + esc(md(w.from) + '~' + md(w.to) + ' 과제 · 강의') + '">' +
       '<div class="aw-grid" style="' + cols + '">' +
         '<span class="aw-head"></span>' +
         w.days.map(function (d) { return '<span class="aw-head aw-day"><b class="num">' + md(d.date).split('/')[1] + '</b>' + d.dow + '</span>'; }).join('') +

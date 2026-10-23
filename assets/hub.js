@@ -51,11 +51,16 @@
     });
   }
 
+  /* 과제 기록 — 15초 안에 답이 없으면 실패로 (「과제 기록 못 불러옴 · 다시 시도」 · 20261031b) */
+  var APP_TIMEOUT = 15000;
   function appReport(code) {
     if (PV) return PV.app();
     var url = CFG.supabase.url + '/functions/v1/' + CFG.appFunction + '?code=' + encodeURIComponent(code);
-    return fetch(url, { headers: { 'apikey': CFG.supabase.key } })
-      .then(function (r) { return r.json().catch(function () { return { ok: false, reason: 'http' + r.status }; }); });
+    return Promise.race([
+      fetch(url, { headers: { 'apikey': CFG.supabase.key } })
+        .then(function (r) { return r.json().catch(function () { return { ok: false, reason: 'http' + r.status }; }); }),
+      new Promise(function (res) { setTimeout(function () { res({ ok: false, reason: 'timeout' }); }, APP_TIMEOUT); })
+    ]);
   }
 
   /* ============================================================
@@ -529,9 +534,31 @@
     if (APP.code !== code || !APP.p) {
       APP.code = code;
       APP.p = appReport(code).then(function (r) { return r && r.ok ? (r.data || {}) : null; }, function () { return null; });
+      /* 실패는 남기지 않는다 — [다시 시도]는 새로 부른다 */
+      APP.p.then(function (d) { if (!d && APP.code === code) APP.p = null; });
     }
     return APP.p;
   }
+  /* 불러오는 동안 — 빙글빙글 「과제 불러오는 중」 (10초가 넘으면 「조금 오래 걸리고 있습니다」) · 실패 — 「과제 기록 못 불러옴 · 다시 시도」 */
+  function appWaitHtml() {
+    return '<div class="card app-wait" data-app-wait><p class="tw-loading"><i class="spin" aria-hidden="true"></i> <span data-app-wait-t>과제 불러오는 중</span></p></div>';
+  }
+  function appWaitSlow(box) {
+    setTimeout(function () {
+      var t = box && box.querySelector('[data-app-wait-t]');
+      if (t) t.textContent = '조금 오래 걸리고 있습니다 · 과제 불러오는 중';
+    }, 10000);
+  }
+  function appFailHtml(key) {
+    return '<div class="card app-fail"><span>과제 기록 못 불러옴</span> <button type="button" class="hub-btn hub-btn--sm" data-app-retry="' + esc(key) + '">다시 시도</button></div>';
+  }
+  var APP_RETRY = {};
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-app-retry]');
+    if (!b || !APP_RETRY[b.dataset.appRetry]) return;
+    APP.p = null;
+    APP_RETRY[b.dataset.appRetry]();
+  });
   function todayISO() { return (global.DDay && DDay.today) ? DDay.today() : new Date().toISOString().slice(0, 10); }
   function mondayOf(iso) {
     var s = String(iso).slice(0, 10);
@@ -601,7 +628,7 @@
     AWB.list[id] = { data: data, months: months, i: Math.max(0, months.indexOf(opt.month || '')), range: opt.range || null };
     var s = (data && data.stats) || {};
     if (opt.first) {
-      var fin = '<h2 class="card-title">📱 ' + esc(opt.title || '앱 과제 요약') + '</h2>' +
+      var fin = '<h2 class="card-title">📱 ' + esc(opt.title || '과제 요약') + '</h2>' +
         (opt.sub ? '<p class="awb-sub">' + opt.sub + '</p>' : '') + '<p class="awb-wait">첫 주라 지난 기록이 없습니다</p>';
       return opt.card === false ? '<div class="awb" id="' + id + '">' + fin + '</div>' : '<div class="card awb aw-card" id="' + id + '">' + fin + '</div>';
     }
@@ -618,14 +645,14 @@
       ? '<p class="awb-total">전체 누적(시작일부터): 과제 ' + tt.hw + '% · 정시 ' + tt.onTime + '% · 강의 ' + (tt.lec == null ? '—' : tt.lec + '%') + '</p>'
       : '<p class="awb-total">전체 누적(시작일부터): 과제 ' + Math.round(Number(s.submissionRate) || 0) + '% · 정시 ' +
         Math.round(Number(s.onTimeRate) || 0) + '% · 강의 ' + Math.round(Number(s.lectureRate) || 0) + '%</p>';
-    var inner = '<h2 class="card-title">📱 ' + esc(opt.title || '앱 과제 요약') + '</h2>' +
+    var inner = '<h2 class="card-title">📱 ' + esc(opt.title || '과제 요약') + '</h2>' +
       (opt.sub ? '<p class="awb-sub">' + opt.sub + '</p>' : '') +
       body + total +
       (w ? AppWeek.tableHtml(w, { pending: !!opt.pending }) : '') +
       (months.length ? '<div class="awb-cal"><div class="awb-cal__t">🗓️ 날짜별 제출</div><div class="awb-cal__m" data-awb-cal="' + id + '">' + calMonthHtml(id) + '</div></div>' : '');
     return opt.card === false ? '<div class="awb" id="' + id + '">' + inner + '</div>' : '<div class="card awb aw-card" id="' + id + '">' + inner + '</div>';
   }
-  function periodTitle(label, from, to) { return '앱 과제 요약 · ' + label + ' (' + Lesson.md(from, false) + '~' + Lesson.md(to, false) + ')'; }
+  function periodTitle(label, from, to) { return '과제 요약 · ' + label + ' (' + Lesson.md(from, false) + '~' + Lesson.md(to, false) + ')'; }
   /* 레포트(수업일 D)의 앱 과제 요약 — 「앱 과제 요약 · 지난 일주일 (10/15~10/21)」 · 「10/22 수업 전까지 한 것」 (20261029h)
      원형 3개 · n/n일 제출 · 날짜 칸(7칸) · 전체 누적(시작일 ~ D-1)이 모두 같은 기간. 앱 기록이 그 뒤에 시작했으면 「첫 주라 지난 기록이 없습니다」 */
   function reportAppHtml(data, lessonDate, card) {
@@ -925,11 +952,13 @@
     if (!box) return;
     if (!(APP.info && APP.info.linked)) { box.innerHTML = ''; return; }
     var ld = lessonDateOf(r, data);
-    box.innerHTML = '<div class="card tw-prog"><p class="tw-loading">앱 과제 기록을 불러오는 중…</p></div>';
+    box.innerHTML = appWaitHtml();
+    appWaitSlow(box);
+    APP_RETRY.report = function () { drawReportApp(box, code, r, data, idx); };
     appData(code).then(function (dd) {
       if (RP.cur !== idx) return;
       if (!dd) {
-        box.innerHTML = '';            /* 못 받으면 칸을 숨긴다 (「아직 입력 전」은 쓰지 않는다 · 20261030a) */
+        box.innerHTML = appFailHtml('report');      /* 멈춰 있지 않고 다시 시도 (20261031b) */
         return;
       }
       if (ld) box.innerHTML = reportAppHtml(dd, ld);
@@ -1771,7 +1800,7 @@
       if (x.status === 'onTime') on++; else if (x.status === 'late') late++; else none++;
       if (x.lecture && x.lecture.videosTotal > 0) { lecN++; if (x.lecture.videosDone >= x.lecture.videosTotal) lecDone++; }
     });
-    if (!n) return '<p class="awb-wait">이 기간에는 앱 과제가 없었습니다</p>';
+    if (!n) return '<p class="awb-wait">이 기간에는 과제가 없었습니다</p>';
     var avg = rateAvg(items);
     var t = function (k, v, sub) { return '<div class="ap-stat"><div class="ap-stat__k">' + k + '</div><div class="ap-stat__v num">' + v + '</div>' + (sub ? '<div class="ap-stat__s">' + sub + '</div>' : '') + '</div>'; };
     return '<div class="ap-stats">' +
@@ -1786,7 +1815,7 @@
   function apCatsHtml(cats) {
     if (!cats.length) return '';
     var low = cats.filter(function (c) { return c.count == null || c.count > 0; }).slice().sort(function (a, b) { return a.rate - b.rate; }).slice(0, 3);
-    return '<div class="card ap-cats"><h2 class="card-title">🎯 영역별 정답률<span class="card-note">앱 전체 기간</span></h2>' +
+    return '<div class="card ap-cats"><h2 class="card-title">🎯 영역별 정답률<span class="card-note">전체 기간</span></h2>' +
       (cats.length > 1 && low.length ? '<div class="ap-top"><div class="ap-top__t">자주 틀리는 영역 TOP ' + low.length + '</div><ol class="ap-top__list">' + low.map(function (c) {
         return '<li><b>' + esc(c.name) + '</b> <span class="num">' + c.rate + '%</span>' + (c.count ? ' <span class="ap-muted num">' + c.count + '회</span>' : '') + '</li>';
       }).join('') + '</ol></div>' : '') +
@@ -1868,12 +1897,13 @@
     var host = $('#panelApp');
 
     if (!app.linked) {
-      host.innerHTML = '<div class="empty">앱 과제 기록이 아직 연결되지 않았습니다.<br>선생님께 문의해 주세요.</div>';
+      host.innerHTML = '<div class="empty">과제 기록이 아직 연결되지 않았습니다.<br>선생님께 문의해 주세요.</div>';
       return;
     }
 
-    host.innerHTML = '<div class="empty">앱 과제 기록을 불러오는 중입니다…</div>' +
-                     '<div class="hub-actions">' + appOpenButton(app) + '</div>';
+    host.innerHTML = appWaitHtml() + '<div class="hub-actions">' + appOpenButton(app) + '</div>';
+    appWaitSlow(host);
+    APP_RETRY.detail = function () { renderApp(code, app, reports); };
 
     appData(code).then(function (dd) {
       var res = dd ? { ok: true, data: dd } : { ok: false };
@@ -1882,8 +1912,8 @@
            '앱 리포트 열기' 로 원래 화면을 볼 수 있게 남겨 둔다. */
         var why = res && res.reason === 'expired'
           ? '앱 공유 링크가 바뀐 것 같습니다. 선생님께 새 링크를 요청해 주세요.'
-          : '여기서는 앱 과제 기록을 불러오지 못했습니다.<br>아래 버튼으로 앱 리포트를 열어 보세요.';
-        host.innerHTML = '<div class="empty">' + why + '</div>' +
+          : '';
+        host.innerHTML = (why ? '<div class="empty">' + why + '</div>' : appFailHtml('detail')) +
                          '<div class="hub-actions">' + appOpenButton(app) + '</div>';
         return;
       }
@@ -1894,7 +1924,7 @@
       var p = currentPeriod(rep, '');
       var aw = p && p.from && global.AppWeek ? AppWeek.compute(d, p.from, p.to, todayISO()) : null;
       host.innerHTML =
-        appBlockHtml(d, aw, { title: p && p.from ? periodTitle('이번 주', p.from, p.to) : '앱 과제 요약', month: todayISO().slice(0, 7), pending: true }) +
+        appBlockHtml(d, aw, { title: p && p.from ? periodTitle('이번 주', p.from, p.to) : '과제 요약', month: todayISO().slice(0, 7), pending: true }) +
         '<div id="apDetail">' + apDetailHtml(d) + '</div>' +
         apCatsHtml(d.categories || []) +
         apLecturesHtml(d.lectures) +
@@ -1919,7 +1949,7 @@
         });
       });
     }).catch(function () {
-      host.innerHTML = '<div class="empty">여기서는 앱 과제 기록을 불러오지 못했습니다.<br>아래 버튼으로 앱 리포트를 열어 보세요.</div>' +
+      host.innerHTML = appFailHtml('detail') +
                        '<div class="hub-actions">' + appOpenButton(app) + '</div>';
     });
   }

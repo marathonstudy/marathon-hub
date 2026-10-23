@@ -1647,7 +1647,7 @@
      「AI로 다듬기」 · 「AI로 초안 쓰기」 (aipolish.js · text-polish · 20261029g)
        반 공통 코멘트 · 학생 코멘트(코멘트 창) — 다듬기 + 초안 · 수업 내용(차시 줄 묶음) — 다듬기
        글 칸은 다시 그릴 때 새로 만들어지므로(setFresh · freshCommentText) 읽기 · 쓰기를 함수로 준다
-       초안 자료는 화면에 이미 있는 것만 — 수업 내용 · 앱 과제 수행 · 복습테스트 제출 여부(점수 없음) · 자료 이름 · 출결 · 집중도.
+       초안 자료는 화면에 이미 있는 것만 — 수업 내용 · 과제 수행 · 복습테스트 제출 여부(점수 없음) · 자료 이름 · 출결 · 집중도.
        학생 이름 · 전화번호 · 금액 · 상담 내용은 넣지 않는다
      ============================================================ */
 
@@ -1665,7 +1665,7 @@
     if (L && L.lessonDate) f.수업일 = Lesson.md(L.lessonDate);
     var ls = lessonsOfClass();
     if (ls.length) f.수업내용 = ls;
-    /* 앱 과제 — 이 레포트 수업일 D 기준 D-7 ~ D-1 (러닝노트 레포트와 같은 기간 · 20261029h) */
+    /* 과제 — 이 레포트 수업일 D 기준 D-7 ~ D-1 (러닝노트 레포트와 같은 기간 · 20261029h) */
     var app = window.Today && Today.classApp ? Today.classApp(cls, (L && L.lessonDate) || '') : null;
     if (app) f.앱과제 = app;
     var rv = window.Review && Review.classFacts ? Review.classFacts(cls, draft.weekStart) : null;

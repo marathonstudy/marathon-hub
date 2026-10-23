@@ -214,7 +214,7 @@
           }).join('') + '</div></div>' +
         '<label class="field"><span class="field__label">첫 수업일</span>' +
           '<input class="input" type="date" id="wkFirst" value="' + esc(s.first || '') + '"></label>' +
-        '<p class="panel__hint" id="wkSchedHint">첫 수업일을 고르면 그 요일이 기준 요일로 들어갑니다. 첫 수업일 앞 주차의 레포트는 예전처럼 기간만 나옵니다.</p>' +
+        '<p class="panel__hint" id="wkSchedHint">이 반이 처음 수업한 날을 고르세요. 그 요일이 매주 수업 요일이 됩니다.</p>' +
         '<div class="wk-edit__btns"><button class="btn btn--sm btn--primary" type="button" id="btnWkSchedSave">저장</button>' +
         '<button class="btn btn--sm btn--ghost" type="button" id="btnWkSchedCancel">취소</button></div>' +
       '</div>';
