@@ -1,7 +1,7 @@
 /* ============================================================
    report-view.js — 주간 레포트 한 편을 그린다
 
-   개인 페이지(/me/)의 '내 레포트' 와 생성기 ② 작성 탭의 미리보기가
+   개인 페이지(/me/)의 「레포트」 탭과 코치룸 미리보기가
    이 파일 하나를 같이 쓴다. 그래서 미리보기와 학부모 화면이 어긋나지 않는다.
 
    ReportView.render(그릴자리, 레포트데이터)
@@ -108,8 +108,9 @@
     return '<div class="header-logo"><img src="' + esc(url) + '" alt="' + esc(B().reportBrand) + '" width="105" height="60"></div>';
   }
 
-  function headerHtml(d) {
-    var line = lessonLine(d) || formatPeriod(d.startDate, d.endDate);
+  /* opts.noPeriod — 수업일을 모르는 예전 레포트도 주 시작일 · 기간은 쓰지 않는다 (러닝노트 · 20261029i) */
+  function headerHtml(d, opts) {
+    var line = lessonLine(d) || (opts && opts.noPeriod ? '' : formatPeriod(d.startDate, d.endDate));
     return '' +
       '<div class="header">' +
         logoHtml() +
@@ -301,8 +302,21 @@
     }
   }
 
+  /* 러닝노트 「레포트」 탭이 칸을 골라 다시 늘어놓을 때 (hub.js · 20261029i)
+     parts: header · student · attendance · lessons · focus · tests · comment */
+  var PARTS = { header: headerHtml, student: studentHtml, attendance: attendanceHtml, lessons: lessonsHtml,
+                focus: focusHtml, tests: testsHtml, comment: commentHtml };
+  function partsHtml(data, parts, opts) {
+    ensureGradient();
+    return (parts || []).map(function (p) {
+      try { return PARTS[p] ? PARTS[p](data || {}, opts) : ''; } catch (e) { return ''; }
+    }).join('');
+  }
+
   global.ReportView = {
     render: render,
+    partsHtml: partsHtml,
+    animate: animate,
     esc: esc,
     mdHtml: mdHtml,
     absentText: absentText,

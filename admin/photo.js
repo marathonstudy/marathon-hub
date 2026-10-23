@@ -231,7 +231,8 @@
       UI.confirmAsk('필기 사진 완전 삭제', '파일과 기록을 모두 지웁니다. 되살릴 수 없습니다. 잠깐 가리려면 [숨기기]를 쓰세요.', '완전 삭제')
         .then(function (ok) {
           if (!ok) return;
-          return sb().storage.from('note-photos').remove([p.path]).then(function (r) {
+          /* 작은 그림(…_s.jpg · 20261029i)도 같이 */
+          return sb().storage.from('note-photos').remove([p.path, String(p.path).replace(/\.jpg$/, '_s.jpg')]).then(function (r) {
             if (r.error) throw new Error(r.error.message);
             return sb().from('note_photos').delete().eq('id', p.id).select('id');
           }).then(check).then(function (r) {

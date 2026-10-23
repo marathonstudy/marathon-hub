@@ -38,7 +38,8 @@ admin/        코치룸 (명단 · 작성 · 공개 · 발송 · 반 공지 · �
   today.js      「오늘」 총괄 (로그인 첫 화면) — 요약 · 챙겨야 할 학생 · 반별 카드
   staff.js      직원 관리 (「오늘」 [설정] · teacher 만) — 팀 가입 코드 · 사용 중지 · 역할
   auth.js       로그인 · 조교 가입 · 비밀번호 찾기
-  weekly.js     주간 레포트 → 작성 반 공통 — 수업일 · 수업 영상 · 배부 자료/과제 파일 · 지난 파일 정리
+  weekly.js     주간 레포트 → 작성 반 공통 — 수업일 · 수업 영상 · 배부 자료/과제 파일 · 지난 파일 정리 · [미리보기 그림 만들기]
+  filethumb.js  파일 「첫 페이지 그림」 만들기 — PDF 첫 페이지(pdf.js · cdnjs 3.11.174) · JPG/PNG 를 가로 400px JPG 로 (20261029i)
   summary.js    주간 레포트 → 작성 반 공통 — 자막으로 AI 수업 요약 (초안 → 확정)
   ../assets/app-week.js  러닝노트 앱 과제 · 강의 표 (레포트는 수업일 D 기준 지난 일주일 D-7 ~ D-1 · 코치룸 「오늘」 · AI 초안도 같은 계산)
   ytbm.js       즐겨찾기 버튼 「마라톤 자막 가져오기」 (PC 크롬 · 유튜브 화면에서 스크립트 복사 → AI 요약 [붙여 넣기])
@@ -64,9 +65,9 @@ assets/
   icon-180.png · icon-192.png  홈 화면 아이콘 (로고)
   report.css    레포트 디자인
   report-view.js 레포트 그리기 (개인 페이지와 코치룸 미리보기가 같이 쓴다)
-  hub.css · hub.js 개인 페이지 · 반 공지 페이지
+  hub.css · hub.js 개인 페이지(탭 레포트 · 수업 영상 · 과제 상세 · 내 필기) · 반 공지 페이지
   dday.js       주요 시험 D-day 계산 (한국 시간 · 코치룸과 학생 화면이 같이 쓴다)
-  photos.js     러닝노트 「필기 노트」 — 사진 줄이기 · 올리기 · 날짜별 앨범
+  photos.js     러닝노트 「내 필기」 — 사진 줄이기 · 올리기(작은 그림 함께) · 날짜별 앨범 · 레포트 「오늘 수업 필기」 · 크게 보기(넘기기 · 확대)
 supabase/
   schema.sql                  표 · RLS · 공개 함수 전부 (SQL Editor 에서 한 번 실행)
   migration-002-textbook.sql  2단계 교재 관리 표 · 계산 함수 · 학부모용 hub_textbook (schema.sql 다음에 한 번)
@@ -101,6 +102,7 @@ supabase/
   migration-026-text-polish.sql     문자 「AI로 다듬기」 — 사용 기록(글은 저장 안 함) · 월 상한(기본 500회 · AI 요약과 따로) · 직원만
   functions/text-polish/index.ts    글 칸 다듬기 · 코멘트 초안 Edge Function — Claude(Haiku 5.5) · 칸 글(초안은 화면이 모은 자료)만 보냄 · 자리표시 · 링크 · 숫자 · 요일 검사 (직원만 · 키는 Secrets 에만)
   migration-027-review-status.sql   레포트 · 러닝노트 복습테스트 칸 — 확인 전 제출은 「제출 완료」만 (review_week_scores 에 status · 새 hub_review_week · 점수는 안 나감)
+  migration-029-file-thumbs.sql     파일 카드 첫 페이지 그림 (class_files.thumb_path · thumb_bytes · class_file_thumbs · 지우기 권한 · 저장 공간에 그림 용량)
   migration-028-review-absent.sql   복습테스트 미응시 사유 (review_absences 표 · review_absent_set / clear · 제출하면 저절로 풀림 · 「오늘」 미제출에서 빠짐 · 학부모에게는 사유 이름만)
   migration-024-student-login.sql   학생 공용 입구 — 반 · 이름 목록 · 휴대폰 번호 로그인(맞음/틀림 + 학생 링크 코드만) · 로그인 기록(직원만)
   kakao/template.txt · kakao/HOW-TO.md  알림톡 템플릿 초안 · 솔라피 등록 방법
@@ -348,6 +350,24 @@ delete from public.staff where email = '조교이메일@example.com';
   원형 3개 · n/n일 제출 · 날짜 7칸 · 전체 누적(시작일 ~ D-1)이 모두 같은 기간, 「날짜별 제출」 달력은 그 7일만 강조. 앱 기록이 그 뒤에 시작했으면 「첫 주라 지난 기록이 없습니다」.
   러닝노트 「이번 주」의 「다음 수업까지 진행 중」 카드는 뺐다 — 진행 중인 주는 「앱 과제」 탭(오늘 기준 · 그대로)에서만.
   같은 기간으로 맞춘 곳: 러닝노트 이번 주 · 각 주차 레포트 · 누적 추이 「과제」 · 코치룸 「오늘」 앱 과제 꼬리표 · 반 평균 · AI 초안 앱 과제 수치(그 앞 일주일 D-14 ~ D-8 과 비교).
+
+### 5-26. 20261029i — 러닝노트 탭 정리 · 레포트 「오늘 수업 필기」 · 파일 카드 (migration-029 + class-file · note-photo 다시 배포)
+1. 028 다음에 SQL Editor → **New query** → `supabase/migration-029-file-thumbs.sql` 전체 → **Run** (세 줄 모두 `true`)
+2. Edge Functions → **class-file** → **Code** 탭 → 새 `supabase/functions/class-file/index.ts` 전체로 바꾸기 → **Deploy updates** (action thumbs)
+3. Edge Functions → **note-photo** → **Code** 탭 → 새 `supabase/functions/note-photo/index.ts` 전체로 바꾸기 → **Deploy updates** (작은 그림)
+4. 코치룸 → 주간 레포트 → 작성 → 반 공통 「배부 자료 · 과제 파일」 → 반마다 **[미리보기 그림 만들기]** 한 번 (이미 올린 PDF · 사진)
+- 러닝노트 탭 네 개 — 레포트 · 수업 영상 · 과제 상세(예전 앱 과제) · 내 필기(예전 필기 노트). 「이번 주」 · 「내 레포트」를 「레포트」 하나로.
+  열면 가장 최근 공개 레포트. 예전 주소(#코드/notice · /week · /this-week · /app · /photo)도 새 탭으로. 새 레포트 빨간 점은 레포트 탭.
+- 레포트 한 편: 머리(수업일) → 출결 · 집중도 · 복습테스트 → 오늘 수업 필기 → 앱 과제 요약(지난 일주일) → 수업 내용(없으면 확정 요약)
+  → 종합 코멘트 → 이 수업 과제 · 자료 카드 → 이 수업 영상 → 선생님 공지 → 학생 정보.
+  가장 최근 레포트에는 예전 「이번 주」의 다른 주 과제 · 자료(접어서) · 지난 공지까지. 「이번 주」의 누적 추이 한 줄은 [누적 추이] 화면으로.
+- 위 한 줄 「◀ 지난주 · 10/22(목) 수업 ▾ · 다음주 ▶ · 누적 추이」 — 날짜 칩 줄 · 「‹ 전체 주차 · 누적 추이」 줄은 없앴다.
+  가운데를 누르면 공개된 수업일 목록. 학부모 · 학생 화면에 주 시작일을 쓰지 않는다(공지 · 자료 묶음 · 누적 추이 표 · 레포트 머리도 수업일).
+- 오늘 수업 필기 — 그 수업일에 올라온 그 학생 필기. 첫 장 크게 · 나머지 2열 · 4장 넘으면 +n장 더 보기 · 크게 보기(넘기기 · 확대) ·
+  「내 필기에서 전체 보기」 → 내 필기 탭 그 날짜(#코드/photo/날짜). 필기가 없으면 칸을 숨긴다.
+  사진은 올릴 때 작은 그림(…_s.jpg · 긴 변 480px)을 같이 올려 목록에 먼저 쓰고, 크게 볼 때 원본(그 전 사진은 원본만).
+- 파일 카드 — 한 줄 두 개 정사각형 · 필수 → 선택 → 배부 · 「필수」 · 「선택」 표시 · 첫 페이지 그림(PDF) · 그 그림(JPG · PNG) · 그 밖은 색 아이콘.
+  그림은 코치룸이 올릴 때 브라우저에서 만들어 같은 폴더 「원래이름.thumb.jpg」로 둔다 (다른 이름은 SQL 이 막는다). 반 공지 /notice/ 도 같은 카드.
 
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.

@@ -6,7 +6,7 @@
        staff_hub_get 등 직원 전용 함수로 대신 받아 넘긴다 (hub.js 의 HUB_PREVIEW).
      · 아무것도 바뀌지 않는다 — 제출 · 사진 올리기 · 지우기는 눌러도 「미리보기에서는 바뀌지 않습니다」.
      · 학생 · 학부모 쪽 열람 기록은 남지 않는다 (그런 기록 자체가 없고, 직원 함수도 남기지 않는다).
-     · 기본은 「이 주차」 — 주간 레포트 → 작성에서 고른 주(예: 10/22 수업)를 지금 입력된 그대로, 첫 화면 「이번 주」로 보여 준다.
+     · 기본은 「이 주차」 — 주간 레포트 → 작성에서 고른 주(예: 10/22 수업)를 지금 입력된 그대로, 첫 화면 「레포트」로 보여 준다.
        공개 전이면 띠에 「아직 공개 전입니다 · 공개하면 학부모에게 이렇게 보입니다」. 위 [이 주차] / [지금 학부모가 보는 화면] 으로 바꾼다.
        「지금 학부모가 보는 화면」은 공개된 레포트만 (실제 /me/ 와 같다) (20261029g)
      · [휴대폰 크기로 보기]
@@ -85,6 +85,23 @@
       }
       if (name === 'hub_textbook') return sb().rpc('staff_hub_textbook', { p_student: cur.sid }).then(unwrap);
       if (name === 'hub_trend') return sb().rpc('staff_hub_trend', { p_student: cur.sid }).then(unwrap);
+      /* 레포트 복습테스트 칸의 낸 것 · 확인 전 · 미응시 — 직원 표(review_week)에서 그 학생 줄만 같은 모양으로 (점수 · 메모 없이) */
+      if (name === 'hub_review_week') {
+        var s = student();
+        if (!s || !s.className) return Promise.resolve(null);
+        return sb().rpc('review_week', { p_class: s.className, p_week: args.p_week }).then(function (r) {
+          if (r.error || !r.data) return null;
+          var row = (r.data.rows || []).find(function (x) { return x.student_id === cur.sid; }) || {};
+          var out = [];
+          (r.data.tests || []).forEach(function (t) {
+            if (t.off) return;
+            var sub = (row.subs || {})[t.id], ab = (row.absent || {})[t.id];
+            if (sub) out.push({ test_name: t.test_name, lesson_date: t.lesson_date, label: t.label, status: sub.status === 'confirmed' ? 'confirmed' : 'submitted' });
+            else if (ab) out.push({ test_name: t.test_name, lesson_date: t.lesson_date, label: t.label, status: 'absent', reason_label: ab.label || '' });
+          });
+          return out;
+        }, function () { return null; });
+      }
       return Promise.resolve(null);
     },
 
@@ -98,13 +115,18 @@
           var inRange = all.filter(function (p) {
             return (!body.from || p.lesson_date >= body.from) && (!body.to || p.lesson_date <= body.to);
           });
-          return signAll('note-photos', inRange, 'path').then(function (m) {
+          /* 작은 그림(…_s.jpg)도 같이 — 없으면 원본 (note-photo 함수와 같은 모양) */
+          var withThumb = inRange.concat(inRange.map(function (p) { return { path: String(p.path).replace(/\.jpg$/, '_s.jpg') }; }));
+          return signAll('note-photos', withThumb, 'path').then(function (m) {
             var days = {};
             all.forEach(function (p) { days[p.lesson_date] = 1; });
             return {
               ok: true, total: all.length, days: Object.keys(days).length, limit: 10,
               today_count: all.filter(function (p) { return p.uploaded_on === t; }).length,
-              photos: inRange.map(function (p) { return { id: p.id, lesson_date: p.lesson_date, width: p.width, height: p.height, url: m[p.path] || '' }; })
+              photos: inRange.map(function (p) {
+                var url = m[p.path] || '';
+                return { id: p.id, lesson_date: p.lesson_date, width: p.width, height: p.height, url: url, thumb: m[String(p.path).replace(/\.jpg$/, '_s.jpg')] || url };
+              })
                 .filter(function (p) { return p.url; })
             };
           });
@@ -137,6 +159,19 @@
         if (!f) return { ok: false, message: '파일을 찾을 수 없습니다.' };
         return sb().storage.from('class-files').createSignedUrl(f.path, 120, { download: f.name + '.' + f.ext }).then(function (x) {
           return x.data ? { ok: true, url: x.data.signedUrl } : { ok: false, message: '열지 못했습니다.' };
+        });
+      });
+    },
+
+    /* 자료 카드의 첫 페이지 그림 (migration-029) — 그림이 있는 파일만 */
+    fileThumbs: function (ids) {
+      return sb().from('class_files').select('id,thumb_path').in('id', ids || []).then(function (r) {
+        var rows = (r.data || []).filter(function (f) { return f.thumb_path; });
+        if (r.error || !rows.length) return { ok: !r.error, urls: {} };
+        return signAll('class-files', rows, 'thumb_path').then(function (m) {
+          var urls = {};
+          rows.forEach(function (f) { if (m[f.thumb_path]) urls[f.id] = m[f.thumb_path]; });
+          return { ok: true, urls: urls };
         });
       });
     },

@@ -9,6 +9,9 @@
                     필수 · 선택은 학생에게 보여 주는 안내다 — 파일마다 분류 드롭다운으로 고른다 (눈에 띄게 · 20261029g)
                    올린 직후 분류를 보여 주고 바로 바꿀 수 있다.
    파일은 비공개 보관함(class-files)에만 올라간다. 학부모는 Edge Function(class-file)이 만든 2분짜리 주소로만 받는다.
+   첫 페이지 그림 (migration-029 · filethumb.js · 20261029i) — PDF · JPG · PNG 를 올리면 브라우저가 가로 400px 안팎 그림을 만들어
+     같은 폴더 「원래이름.thumb.jpg」로 올린다 (학생 화면 파일 카드 윗부분). 이미 올린 파일은 [미리보기 그림 만들기]로 한 번에.
+     그림을 못 만들어도 파일은 그대로 올라간다. 파일을 지우면 그림도 같이 지운다.
    지우기: 직원 누구나 언제든 ([지난 파일 정리]). 지울 때마다 서버에 기록이 남는다.
    ============================================================ */
 
@@ -24,6 +27,7 @@
   }
   function isMissing(e) { return /does not exist|Could not find the|schema cache|relation .* does not exist/i.test((e && e.message) || ''); }
   var NEED_SQL = 'migration-011 SQL 을 먼저 실행해 주세요 (README 5-8).';
+  var NEED_029 = '미리보기 그림은 migration-029 SQL 을 먼저 실행해 주세요 (README 5-26).';
 
   var BUCKET = 'class-files';
   var MAX_BYTES = 20 * 1024 * 1024;
@@ -427,7 +431,7 @@
         '<select class="input wk-file__kind wk-kind--' + esc(f.kind) + '" data-wk="kind" aria-label="학생에게 보이는 분류" title="학생에게 보이는 분류 — 필수 과제 · 선택 과제 · 배부 자료">' + KINDS.map(function (k) {
           return '<option value="' + k[0] + '"' + (f.kind === k[0] ? ' selected' : '') + '>' + k[1] + '</option>';
         }).join('') + '</select>' +
-        '<span class="wk-file__size num">' + sizeText(f.bytes) + '</span>' +
+        '<span class="wk-file__size num">' + sizeText(f.bytes) + (f.thumb_path ? ' <span class="wk-file__th" title="학생 화면 카드에 첫 페이지 그림이 보입니다">🖼</span>' : '') + '</span>' +
         '<button class="btn btn--sm btn--ghost" type="button" data-wk-act="fget">열기</button>' +
         (canDelete(f) ? '<button class="btn btn--sm btn--ghost" type="button" data-wk-act="fdel" aria-label="파일 지우기">삭제</button>' : '<span></span>') +
         (fresh ? '<span class="wk-tag">방금 올림 · 자동 분류: ' + esc(KIND_LABEL[fresh]) + '</span>' : '') +
@@ -451,6 +455,7 @@
       var gb = function (b) { b = b || 0; return b >= 1073741824 ? (b / 1073741824).toFixed(2) + 'GB' : (b / 1048576).toFixed(1) + 'MB'; };
       host.innerHTML = '<div class="ph-usage wk-usage"><div class="ph-usage__text">저장 공간 <b>' + gb(limit) + ' 중 ' + gb(u.bytes || 0) +
         ' (' + pct + '%)</b> 사용 <span class="muted-note">· 자료 파일 ' + (u.files || 0) + '개 ' + gb(u.file_bytes || 0) +
+        (u.thumb_bytes != null ? ' · 미리보기 그림 ' + (u.thumbs || 0) + '개 ' + gb(u.thumb_bytes || 0) : '') +
         ' · 필기 사진 ' + (u.photos || 0) + '장 ' + gb(u.photo_bytes || 0) +
         (u.review_bytes != null ? ' · 시험지 사진 ' + (u.reviews || 0) + '장 ' + gb(u.review_bytes || 0) : '') + ' · 무료 1GB 기준</span></div>' +
         '<div class="progress__bar"><div class="progress__fill ph-usage__fill' + (pct >= 80 ? ' is-warn' : '') + '" style="width:' + pct + '%"></div></div>' +
@@ -484,7 +489,7 @@
 
     st.busy = true;
     var cls = st.cls, week = st.week, key = st.key;
-    var done = 0, fails = bad.slice(), freshNow = {};
+    var done = 0, fails = bad.slice(), freshNow = {}, thumbQ = [];
     note.innerHTML = '<p class="panel__hint">올리는 중… 0 / ' + ok.length + '</p>';
     var chain = Promise.resolve();
     ok.forEach(function (f) {
@@ -504,6 +509,8 @@
             }
             var row = r.data && r.data[0];
             if (row) { freshNow[row.id] = kind; if (key === st.key) st.files.push(row); }
+            /* 첫 페이지 그림 — 못 만들어도 파일은 그대로 */
+            if (row && window.FileThumb && FileThumb.can(ext)) thumbQ.push({ row: row, blob: f });     /* 다 올린 뒤에 따로 만든다 */
           });
         }).then(function () {
           done++;
@@ -526,6 +533,74 @@
       renderFiles();
       loadUsage();
       if (done) toast(done + '개 파일을 올렸습니다', 'good');
+      /* 첫 페이지 그림 — 파일을 다 올린 뒤 하나씩 (못 만들어도 파일은 그대로) · 끝나면 목록 · 저장 공간을 다시 */
+      if (thumbQ.length) {
+        thumbQ.reduce(function (p, x) {
+          return p.then(function () { return makeThumb(x.row, x.blob).catch(function () { return null; }); });
+        }, Promise.resolve()).then(function () { if (key === st.key) renderFiles(); loadUsage(); });
+      }
+    });
+  }
+
+  /* ---------- 첫 페이지 그림 (migration-029) ---------- */
+
+  /* 한 파일 — blob(없으면 보관함에서 받는다) → 그림 → 같은 폴더 「….thumb.jpg」 → class_files.thumb_path.
+     029 전이면(칸이 없으면) 올린 그림을 지우고 'missing' 으로 알린다 */
+  function makeThumb(row, blob) {
+    var get = blob ? Promise.resolve(blob) : sb().storage.from(BUCKET).download(row.path).then(function (r) {
+      if (r.error || !r.data) throw new Error('파일을 받지 못했습니다');
+      return r.data;
+    });
+    return get.then(function (b) { return FileThumb.make(b, row.ext); }).then(function (img) {
+      if (!img) return null;
+      var tp = FileThumb.pathOf(row.path);
+      return sb().storage.from(BUCKET).upload(tp, img, { contentType: 'image/jpeg', upsert: false }).then(function (up) {
+        if (up.error && !/exists|duplicate/i.test(up.error.message || '')) throw new Error(up.error.message);
+        return sb().from('class_files').update({ thumb_path: tp, thumb_bytes: img.size }).eq('id', row.id).select().then(function (r) {
+          if (r.error) {
+            return sb().storage.from(BUCKET).remove([tp]).then(function () {
+              if (isMissing(r.error)) { var e = new Error(NEED_029); e.missing = true; throw e; }
+              throw new Error(r.error.message);
+            });
+          }
+          row.thumb_path = tp; row.thumb_bytes = img.size;
+          var mine = st.files.find(function (x) { return x.id === row.id; });
+          if (mine) { mine.thumb_path = tp; mine.thumb_bytes = img.size; }
+          return tp;
+        });
+      });
+    });
+  }
+
+  /* [미리보기 그림 만들기] — 그 반의 모든 주에서 그림이 없는 PDF · JPG · PNG 를 한 번에 */
+  function makeAllThumbs() {
+    if (!st.cls) { toast('반을 먼저 골라 주세요', 'bad'); return; }
+    if (st.busy) { toast('올리는 중입니다. 끝난 뒤 다시 해 주세요', 'bad'); return; }
+    if (!window.FileThumb) return;
+    var note = $('#wkUploadNote'), cls = st.cls;
+    sb().from('class_files').select('*').eq('class_name', cls).is('thumb_path', null).in('ext', ['pdf', 'jpg', 'jpeg', 'png']).order('week_start').then(function (r) {
+      if (r.error) { toast(isMissing(r.error) ? NEED_029 : r.error.message, 'bad'); return; }
+      var list = r.data || [];
+      if (!list.length) { toast(cls + ' — 그림을 만들 PDF · 사진 파일이 없습니다 (모두 만들어져 있습니다)'); return; }
+      st.busy = true;
+      var done = 0, fails = [];
+      note.innerHTML = '<p class="panel__hint">미리보기 그림 만드는 중… 0 / ' + list.length + '</p>';
+      list.reduce(function (p, f) {
+        return p.then(function () {
+          return makeThumb(f, null).then(function (tp) { if (tp) done++; }, function (e) {
+            fails.push(f.name + ' — ' + e.message);
+            if (e.missing) throw e;
+          }).then(function () {
+            note.innerHTML = '<p class="panel__hint">미리보기 그림 만드는 중… ' + (done + fails.length) + ' / ' + list.length + '</p>';
+          });
+        });
+      }, Promise.resolve()).catch(function () {}).then(function () {
+        st.busy = false;
+        note.innerHTML = (done ? '<p class="wk-done">✅ 미리보기 그림 ' + done + '개를 만들었습니다 — 학생 화면 파일 카드에 첫 페이지가 보입니다.</p>' : '') +
+          (fails.length ? '<div class="wk-err">만들지 못한 파일<br>' + fails.map(esc).join('<br>') + '</div>' : '');
+        renderFiles(); loadUsage();
+        if (done) toast('미리보기 그림 ' + done + '개를 만들었습니다', 'good');
+      });
     });
   }
 
@@ -579,7 +654,10 @@
     for (var i = 0; i < list.length; i += 100) chunks.push(list.slice(i, i + 100));
     return chunks.reduce(function (p, part) {
       return p.then(function () {
-        return sb().storage.from(BUCKET).remove(part.map(function (f) { return f.path; })).then(function (r) {
+        /* 첫 페이지 그림도 같이 (migration-029) */
+        var paths = [];
+        part.forEach(function (f) { paths.push(f.path); if (f.thumb_path) paths.push(f.thumb_path); });
+        return sb().storage.from(BUCKET).remove(paths).then(function (r) {
           if (r.error) throw new Error('보관함에서 지우지 못했습니다 — ' + r.error.message);
           return sb().from('class_files').delete().in('id', part.map(function (f) { return f.id; })).select('id');
         }).then(function (r) {
@@ -610,7 +688,7 @@
     var before = $('#wkCleanBefore').value;
     if (!before) { toast('날짜를 골라 주세요', 'bad'); return; }
     $('#wkCleanList').innerHTML = '<p class="panel__hint">찾는 중…</p>';
-    sb().from('class_files').select('id,class_name,week_start,kind,name,bytes,path').lt('week_start', before).order('week_start').then(function (r) {
+    sb().from('class_files').select('*').lt('week_start', before).order('week_start').then(function (r) {
       if (r.error) { $('#wkCleanList').innerHTML = '<p class="panel__hint">' + esc(isMissing(r.error) ? NEED_SQL : r.error.message) + '</p>'; return; }
       clean.rows = r.data || [];
       if (!clean.rows.length) {
@@ -703,6 +781,7 @@
     $('#wkFiles').addEventListener('click', onFileClick);
 
     $('#btnWkCleanup').addEventListener('click', openCleanup);
+    $('#btnWkThumbs').addEventListener('click', makeAllThumbs);
     $('#btnWkCleanFind').addEventListener('click', findCleanup);
     $('#btnWkCleanGo').addEventListener('click', runCleanup);
     $('#btnWkCleanClose').addEventListener('click', function () { $('#wkCleanModal').close(); });

@@ -719,29 +719,46 @@ label.hub-btn { cursor: pointer; text-align: center; }
 }
 .hub-tabs--six .hub-tab { font-size: 12.5px; letter-spacing: -0.05em; }
 
-/* ---------- 내 레포트 — 주차 띠 · ◀ ▶ ---------- */
+/* ---------- 레포트 — 한 줄 「◀ 지난주 · 10/22(목) 수업 ▾ · 다음주 ▶ · 누적 추이」 (20261029i) ---------- */
 .rw-nav:empty { display: none; }
-.rw-nav { margin-bottom: 12px; display: grid; gap: 8px; }
-.rw-arrows { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+.rw-nav { position: relative; margin-bottom: 12px; }
+.rw-bar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 6px; }
 .rw-arrow {
   appearance: none; border: 0; font: inherit; cursor: pointer;
-  min-height: 44px; padding: 8px 12px; border-radius: 12px;
+  min-height: 44px; padding: 8px 10px; border-radius: 12px;
   background: rgba(255, 255, 255, .9); color: var(--ink-mid);
-  font-size: 14px; font-weight: 800; box-shadow: var(--card-shadow); white-space: nowrap;
+  font-size: 13.5px; font-weight: 800; box-shadow: var(--card-shadow); white-space: nowrap;
 }
 .rw-arrow:disabled { opacity: .38; cursor: default; box-shadow: none; }
-.rw-now { text-align: center; font-size: 15px; font-weight: 900; color: var(--ink-deep); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rw-chips {
-  display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 6px;
-  scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; scrollbar-width: thin;
+.rw-now {
+  appearance: none; border: 0; font: inherit; cursor: pointer; min-width: 0; min-height: 44px; padding: 6px 8px; border-radius: 12px;
+  background: transparent; text-align: center; font-size: 15px; font-weight: 900; color: var(--ink-deep);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.rw-chip {
-  appearance: none; border: 1.5px solid #E2DEF5; font: inherit; cursor: pointer; flex: 0 0 auto;
-  min-height: 40px; min-width: 52px; padding: 6px 12px; border-radius: 999px;
-  background: #fff; color: var(--ink-mid); font-size: 13.5px; font-weight: 800; scroll-snap-align: center;
+.rw-now:disabled { cursor: default; }
+.rw-now[aria-expanded="true"] { background: rgba(255, 255, 255, .75); }
+.rw-caret { margin-left: 3px; font-size: 11px; color: var(--ink-light); }
+.rw-trend {
+  appearance: none; border: 0; background: none; font: inherit; cursor: pointer; padding: 6px 2px; min-height: 44px;
+  font-size: 12.5px; font-weight: 800; color: var(--ink-mid); text-decoration: underline; text-underline-offset: 3px; white-space: nowrap;
 }
-.rw-chip.is-on { background: var(--grad-strong); border-color: transparent; color: #fff; }
-.rw-chip--draft { border-style: dashed; }
+.rw-pick {
+  position: absolute; z-index: 20; left: 50%; top: 50px; transform: translateX(-50%);
+  width: min(260px, 100%); max-height: 300px; overflow-y: auto; padding: 6px;
+  border-radius: 14px; background: #fff; box-shadow: 0 12px 32px rgba(44, 53, 102, .22);
+}
+.rw-pick[hidden] { display: none; }
+.rw-pick__i {
+  display: block; width: 100%; appearance: none; border: 0; background: none; font: inherit; cursor: pointer;
+  text-align: left; padding: 10px 12px; border-radius: 10px; font-size: 14.5px; font-weight: 800; color: var(--ink-mid);
+}
+.rw-pick__i:hover, .rw-pick__i:focus-visible { background: var(--grad-soft); }
+.rw-pick__i.is-on { background: var(--grad-strong); color: #fff; }
+@media (max-width: 380px) {
+  .rw-arrow { padding: 8px 7px; font-size: 12.5px; }
+  .rw-now { font-size: 14px; padding: 6px 4px; }
+  .rw-trend { font-size: 12px; }
+}
 .rw-videos { margin-top: 14px; }
 
 /* ---------- 누적 추이 (한 줄 그래프 — #7858E8, 범례 없음) ---------- */
@@ -897,3 +914,76 @@ label.hub-btn { cursor: pointer; text-align: center; }
 .rv-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
 .rv-hist__sum { flex-wrap: wrap; row-gap: 4px; }
 .tw-rvs { display: grid; gap: 2px; }
+
+/* ---------- 레포트 칸 (20261029i) ---------- */
+.rw-sum { margin-bottom: 16px; }
+.tw-note { display: block; margin-top: 2px; font-size: 12px; font-weight: 700; color: var(--ink-light); white-space: normal; }
+.tw-q { font-size: 12.5px; font-weight: 700; color: var(--ink-light); }
+.rw-files, .tw-notice { margin-top: 0; }
+
+/* ---------- 오늘 수업 필기 (photos.js lessonCard) — 흰 종이처럼 · 비율 그대로 ---------- */
+.ph-lesson .card-title { flex-wrap: wrap; row-gap: 2px; }
+.ph-paper {
+  display: block; width: 100%; padding: 0; border: 0; cursor: zoom-in; background: #fff;
+  border-radius: 12px; overflow: hidden; box-shadow: 0 2px 10px rgba(44, 53, 102, .16), 0 0 0 1px rgba(44, 53, 102, .05);
+}
+.ph-paper img { display: block; width: 100%; height: auto; }
+.ph-paper--big { margin-bottom: 10px; }
+.ph-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: start; }
+.ph-paper[hidden] { display: none; }
+.ph-more, .ph-all {
+  appearance: none; border: 0; font: inherit; cursor: pointer; display: block; width: 100%;
+  margin-top: 10px; min-height: 44px; border-radius: 12px; font-size: 14.5px; font-weight: 800;
+}
+.ph-more { background: var(--grad-soft); color: var(--ink-mid); }
+.ph-all { background: none; color: var(--ink-mid); text-decoration: underline; text-underline-offset: 3px; text-align: right; padding: 4px 2px; min-height: 36px; }
+
+/* ---------- 내 필기 탭 ---------- */
+.ph-title { margin: 2px 4px 12px; font-size: 18px; font-weight: 900; color: var(--ink-deep); }
+.ph-day.is-focus { box-shadow: 0 0 0 3px #B9A8F2, var(--card-shadow); transition: box-shadow .3s; }
+
+/* ---------- 크게 보기 (넘기기 · 확대) ---------- */
+.ph-gal { padding: 0; touch-action: none; overflow: hidden; }
+.ph-gal__stage { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.ph-gal__img { max-width: 100%; max-height: 100%; border-radius: 6px; background: #fff; transform-origin: center center; transition: transform .08s linear; user-select: none; -webkit-user-drag: none; }
+.ph-gal__nav {
+  position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 64px; border: 0; border-radius: 12px;
+  background: rgba(255, 255, 255, .14); color: #fff; font-size: 34px; line-height: 1; cursor: pointer;
+}
+.ph-gal__prev { left: 8px; }
+.ph-gal__next { right: 8px; }
+.ph-gal__count { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); padding: 4px 12px; border-radius: 999px; background: rgba(255, 255, 255, .16); color: #fff; font-size: 13px; font-weight: 800; }
+
+/* ---------- 배부 자료 · 과제 파일 카드 — 한 줄에 두 개 · 정사각형 (20261029i) ---------- */
+.fc-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 6px; }
+.fc {
+  appearance: none; border: 0; font: inherit; cursor: pointer; text-align: left; padding: 0;
+  display: flex; flex-direction: column; aspect-ratio: 1 / 1; min-width: 0;
+  border-radius: 14px; overflow: hidden; background: #fff; box-shadow: 0 2px 10px rgba(44, 53, 102, .14), 0 0 0 1px rgba(44, 53, 102, .05);
+}
+.fc.is-busy { opacity: .55; }
+.fc__top { position: relative; flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; background: var(--fc-bg, #F2F3F8); }
+.fc__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top center; background: #fff; }
+.fc.has-img .fc__top { background: #fff; }
+.fc__icon {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 64px; height: 64px; padding: 0 10px;
+  border-radius: 14px; background: var(--fc-ink, #8A8FB0); color: #fff; font-size: 17px; font-weight: 900; letter-spacing: .02em;
+}
+.fc.has-img .fc__icon { display: none; }
+.fc__tag {
+  position: absolute; top: 7px; left: 7px; z-index: 1; padding: 2px 8px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 900; color: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .15);
+}
+.fc__tag--req { background: #C4566F; }
+.fc__tag--opt { background: #3B7FB0; }
+.fc__name {
+  padding: 8px 10px 0; font-size: 13.5px; font-weight: 800; color: var(--ink-deep); line-height: 1.35;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-all;
+}
+.fc__meta { padding: 2px 10px 9px; font-size: 11.5px; font-weight: 700; color: var(--ink-light); }
+.fc--pdf { --fc-bg: #FCEEEE; --fc-ink: #D2464B; }
+.fc--hwp { --fc-bg: #EAF1FC; --fc-ink: #2F6FD0; }
+.fc--doc { --fc-bg: #EAF0FA; --fc-ink: #2B579A; }
+.fc--ppt { --fc-bg: #FCEFE8; --fc-ink: #D04A1E; }
+.fc--xls { --fc-bg: #E9F5EE; --fc-ink: #217346; }
+.fc--img { --fc-bg: #F1EEFB; --fc-ink: #7858E8; }

@@ -7,6 +7,10 @@
 //    3) 2분짜리 서명 주소를 만들어 돌려준다. 화면은 그 주소로 바로 내려받는다.
 //  보관함(class-files)은 비공개다. 공개 주소는 만들지 않고, 보관 위치(path)도 화면에 보내지 않는다.
 //
+//  action thumbs (migration-029) — 파일 카드의 「첫 페이지 그림」. 화면이 파일 id 들(60개까지)을 보내면
+//    DB 함수 class_file_thumbs 가 그 링크로 볼 수 있는 파일의 그림 위치만 골라 주고, 10분짜리 서명 주소로 돌려준다.
+//    그림이 없는 파일은 빠진다 (화면은 아이콘 카드로 보인다).
+//
 //  키
 //    이 파일에는 어떤 키도 적지 않는다. Supabase 가 함수에 자동으로 넣어 주는
 //    SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY 를 쓴다. 이 키는 함수 안에서만 쓰이고
@@ -22,6 +26,7 @@ const ALLOWED_ORIGINS = [
 
 const BUCKET = "class-files";
 const SIGN_SECONDS = 120;
+const THUMB_SECONDS = 600;
 
 function corsHeaders(origin: string | null): Record<string, string> {
   const ok = !!origin && (
@@ -104,6 +109,25 @@ async function url(body: Any, cors: Record<string, string>) {
   }, 200, cors);
 }
 
+async function thumbs(body: Any, cors: Record<string, string>) {
+  const ids = Array.isArray(body.ids) ? body.ids.filter(validId).slice(0, 60) : [];
+  if (!validCode(body.code) || !ids.length) return json({ ok: false, reason: "notfound" }, 400, cors);
+  const list: Any[] = await rpc("class_file_thumbs", { p_code: body.code, p_ids: ids });
+  const urls: Record<string, string> = {};
+  if (Array.isArray(list) && list.length) {
+    const r = await fetch(`${URL_}/storage/v1/object/sign/${BUCKET}`, {
+      method: "POST",
+      headers: adminHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ expiresIn: THUMB_SECONDS, paths: list.map((x) => x.path) }),
+    });
+    const signed: Any[] = r.ok ? await r.json() : [];
+    const byPath: Record<string, string> = {};
+    for (const s of signed) if (s?.signedURL) byPath[s.path] = `${URL_}/storage/v1${s.signedURL}`;
+    for (const x of list) if (byPath[x.path]) urls[x.id] = byPath[x.path];   /* 보관 위치는 화면에 보내지 않는다 */
+  }
+  return json({ ok: true, urls, expires_in: THUMB_SECONDS }, 200, cors);
+}
+
 Deno.serve(async (req) => {
   const cors = corsHeaders(req.headers.get("origin"));
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -113,6 +137,7 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     if (body.action === "url") return await url(body, cors);
+    if (body.action === "thumbs") return await thumbs(body, cors);
     return json({ ok: false, reason: "action" }, 400, cors);
   } catch (e) {
     console.error(e);

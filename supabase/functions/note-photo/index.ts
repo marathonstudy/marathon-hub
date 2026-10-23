@@ -8,6 +8,8 @@
 //    4) 그 학생이 자기 사진을 지우면 파일까지 지운다.
 //  사진 보관함(note-photos)은 비공개다. 공개 주소는 만들지 않는다.
 //  올리기 · 지우기는 학생 링크만 (전환 기간에는 학부모 링크도 — migration-015). 보기는 두 링크 모두.
+//  작은 그림 (20261029i) — 올릴 때 화면이 긴 변 480px 안팎의 작은 그림(thumb)을 같이 보내면 「…_s.jpg」로 함께 둔다.
+//    보기(list)는 사진마다 url(원본) · thumb(작은 그림, 없으면 원본) 두 주소를 준다. 지울 때는 둘 다 지운다.
 //
 //  막는 것
 //    · JPEG 가 아닌 파일, 장당 600KB 넘는 파일 (화면에서 0.3MB 안팎으로 줄여 보낸다)
@@ -29,6 +31,10 @@ const ALLOWED_ORIGINS = [
 
 const BUCKET = "note-photos";
 const MAX_BYTES = 600 * 1024;
+const THUMB_MAX = 120 * 1024;
+/* 작은 그림 위치 — 원본 「…/무작위.jpg」 옆 「…/무작위_s.jpg」 (DB 칸 없이 이름으로 정한다) */
+function thumbOf(path: string): string { return path.replace(/\.jpg$/, "_s.jpg"); }
+function isJpeg(b: Uint8Array): boolean { return b[0] === 0xFF && b[1] === 0xD8 && b[2] === 0xFF; }
 const SIGN_SECONDS = 600;
 
 function corsHeaders(origin: string | null): Record<string, string> {
@@ -106,8 +112,15 @@ async function upload(req: Request, cors: Record<string, string>) {
   if (file.size < 1 || file.size > MAX_BYTES) return json({ ok: false, reason: "size", message: REASON.size }, 400, cors);
 
   const bytes = new Uint8Array(await file.arrayBuffer());
-  if (!(bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF)) {
+  if (!isJpeg(bytes)) {
     return json({ ok: false, reason: "type", message: REASON.type }, 400, cors);
+  }
+  /* 작은 그림은 있으면 쓰고, 이상하면 그냥 원본만 (올리기는 막지 않는다) */
+  const tf = form.get("thumb");
+  let thumb: Uint8Array | null = null;
+  if (tf instanceof File && tf.size > 0 && tf.size <= THUMB_MAX) {
+    const tb = new Uint8Array(await tf.arrayBuffer());
+    if (isJpeg(tb)) thumb = tb;
   }
 
   const gate = await rpc("photo_gate", { p_code: code });
@@ -122,17 +135,24 @@ async function upload(req: Request, cors: Record<string, string>) {
     body: bytes,
   });
   if (!up.ok) return json({ ok: false, reason: "storage", message: "올리지 못했습니다. 잠시 뒤 다시 해 주세요." }, 502, cors);
+  if (thumb) {
+    await fetch(`${URL_}/storage/v1/object/${BUCKET}/${thumbOf(path)}`, {
+      method: "POST",
+      headers: adminHeaders({ "Content-Type": "image/jpeg", "x-upsert": "false" }),
+      body: thumb,
+    }).catch(() => null);
+  }
 
   const w = Math.max(0, Math.min(10000, Number(form.get("width")) || 0)) || null;
   const h = Math.max(0, Math.min(10000, Number(form.get("height")) || 0)) || null;
   const added = await rpc("photo_add", {
-    p_code: code, p_lesson_date: lessonDate, p_path: path, p_bytes: bytes.length, p_width: w, p_height: h,
+    p_code: code, p_lesson_date: lessonDate, p_path: path, p_bytes: bytes.length + (thumb ? thumb.length : 0), p_width: w, p_height: h,
   });
   if (!added?.ok) {
     /* 기록을 못 남겼으면 올린 파일도 지운다 */
     await fetch(`${URL_}/storage/v1/object/${BUCKET}`, {
       method: "DELETE", headers: adminHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ prefixes: [path] }),
+      body: JSON.stringify({ prefixes: [path, thumbOf(path)] }),
     });
     return json({ ok: false, reason: added?.reason, message: REASON[added?.reason] ?? REASON.path }, 400, cors);
   }
@@ -152,7 +172,7 @@ async function list(body: Any, cors: Record<string, string>) {
     const r = await fetch(`${URL_}/storage/v1/object/sign/${BUCKET}`, {
       method: "POST",
       headers: adminHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ expiresIn: SIGN_SECONDS, paths: photos.map((p) => p.path) }),
+      body: JSON.stringify({ expiresIn: SIGN_SECONDS, paths: photos.flatMap((p) => [p.path, thumbOf(p.path)]) }),
     });
     const signed: Any[] = r.ok ? await r.json() : [];
     const byPath: Record<string, string> = {};
@@ -161,6 +181,7 @@ async function list(body: Any, cors: Record<string, string>) {
     }
     for (const p of photos) {
       p.url = byPath[p.path] ?? "";
+      p.thumb = byPath[thumbOf(p.path)] ?? p.url;      /* 작은 그림이 없는 예전 사진은 원본 */
       delete p.path;                                  /* 보관함 경로는 화면에 보내지 않는다 */
     }
   }
@@ -179,7 +200,7 @@ async function remove(body: Any, cors: Record<string, string>) {
   if (!path) return json({ ok: false, reason: "notfound" }, 404, cors);
   const del = await fetch(`${URL_}/storage/v1/object/${BUCKET}`, {
     method: "DELETE", headers: adminHeaders({ "Content-Type": "application/json" }),
-    body: JSON.stringify({ prefixes: [path] }),
+    body: JSON.stringify({ prefixes: [path, thumbOf(path)] }),
   });
   if (!del.ok) return json({ ok: false, reason: "storage" }, 502, cors);
   await rpc("photo_remove", { p_code: body.code, p_id: body.id });

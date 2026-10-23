@@ -3,12 +3,15 @@
 
    로그인이 없다. 주소의 # 뒤 코드를 Supabase 공개 함수에 넘기고,
    함수가 돌려준 것만 그린다. 표를 직접 읽지 않는다.
-     /me/#개인링크코드          → hub_get · hub_report · Edge Function(app-report)
-     /me/#개인링크코드/report   → 내 레포트 탭의 최신 레포트를 바로 연다
+     /me/#개인링크코드          → 레포트 탭 — 가장 최근 수업 레포트 (hub_get · hub_report · Edge Function(app-report))
+     /me/#개인링크코드/report/주 → 그 수업 레포트 · /reports → 누적 추이
+     /me/#개인링크코드/app      → 과제 상세 탭 (예전 「앱 과제」)
      /me/#개인링크코드/book     → 교재비 탭 (hub_textbook — 그 학생 청구서만)
-     /me/#개인링크코드/photo    → 필기 노트 탭 (Edge Function note-photo — 그 학생 사진만)
+     /me/#개인링크코드/photo    → 내 필기 탭 (예전 「필기 노트」 · Edge Function note-photo — 그 학생 사진만)
+     예전 주소 #코드/notice · /week · /this-week 는 레포트 탭으로 (20261029i)
      /notice/#반코드            → class_notice_get
      자료 파일 내려받기          → Edge Function(class-file) — 링크 코드 · 파일의 반을 확인하고 2분짜리 주소
+     자료 카드의 첫 페이지 그림  → 같은 함수의 action thumbs (migration-029 · 10분짜리 주소)
 
    # 뒤의 값은 서버 로그에도, 다른 사이트로 넘어가는 주소(referrer)에도
    남지 않는다. 그래서 코드를 ?code= 가 아니라 # 뒤에 둔다.
@@ -141,10 +144,8 @@
     if (t.closest('[data-yt-close]')) closePlayers(null);
   });
 
-  function weekLabel(n) {
-    var sp = ReportView.shortPeriod(n.week_start, n.week_end);
-    return sp || ReportView.shortDate(n.week_start);
-  }
+  /* 공지 · 자료 묶음의 날짜 — 그 주 수업일 「10/22(목) 수업」 (주 시작일은 쓰지 않는다 · 20261029i) */
+  function weekLabel(n) { return weekName(n.week_start); }
 
   function setTitle(t) { document.title = t; }
 
@@ -258,7 +259,6 @@
      ============================================================ */
 
   var WEEKLY = null;
-  var KIND_ROWS = [['material', '📄 배부 자료'], ['required', '✏️ 필수 과제'], ['optional', '➕ 선택 과제']];
   var PART_NAME = { full: '수업 전체', '1': '1차시', '2': '2차시', makeup: '보강' };
   var PART_ORDER = { full: 0, '1': 1, '2': 2, makeup: 3 };
   /* 한 주 안에서 수업 전체 → 1차시 → 2차시 → 보강 */
@@ -274,7 +274,6 @@
       '<span class="wk-part wk-part--' + esc(v.part) + '">' + esc(part) + (v.personal ? ' · 나만 보는 영상' : '') + '</span>' +
       esc(v.title || (v.part === 'full' ? '수업 영상' : part + ' 영상')));
   }
-  var EXT_ICON = { pdf: '📕', hwp: '📘', hwpx: '📘', doc: '📘', docx: '📘', ppt: '📙', pptx: '📙', xlsx: '📗', jpg: '🖼️', jpeg: '🖼️', png: '🖼️' };
 
   function plusDays(iso, n) {
     var d = new Date(iso + 'T00:00:00Z');
@@ -297,13 +296,15 @@
   /* 레포트 목록 — 수업일이 있는 레포트는 "10/15(목) 수업", 예전 레포트는 기간 */
   function reportLabel(r) {
     if (r.lesson_date && ReportView.dowDate) return ReportView.dowDate(r.lesson_date) + ' 수업';
-    return ReportView.shortPeriod(r.week_start, r.week_end) || ReportView.shortDate(r.week_start);
+    return weekName(r.week_start);
   }
 
+  /* 그 주 수업일 「10/22(목) 수업」 — 수업 요일을 정하기 전 예전 주는 「10/18까지」 (주 시작일은 쓰지 않는다 · 20261029i) */
   function weekName(weekStart) {
     var L = lessonOf(weekStart);
     if (L && L.date) return Lesson.md(L.date) + ' 수업';
-    return ReportView.shortPeriod(weekStart, plusDays(weekStart, 6));
+    var ws = String(weekStart || '').slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(ws) ? ReportView.shortDate(plusDays(ws, 6)) + '까지' : '';
   }
 
   function sizeText(b) {
@@ -329,19 +330,7 @@
     if (vids.length) {
       html += '<div class="nt-sub">▶️ 수업 영상</div><div class="nt-videos">' + vids.map(weekVideoHtml).join('') + '</div>';
     }
-    var files = w.files || [];
-    KIND_ROWS.forEach(function (k) {
-      var list = files.filter(function (f) { return f.kind === k[0]; });
-      if (!list.length) return;
-      html += '<div class="nt-sub">' + k[1] + '</div><div class="nt-files">' + list.map(function (f) {
-        return '<button type="button" class="nt-file wk-file" data-file="' + esc(f.id) + '">' +
-                 '<span class="nt-file__icon" aria-hidden="true">' + (EXT_ICON[f.ext] || '📄') + '</span>' +
-                 '<span class="nt-file__name">' + esc(f.name) +
-                   ' <span class="wk-file__meta">' + esc(String(f.ext || '').toUpperCase()) + ' · ' + sizeText(f.bytes) + '</span></span>' +
-                 '<span class="nt-file__go" aria-hidden="true">⬇</span>' +
-               '</button>';
-      }).join('') + '</div>';
-    });
+    html += filesOf(w);                 /* 카드 — 필수 과제 → 선택 과제 → 배부 자료 (20261029i) */
     return html || '<p class="hub-muted">이 주에는 영상 · 자료가 없습니다.</p>';
   }
 
@@ -408,6 +397,7 @@
         var w = (WEEKLY.weeks || [])[+d.dataset.w];
         if (w) body.innerHTML = lessonLineHtml(w.week_start) + weekBodyHtml(w);
         body.dataset.done = '1';
+        loadThumbs(body, code);
       }
     }, true);
 
@@ -532,7 +522,7 @@
 
 
   /* ============================================================
-     앱 기록 — 한 번만 불러와 「이번 주」 · 레포트 · 앱 과제 탭 · 누적 추이가 같이 쓴다 (app-week.js)
+     앱 기록 — 한 번만 불러와 레포트 · 과제 상세 탭 · 누적 추이가 같이 쓴다 (app-week.js)
      ============================================================ */
   var APP = { code: '', p: null, info: null };
   function appData(code) {
@@ -550,18 +540,9 @@
   function weekOf(mon) {
     return ((WEEKLY && WEEKLY.weeks) || []).filter(function (x) { return x.week_start && mondayOf(x.week_start) === mon; })[0] || null;
   }
-  /* 그 과제 기간의 앱 과제 · 강의 표를 box 에 (앱 연결 전 · 못 불러오면 비워 둔다) */
-  function appWeekInto(box, code, from, to, title) {
-    if (!box || !global.AppWeek || !APP.info || !APP.info.linked || !from || !to) return;
-    appData(code).then(function (data) {
-      var w = data ? AppWeek.compute(data, from, to, todayISO()) : null;
-      box.innerHTML = w && w.any ? appBlockHtml(data, w, { title: periodTitle(title || '과제 기간', from, to), month: to.slice(0, 7) }) : '';
-      animateRings(box);
-    });
-  }
 
   /* ============================================================
-     「앱 과제 요약」 한 덩어리 — 「이번 주」 · 각 레포트 · 앱 과제 탭 · 코치룸 미리보기가 같이 쓴다
+     「앱 과제 요약」 한 덩어리 — 각 레포트 · 과제 상세 탭 · 코치룸 미리보기가 같이 쓴다
        큰 동그라미 3개 = 그 기간(주간) 기준 — 아래 표(app-week.js)와 같은 날짜 계산
          과제 제출 = 제출일 / 과제 있던 날 · 정시 제출 = 정시 제출일 / 과제 있던 날 · 강의 시청 = ✓ 날 / 강의 있던 날
        아래 작은 줄 = 앱이 주는 전체 누적 그대로 · 「날짜별 제출」 달력은 한 달씩 (◀ ▶ 는 앱 기록이 있는 달 사이만)
@@ -660,7 +641,7 @@
     var host = document.querySelector('[data-awb-cal="' + b.dataset.awb + '"]');
     if (host) host.innerHTML = calMonthHtml(b.dataset.awb);
   });
-  /* 지금 진행 중인 과제 기간 — 가장 최근 공개 레포트 수업일 ~ 다음 수업일 전날 (레포트가 없으면 오늘 기준 다음 수업의 과제 기간) */
+  /* 과제 상세 탭의 진행 중 기간 — 가장 최근 공개 레포트 수업일 ~ 다음 수업일 전날 (레포트가 없으면 오늘 기준 다음 수업의 과제 기간) */
   function currentPeriod(rep, lessonDate) {
     var start = rep ? (lessonDate || rep.lesson_date || ((lessonOf(rep.week_start) || {}).date) || '') : '';
     start = /^\d{4}-\d{2}-\d{2}/.test(start) ? start.slice(0, 10) : '';
@@ -687,20 +668,21 @@
   }
 
   /* ============================================================
-     「이번 주」 — 링크를 열면 처음 보이는 화면 (#코드 · 예전 #코드/notice 도 여기로)
-       기준 = 이 학생에게 가장 최근에 공개된 레포트의 주 (달력 주가 아니다). 다음 레포트를 공개하면 그때 넘어간다.
-       카드 제목 「10/15(목) 수업 레포트」, 카드 아래 「앱 과제 요약 · 지난 일주일 (10/8~10/14)」 — 그 레포트 수업일 D 기준 D-7 ~ D-1 (20261029h).
-       지금 진행 중인 주(D ~ 다음 수업 전날)는 「앱 과제」 탭에서만 보여 준다.
-       공개된 레포트가 없으면 카드 자리에 「첫 레포트는 첫 수업 날 올라옵니다」.
-       [복습테스트 입력하기](학생 링크 · 제출 기간) → 이번 주 카드 → 오늘 배운 것 → 이번 주 과제 · 자료
-       → 수업 영상 → 누적 추이 한 줄 → 선생님 공지(작게)
-       공개된 레포트 · 선생님이 확인한 복습 점수 · 확정된 요약 · 앱 기록만. 상담 · 성적 · 금액 · 다른 학생 정보는 넣지 않는다.
-       비어 있는 칸은 숨기고, 카드 안에서는 「아직 입력 전」으로 흐리게.
+     「레포트」 탭의 수업 레포트 한 편 (20261029i — 예전 「이번 주」 · 「내 레포트」를 하나로 합쳤다)
+       열면 가장 최근에 공개된 수업 레포트. 위 한 줄 「◀ 지난주 · 10/22(목) 수업 ▾ · 다음주 ▶ · 누적 추이」로 다른 수업.
+       차례: 머리(수업일) → 출결 · 집중도 · 복습테스트 → 오늘 수업 필기 → 앱 과제 요약 · 지난 일주일
+             → 수업 내용(레포트에 담긴 것 · 없으면 확정된 요약 「오늘 배운 것」) → 종합 코멘트(선생님 한마디)
+             → 이 수업 과제 · 자료(카드) → 수업 영상 → 선생님 공지 → 학생 정보
+       예전 「이번 주」에만 있던 것도 빠뜨리지 않는다 — 가장 최근 레포트에는 「다른 주 과제 · 자료」(접어서) · 지난 공지까지.
+       [복습테스트 입력하기](학생 링크 · 제출 기간)는 탭 맨 위, 홈 화면 추가 안내는 맨 아래.
+       공개된 레포트 · 선생님이 확인한 복습 점수 · 확정된 요약 · 앱 기록 · 학생이 올린 필기만. 상담 · 성적 · 금액 · 다른 학생 정보는 넣지 않는다.
+       주 시작일(10/12 같은 날짜)은 화면에 쓰지 않는다 — 수업일로 (레포트에 없으면 반 일정의 수업일).
      ============================================================ */
-  var TW = null;
   var YET = '<span class="tw-yet">아직 입력 전</span>';
+  var HUBD = null;        /* hub_get 이 준 것 (확인된 복습 점수 · 공지) */
+  var RVW = {};           /* 주(월요일) → hub_review_week (낸 것 · 확인 전 · 미응시 — 점수는 오지 않는다) */
 
-  /* 그 주 확인된 복습테스트 — 시험마다 점수와 같은 시험 지난번과의 차이 (migration-025: 「복습 TEST」 · 「화작문 TEST」 …) */
+  /* 그 주 확인된 복습테스트 — 시험마다 점수 · 맞은 수 / 전체 · 같은 시험 지난번과의 차이 (migration-025) */
   function reviewOfWeek(list, mon) {
     var end = plusDays(mon, 6), out = [];
     list.forEach(function (x, k) {
@@ -708,7 +690,7 @@
       if (d < mon || d > end) return;
       var name = x.test_name || '복습 TEST', prev = null;
       for (var j = k - 1; j >= 0; j--) if ((list[j].test_name || '복습 TEST') === name) { prev = list[j]; break; }
-      out.push({ name: name, score: Number(x.score), diff: prev ? Number(x.score) - Number(prev.score) : null });
+      out.push({ name: name, score: Number(x.score), correct: x.correct, q: x.q_count, diff: prev ? Number(x.score) - Number(prev.score) : null });
     });
     return out.length ? out : null;
   }
@@ -717,82 +699,78 @@
     return '<div class="tw-tile"><div class="tw-tile__k">' + label + '</div><div class="tw-tile__v">' + value + '</div></div>';
   }
 
-  function drawWeekCard() {
-    var box = $('#twCard');
-    if (!box || !TW || !TW.rep) return;
-    var r = TW.report && TW.report !== 'loading' ? TW.report : null;
-    var st = r && r.attendance ? (r.attendance.status === 'makeup' ? 'attend' : r.attendance.status) : '';
+  /* 그 레포트의 수업일 — 레포트에 저장된 수업일, 없으면 반 일정으로 */
+  function lessonDateOf(r, data) {
+    var d = (data && data.lessonDate) || (r && r.lesson_date) || '';
+    if (!/^\d{4}-\d{2}-\d{2}/.test(d) && r && r.week_start) { var L = lessonOf(r.week_start); d = L && !L.canceled ? L.date : ''; }
+    return /^\d{4}-\d{2}-\d{2}/.test(d || '') ? String(d).slice(0, 10) : '';
+  }
+  function stripDay(n) { return String(n || '').replace(/^\d+\/\d+(\([^)]*\))?\s*/, ''); }
+
+  /* 복습테스트 칸 — 확인한 시험은 점수(맞은 수/전체 · ▲▼), 냈지만 확인 전이면 「제출 완료」, 미응시면 「미응시 · 결석」
+     낸 것 · 미응시는 hub_review_week(027 · 028)로, 없으면 레포트에 담긴 것으로 */
+  function rvTileHtml(r, data) {
+    var mon = mondayOf(r.week_start);
+    var conf = reviewOfWeek((HUBD && HUBD.review) || [], mon) || [];
+    var tests = (data && data.tests) || [];
+    tests.forEach(function (t) {
+      if (!t || t.kind !== 'review' || t.submitted || t.absent || t.score == null) return;
+      var n = stripDay(t.name);
+      if (n && !conf.some(function (x) { return x.name === n; })) conf.push({ name: n, score: Number(t.score), correct: t.correct, q: t.total, diff: null });
+    });
+    var has = function (n) { return conf.some(function (x) { return x.name === n; }); };
+    var live = Array.isArray(RVW[mon]) ? RVW[mon] : null;
+    var done = [], abs = [];
+    if (live) {
+      live.forEach(function (x) {
+        if (!x || has(x.test_name)) return;
+        if (x.status === 'submitted' && done.indexOf(x.test_name) === -1) done.push(x.test_name);
+        if (x.status === 'absent' && !abs.some(function (a) { return a.name === x.test_name; })) abs.push({ name: x.test_name, reason: x.reason_label || '' });
+      });
+    } else {
+      tests.forEach(function (t) {
+        if (!t || t.kind !== 'review') return;
+        var n = stripDay(t.name);
+        if (!n || has(n)) return;
+        if (t.submitted && done.indexOf(n) === -1) done.push(n);
+        else if (t.absent && !abs.some(function (a) { return a.name === n; })) abs.push({ name: n, reason: t.absent });
+      });
+    }
+    if (!conf.length && !done.length && !abs.length) return YET;
+    var many = conf.length + done.length + abs.length > 1;
+    var nm = function (n) { return many ? '<small>' + esc(n.replace(/ TEST$/, '')) + '</small> ' : ''; };
+    return '<span class="tw-rvs">' + conf.map(function (x) {
+      var df = x.diff;
+      return '<span>' + nm(x.name) + '<b class="num">' + x.score + '점</b>' +
+        (x.q != null && x.correct != null ? ' <span class="tw-q num">' + esc(x.correct) + '/' + esc(x.q) + '</span>' : '') +
+        (df > 0 ? ' <span class="tw-up num">▲' + df + '</span>' : df < 0 ? ' <span class="tw-down num">▼' + (-df) + '</span>' : df === 0 ? ' <span class="tw-same">–</span>' : '') + '</span>';
+    }).concat(done.map(function (n) {
+      return '<span>' + nm(n) + '<b class="tw-ok">제출 완료</b></span>';
+    })).concat(abs.map(function (a) {
+      return '<span>' + nm(a.name) + '<b class="tw-abs">' + esc(ReportView.absentText(a.reason)) + '</b></span>';
+    })).join('') + '</span>';
+  }
+
+  /* 출결 · 집중도 · 복습테스트 세 칸 */
+  function sumHtml(r, data) {
+    var a = (data && data.attendance) || {};
+    var st = a.status === 'makeup' ? 'attend' : a.status;
     var ATT = { attend: '출석', late: '지각', absent: '결석' };
-    var att = r && ATT[st] ? '<b class="tw-att tw-att--' + st + '">' + ATT[st] + '</b>' : YET;
+    var note = String(a.note == null ? '' : a.note).trim();
+    var att = ATT[st] ? '<b class="tw-att tw-att--' + st + '">' + ATT[st] + '</b>' + (note ? '<small class="tw-note">' + esc(note) + '</small>' : '') : YET;
     var focus = YET;
-    if (r && st === 'absent') focus = '<span class="tw-yet">—</span>';
-    else if (r && Number(r.focusScore) > 0) {
-      var sc = Math.max(0, Math.min(5, Math.round(Number(r.focusScore))));
+    if (st === 'absent') focus = '<span class="tw-yet">—</span>';
+    else if (Number(data && data.focusScore) > 0) {
+      var sc = Math.max(0, Math.min(5, Math.round(Number(data.focusScore))));
       var stars = '';
       for (var i = 1; i <= 5; i++) stars += '<span class="tw-star' + (i <= sc ? ' is-on' : '') + '">★</span>';
       focus = '<span class="tw-stars" aria-label="5점 만점에 ' + sc + '점">' + stars + '</span>';
     }
-    /* 복습테스트 — 선생님이 확인한 시험은 점수, 냈지만 아직 확인 전이면 「제출 완료」만 (확인 전 점수는 안 보인다 · 20261029g) */
-    var rv = YET;
-    var conf = TW.review || [];
-    var done = rvSubmittedNames(r).filter(function (n) { return !conf.some(function (x) { return x.name === n; }); });
-    /* 미응시 — 「미응시 · 결석」 사유 이름만 (migration-028 · 20261029h) */
-    var abs = rvAbsentList(r).filter(function (a) { return !conf.some(function (x) { return x.name === a.name; }) && done.indexOf(a.name) === -1; });
-    if (conf.length || done.length || abs.length) {
-      var many = conf.length + done.length + abs.length > 1;
-      rv = '<span class="tw-rvs">' + conf.map(function (x) {
-        var df = x.diff;
-        return '<span>' + (many ? '<small>' + esc(x.name.replace(/ TEST$/, '')) + '</small> ' : '') + '<b class="num">' + x.score + '점</b>' +
-          (df > 0 ? ' <span class="tw-up num">▲' + df + '</span>' : df < 0 ? ' <span class="tw-down num">▼' + (-df) + '</span>' : df === 0 ? ' <span class="tw-same">–</span>' : '') + '</span>';
-      }).concat(done.map(function (n) {
-        return '<span>' + (many ? '<small>' + esc(n.replace(/ TEST$/, '')) + '</small> ' : '') + '<b class="tw-ok">제출 완료</b></span>';
-      })).concat(abs.map(function (a) {
-        return '<span>' + (many ? '<small>' + esc(a.name.replace(/ TEST$/, '')) + '</small> ' : '') + '<b class="tw-abs">' + esc(ReportView.absentText(a.reason)) + '</b></span>';
-      })).join('') + '</span>';
-    }
-    /* 앱 과제는 카드 아래 「앱 과제 요약 · 지난 일주일」 한 덩어리로 (drawProgress · 20261029h) */
-    var cm = r ? String(r.comment == null ? '' : r.comment).trim() : '';
-    var ld = reportLessonDate();
-    var title = ld ? Lesson.md(ld) + ' 수업 레포트'
-      : ReportView.shortPeriod(TW.rep.week_start, TW.rep.week_end || plusDays(TW.rep.week_start, 6)) + ' 레포트';
-    box.innerHTML =
-      '<h2 class="card-title">📅 ' + esc(title) + '<span class="card-note">이번 주</span></h2>' +
-      /* 출결 · 집중도 · 복습테스트 세 칸 (수기 「필수 과제」 칸은 뺐다 — 과제는 아래 앱 표로 · 20261029g) */
-      '<div class="tw-tiles tw-tiles--3">' + tile('출결', att) + tile('집중도', focus) + tile('복습테스트', rv) + '</div>' +
-      '<div class="tw-say"><div class="tw-tile__k">선생님 한마디</div>' +
-        (cm ? '<p class="tw-comment" tabindex="0" role="button" aria-label="선생님 한마디 펼치기">' + ReportView.mdHtml(cm) + '</p>' : YET) + '</div>';
+    return '<div class="card tw-card rw-sum" id="rwSum"><div class="tw-tiles tw-tiles--3">' +
+      tile('출결', att) + tile('집중도', focus) + tile('복습테스트', rvTileHtml(r, data)) + '</div></div>';
   }
 
-  /* 그 주에 냈지만 아직 확인 전인 시험 이름 — hub_review_week(migration-027), 없으면 레포트에 담긴 「제출 완료」 */
-  function rvSubmittedNames(r) {
-    var out = [];
-    if (TW.rvStatus) {
-      TW.rvStatus.forEach(function (x) { if (x && x.status === 'submitted' && out.indexOf(x.test_name) === -1) out.push(x.test_name); });
-      return out;
-    }
-    ((r && r.tests) || []).forEach(function (t) {
-      if (!t || t.kind !== 'review' || !t.submitted) return;
-      var n = String(t.name || '').replace(/^\d+\/\d+(\([^)]*\))?\s*/, '');
-      if (n && out.indexOf(n) === -1) out.push(n);
-    });
-    return out;
-  }
-
-  /* 그 주 미응시 시험 — [{ name, reason(사유 이름) }] · hub_review_week(migration-028), 없으면 레포트에 담긴 「미응시」 */
-  function rvAbsentList(r) {
-    var out = [];
-    if (TW.rvStatus) {
-      TW.rvStatus.forEach(function (x) { if (x && x.status === 'absent' && !out.some(function (a) { return a.name === x.test_name; })) out.push({ name: x.test_name, reason: x.reason_label || '' }); });
-      return out;
-    }
-    ((r && r.tests) || []).forEach(function (t) {
-      if (!t || t.kind !== 'review' || !t.absent) return;
-      var n = String(t.name || '').replace(/^\d+\/\d+(\([^)]*\))?\s*/, '');
-      if (n && !out.some(function (a) { return a.name === n; })) out.push({ name: n, reason: t.absent });
-    });
-    return out;
-  }
-
+  /* 확정된 수업 요약 — 레포트에 수업 내용이 없을 때 「오늘 배운 것」으로 */
   function learnHtml(w) {
     var list = ((w && w.lessons) || []).filter(function (t) { return String(t || '').trim(); });
     if (!list.length) return '';
@@ -802,49 +780,101 @@
       (list.length > 3 ? '<button type="button" class="tw-more" data-tw-more>더 보기 (' + list.length + '줄)</button>' : '') + '</div>';
   }
 
-  function fileButtons(list) {
-    return '<div class="nt-files">' + list.map(function (f) {
-      return '<button type="button" class="nt-file wk-file" data-file="' + esc(f.id) + '">' +
-               '<span class="nt-file__icon" aria-hidden="true">' + (EXT_ICON[f.ext] || '📄') + '</span>' +
-               '<span class="nt-file__name">' + esc(f.name) +
-                 ' <span class="wk-file__meta">' + esc(String(f.ext || '').toUpperCase()) + ' · ' + sizeText(f.bytes) + '</span></span>' +
-               '<span class="nt-file__go" aria-hidden="true">⬇</span>' +
-             '</button>';
-    }).join('') + '</div>';
-  }
+  /* ============================================================
+     배부 자료 · 과제 파일 카드 (20261029i) — 한 줄에 두 개, 정사각형. 필수 과제 → 선택 과제 → 배부 자료 (빈 묶음은 숨김)
+       윗부분 = PDF 첫 페이지 그림 · JPG/PNG 는 그 그림 (코치룸이 올릴 때 만든 작은 그림 · migration-029 · class-file 함수 action thumbs)
+       그림이 없거나 HWP · DOC · PPT · XLSX 는 종류별 색 아이콘. 아래 = 파일 이름 두 줄 · 「PDF · 2.4MB」. 카드 전체를 누르면 내려받기.
+     ============================================================ */
   var FILE_ORDER = [['required', '✏️ 필수 과제'], ['optional', '➕ 선택 과제'], ['material', '📄 배부 자료']];
+  var THUMB_EXT = { pdf: 1, jpg: 1, jpeg: 1, png: 1 };
+  var EXT_KIND = { pdf: 'pdf', hwp: 'hwp', hwpx: 'hwp', doc: 'doc', docx: 'doc', ppt: 'ppt', pptx: 'ppt', xlsx: 'xls', jpg: 'img', jpeg: 'img', png: 'img' };
+  function kindOf(f) { return f.kind === 'required' || f.kind === 'optional' ? f.kind : 'material'; }
+  function extName(ext) { ext = String(ext || '').toLowerCase(); return ext === 'jpeg' ? 'JPG' : ext.toUpperCase(); }
+  function fileCardHtml(f) {
+    var ext = String(f.ext || '').toLowerCase(), kd = kindOf(f);
+    return '<button type="button" class="fc fc--' + (EXT_KIND[ext] || 'etc') + '" data-file="' + esc(f.id) + '"' + (THUMB_EXT[ext] ? ' data-thumb="1"' : '') +
+             ' aria-label="' + esc(f.name + ' 내려받기') + '">' +
+             '<span class="fc__top"><span class="fc__icon" aria-hidden="true">' + esc(extName(ext) || '파일') + '</span>' +
+               (kd === 'required' ? '<span class="fc__tag fc__tag--req">필수</span>' : kd === 'optional' ? '<span class="fc__tag fc__tag--opt">선택</span>' : '') + '</span>' +
+             '<span class="fc__name">' + esc(f.name) + '</span>' +
+             '<span class="fc__meta num">' + esc(extName(ext)) + ' · ' + sizeText(f.bytes) + '</span>' +
+           '</button>';
+  }
   function filesOf(w) {
     var files = (w && w.files) || [], html = '';
     FILE_ORDER.forEach(function (k) {
-      var list = files.filter(function (f) { var kd = f.kind === 'required' || f.kind === 'optional' ? f.kind : 'material'; return kd === k[0]; });
-      if (list.length) html += '<div class="nt-sub">' + k[1] + '</div>' + fileButtons(list);
+      var list = files.filter(function (f) { return kindOf(f) === k[0]; });
+      if (list.length) html += '<div class="nt-sub">' + k[1] + '</div><div class="fc-grid">' + list.map(fileCardHtml).join('') + '</div>';
     });
     return html;
   }
-  function filesSectionHtml(w, mon) {
-    var now = filesOf(w);
-    var past = ((WEEKLY && WEEKLY.weeks) || []).filter(function (x) { return x.week_start && mondayOf(x.week_start) !== mon && (x.files || []).length; });
-    var html = now ? '<div class="card tw-files"><h2 class="card-title">✏️ 이번 주 과제 · 자료</h2>' + now + '</div>' : '';
-    if (past.length) {
-      html += '<details class="card tw-pastfiles"><summary>🗂️ 지난 과제 · 자료 <span class="card-note">' + past.length + '주</span></summary>' +
-        past.map(function (x) { return '<div class="tw-pastweek"><div class="nt-past__week num">' + esc(weekName(x.week_start)) + '</div>' + filesOf(x) + '</div>'; }).join('') +
-        '</details>';
-    }
-    return html;
-  }
-  function videosSectionHtml(w) {
-    var vids = w ? sortVideos((w.videos || []).filter(function (v) { return v && safeUrl(v.url); })) : [];
-    if (!vids.length) return '';
-    return '<div class="card tw-videos"><h2 class="card-title">▶️ 수업 영상</h2><div class="nt-videos">' + vids.map(weekVideoHtml).join('') + '</div></div>';
+  /* 가장 최근 레포트 아래 — 그 수업 말고 다른 주에 올린 과제 · 자료 (예전 「이번 주」의 지난 과제 · 자료) */
+  function otherFilesHtml(mon) {
+    var other = ((WEEKLY && WEEKLY.weeks) || []).filter(function (x) { return x.week_start && mondayOf(x.week_start) !== mon && (x.files || []).length; });
+    if (!other.length) return '';
+    return '<details class="card tw-pastfiles"><summary>🗂️ 다른 주 과제 · 자료 <span class="card-note">' + other.length + '주</span></summary>' +
+      other.map(function (x) { return '<div class="tw-pastweek"><div class="nt-past__week num">' + esc(weekName(x.week_start)) + '</div>' + filesOf(x) + '</div>'; }).join('') +
+      '</details>';
   }
 
-  /* 선생님 공지 — 수업일 · 영상 · 자료는 위 칸과 겹치므로 빼고, 공지 글만 작게 (옛 공지는 그대로 접어 둔다) */
+  /* 카드 윗부분 그림 — 10분짜리 서명 주소를 받아 넣는다 (못 받으면 아이콘 카드 그대로) */
+  var THUMBS = {};
+  function fileThumbs(code, ids) {
+    if (PV) return PV.fileThumbs ? PV.fileThumbs(ids) : Promise.resolve({ ok: false });
+    return fetch(CFG.supabase.url + '/functions/v1/' + (CFG.fileFunction || 'class-file'), {
+      method: 'POST',
+      headers: { 'apikey': CFG.supabase.key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'thumbs', code: code, ids: ids })
+    }).then(function (r) { return r.json().catch(function () { return { ok: false }; }); });
+  }
+  function setThumb(b, url) {
+    var top = b.querySelector('.fc__top');
+    if (!top || top.querySelector('.fc__img')) return;
+    var img = document.createElement('img');
+    img.className = 'fc__img';
+    img.alt = '';
+    img.setAttribute('loading', 'lazy');
+    img.setAttribute('decoding', 'async');
+    img.onerror = function () { img.remove(); b.classList.remove('has-img'); };
+    img.src = url;
+    top.insertBefore(img, top.firstChild);
+    b.classList.add('has-img');
+  }
+  function loadThumbs(root, code) {
+    if (!root || !code) return;
+    var btns = Array.prototype.filter.call(root.querySelectorAll('.fc[data-thumb]'), function (b) { return !b.dataset.thumbDone; });
+    if (!btns.length) return;
+    var now = Date.now(), need = [];
+    btns.forEach(function (b) {
+      b.dataset.thumbDone = '1';
+      var c = THUMBS[b.dataset.file];
+      if (c && now - c.at < 540000) setThumb(b, c.url);
+      else if (need.indexOf(b.dataset.file) === -1) need.push(b.dataset.file);
+    });
+    for (var k = 0; k < need.length; k += 60) {
+      fileThumbs(code, need.slice(k, k + 60)).then(function (res) {
+        var urls = (res && res.ok && res.urls) || {};
+        Object.keys(urls).forEach(function (id) { THUMBS[id] = { url: urls[id], at: Date.now() }; });
+        btns.forEach(function (b) { if (urls[b.dataset.file]) setThumb(b, urls[b.dataset.file]); });
+      }).catch(function () {});
+    }
+  }
+
+  /* 그 수업 영상 (수업 영상 탭과 같은 목록에서) */
+  function weekVideosHtml(w) {
+    var vids = w ? sortVideos((w.videos || []).filter(function (v) { return v && safeUrl(v.url); })) : [];
+    if (!vids.length) return '';
+    return '<div class="card tw-videos rw-videos"><h2 class="card-title">▶️ 이 수업 영상</h2><div class="nt-videos">' + vids.map(weekVideoHtml).join('') + '</div></div>';
+  }
+
+  /* 선생님 공지 — 수업일 · 영상 · 자료는 위 칸과 겹치므로 빼고, 공지 글만 */
   function noticeHasText(n) {
     return !!(String(n.special || '').trim() || NOTICE_ROWS.some(function (r) { return String(n[r[0]] || '').trim(); }) ||
       (n.materials || []).some(function (m) { return m && safeUrl(m.url); }) || (n.videos || []).some(function (v) { return v && safeUrl(v.url); }));
   }
-  function teacherNoticeHtml(list) {
-    var items = (list || []).filter(noticeHasText);
+  function noticeItems() { return ((HUBD && HUBD.notices) || []).filter(noticeHasText); }
+  /* 가장 최근 레포트(과 레포트가 없을 때) — 가장 최근 공지 + 지난 공지(접어서) · 예전 「이번 주」와 같다 */
+  function teacherNoticeHtml(items) {
     if (!items.length) return '';
     var latest = items[0];
     return '<div class="card tw-notice" id="twNotice">' +
@@ -858,59 +888,15 @@
         }).join('') + '</div></details>' : '') +
     '</div>';
   }
-
-  /* 누적 추이 한 줄 — 작은 선 그래프 몇 개 + [자세히 ›] (내 레포트의 전체 주차 · 누적 추이로) */
-  function spark(c, rows) {
-    var W = 80, H = 26, n = rows.length, pts = [];
-    rows.forEach(function (x, i) {
-      var v = x[c.key];
-      if (v == null) return;
-      pts.push((n === 1 ? W / 2 : 2 + i * (W - 4) / (n - 1)).toFixed(1) + ',' + (2 + (1 - Math.max(0, Math.min(c.max, v)) / c.max) * (H - 4)).toFixed(1));
-    });
-    var last = null;
-    rows.forEach(function (x) { if (x[c.key] != null) last = x[c.key]; });
-    return '<div class="tw-spark"><span class="tw-spark__k">' + c.name + '</span>' +
-      '<svg viewBox="0 0 ' + W + ' ' + H + '" aria-hidden="true"><polyline points="' + pts.join(' ') + '" style="stroke:' + TREND_INK + '"/></svg>' +
-      '<b class="num">' + (last == null ? '—' : esc(c.fmt(last))) + '</b></div>';
-  }
-  function trendMiniHtml(weeks) {
-    if (weeks.length < 2) return '';
-    var rows = trendSeries(weeks).rows;
-    var charts = [
-      { key: 'att', name: '출석률', max: 100, fmt: function (v) { return v + '%'; } },
-      { key: 'focus', name: '집중도', max: 5, fmt: function (v) { return round1(v).toFixed(1); } },
-      { key: 'review', name: '복습', max: 100, fmt: function (v) { return Math.round(v) + '점'; } },
-      { key: 'hw', name: '과제', max: 100, fmt: function (v) { return v + '%'; } }
-    ].filter(function (c) { return rows.some(function (x) { return x[c.key] != null; }); });
-    if (!charts.length) return '';
-    return '<div class="card tw-trend"><div class="tw-trend__head"><h2 class="card-title">📈 누적 추이</h2>' +
-      '<button type="button" class="tw-detail" data-tw-trend>자세히 ›</button></div>' +
-      '<div class="tw-sparks">' + charts.map(function (c) { return spark(c, rows); }).join('') + '</div></div>';
-  }
-  function loadTrendMini(code) {
-    var host = $('#twTrend');
-    if (!host) return;
-    rpc('hub_trend', { p_code: code }).then(function (t) {
-      if (!t || !t.ok || !Array.isArray(t.weeks)) return;
-      host.innerHTML = trendMiniHtml(t.weeks);
-      if (APP.info && APP.info.linked) appData(code).then(function (data) { if (data) host.innerHTML = trendMiniHtml(appAdjust(t.weeks, data)); });
-    }).catch(function () {});
+  /* 지난 레포트 — 그 수업 주의 공지만 */
+  function weekNoticeHtml(mon) {
+    var n = noticeItems().filter(function (x) { return x.week_start && mondayOf(x.week_start) === mon; })[0];
+    if (!n) return '';
+    return '<div class="card tw-notice"><h2 class="card-title">📢 선생님 공지<span class="card-note">' + esc(weekLabel(n)) + '</span></h2>' +
+      (String(n.title || '').trim() ? '<p class="nt-title">' + md(n.title) + '</p>' : '') + noticeBodyHtml(n) + '</div>';
   }
 
-  /* 그 레포트의 수업일 · 과제 기간 — 레포트에 저장된 값, 없으면 반 일정으로 */
-  function reportData() { return TW && TW.report && TW.report !== 'loading' ? TW.report : null; }
-  function reportLessonDate() {
-    var r = reportData(), rep = TW && TW.rep;
-    if (!rep) return '';
-    var d = (r && r.lessonDate) || rep.lesson_date || (TW.L && !TW.L.canceled ? TW.L.date : '');
-    return /^\d{4}-\d{2}-\d{2}/.test(d || '') ? String(d).slice(0, 10) : '';
-  }
-  function reportPeriod() {
-    var r = reportData(), L = TW && TW.L;
-    var from = (r && r.hwFrom) || (L && L.hwFrom) || '', to = (r && r.hwTo) || (L && L.hwTo) || '';
-    return from && to ? { from: from, to: to } : null;
-  }
-  /* date 보다 뒤의 첫 수업 (휴강 주는 건너뛴다 · 8주 안) */
+  /* date 보다 뒤의 첫 수업 (휴강 주는 건너뛴다 · 8주 안) — 과제 상세 탭의 진행 중 기간 */
   function nextLessonAfter(date) {
     if (!WEEKLY || !WEEKLY.schedule || !date) return null;
     var mon = mondayOf(date);
@@ -920,78 +906,53 @@
     }
     return null;
   }
-  /* 이번 주 레포트의 앱 과제 요약 — 그 레포트 수업일 D 기준 「지난 일주일」 D-7 ~ D-1 (20261029h).
-     지금 진행 중인 주(D ~ 다음 수업 전날)는 「앱 과제」 탭에서만 보여 준다 (예전 「다음 수업까지 진행 중」 카드는 뺐다).
-     수업일이 없는 예전 레포트는 저장된 과제 기간으로 */
-  function drawProgress() {
-    var box = $('#twProg');
-    if (!box || !TW) return;
-    if (!TW.rep || TW.app === 'none') { box.innerHTML = ''; return; }
-    if (TW.app === 'loading') { box.innerHTML = '<div class="card tw-prog"><p class="tw-loading">앱 과제 기록을 불러오는 중…</p></div>'; return; }
-    var data = TW.app || null;
-    var ld = reportLessonDate();
-    if (ld) {
-      /* 앱 기록을 못 불러오면 「앱 과제 · 강의 아직 입력 전」 */
-      box.innerHTML = data ? reportAppHtml(data, ld) : '<div class="card tw-prog"><p class="tw-row"><span class="tw-tile__k">앱 과제 · 강의</span> ' + YET + '</p></div>';
-    } else {
-      var per = reportPeriod();
-      var aw = data && per ? AppWeek.compute(data, per.from, per.to, todayISO()) : null;
-      box.innerHTML = aw && aw.any ? appBlockHtml(data, aw, { title: periodTitle('과제 기간', per.from, per.to), month: per.to.slice(0, 7) }) : '';
-    }
-    animateRings(box);
-  }
 
-  function renderWeek(code, d) {
-    var host = $('#panelWeek');
-    /* 가장 최근에 공개된 레포트 (hub_get 은 공개된 것만 · 최신이 앞 — 미리보기의 「공개 전」 초안은 넣지 않는다) */
-    var rep = (d.reports || []).filter(function (r) { return r && r.week_start && !r.draft; })[0] || null;
-    var mon = rep ? mondayOf(rep.week_start) : '';
-    var w = rep ? weekOf(mon) : null;
-    TW = { code: code, rep: rep, mon: mon, L: rep ? lessonOf(rep.week_start) : null, report: rep ? 'loading' : null,
-           app: APP.info && APP.info.linked ? 'loading' : 'none', review: rep ? reviewOfWeek(d.review || [], mon) : null };
-    host.innerHTML =
-      '<div id="rvTop"><button type="button" class="tw-rv-btn" id="twRvBtn" hidden>📝 복습테스트 입력하기</button><div id="reviewCard" hidden></div></div>' +
-      (rep ? '<div class="card tw-card" id="twCard"></div>'
-           : '<div class="card tw-card tw-card--first" id="twCard"><p class="tw-first">첫 레포트는 첫 수업 날 올라옵니다</p></div>') +
-      '<div id="twProg"></div>' +
-      (rep ? learnHtml(w) + filesSectionHtml(w, mon) + videosSectionHtml(w) : '') +
-      '<div id="twTrend"></div>' + teacherNoticeHtml(d.notices || []) +
-      kakaoNoteHtml() + homeGuideHtml();
-    if (rep) drawWeekCard();
-    drawProgress();
-    if (rep) {
-      rpc('hub_report', { p_code: code, p_week: rep.week_start }).then(function (data) {
-        TW.report = data || null; drawWeekCard(); drawProgress();
-      }, function () { TW.report = null; drawWeekCard(); drawProgress(); });
-      /* 그 주 복습테스트 낸 것 / 확인 전 (migration-027 · 점수는 오지 않는다). 027 전이면 레포트에 담긴 것으로 */
-      rpc('hub_review_week', { p_code: code, p_week: mon }).then(function (list) {
-        TW.rvStatus = Array.isArray(list) ? list : null; drawWeekCard();
-      }, function () {});
-    }
-    if (TW.app === 'loading') {
-      appData(code).then(function (data) {
-        TW.app = data || null;            /* 앱 기록 그대로 — 레포트 수업일 기준 지난 일주일만 잘라 쓴다 */
-        if (TW.rep) drawWeekCard();
-        drawProgress();
-      });
-    }
-    loadTrendMini(code);
-    bindArchive(host, (d.notices || []).filter(noticeHasText));
-    bindWeekly(host, code);
-    host.addEventListener('click', function (e) {
-      if (e.target.closest('[data-tw-more]')) {
-        var c = $('#twLearn'); if (c) c.classList.remove('is-short');
-        e.target.closest('[data-tw-more]').remove();
+  /* 레포트의 앱 과제 요약 — 그 레포트 수업일 D 기준 「지난 일주일」 D-7 ~ D-1 (20261029h).
+     지금 진행 중인 주(D ~ 다음 수업 전날)는 「과제 상세」 탭에서만. 수업일을 모르는 예전 레포트는 저장된 과제 기간으로 */
+  function drawReportApp(box, code, r, data, idx) {
+    if (!box) return;
+    if (!(APP.info && APP.info.linked)) { box.innerHTML = ''; return; }
+    var ld = lessonDateOf(r, data);
+    box.innerHTML = '<div class="card tw-prog"><p class="tw-loading">앱 과제 기록을 불러오는 중…</p></div>';
+    appData(code).then(function (dd) {
+      if (RP.cur !== idx) return;
+      if (!dd) {
+        box.innerHTML = '<div class="card tw-prog"><p class="tw-row"><span class="tw-tile__k">앱 과제 · 강의</span> ' + YET + '</p></div>';
         return;
       }
-      var cm = e.target.closest('.tw-comment');
-      if (cm) { cm.classList.toggle('is-open'); return; }
-      if (e.target.closest('#twRvBtn')) {
-        $('#twRvBtn').hidden = true;
-        $('#reviewCard').hidden = false;
-        var rc = $('#reviewCard'); if (rc.scrollIntoView) rc.scrollIntoView({ block: 'start' });
+      if (ld) box.innerHTML = reportAppHtml(dd, ld);
+      else {
+        var L = lessonOf(r.week_start) || {};
+        var from = data.hwFrom || L.hwFrom, to = data.hwTo || L.hwTo;
+        var aw = from && to ? AppWeek.compute(dd, from, to, todayISO()) : null;
+        box.innerHTML = aw && aw.any ? appBlockHtml(dd, aw, { title: periodTitle('과제 기간', from, to), month: to.slice(0, 7) }) : '';
       }
+      animateRings(box);
     });
+  }
+
+  /* 레포트 한 편 — latest: 가장 최근 레포트 (다른 주 과제 · 자료와 지난 공지까지) */
+  function reportHtml(r, data, latest) {
+    var ld = lessonDateOf(r, data);
+    var d2 = {};
+    Object.keys(data || {}).forEach(function (k) { d2[k] = data[k]; });
+    if (!d2.lessonDate && ld) d2.lessonDate = ld;
+    var mon = mondayOf(r.week_start);
+    var w = weekOf(mon);
+    var hasLessons = (d2.lessons || []).some(function (t) { return String(t || '').trim(); });
+    var files = filesOf(w);
+    return (r.draft ? '<div class="pv-draft">아직 공개 전 — 지금 작성 내용으로 공개하면 이렇게 보입니다</div>' : '') +
+      ReportView.partsHtml(d2, ['header'], { noPeriod: true }) +
+      sumHtml(r, d2) +
+      '<div id="rwNotes"></div>' +
+      '<div id="rwApp"></div>' +
+      (hasLessons ? ReportView.partsHtml(d2, ['lessons']) : learnHtml(w)) +
+      ReportView.partsHtml(d2, ['comment']) +
+      (files ? '<div class="card tw-files rw-files"><h2 class="card-title">✏️ 이 수업 과제 · 자료</h2>' + files + '</div>' : '') +
+      (latest ? otherFilesHtml(mon) : '') +
+      weekVideosHtml(w) +
+      (latest ? teacherNoticeHtml(noticeItems()) : weekNoticeHtml(mon)) +
+      ReportView.partsHtml(d2, ['student']);
   }
 
   /* ============================================================
@@ -1020,7 +981,7 @@
 
   /* ============================================================
      뒤로가기 (개인 페이지) — 탭 · 레포트 한 편 · 크게 보기 사진마다 기록
-       주소: #코드 · #코드/reports · #코드/report/주차 · #코드/app · #코드/photo · #코드/book
+       주소: #코드(레포트) · #코드/reports(누적 추이) · #코드/report/주차 · #코드/app · #코드/photo(/날짜) · #코드/book
        # 바로 뒤의 개인 링크 코드는 절대 바꾸지 않는다 (뒤에 /보기 만 붙였다 뗐다 한다)
        코치룸 미리보기(틀 안)에서는 기록하지 않는다 — 코치룸 뒤로가기를 흐트러뜨리지 않게
      ============================================================ */
@@ -1082,20 +1043,20 @@
       tabs.hidden = false;
       setTitle(global.BRAND ? BRAND.noteTitle : '마라톤국어 러닝노트');
 
+      /* 탭 네 개 — 레포트 · 수업 영상 · 과제 상세 · 내 필기 (교재비는 청구서가 있을 때만 · 20261029i)
+         예전 「이번 주」 · 「내 레포트」는 「레포트」 하나로 합쳤다 */
       root.innerHTML =
-        '<section class="hub-panel" id="panelWeek" role="tabpanel"></section>' +
-        '<section class="hub-panel" id="panelReport" role="tabpanel" hidden></section>' +
+        '<section class="hub-panel" id="panelReport" role="tabpanel"></section>' +
         '<section class="hub-panel" id="panelVideo" role="tabpanel" hidden></section>' +
         '<section class="hub-panel" id="panelApp" role="tabpanel" hidden></section>' +
         '<section class="hub-panel" id="panelBook" role="tabpanel" hidden></section>' +
         '<section class="hub-panel" id="panelPhoto" role="tabpanel" hidden></section>';
 
-      /* 이번 주 — 첫 화면 (반 공지 탭은 없앴다. 공지 글은 맨 아래 「선생님 공지」로) */
       WEEKLY = d.weekly || null;
       APP.info = d.app || null;
-      renderWeek(h.code, d);
+      HUBD = d;
 
-      /* 내 레포트 */
+      /* 레포트 — 새 레포트 알림 빨간 점은 탭을 눌러 볼 때까지 */
       var reports = d.reports || [];
       renderReportList(h.code, reports, d.draft || null);
       if (reports.length) $('#tabReport').classList.add('has-new');
@@ -1111,7 +1072,7 @@
         renderVideos($('#panelVideo'));
       }
 
-      /* 복습테스트 (migration-013) — 수업일 당일 맨 위 기록 카드, 내 레포트 탭 위 점수 그래프.
+      /* 복습테스트 (migration-013) — 수업일 당일 레포트 탭 맨 위 기록 카드, 누적 추이 화면 점수 그래프.
          기록 카드와 「확인 전」 내 기록은 입력할 수 있는 링크(학생 링크)에서만 */
       if (global.ReviewCard) {
         ReviewCard.history($('#reviewHist'), d.review || [], []);
@@ -1135,7 +1096,7 @@
         }
       }
 
-      /* 앱 과제 — 처음 열 때 불러온다 */
+      /* 과제 상세 (예전 「앱 과제」) — 처음 열 때 불러온다 */
       var appLoaded = false;
       function openApp() {
         if (appLoaded) return;
@@ -1143,11 +1104,14 @@
         renderApp(h.code, d.app || {}, d.reports || []);
       }
 
+      /* 내 필기 (예전 「필기 노트」) — date 가 있으면 그 수업일 칸으로 */
       var photoOpened = false;
-      function openPhoto() {
-        if (photoOpened || !global.Photos) return;
+      function openPhoto(date) {
+        if (!global.Photos) return;
+        var host = $('#panelPhoto');
+        if (photoOpened) { if (date && host.phFocus) host.phFocus(date); return; }
         photoOpened = true;
-        Photos.renderTab($('#panelPhoto'), h.code, { readOnly: !canWrite });
+        Photos.renderTab(host, h.code, { readOnly: !canWrite, focus: date || '' });
       }
 
       /* 탭 수에 맞춰 칸을 나눈다 (교재비 탭은 청구서가 있을 때만) */
@@ -1160,10 +1124,10 @@
       layoutTabs();
 
       function select(which) {
-        if (which === 'video' && !(tabVideo && !tabVideo.hidden)) which = 'week';
+        if (which === 'week') which = 'report';
+        if (which === 'video' && !(tabVideo && !tabVideo.hidden)) which = 'report';
         closePlayers(null);
-        [['week',   '#tabWeek',   '#panelWeek'],
-         ['report', '#tabReport', '#panelReport'],
+        [['report', '#tabReport', '#panelReport'],
          ['video',  '#tabVideo',  '#panelVideo'],
          ['app',    '#tabApp',    '#panelApp'],
          ['photo',  '#tabPhoto',  '#panelPhoto'],
@@ -1173,67 +1137,47 @@
           $(t[2]).hidden = !on;
         });
         if (which === 'app') openApp();
-        if (which === 'photo') openPhoto();
+        if (which === 'photo') openPhoto('');
         if (which === 'video') openVideos();
-        if (which === 'report') $('#tabReport').classList.remove('has-new');
       }
 
-      $('#tabWeek').onclick = function () { select('week'); navPush('week'); };
-      /* 「이번 주」 누적 추이 [자세히 ›] → 내 레포트의 전체 주차 · 누적 추이 */
-      $('#panelWeek').addEventListener('click', function (e) {
-        if (!e.target.closest('[data-tw-trend]')) return;
-        select('report'); showReportList(); navPush('reports');
-        var tc = $('#trendCard'); if (tc && tc.scrollIntoView) tc.scrollIntoView({ block: 'start' });
-      });
-      /* 내 레포트 — 가장 최근 주 레포트를 바로 연다 (위 주차 띠 · ◀ ▶ 로 다른 주) */
+      /* 레포트 — 가장 최근 수업 레포트를 바로 연다 (위 한 줄 ◀ ▶ · 수업일 목록으로 다른 수업) */
       $('#tabReport').onclick = function () {
-        select('report');
-        var first = RP.list[0];
-        /* 기록: 전체 주차 → 그 주 레포트 (레포트에서 뒤로가기 = 전체 주차 · 누적 추이) */
-        navPush('reports');
-        if (first) { openReport(h.code, first); if (!first.draft) navPush('report', first.week_start); }
-        else showReportList();
+        $('#tabReport').classList.remove('has-new');
+        select('report'); showLatest(); navPush('week');
       };
       if (tabVideo) tabVideo.onclick = function () { select('video'); navPush('videos'); };
       $('#tabApp').onclick    = function () { select('app'); navPush('app'); };
       $('#tabBook').onclick   = function () { select('book'); navPush('book'); };
       $('#tabPhoto').onclick  = function () { select('photo'); navPush('photo'); };
+      /* 레포트 「오늘 수업 필기」의 「내 필기에서 전체 보기」 → 내 필기 탭의 그 날짜 */
+      $('#panelReport').addEventListener('click', function (e) {
+        var g = e.target.closest('[data-photo-go]');
+        if (!g) return;
+        var date = g.getAttribute('data-photo-go');
+        select('photo'); openPhoto(date); navPush('photo', date);
+      });
 
-      /* 뒤로가기 — 주소(#코드/보기)를 보고 그 화면으로 */
+      /* 뒤로가기 — 주소(#코드/보기)를 보고 그 화면으로
+         예전 주소도 새 탭으로: #코드/notice · /week · /this-week → 레포트, /app → 과제 상세, /photo → 내 필기 */
       nav.code = h.code;
       nav.on = !PV;
       nav.apply = function (v, arg) {
-        if (v === 'report' || v === 'reports') {
+        if (v === 'report' && arg) {
           select('report');
-          var rr = arg && reports.find(function (x) { return x.week_start === arg; });
-          if (rr) openReport(h.code, rr);
-          else if (v === 'report' && !arg && RP.list[0]) openReport(h.code, RP.list[0]);
-          else showReportList();
-        } else if (v === 'videos') select('video');
-        else if (v === 'app' || v === 'photo') select(v);
+          var rr = reports.find(function (x) { return x.week_start === arg; });
+          if (rr) openReport(h.code, rr); else showLatest();
+        } else if (v === 'reports') { select('report'); showReportList(); }
+        else if (v === 'videos' || v === 'video') select('video');
+        else if (v === 'app') select('app');
+        else if (v === 'photo') { select('photo'); if (arg) openPhoto(arg); }
         else if (v === 'book' && !$('#tabBook').hidden) select('book');
-        else select('week');
+        else { select('report'); showLatest(); }
       };
-      /* 예전 주소 #코드/notice → 「이번 주」 (#코드) */
-      if (h.view === 'notice') { h.view = ''; if (nav.on) history.replaceState(null, '', navHash('week')); }
+      if (/^(notice|week|this-week|thisweek)$/.test(h.view)) { h.view = ''; h.arg = ''; if (nav.on) history.replaceState(null, '', navHash('week')); }
+      if (h.view === 'report' && !h.arg) h.view = '';
       if (nav.on) history.replaceState({ hub: { v: h.view || 'week', arg: h.arg || '' } }, '', location.hash);
-
-      if (h.view === 'report' && h.arg) {
-        nav.apply('report', h.arg);
-      } else if (h.view === 'reports') {
-        select('report');
-      } else if (h.view === 'report') {
-        select('report');
-        if (RP.list.length) openReport(h.code, RP.list[0]);
-      } else if (h.view === 'videos') {
-        select('video');
-      } else if (h.view === 'app') {
-        select('app');
-      } else if (h.view === 'photo') {
-        select('photo');
-      } else {
-        select('week');
-      }
+      nav.apply(h.view || 'week', h.arg || '');
 
       /* 교재비 — 청구서가 있는 학생에게만 탭이 보인다.
          2단계 SQL 을 아직 안 돌렸거나 실패해도 다른 탭은 그대로 쓴다. */
@@ -1367,43 +1311,55 @@
     });
   }
 
-  /* ---------- 내 레포트 ---------- */
+  /* ---------- 「레포트」 탭 (20261029i) ---------- */
 
-  /* 지금 보이는 레포트 목록 (최신이 앞. 코치룸 미리보기의 '공개 전' 은 맨 앞) */
-  var RP = { code: '', list: [], cur: -1 };
+  /* 공개된 레포트 목록 (최신이 앞. 코치룸 미리보기의 '공개 전' 은 맨 앞) · latest = 가장 최근 공개 레포트 */
+  var RP = { code: '', list: [], cur: -1, latest: -1, data: null, r: null };
+
+  function firstHtml() {
+    return '<div class="card tw-card tw-card--first" id="twCard"><p class="tw-first">첫 레포트는 첫 수업 날 올라옵니다</p></div>' +
+      teacherNoticeHtml(noticeItems());
+  }
 
   function renderReportList(code, reports, draft) {
     var host = $('#panelReport');
     if (draft) reports = [{ week_start: draft.week_start, week_end: draft.week_end, lesson_date: draft.lesson_date || '', draft: true }].concat(reports);
     RP.code = code; RP.list = reports; RP.cur = -1;
-    if (!reports.length) {
-      host.innerHTML = '<div id="reviewHist"></div><div class="empty">아직 공개된 주간 레포트가 없습니다.</div>';
-      return;
-    }
+    RP.latest = -1;
+    for (var k = 0; k < reports.length; k++) if (!reports[k].draft) { RP.latest = k; break; }
     host.innerHTML =
-      '<div id="reportOverview">' +
-      '<div id="reviewHist"></div>' +
-      '<div id="trendCard"></div>' +
-      '<div class="card" id="reportListCard">' +
-        '<h2 class="card-title">🗓️ 주간 레포트<span class="card-note">' + reports.length + '편</span></h2>' +
-        '<ul class="rp-list">' + reports.map(function (r, i) {
-          return '<li><button type="button" class="rp-item' + (r.draft ? ' rp-item--draft' : '') + '" data-i="' + i + '">' +
-                   '<span class="rp-item__week num">' + esc(reportLabel(r)) + '</span>' +
-                   '<span class="rp-item__label">' + (r.draft ? '공개하면 이렇게 보입니다 (미리보기)' : '주간 학습 레포트') + '</span>' +
-                   (i === 0 && !r.draft ? '<span class="rp-item__new">NEW</span>' : '') +
-                   '<span class="rp-item__go" aria-hidden="true">›</span>' +
-                 '</button></li>';
-        }).join('') + '</ul>' +
-      '</div>' +
-      '</div>' +
-      '<div id="reportView" hidden>' +
-        '<button type="button" class="hub-back" id="reportBack">‹ 전체 주차 · 누적 추이</button>' +
+      '<div id="rvTop"><button type="button" class="tw-rv-btn" id="twRvBtn" hidden>📝 복습테스트 입력하기</button><div id="reviewCard" hidden></div></div>' +
+      '<div id="reportView">' +
         '<div class="rw-nav" id="reportNav"></div>' +
-        '<div id="reportBody"></div>' +
-      '</div>';
+        '<div id="reportBody">' + (reports.length ? '' : firstHtml()) + '</div>' +
+      '</div>' +
+      '<div id="reportOverview" hidden>' +
+        '<button type="button" class="hub-back" id="reportBack">‹ 레포트로</button>' +
+        '<div id="reviewHist"></div>' +
+        '<div id="trendCard"></div>' +
+        (reports.length
+          ? '<div class="card" id="reportListCard">' +
+              '<h2 class="card-title">🗓️ 수업 레포트<span class="card-note">' + reports.length + '편</span></h2>' +
+              '<ul class="rp-list">' + reports.map(function (r, i) {
+                return '<li><button type="button" class="rp-item' + (r.draft ? ' rp-item--draft' : '') + '" data-i="' + i + '">' +
+                         '<span class="rp-item__week num">' + esc(reportLabel(r)) + '</span>' +
+                         '<span class="rp-item__label">' + (r.draft ? '공개하면 이렇게 보입니다 (미리보기)' : '수업 레포트') + '</span>' +
+                         (i === RP.latest ? '<span class="rp-item__new">NEW</span>' : '') +
+                         '<span class="rp-item__go" aria-hidden="true">›</span>' +
+                       '</button></li>';
+              }).join('') + '</ul>' +
+            '</div>'
+          : '') +
+      '</div>' +
+      kakaoNoteHtml() + homeGuideHtml();
 
     loadTrend(code);
+    bindArchive(host, noticeItems());
+    bindFiles(host, code);
 
+    host.addEventListener('toggle', function (e) {
+      if (e.target.classList && e.target.classList.contains('tw-pastfiles') && e.target.open) loadThumbs(e.target, code);
+    }, true);
     host.addEventListener('click', function (e) {
       var b = e.target.closest('.rp-item');
       if (b) {
@@ -1412,34 +1368,65 @@
         if (!rp.draft) navPush('report', rp.week_start);
         return;
       }
-      /* 주차 띠 · ◀ 지난주 · 다음주 ▶ · 추이 그래프의 점 — 같은 화면 안에서 주만 바꾼다 (주소는 바꾸되 기록은 쌓지 않는다) */
+      /* 가운데 수업일 — 공개된 수업일 목록을 작게 펼친다 */
+      if (e.target.closest('#rwNow')) {
+        var pick = $('#rwPick'), now = $('#rwNow');
+        if (pick) { pick.hidden = !pick.hidden; now.setAttribute('aria-expanded', String(!pick.hidden)); }
+        return;
+      }
+      /* ◀ 지난주 · 다음주 ▶ · 목록에서 고르기 — 같은 화면 안에서 수업만 바꾼다 (주소는 바꾸되 기록은 쌓지 않는다) */
       var w = e.target.closest('[data-rw]');
       if (w && !w.disabled) {
         var i = +w.dataset.rw;
         if (reports[i]) { openReport(code, reports[i]); navReplace(reports[i]); }
         return;
       }
+      if (e.target.closest('[data-rw-trend]')) {
+        showReportList(); navPush('reports');
+        var tc = $('#trendCard'); if (tc && tc.scrollIntoView) tc.scrollIntoView({ block: 'start' });
+        return;
+      }
       var tp = e.target.closest('[data-tw]');
       if (tp) {
-        var k = indexOfWeek(tp.getAttribute('data-tw'));
-        if (k !== -1) { openReport(code, reports[k]); navPush('report', reports[k].week_start); }
+        var k2 = indexOfWeek(tp.getAttribute('data-tw'));
+        if (k2 !== -1) { openReport(code, reports[k2]); navPush('report', reports[k2].week_start); }
+        return;
+      }
+      if (e.target.closest('[data-tw-more]')) {
+        var c = $('#twLearn'); if (c) c.classList.remove('is-short');
+        e.target.closest('[data-tw-more]').remove();
+        return;
+      }
+      if (e.target.closest('#twRvBtn')) {
+        $('#twRvBtn').hidden = true;
+        $('#reviewCard').hidden = false;
+        var rc = $('#reviewCard'); if (rc.scrollIntoView) rc.scrollIntoView({ block: 'start' });
         return;
       }
       if (e.target.closest('#reportBack')) {
-        /* 목록으로 — 뒤로가기 기록이 레포트 한 편이면 뒤로가기와 같게 */
+        /* 레포트로 — 뒤로가기 기록이 누적 추이면 뒤로가기와 같게 */
         var hs = nav.on && history.state;
-        if (hs && hs.p && hs.hub && hs.hub.v === 'report') history.back();
-        else { showReportList(); if (nav.on) history.replaceState({ hub: { v: 'reports', arg: '' }, p: hs && hs.p }, '', navHash('reports')); }
+        if (hs && hs.p && hs.hub && hs.hub.v === 'reports') history.back();
+        else { showLatest(); if (nav.on) history.replaceState({ hub: { v: 'week', arg: '' }, p: hs && hs.p }, '', navHash('week')); }
       }
     });
   }
 
+  /* 누적 추이 (전체 수업 · 복습테스트 점수 그래프) */
   function showReportList() {
-    var list = $('#reportOverview') || $('#reportListCard'), view = $('#reportView');
-    if (list) list.hidden = false;
+    var ov = $('#reportOverview'), view = $('#reportView');
+    if (ov) ov.hidden = false;
     if (view) view.hidden = true;
     RP.cur = -1;
     closePlayers(null);
+  }
+  /* 가장 최근 공개 레포트 (레포트가 없으면 「첫 레포트는 첫 수업 날 올라옵니다」) */
+  function showLatest() {
+    var r = RP.list[RP.latest] || RP.list[0];
+    if (r) { openReport(RP.code, r); return; }
+    var ov = $('#reportOverview'), view = $('#reportView');
+    if (ov) ov.hidden = true;
+    if (view) view.hidden = false;
   }
 
   function indexOfWeek(week) {
@@ -1448,48 +1435,37 @@
   }
   function navReplace(r) {
     if (!nav.on) return;
-    var hh = r.draft ? navHash('reports') : navHash('report', r.week_start);
+    var hh = r.draft ? navHash('week') : navHash('report', r.week_start);
     var p = history.state && history.state.p;
-    history.replaceState({ hub: r.draft ? { v: 'reports', arg: '' } : { v: 'report', arg: r.week_start }, p: p }, '', hh);
+    history.replaceState({ hub: r.draft ? { v: 'week', arg: '' } : { v: 'report', arg: r.week_start }, p: p }, '', hh);
   }
 
-  /* 주차 띠 (가로로 밀기) + ◀ 지난주 · 다음주 ▶ — 목록은 최신이 앞이므로 '지난주' = 다음 칸 */
-  function chipLabel(r) {
-    if (r.draft) return '공개 전';
-    if (r.lesson_date && global.Lesson && Lesson.md) return Lesson.md(r.lesson_date);
-    return ReportView.shortDate(r.week_start);
-  }
+  /* 한 줄 — ◀ 지난주 · [10/22(목) 수업 ▾] · 다음주 ▶ · 누적 추이 (목록은 최신이 앞이므로 '지난주' = 다음 칸)
+     가운데를 누르면 공개된 수업일 목록. 주 시작일은 쓰지 않는다 */
   function reportNavHtml(i) {
     var L = RP.list, n = L.length;
-    if (n < 2) return '';
-    var chips = L.map(function (r, k) { return k; }).reverse().map(function (k) {
-      var r = L[k];
-      return '<button type="button" class="rw-chip' + (k === i ? ' is-on' : '') + (r.draft ? ' rw-chip--draft' : '') + '" data-rw="' + k + '"' +
-             (k === i ? ' aria-current="true"' : '') + '>' + esc(chipLabel(r)) + '</button>';
-    }).join('');
-    return '<div class="rw-arrows">' +
-             '<button type="button" class="rw-arrow" data-rw="' + (i + 1) + '"' + (i + 1 >= n ? ' disabled' : '') + '>◀ 지난주</button>' +
-             '<span class="rw-now num">' + esc(reportLabel(L[i])) + '</span>' +
-             '<button type="button" class="rw-arrow" data-rw="' + (i - 1) + '"' + (i - 1 < 0 ? ' disabled' : '') + '>다음주 ▶</button>' +
+    if (!n) return '';
+    var cur = L[i] || L[0];
+    var name = function (r) { return (r.draft ? '공개 전 · ' : '') + reportLabel(r); };
+    return '<div class="rw-bar">' +
+             '<button type="button" class="rw-arrow" data-rw="' + (i + 1) + '"' + (i + 1 >= n ? ' disabled' : '') + ' aria-label="지난 수업 레포트">◀ 지난주</button>' +
+             '<button type="button" class="rw-now num" id="rwNow" aria-haspopup="listbox" aria-expanded="false"' + (n < 2 ? ' disabled' : '') + '>' +
+               esc(name(cur)) + (n > 1 ? '<span class="rw-caret" aria-hidden="true">▾</span>' : '') + '</button>' +
+             '<button type="button" class="rw-arrow" data-rw="' + (i - 1) + '"' + (i - 1 < 0 ? ' disabled' : '') + ' aria-label="다음 수업 레포트">다음주 ▶</button>' +
+             '<button type="button" class="rw-trend" data-rw-trend>누적 추이</button>' +
            '</div>' +
-           '<div class="rw-chips" role="list">' + chips + '</div>';
+           (n > 1 ? '<div class="rw-pick" id="rwPick" role="listbox" aria-label="공개된 수업 레포트" hidden>' + L.map(function (r, k) {
+             return '<button type="button" class="rw-pick__i num' + (k === i ? ' is-on' : '') + '" role="option" aria-selected="' + (k === i) + '" data-rw="' + k + '">' + esc(name(r)) + '</button>';
+           }).join('') + '</div>' : '');
   }
   function drawReportNav(i) {
     var box = $('#reportNav');
-    if (!box) return;
-    box.innerHTML = reportNavHtml(i);
-    var on = box.querySelector('.rw-chip.is-on');
-    var strip = box.querySelector('.rw-chips');
-    if (on && strip) {
-      /* 고른 칩이 보이게 가로로 */
-      var left = on.offsetLeft - (strip.clientWidth - on.offsetWidth) / 2;
-      strip.scrollLeft = Math.max(0, left);
-    }
+    if (box) box.innerHTML = reportNavHtml(i);
   }
 
   function openReport(code, r) {
     var body = $('#reportBody');
-    var ov = $('#reportOverview') || $('#reportListCard');
+    var ov = $('#reportOverview');
     if (ov) ov.hidden = true;
     $('#reportView').hidden = false;
     closePlayers(null);
@@ -1499,65 +1475,35 @@
     drawReportNav(idx);
     body.innerHTML = '<div class="empty">레포트를 불러오는 중입니다…</div>';
     window.scrollTo(0, 0);
+    var mon = mondayOf(r.week_start);
+    /* 그 주 복습테스트 낸 것 · 확인 전 · 미응시 (027 · 028 · 점수는 오지 않는다). 함수가 없으면 레포트에 담긴 것으로 */
+    if (!(mon in RVW)) {
+      RVW[mon] = 'loading';
+      rpc('hub_review_week', { p_code: code, p_week: mon }).then(function (list) {
+        RVW[mon] = Array.isArray(list) ? list : null;
+        if (RP.cur === idx && RP.data) { var s = $('#rwSum'); if (s) s.outerHTML = sumHtml(RP.r, RP.data); }
+      }, function () { RVW[mon] = null; });
+    }
 
     rpc('hub_report', { p_code: code, p_week: r.draft ? '__draft' : r.week_start }).then(function (data) {
-      if (RP.cur !== idx) return;                       /* 그 사이 다른 주를 눌렀다 */
+      if (RP.cur !== idx) return;                       /* 그 사이 다른 수업을 눌렀다 */
       if (!data) { body.innerHTML = '<div class="empty">이 레포트는 지금 볼 수 없습니다.</div>'; return; }
-      ReportView.render(body, data);
-      reportVideos(body, r);
-      reportExtras(body, r, data, code);
-      if (r.draft) body.insertAdjacentHTML('afterbegin', '<div class="pv-draft">아직 공개 전 — 지금 작성 내용으로 공개하면 이렇게 보입니다</div>');
-      /* 그 주차(시작일 ~ 종료일) 필기를 레포트 아래에 함께 */
-      if (global.Photos) {
-        var box = document.createElement('div');
-        box.className = 'report-photos';
-        body.appendChild(box);
-        var end = r.week_end || data.endDate || Photos.addDays(r.week_start, 6);
-        Photos.weekCard(box, code, r.week_start, end);
+      RP.data = data; RP.r = r;
+      try {
+        body.innerHTML = reportHtml(r, data, idx === RP.latest);
+      } catch (e) {
+        body.innerHTML = '<div class="empty">레포트를 그리지 못했습니다.<br>선생님께 다시 확인 부탁드립니다.</div>';
+        return;
       }
+      if (ReportView.animate) ReportView.animate(body);
+      /* 오늘 수업 필기 — 그 수업일에 올라온 그 학생 필기 (없으면 칸이 없다) */
+      var ld = lessonDateOf(r, data);
+      if (global.Photos && Photos.lessonCard && ld) Photos.lessonCard($('#rwNotes'), code, ld);
+      drawReportApp($('#rwApp'), code, r, data, idx);
+      loadThumbs(body, code);
     }).catch(function () {
       body.innerHTML = '<div class="empty">불러오지 못했습니다. 새로고침해 주세요.</div>';
     });
-  }
-
-  /* 레포트 아래 — 그 레포트 수업 전 일주일(D-7 ~ D-1)의 앱 과제 요약, 그 주 과제 · 자료 (수업일이 없는 예전 레포트는 저장된 과제 기간) */
-  function reportExtras(body, r, data, code) {
-    if (!r.week_start) return;
-    var L = lessonOf(r.week_start) || {};
-    var box = document.createElement('div');
-    body.appendChild(box);
-    var ld = /^\d{4}-\d{2}-\d{2}/.test(data.lessonDate || '') ? String(data.lessonDate).slice(0, 10) : (!L.canceled && L.date ? L.date : '');
-    if (ld && global.AppWeek && APP.info && APP.info.linked) {
-      appData(code).then(function (dd) { box.innerHTML = dd ? reportAppHtml(dd, ld) : ''; animateRings(box); });
-    } else {
-      appWeekInto(box, code, data.hwFrom || L.hwFrom, data.hwTo || L.hwTo, '과제 기간');
-    }
-    var w = r.draft ? null : weekOf(mondayOf(r.week_start));
-    var files = filesOf(w);
-    if (files) {
-      var fb = document.createElement('div');
-      fb.className = 'card rw-files';
-      fb.innerHTML = '<h2 class="card-title">✏️ 이 주 과제 · 자료</h2>' + files;
-      body.appendChild(fb);
-      bindFiles(fb, code);
-    }
-  }
-
-  /* 레포트 아래 — 그 주 수업 영상 (이번 주 수업 · 수업 영상 탭과 같은 목록에서) */
-  function reportVideos(body, r) {
-    if (r.draft || !WEEKLY || !r.week_start) return;
-    function monday(iso) {
-      var d = new Date(String(iso).slice(0, 10) + 'T00:00:00Z');
-      return plusDays(String(iso).slice(0, 10), -((d.getUTCDay() + 6) % 7));
-    }
-    var mon = monday(r.week_start);
-    var w = (WEEKLY.weeks || []).filter(function (x) { return x.week_start && monday(x.week_start) === mon; })[0];
-    var vids = w ? sortVideos((w.videos || []).filter(function (v) { return v && safeUrl(v.url); })) : [];
-    if (!vids.length) return;
-    var box = document.createElement('div');
-    box.className = 'card rw-videos';
-    box.innerHTML = '<h2 class="card-title">▶️ 이 주 수업 영상</h2><div class="nt-videos">' + vids.map(weekVideoHtml).join('') + '</div>';
-    body.appendChild(box);
   }
 
   /* ============================================================
@@ -1642,7 +1588,7 @@
 
   function weekShort(x) {
     if (x.date && global.Lesson && Lesson.md) return Lesson.md(x.date);
-    return ReportView.shortDate(x.week);
+    return weekName(x.week).replace(/ 수업$/, '');
   }
 
   /* 작은 꺾은선 — 한 줄짜리라 범례 없이, 마지막 점에만 값. 값이 빈 주는 선을 끊는다 */
@@ -1705,7 +1651,7 @@
     }
   });
 
-  /* ---------- 앱 과제 ---------- */
+  /* ---------- 과제 상세 (예전 「앱 과제」 탭 · 20261029i) — 지금 진행 중인 주는 여기에서만 ---------- */
 
   function ring(value, label) {
     var v = Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
@@ -1784,7 +1730,7 @@
       }
 
       var d = res.data || {};
-      /* 이번 주 = 「이번 주」 탭의 진행 중 기간과 같다 */
+      /* 이번 주 = 가장 최근 레포트 수업일 ~ 다음 수업 전날 (진행 중 · 오늘 기준) */
       var rep = (reports || []).filter(function (r) { return r && r.week_start && !r.draft; })[0] || null;
       var p = currentPeriod(rep, '');
       var aw = p && p.from && global.AppWeek ? AppWeek.compute(d, p.from, p.to, todayISO()) : null;
@@ -1833,6 +1779,7 @@
       root.innerHTML = weeklyHtml(WEEKLY) + noticesHtml(d.notices || []);
       bindArchive(root, d.notices || []);
       bindWeekly(root, code);
+      loadThumbs(root, code);
     }).catch(function () { stopScreen(root, 'network'); });
   }
 

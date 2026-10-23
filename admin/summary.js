@@ -203,7 +203,7 @@
             : '<button class="btn btn--sm btn--ghost" type="button" data-ai-act="discard">초안 지우기</button>') +
           '<button class="btn btn--sm btn--primary" type="button" data-ai-act="confirm">' + (confirmed ? '고친 내용으로 다시 확정' : '확정') + '</button>' +
         '</div>' +
-        '<p class="panel__hint">[확정]하면 러닝노트 「이번 주」 · 반 공지에 보이고, 위 「수업 내용」 차시 칸에 들어가 레포트를 공개할 때 함께 나갑니다. 자동 자막은 작품명 · 용어를 틀리게 받아 적을 때가 많으니 꼭 읽고 고쳐 주세요.</p>' +
+        '<p class="panel__hint">[확정]하면 러닝노트 「레포트」 · 반 공지에 보이고, 위 「수업 내용」 차시 칸에 들어가 레포트를 공개할 때 함께 나갑니다. 자동 자막은 작품명 · 용어를 틀리게 받아 적을 때가 많으니 꼭 읽고 고쳐 주세요.</p>' +
       '</div>';
     aiButton();
   }
