@@ -4,7 +4,8 @@
    반 수업일마다 기본 시험들(「복습 TEST」 · 「화작문 TEST」, 반 관리에서 바꿈)이 서버에서 저절로 생긴다.
    모든 곳에서 「10/22(목) 복습 TEST」처럼 수업일 + 시험 이름으로 부른다 (회차는 쓰지 않는다).
    · 그 주 시험 줄: [+ 시험 추가](그 주만) · [이번 주 시험 빼기](제출이 있는 시험은 뺄 수 없음) · 뺀 시험은 요약 줄에 「… 이번 주 안 봄 · 되돌리기」 (20261029g)
-   · 확인 표: 학생 한 줄 — 시험마다 점수 · 상태(미제출/제출/확인) · [확인] [고치기] [대신 입력] [미응시], 사진(여러 장)
+   · 표: 학생 한 줄 — 시험마다 점수 · 상태(미제출/제출) · [고치기] [대신 입력] [미응시], 사진(여러 장)
+     「확인」 단계는 없앴다 (20261030a · migration-030) — 학생이 낸 값을 그대로 쓰고, 이상하면 [고치기]. 고친 기록은 그대로 남는다
    · 미응시 (migration-028 · 20261029h): 사유 결석 · 지각 · 상담 중 · 다른 시험으로 대체 · 기타 (뒤의 둘은 짧은 메모 — 코치룸에서만 보임).
      이름 옆 [이번 주 전부 미응시]는 그 주 안 낸 시험 모두에 같은 사유. 회색 「미응시 · 결석」을 누르면 사유 바꾸기 · [미응시 취소].
      학생이 내거나 [대신 입력]하면 서버가 미응시를 저절로 푼다. 제출 현황은 「제출 9 · 미응시 1 / 11」처럼 따로 센다.
@@ -13,7 +14,7 @@
      고치기 · 대신 입력은 시험마다 「전체 문항 수」 · 「틀린 개수」. 누가 · 언제 했는지 서버(review_log)에 남는다
      예전 기록(틀린 번호 방식)은 「복습 TEST」로 그대로 보인다
    · [지금 제출 현황]: 교실 화면용 — 이름 옆에 시험별 제출 여부만 (점수는 아예 불러오지 않는다)
-   · [시험별 평균]: 반 단위, 최근 확인된 시험들의 평균 점수 (코치룸에서만)
+   · [시험별 평균]: 반 단위, 최근 시험들의 평균 점수 — 낸 점수 그대로 (코치룸에서만)
    · [지난 시험지 사진 정리] — 점수는 남기고 사진만 지운다
    ============================================================ */
 
@@ -104,14 +105,12 @@
       return;
     }
     var rows = d.rows || [];
-    var ok = 0;
-    rows.forEach(function (x) { on.forEach(function (t) { var s = x.subs && x.subs[t.id]; if (s && s.status === 'confirmed') ok++; }); });
     var day = all[0].lesson_date;
     /* 요약 줄 — 보는 시험은 굵게, 뺀 시험은 「복습 TEST 이번 주 안 봄 · 되돌리기」 (20261029g)
        시험마다 「복습 TEST 제출 9 · 미응시 1 / 11」 — 미응시는 제출과 따로 센다 (20261029h) */
     line.innerHTML = '<b>' + esc(Lesson.md(String(day).slice(0, 10))) + '</b> · ' + (on.length ? on.map(function (t) { return '<b>' + esc(t.test_name) + '</b>'; }).join(' · ') : '시험 없음') +
       ' · 마감 ' + esc(Lesson.md(String(day).slice(0, 10))) + ' 밤 12시' +
-      (on.length ? ' <span class="muted-note rv-count">' + on.map(function (t) { return esc(countText(t, rows)); }).join(' · ') + ' · 확인 ' + ok + '</span>' : '') +
+      (on.length ? ' <span class="muted-note rv-count">' + on.map(function (t) { return esc(countText(t, rows)); }).join(' · ') + '</span>' : '') +
       all.filter(function (t) { return t.off; }).map(function (t) {
         return ' <span class="rv-off">' + esc(t.test_name) + ' 이번 주 안 봄 · <button type="button" class="link-btn" data-rv="on" data-tid="' + esc(t.id) + '">되돌리기</button></span>';
       }).join('');
@@ -136,12 +135,11 @@
 
   function cleanBtn() { return '<button class="btn btn--sm btn--ghost" type="button" data-rv="clean">지난 시험지 사진 정리</button>'; }
 
+  /* 「확인」 표시는 없앴다 — 누가 넣었는지만 (조교 입력 · 고침 · 학생 입력) */
   function stateHtml(s) {
     if (!s) return '<span class="rv-st rv-st--none">미제출</span>';
-    if (s.status === 'confirmed') {
-      return '<span class="rv-st rv-st--ok">확인</span> <span class="muted-note">' +
-        (s.source === 'staff' ? '조교 입력 · ' : (s.edited_by ? '고침 · ' : '')) + esc(s.confirmed_by) + ' ' + fmtDT(s.confirmed_at) + '</span>';
-    }
+    if (s.source === 'staff') return '<span class="rv-st rv-st--sub">제출</span> <span class="muted-note">조교 입력 · ' + esc(s.confirmed_by) + ' ' + fmtDT(s.confirmed_at) + '</span>';
+    if (s.edited_by) return '<span class="rv-st rv-st--sub">제출</span> <span class="muted-note">고침 · ' + esc(s.edited_by) + ' ' + fmtDT(s.edited_at || s.confirmed_at) + '</span>';
     return '<span class="rv-st rv-st--sub">제출</span> <span class="muted-note">학생 입력 · ' + fmtDT(s.submitted_at) + '</span>';
   }
 
@@ -167,11 +165,8 @@
     var acts = !s
       ? '<button class="btn btn--sm" type="button" data-rv="entry" data-tid="' + esc(t.id) + '">대신 입력</button>' +
         '<button class="btn btn--sm btn--ghost" type="button" data-rv="absent" data-tid="' + esc(t.id) + '">미응시</button>'
-      : (s.status === 'confirmed'
-          ? '<button class="btn btn--sm btn--ghost" type="button" data-rv="edit" data-tid="' + esc(t.id) + '">고치기</button>'
-          : '<button class="btn btn--sm btn--primary" type="button" data-rv="confirm" data-tid="' + esc(t.id) + '">확인</button>' +
-            '<button class="btn btn--sm btn--ghost" type="button" data-rv="edit" data-tid="' + esc(t.id) + '">고치기</button>');
-    return '<td class="rv-cell' + (s && s.status !== 'confirmed' ? ' is-pending' : '') + '">' +
+      : '<button class="btn btn--sm btn--ghost" type="button" data-rv="edit" data-tid="' + esc(t.id) + '">고치기</button>';
+    return '<td class="rv-cell">' +
       (s ? '<div class="num rv-cell__score">' + esc(scoreText(s)) + '</div>' +
            (s.mode === 'numbers' && (s.wrong || []).length ? '<div class="muted-note">틀린 번호 ' + esc(s.wrong.join(', ')) + '</div>' : '') : '') +
       '<div>' + stateHtml(s) + '</div>' +
@@ -214,7 +209,7 @@
       (e.mode === 'entry'
         ? '<label class="btn btn--sm">시험지 사진 (선택 · 여러 장)<input type="file" accept="image/*" multiple data-rv-file hidden></label> <span class="muted-note" data-rv-photo-note>' +
             (e.blobs.length ? '사진 ' + e.blobs.length + '장 준비됨' : '사진 없이도 저장됩니다 · 「조교 입력」으로 표시') + '</span>'
-        : '<span class="muted-note">저장하면 확인까지 함께 됩니다. 고치기 전 값과 고친 사람이 기록됩니다.</span>') +
+        : '<span class="muted-note">고치기 전 값과 고친 사람이 기록됩니다.</span>') +
       '<div class="wk-edit__btns"><button class="btn btn--sm btn--primary" type="button" data-rv="save">저장</button>' +
       '<button class="btn btn--sm btn--ghost" type="button" data-rv="cancel">취소</button></div>' +
     '</div>';
@@ -274,7 +269,6 @@
       call('review_test_add', { p_class: st.cls, p_week: st.mon, p_name: nm.trim() }, '「' + nm.trim() + '」을(를) 이번 주에 넣었습니다');
     }
     if (act === 'clean') cleanPhotos();
-    if (act === 'confirm' && s) call('review_confirm', { p_sub: s.id }, x.name + ' ' + t.test_name + ' 확인했습니다');
     if (act === 'edit' && s) { st.edit = { sid: x.student_id, tid: t.id, mode: 'edit', q: String(s.q_count), w: String(wrongN(s)), blobs: [] }; draw(); focusEditor(); }
     if (act === 'entry' && x && t) { st.edit = { sid: x.student_id, tid: t.id, mode: 'entry', q: '', w: '', blobs: [] }; draw(); focusEditor(); }
     if (act === 'absent' && x && t) {
@@ -342,7 +336,7 @@
     var c = editCheck(e);
     if (!c.ok) { toast(c.msg, 'bad'); return; }
     if (e.mode === 'edit') {
-      call('review_edit2', { p_sub: x.subs[t.id].id, p_q: c.q, p_wrong: c.w }, x.name + ' ' + t.test_name + ' 점수를 고치고 확인했습니다');
+      call('review_edit2', { p_sub: x.subs[t.id].id, p_q: c.q, p_wrong: c.w }, x.name + ' ' + t.test_name + ' 점수를 고쳤습니다');
       return;
     }
     var ups = e.blobs.map(function (blob) {
@@ -498,7 +492,7 @@
   }
 
   /* ============================================================
-     시험별 평균 (반 단위 · 최근 확인된 시험들) — 「자주 틀린 번호」 대신 (migration-025)
+     시험별 평균 (반 단위 · 최근 시험들 · 낸 점수 그대로 · migration-030) — 「자주 틀린 번호」 대신 (migration-025)
      ============================================================ */
 
   function openStats() {
@@ -509,7 +503,7 @@
     sb().rpc('review_stats', { p_class: st.cls }).then(function (r) {
       if (r.error) { $('#rvStatsBody').innerHTML = '<p class="panel__hint">' + esc(isMissing(r.error) ? NEED_SQL : r.error.message) + '</p>'; return; }
       var list = r.data || [];
-      if (!list.length) { $('#rvStatsBody').innerHTML = '<p class="panel__hint">아직 확인된 복습테스트 기록이 없습니다.</p>'; return; }
+      if (!list.length) { $('#rvStatsBody').innerHTML = '<p class="panel__hint">아직 낸 복습테스트 기록이 없습니다.</p>'; return; }
       $('#rvStatsBody').innerHTML = list.map(function (t) {
         var avg = t.avg == null ? 0 : Number(t.avg);
         return '<div class="rv-bar rv-bar--avg"><span class="rv-bar__q">' + esc(t.label || t.test_name) + '</span>' +
@@ -557,7 +551,7 @@
   bind();
 
   /* 학생 카드 「복습테스트」 한 줄 (write.js · 20261029g) — 그 반 그 주를 아직 안 불러왔으면 null
-     「복습 TEST 6/10 · 화작문 TEST 10/10 · 확인 전」 · 하나도 안 냈으면 「아직 제출 안 함」 */
+     「복습 TEST 6/10 · 화작문 TEST 10/10」 · 하나도 안 냈으면 「아직 제출 안 함」 (「확인 전 / 확인 완료」는 없앴다 · 20261030a) */
   function lineOf(cls, week, sid) {
     if (st.missing) return '복습테스트 SQL(025) 전';
     if (!cls || st.cls !== cls || st.mon !== monday(week) || !st.data) return null;
@@ -567,15 +561,13 @@
     var subs = (x && x.subs) || {};
     var anySub = on.some(function (t) { return subs[t.id]; });
     if (!anySub && !on.some(function (t) { return absentOf(x, t); })) return '아직 제출 안 함';
-    var pending = false;
     /* 미응시 — 「복습 TEST 미응시(결석)」 (migration-028) */
     var parts = on.map(function (t) {
       var s = subs[t.id], ab = absentOf(x, t);
       if (!s) return t.test_name + (ab ? ' 미응시(' + (ab.label || reasonLabel(ab.reason)) + ')' : ' 미제출');
-      if (s.status !== 'confirmed') pending = true;
       return t.test_name + ' ' + s.correct + '/' + s.q_count;
     });
-    return parts.join(' · ') + (anySub ? ' · ' + (pending ? '확인 전' : '확인 완료') : '');
+    return parts.join(' · ');
   }
 
   /* 학생 카드 [고치기] — 복습테스트 화면으로 가서 그 학생 줄을 잠깐 표시 */

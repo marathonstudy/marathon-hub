@@ -18,7 +18,7 @@
 
   var state = {
     week: '', weekEnd: '',
-    rows: [],              /* [{ student, status, pub, checked }] */
+    rows: [],              /* [{ student, pub, checked }] */
     published: {}
   };
 
@@ -27,18 +27,16 @@
     return Store.read(Store.KEYS.draft, null);
   }
 
+  /* 「작성 중 / 작성 완료」 구분 없이 반 학생 전원 (20261030a) — 비어 있는 칸은 레포트에서 숨는다 */
   function buildRows(d) {
-    var includePartial = $('#pubIncludePartial').checked;
     return UI.activeStudents().map(function (s) {
       var common = (d.common || {})[s.className || ''] || { lessons: [], tests: [] };
-      var st = Report.entryStatus(common, (d.entries || {})[s.id]);
       var pub = state.published[s.id] || null;
-      var eligible = st.state === 'done' || (includePartial && st.state === 'partial');
       return {
         student: s, common: common, entry: (d.entries || {})[s.id] || {},
-        status: st, pub: pub, eligible: eligible,
-        /* 아직 공개 안 한, 다 쓴 학생은 미리 체크해 둔다 */
-        checked: eligible && !pub
+        pub: pub, eligible: true,
+        /* 아직 공개 안 한 학생은 미리 체크해 둔다 */
+        checked: !pub
       };
     }).sort(function (a, b) {
       var c = (a.student.className || '').localeCompare(b.student.className || '', 'ko');
@@ -112,7 +110,6 @@
           '<label class="chk-inline"><input type="checkbox" data-pick' +
             (r.eligible ? '' : ' disabled') + (r.checked ? ' checked' : '') + '></label>' +
           '<span class="pub-row__name"></span>' +
-          '<span class="entry__badge entry__badge--' + r.status.state + '">' + Report.statusLabel(r.status.state) + '</span>' +
           tag +
           (noLink ? '<span class="pub-tag pub-tag--warn" title="학생 → 명단에서 개인 링크를 발급해야 학부모가 볼 수 있습니다">링크 없음</span>' : '') +
           '<span class="spacer"></span>' +
@@ -121,7 +118,8 @@
                 (r.pub.visible ? '숨기기' : '다시 보이기') + '</button>'
             : '');
         row.querySelector('.pub-row__name').textContent = r.student.name;
-        if (r.status.missing.length) row.title = '아직 필요한 것 — ' + r.status.missing.join(', ');
+        var gaps = Report.gapsOf(r.common, r.entry);
+        if (gaps.length) row.title = '비어 있는 칸 — ' + gaps.join(', ') + ' (레포트에서 숨습니다)';
         frag.appendChild(row);
       });
     });
@@ -132,13 +130,11 @@
   function refreshButton() {
     var picked = state.rows.filter(function (r) { return r.checked; });
     var again = picked.filter(function (r) { return r.pub; }).length;
-    var skipped = state.rows.filter(function (r) { return !r.eligible && r.status.state === 'partial'; }).length;
 
     $('#btnPublish').disabled = !picked.length;
     $('#btnPublish').textContent = picked.length ? picked.length + '명 공개' : '체크한 학생 공개';
     $('#pubInfo').textContent =
-      (picked.length ? picked.length + '명 선택' + (again ? ' (그중 ' + again + '명은 다시 공개 — 내용이 새로 바뀝니다)' : '') : '공개할 학생을 체크하세요') +
-      (skipped ? ' · 작성 중 ' + skipped + '명은 빠졌습니다' : '');
+      picked.length ? picked.length + '명 선택' + (again ? ' (그중 ' + again + '명은 다시 공개 — 내용이 새로 바뀝니다)' : '') : '공개할 학생을 체크하세요';
   }
 
   function load() {
@@ -206,9 +202,12 @@
     var picked = state.rows.filter(function (r) { return r.checked; });
     if (!picked.length) return;
 
+    /* 정말 빠진 것만 한 줄 (막지는 않는다 · 개별 코멘트는 넣지 않는다) */
+    var gap = Report.gapLine(picked.map(function (r) { return { name: r.student.name, common: r.common, entry: r.entry }; }));
     UI.confirmAsk('학부모에게 공개',
       picked.length + '명의 ' + Store.shortDate(state.week) + '~' + Store.shortDate(state.weekEnd) +
-      ' 레포트를 공개합니다. 공개하면 바로 학생 개인 페이지에서 보입니다.', '공개').then(function (ok) {
+      ' 레포트를 공개합니다. 공개하면 바로 학생 개인 페이지에서 보입니다.' +
+      (gap ? '\n\n' + gap + ' — 비어 있는 칸은 레포트에서 숨습니다.' : ''), '공개').then(function (ok) {
       if (!ok) return;
       var btn = $('#btnPublish');
       btn.disabled = true;
@@ -238,11 +237,6 @@
 
   $('#btnPubRefresh').addEventListener('click', function () {
     load().then(function () { toast('다시 읽었습니다'); });
-  });
-
-  $('#pubIncludePartial').addEventListener('change', function () {
-    var d = draft();
-    if (d) { state.rows = buildRows(d); render(); }
   });
 
   document.addEventListener('jt:tab', function (e) {

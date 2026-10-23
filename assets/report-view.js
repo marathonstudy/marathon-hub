@@ -10,7 +10,9 @@
      school · grade · studentName · startDate · endDate
      attendance {status: attend|late|absent (예전 makeup 은 출석으로 보임), note}
      lessons ["1차시 내용", …]  focusScore 0~5
-     tests [{name, score}] — 복습테스트(kind: review)만 보인다. 확인 전이면 {submitted: true} → 「제출 완료」 · 미응시면 {absent: 사유 이름} → 「미응시 · 결석」
+     tests [{name, score, correct, total}] — 복습테스트(kind: review)만 보인다. 낸 점수 그대로 「8/10」 (확인 단계 없음 · 20261030a)
+           예전 레포트의 {submitted: true} → 「제출 완료」 · 미응시면 {absent: 사유 이름} → 「미응시 · 결석」 (사유 없이 안 냈으면 「미응시」)
+     비어 있는 칸(출결 · 집중도 · 코멘트 · 복습테스트)은 그리지 않는다 (20261030a)
      (예전 레포트의 수기 리뷰테스트 점수 · homework · requiredRate 는 남아 있어도 그리지 않는다 · 20261029g)
      comment
      lessonDate · lessonDays[] · hwFrom · hwTo  (반 수업 요일을 정한 뒤 공개한 레포트만 · migration-011)
@@ -162,6 +164,7 @@
   function attendanceHtml(d) {
     var a = d.attendance || {};
     var st = statusOf(d);
+    if (!MARKS[st] || st === 'none') return '';      /* 출결을 안 넣었으면 칸을 숨긴다 (20261030a) */
     var key = MARKS[st] && st !== 'none' ? st : 'none';
     var note = String(a.note == null ? '' : a.note).trim();
     var body = '' +
@@ -193,6 +196,7 @@
   function focusHtml(d) {
     var score = Math.max(0, Math.min(5, Math.round(Number(d.focusScore) || 0)));
     if (statusOf(d) === 'absent') return '';          /* 결석한 주는 집중도 줄을 숨긴다 */
+    if (!score) return '';                            /* 집중도를 안 넣었으면 숨긴다 (20261030a) */
     var stars = '';
     for (var i = 1; i <= 5; i++) {
       stars += '<span class="focus-star' + (i <= score ? ' active' : '') + '">★</span>';
@@ -204,7 +208,7 @@
   }
 
   /* 복습테스트 — 학생 QR 기록만 (수기 리뷰테스트 점수는 그리지 않는다 · 20261029g).
-     선생님이 확인한 시험은 점수, 아직 확인 전이면 「제출 완료」만, 미응시면 「미응시 · 결석」(사유 이름만 · 20261029h) */
+     낸 시험은 「8 / 10」 그대로(확인 단계 없음 · 20261030a), 미응시면 「미응시 · 결석」(사유 이름만 · 20261029h) · 사유 없이 안 냈으면 「미응시」 */
   function testsHtml(d) {
     var list = (d.tests || []).filter(function (t) { return t && t.kind === 'review' && String(t.name || '').trim(); });
     if (!list.length) return '';
@@ -228,8 +232,8 @@
       var score = pct(t.score);
       return '<div class="test-item">' +
                '<div class="test-header">' +
-                 '<span class="test-name">' + esc(t.name) + '<span class="test-badge test-badge--ok">선생님 확인</span></span>' +
-                 '<span class="test-score-text num">' + (+t.correct) + ' / ' + (+t.total) + ' · ' + score + '<small>점</small></span>' +
+                 '<span class="test-name">' + esc(t.name) + '</span>' +
+                 '<span class="test-score-text num">' + (t.correct != null && t.total != null ? (+t.correct) + ' / ' + (+t.total) : score + '<small>점</small>') + '</span>' +
                '</div>' +
                '<div class="progress-bar"><div class="progress-fill" data-width="' + score + '"></div></div>' +
              '</div>';

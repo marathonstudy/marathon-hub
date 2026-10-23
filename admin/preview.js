@@ -85,7 +85,7 @@
       }
       if (name === 'hub_textbook') return sb().rpc('staff_hub_textbook', { p_student: cur.sid }).then(unwrap);
       if (name === 'hub_trend') return sb().rpc('staff_hub_trend', { p_student: cur.sid }).then(unwrap);
-      /* 레포트 복습테스트 칸의 낸 것 · 확인 전 · 미응시 — 직원 표(review_week)에서 그 학생 줄만 같은 모양으로 (점수 · 메모 없이) */
+      /* 레포트 복습테스트 칸의 낸 것(맞은 수 / 전체) · 미응시 — 직원 표(review_week)에서 그 학생 줄만 hub_review_week(030)와 같은 모양으로 (메모 없이) */
       if (name === 'hub_review_week') {
         var s = student();
         if (!s || !s.className) return Promise.resolve(null);
@@ -96,7 +96,7 @@
           (r.data.tests || []).forEach(function (t) {
             if (t.off) return;
             var sub = (row.subs || {})[t.id], ab = (row.absent || {})[t.id];
-            if (sub) out.push({ test_name: t.test_name, lesson_date: t.lesson_date, label: t.label, status: sub.status === 'confirmed' ? 'confirmed' : 'submitted' });
+            if (sub) out.push({ test_name: t.test_name, lesson_date: t.lesson_date, label: t.label, status: 'submitted', correct: sub.correct, q_count: sub.q_count });
             else if (ab) out.push({ test_name: t.test_name, lesson_date: t.lesson_date, label: t.label, status: 'absent', reason_label: ab.label || '' });
           });
           return out;
@@ -254,7 +254,7 @@
     o.querySelector('#pvFrame').src = '../me/index.html?preview=1&v=' + encodeURIComponent(CONFIG.version) + '&t=' + Date.now();
   }
 
-  /* view · arg — 처음 열 화면 (주차 현황 [보기] = 'report', 그 주 시작일) */
+  /* view · arg — 처음 열 화면 (주차 현황 [보기] = 'report', 그 주 시작일 · 학생 카드 [과제 상세 보기] = 'app') */
   function open(sid, role, view, arg) {
     if (!sid) return;
     if (window.Writer && Writer.flush) Writer.flush();
@@ -262,7 +262,7 @@
     bridge.arg = arg || '';
     cur.sid = sid;
     cur.role = role === 'student' ? 'student' : 'parent';
-    cur.mode = view ? 'live' : 'week';         /* 주차 현황 [보기] 처럼 볼 주를 정해 열면 공개된 화면 */
+    cur.mode = view && view !== 'app' ? 'live' : 'week';   /* 주차 현황 [보기] 처럼 볼 주를 정해 열면 공개된 화면 · [과제 상세 보기]는 그대로 */
     var o = build();
     o.hidden = false;
     document.body.classList.add('pv-open');
@@ -277,14 +277,15 @@
     document.body.classList.remove('pv-open');
   }
 
-  /* 명단 · 주간 레포트 → 작성 · 주간 레포트 → 발송의 [학부모 화면] [학생 화면] 단추 */
+  /* 명단 · 주간 레포트 → 작성 · 주간 레포트 → 발송의 [학부모 화면] [학생 화면] · [과제 상세 보기](data-pv-view="app") 단추
+     data-pv 가 parent · student 인 것만 (교재비 표의 체크 칸 data-pv="0" 같은 것은 건드리지 않는다) */
   document.addEventListener('click', function (e) {
     var b = e.target.closest('[data-pv]');
-    if (!b) return;
+    if (!b || (b.dataset.pv !== 'parent' && b.dataset.pv !== 'student')) return;
     e.preventDefault();
     e.stopPropagation();
     var holder = b.closest('[data-id]');
-    open(b.dataset.sid || (holder && holder.dataset.id), b.dataset.pv);
+    open(b.dataset.sid || (holder && holder.dataset.id), b.dataset.pv, b.dataset.pvView || '');
   }, true);
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && el() && !el().hidden) close(); });
 

@@ -2,7 +2,7 @@
    weeks.js — 주간 레포트 → 작성 → 반을 고르면 처음 나오는 「주차 현황」 (migration-018)
 
    · 그 반의 첫 주부터 다음 주까지 모든 주차 — 최신 주가 위. 최근 8주만 펼치고 나머지는 [이전 주 더 보기]
-   · 주차마다: 수업일(휴강 · 바뀐 날), 레포트(빈칸 · 작성 중 n/전체 · 보냄), 수업 내용 첫 줄 · 초안,
+   · 주차마다: 수업일(휴강 · 바뀐 날), 레포트(공개 전 · 공개 n/전체 · 발송 n/전체 · 보냄), 수업 내용 첫 줄 · 초안,
      배부 · 필수 · 선택 파일 수, 영상 차시, 출석, 복습테스트, 빠진 것(빨간 표시)
    · 줄을 누르면 그 주 작성 화면, [보기] = 그 주 공개된 레포트를 학부모 화면 미리보기로
    · 주소: #tab=write&cls=반이름 (작성 화면은 &week= 가 붙는다 — nav.js)
@@ -73,8 +73,9 @@
 
   function statusHtml(w, total) {
     if (total > 0 && w.sent >= total) return '<span class="wkv-st wkv-st--sent">보냄</span>';
-    if (w.published > 0 || w.written > 0) return '<span class="wkv-st wkv-st--doing">작성 중 <b class="num">' + w.published + '/' + total + '</b></span>';
-    return '<span class="wkv-st wkv-st--empty">빈칸</span>';
+    /* 공개 · 발송 두 단계만 (「작성 중」 구분은 없앴다 · 20261030a) */
+    if (w.published > 0) return '<span class="wkv-st wkv-st--doing">공개 <b class="num">' + w.published + '/' + total + '</b> · 발송 <b class="num">' + (w.sent || 0) + '/' + total + '</b></span>';
+    return '<span class="wkv-st wkv-st--empty">공개 전</span>';
   }
 
   function missingOf(w, L, d) {
@@ -98,7 +99,7 @@
     var parts = [v.p1 ? '1차시' : '', v.p2 ? '2차시' : '', v.makeup ? '보강' : ''].filter(Boolean).join(' · ');
     var rv = w.review;
     var rvText = !rv ? '복습 —' : rv.off ? '복습 없음' :
-      '복습 ' + (rv.confirmed ? '평균 <b class="num">' + rv.avg + '</b>' : '확인 전') + ' · 제출 <span class="num">' + rv.submitted + '/' + total + '</span>';
+      '복습 ' + (rv.avg != null ? '평균 <b class="num">' + rv.avg + '</b>' : '평균 —') + ' · 제출 <span class="num">' + rv.submitted + '/' + total + '</span>';
     var miss = missingOf(w, L, d);
     return '<div class="wkv-row' + (isNow ? ' is-now' : '') + (isNext ? ' is-next' : '') + '" role="button" tabindex="0" data-wo="' + esc(w.open_start) + '" aria-label="' + esc(Lesson.md(w.week_start, false)) + ' 주 작성 화면 열기">' +
       '<div class="wkv-wk">' +

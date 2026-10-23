@@ -310,6 +310,7 @@
       '<td class="roster__actions">' +
         '<button class="btn btn--sm btn--ghost" data-pv="parent" title="학부모 링크로 열었을 때 모습 (작성 화면에서 고른 주 · 공개 전 내용 포함)">학부모 화면 미리보기</button>' +
         '<button class="btn btn--sm btn--ghost" data-pv="student" title="학생 링크로 열었을 때 모습 (작성 화면에서 고른 주 · 공개 전 내용 포함)">학생 화면 미리보기</button>' +
+        '<button class="btn btn--sm btn--ghost" data-pv="parent" data-pv-view="app" title="러닝노트 「과제 상세」 탭 — 앱 과제 세부 기록 (학부모 화면과 같은 화면)">과제 상세 보기</button>' +
         '<button class="btn btn--sm btn--ghost" data-sms-sid="" title="사이트에서 문자 보내기 (sms.js)">문자</button>' +
         '<button class="btn btn--sm" data-act="edit">수정</button>' +
       '</td>';

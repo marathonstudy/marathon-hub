@@ -3,10 +3,11 @@
 
    개인 링크(/me/#코드)에서만 쓴다. 이 링크는 학부모도 함께 본다.
      · 수업일 당일: 맨 위 카드 — 시험마다 전체 문항 수 · 틀린 개수 → 시험지 사진(필수 · 여러 장) → 제출 (migration-025)
-       마감 = 수업일 밤 12시. 마감 전 · 선생님 확인 전에는 고칠 수 있다.
-     · 제출한 뒤: 「학생 입력 · 확인 전」 → 선생님이 확인하면 「선생님 확인 ✓」
+       마감 = 수업일 밤 12시. 마감 전에는 고칠 수 있다 (선생님이 고친 시험은 잠긴다).
+     · 제출한 뒤: 「제출 ✓」 — 낸 점수가 그대로 레포트에 들어간다. 「확인」 단계는 없앴다 (20261030a · migration-030)
+       선생님이 고치면 「선생님이 고침 ✓」, 대신 넣으면 「선생님 입력 ✓」
      · 선생님이 미응시로 둔 시험은 입력 칸 없이 「미응시 · 결석」만 (사유 이름만 · migration-028 · 20261029h)
-     · 레포트 탭 「누적 추이」: 확인된 점수만 그래프로, 최근 기록은 확인 전도 「확인 전」 표시와 함께
+     · 레포트 탭 「누적 추이」: 낸 점수 그래프 · 최근 기록
    서버: Edge Function(review-test) — 링크 코드 · 오늘 날짜 · 마감을 서버가 확인한다.
    ============================================================ */
 
@@ -36,12 +37,12 @@
     }).then(function (r) { return r.json().catch(function () { return { ok: false }; }); });
   }
 
+  /* 「확인 전 / 선생님 확인」 표시는 없앴다 — 누가 넣었는지만 */
   function badge(sub) {
     if (!sub) return '';
-    if (sub.status === 'confirmed') {
-      return '<span class="rv-badge rv-badge--ok">' + (sub.source === 'staff' ? '선생님 입력 ✓' : '선생님 확인 ✓') + '</span>';
-    }
-    return '<span class="rv-badge">학생 입력 · 확인 전</span>';
+    if (sub.source === 'staff') return '<span class="rv-badge rv-badge--ok">선생님 입력 ✓</span>';
+    if (sub.edited_by) return '<span class="rv-badge rv-badge--ok">선생님이 고침 ✓</span>';
+    return '<span class="rv-badge rv-badge--ok">제출 ✓</span>';
   }
 
   function lightbox(url) {
@@ -57,7 +58,7 @@
      오늘 카드 (migration-025 · 20261028d)
      오늘 수업일의 시험들(「10/22(목) 복습 TEST」 · 「10/22(목) 화작문 TEST」 …)마다 「전체 문항 수」 · 「틀린 개수」 두 숫자만.
      시험지 사진은 필수 · 여러 장(두 시험을 한 장에 찍어도 된다). 한 번에 내도 되고 하나씩 내도 된다.
-     마감 = 수업일 밤 12시 · 선생님 확인 전까지 고칠 수 있다 · 확인되면 그 시험은 잠긴다.
+     마감 = 수업일 밤 12시까지 고칠 수 있다 · 선생님이 고치거나 대신 넣은 시험은 잠긴다 (예전에 확인된 시험도).
      ============================================================ */
 
   var MAX_PHOTOS = 10;
@@ -130,7 +131,7 @@
     return out;
   }
 
-  /* 낼 수 있는 시험 (확인 전 · 두 칸 모두 맞게 적은 것) */
+  /* 낼 수 있는 시험 (잠기지 않은 것 · 두 칸 모두 맞게 적은 것) */
   function plan() {
     var items = [], bad = '';
     tests().forEach(function (t) {
@@ -185,8 +186,8 @@
           '<div class="rv-thumbs">' + thumbs(oldPhotoUrls()) + '</div>' +
           (canEdit
             ? '<button type="button" class="hub-btn hub-btn--ghost rv-edit">고치기</button>' +
-              '<p class="rv-note">오늘 밤 12시까지, 선생님이 확인하기 전에는 고칠 수 있어요.</p>'
-            : '<p class="rv-note">선생님이 확인한 점수가 레포트에 들어갑니다.</p>') +
+              '<p class="rv-note">오늘 밤 12시까지 고칠 수 있어요. 낸 점수가 그대로 레포트에 들어갑니다.</p>'
+            : '<p class="rv-note">낸 점수가 그대로 레포트에 들어갑니다.</p>') +
         '</div>';
       return;
     }
@@ -227,7 +228,7 @@
         '<button type="button" class="hub-btn rv-submit"' + (photoOk && p.items.length && !p.bad && !st.busy ? '' : ' disabled') + '>' +
           (st.busy ? '올리는 중…' : p.items.length > 1 ? p.items.length + '개 한 번에 제출하기' : (anySub ? '제출하기 (고친 것 · 남은 것)' : '제출하기')) + '</button>' +
         '<p class="rv-note rv-note--warn"' + (p.bad || !photoOk ? '' : ' hidden') + '>' + esc(p.bad || (!photoOk ? '사진을 찍어야 제출 버튼이 눌려요.' : '')) + '</p>' +
-        '<p class="rv-note">마감 오늘 ' + esc(day) + ' 밤 12시 · 선생님 확인 전까지 고칠 수 있어요.</p>' +
+        '<p class="rv-note">마감 오늘 ' + esc(day) + ' 밤 12시 · 그 전까지 고칠 수 있어요.</p>' +
         (st.editing ? '<button type="button" class="rv-cancel">고치지 않고 닫기</button>' : '') +
       '</div>';
   }
@@ -317,7 +318,7 @@
   }
 
   /* ============================================================
-     복습테스트 점수 (레포트 탭 「누적 추이」) — 확인된 점수만 그래프, 최근 기록은 확인 전도
+     복습테스트 점수 (레포트 탭 「누적 추이」) — 낸 점수 그래프 (migration-030 · 확인 단계 없음) · 최근 기록
      시험마다 선을 나눈다 (「복습 TEST」 · 「화작문 TEST」 …). 가로축은 수업일, 점마다 「10/22(목) 복습 TEST · 17/20 · 85점」
      2px 선 · 8px 점(흰 테두리) · 0/50/100 가는 눈금 · 마지막 점에만 값 · 아래 「표로 보기」에 전부 있다.
      ============================================================ */
@@ -361,7 +362,7 @@
       var end = '<text x="' + (x(last.lesson_date) + 9) + '" y="' + (y(last.score) + 4 + k * 12) + '" class="rv-g-end" style="fill:' + color + '">' + last.score + '점</text>';
       return line + dots + end;
     }).join('');
-    return '<svg class="rv-graph" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="복습테스트 시험별 점수 (선생님 확인)">' + grid + xl + series + '</svg>' +
+    return '<svg class="rv-graph" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="복습테스트 시험별 점수">' + grid + xl + series + '</svg>' +
       (names.length > 1 ? '<div class="rv-legend">' + names.map(function (nm, k) {
         return '<span><i style="background:' + COLORS[k % COLORS.length] + '"></i>' + esc(nm) + '</span>';
       }).join('') + '</div>' : '');
@@ -372,7 +373,7 @@
     recent = recent || [];
     if (!confirmed.length && !recent.length) { host.innerHTML = ''; return; }
     var html = '<div class="card rv-hist">' +
-      '<h2 class="card-title">📈 복습테스트 점수<span class="card-note">선생님 확인한 점수</span></h2>';
+      '<h2 class="card-title">📈 복습테스트 점수</h2>';
     if (confirmed.length) {
       var names = [];
       confirmed.forEach(function (r) { if (names.indexOf(nameOf(r)) === -1) names.push(nameOf(r)); });
@@ -388,7 +389,7 @@
                 return '<tr><td>' + esc(labelOf(r)) + '</td><td class="num">' + esc(scoreText(r.correct, r.q_count, r.score)) + '</td></tr>';
               }).join('') + '</tbody></table></details>';
     } else {
-      html += '<p class="hub-muted">아직 선생님이 확인한 점수가 없습니다.</p>';
+      html += '<p class="hub-muted">아직 낸 점수가 없습니다.</p>';
     }
     if (recent.length) {
       html += '<div class="nt-sub">🧾 최근 기록</div><ul class="rv-recent">' + recent.map(function (s) {

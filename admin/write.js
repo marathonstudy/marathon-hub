@@ -158,15 +158,6 @@
     return draft.entries[id];
   }
 
-  /* 이 학생의 작성 상태. 규칙은 report.js 한 곳에 있다.
-     주간 레포트 → 공개도 같은 함수를 쓰므로 둘이 어긋날 수 없다. */
-  function statusOf(id) {
-    var s = students().find(function (x) { return x.id === id; });
-    return Report.entryStatus(commonOf((s && s.className) || '_'), entryOf(id));
-  }
-
-  function isWritten(id) { return statusOf(id).state === 'done'; }
-
   function studentsOfClass(cls) {
     return students()
       .filter(function (s) { return (s.className || '') === cls; })
@@ -275,23 +266,19 @@
     var frag = document.createDocumentFragment();
     classes.forEach(function (c) {
       var list = studentsOfClass(c.name);
-      var done = list.filter(function (s) { return isWritten(s.id); }).length;
 
       var b = document.createElement('button');
       b.type = 'button';
-      b.className = 'chip' + (c.name === currentClass ? ' is-on' : '') +
-                    (done === list.length && list.length ? ' is-done' : '');
+      b.className = 'chip' + (c.name === currentClass ? ' is-on' : '');
       b.dataset.cls = c.name;
       b.innerHTML = '<span class="chip__name"></span>' +
-                    '<span class="chip__count num">' + done + '/' + list.length + '</span>';
+                    '<span class="chip__count num">' + list.length + '명</span>';
       b.querySelector('.chip__name').textContent = c.name;
       frag.appendChild(b);
     });
     host.appendChild(frag);
 
-    var total = students().length;
-    var written = students().filter(function (s) { return isWritten(s.id); }).length;
-    $('#classPickerHint').textContent = '전체 ' + written + ' / ' + total + '명 작성됨';
+    $('#classPickerHint').textContent = '전체 ' + students().length + '명';
   }
 
   $('#classPicker').addEventListener('click', function (e) {
@@ -575,11 +562,10 @@
     var needNote = e.attendStatus === 'late';
 
     return '' +
-      '<div class="entry' + (open ? '' : ' is-collapsed') + (isWritten(s.id) ? ' is-written' : '') +
+      '<div class="entry' + (open ? '' : ' is-collapsed') +
         (selectedId === s.id ? ' is-selected' : '') + '" data-id="' + s.id + '">' +
         '<div class="entry__head" data-act="head">' +
           '<span class="entry__name"></span>' +
-          '<span class="entry__badge"></span>' +
           '<span class="entry__save" data-save aria-live="polite"></span>' +
           '<span class="entry__caret" aria-hidden="true">▾</span>' +
         '</div>' +
@@ -616,6 +602,7 @@
             '<span class="fieldline__label">미리보기</span>' +
             '<button type="button" class="btn btn--sm" data-pv="parent">학부모 화면 미리보기</button>' +
             '<button type="button" class="btn btn--sm btn--ghost" data-pv="student">학생 화면 미리보기</button>' +
+            '<button type="button" class="btn btn--sm btn--ghost" data-pv="parent" data-pv-view="app">과제 상세 보기</button>' +
           '</div>' +
         '</div>' +
       '</div>';
@@ -628,23 +615,11 @@
     return el;
   }
 
-  /* 카드 오른쪽 위 딱지 — 미작성(회색) · 작성 중(주황) · 작성 완료(초록).
-     작성 중이면 무엇이 빠졌는지 마우스를 올려 볼 수 있게 적어 둔다. */
-  function fillBadge(el, id) {
-    var b = el.querySelector('.entry__badge');
-    if (!b) return;
-    var st = statusOf(id);
-    b.textContent = Report.statusLabel(st.state);
-    b.className = 'entry__badge entry__badge--' + st.state;
-    b.title = st.missing.length ? '아직 필요한 것 — ' + st.missing.join(', ') : '';
-  }
-
   function fillEntryCard(el, s, tests) {
     var e = entryOf(s.id);
     el.querySelector('.entry__name').textContent = s.name || '';
     var sv = el.querySelector('[data-save]');
     if (sv && uiState.entry[s.id]) { sv.textContent = SAVE_TEXT[uiState.entry[s.id]] || ''; sv.className = 'entry__save save-state save-state--' + uiState.entry[s.id]; }
-    fillBadge(el, s.id);
 
     var note = el.querySelector('[data-act="note"]');
     if (note) note.value = e.attendNote || '';
@@ -663,7 +638,7 @@
   }
 
   /* 학생 카드 「복습테스트」 — 그 주 수업일 복습테스트 기록 (review.js 가 불러온 것 · 20261029g)
-     「복습 TEST 6/10 · 화작문 TEST 10/10 · 확인 전」 · 제출이 없으면 「아직 제출 안 함」 */
+     「복습 TEST 6/10 · 화작문 TEST 10/10」 · 제출이 없으면 「아직 제출 안 함」 */
   function fillReview(el, id) {
     var host = el.querySelector('[data-role="rv"]');
     if (!host) return;
@@ -678,8 +653,7 @@
   function renderEntries() {
     var host = $('#entryList');
     var list = studentsOfClass(currentClass);
-    var onlyUn = $('#onlyUnwritten').checked;
-    var shown = onlyUn ? list.filter(function (s) { return !isWritten(s.id); }) : list;
+    var shown = list;
     var tests = (commonOf(currentClass || '_').tests || [])
       .filter(function (t) { return String(t || '').trim(); });
 
@@ -687,8 +661,6 @@
 
     if (!list.length) {
       host.innerHTML = '<div class="empty-state">이 반에 등록된 학생이 없습니다.</div>';
-    } else if (!shown.length) {
-      host.innerHTML = '<div class="empty-state">이 반은 <b>모두 작성했습니다.</b></div>';
     } else {
       var frag = document.createDocumentFragment();
       shown.forEach(function (s) {
@@ -758,8 +730,6 @@
       var note = card.querySelector('[data-act="note"]');
       note.hidden = e.attendStatus !== 'late';
       if (!note.hidden) note.value = e.attendNote || '';
-      card.classList.toggle('is-written', isWritten(id));
-      fillBadge(card, id);
       afterChange(id, true);
       return;
     }
@@ -806,23 +776,16 @@
 
   function updateCounts() {
     var list = studentsOfClass(currentClass);
-    var n = { none: 0, partial: 0, done: 0 };
-    list.forEach(function (s) { n[statusOf(s.id).state]++; });
 
-    $('#entryProgress').textContent = currentClass
-      ? currentClass + ' · 작성 완료 ' + n.done + ' / ' + list.length + '명' +
-        (n.partial ? ' · 작성 중 ' + n.partial + '명' : '')
+    $('#entryProgress').textContent = currentClass ? currentClass + ' · ' + list.length + '명' : '';
+
+    /* 「작성 중 / 작성 완료」 구분 없이 반 학생 전원이 공개에 올라간다 (20261030a) */
+    $('#queueInfo').textContent = list.length
+      ? list.length + '명 모두 주간 레포트 → 공개에 올라갑니다 · 비어 있는 칸은 레포트에서 숨습니다'
       : '';
 
-    $('#queueInfo').textContent = n.done
-      ? n.done + '명 작성 완료 · 주간 레포트 → 공개에 올라갑니다' +
-        (n.partial ? ' (작성 중 ' + n.partial + '명은 빠집니다)' : '')
-      : '필수 항목을 다 채우면 공개 목록에 올라갑니다';
-
-    $('#btnEnqueue').disabled = !n.done;
+    $('#btnEnqueue').disabled = !list.length;
   }
-
-  $('#onlyUnwritten').addEventListener('change', renderEntries);
 
   $('#btnCollapseEntries').addEventListener('click', function () {
     var list = studentsOfClass(currentClass);
@@ -1361,7 +1324,7 @@
   $('#btnEnqueue').addEventListener('click', function () {
     if (!draft.weekStart || !draft.weekEnd) { toast('주차를 먼저 정해 주세요', 'bad'); return; }
 
-    var list = studentsOfClass(currentClass).filter(function (s) { return isWritten(s.id); });
+    var list = studentsOfClass(currentClass);
     if (!list.length) { toast('담을 학생이 없습니다', 'bad'); return; }
 
     /* 맞춤법 확인 */
@@ -1473,7 +1436,6 @@
     var card = wrap.firstElementChild;
     fillEntryCard(card, s, tests);
     card.className = old.className;
-    card.classList.toggle('is-written', isWritten(id));
     old.replaceWith(card);
   }
 

@@ -1,9 +1,9 @@
 /* ============================================================
-   report.js — 작성 내용 → 레포트 데이터 · 작성 완료 판정
+   report.js — 작성 내용 → 레포트 데이터 · 빠진 칸 알림
 
    레포트를 '그리는' 코드는 assets/report-view.js 한 곳에 있다.
-   여기서는 그릴 데이터를 만들고, 작성이 끝났는지 판정만 한다.
-   주간 레포트 → 작성의 딱지와 주간 레포트 → 공개의 목록이 같은 함수를 쓴다.
+   여기서는 그릴 데이터를 만들고, 비어 있는 칸(출결 · 집중도 · 코멘트)을 알려 준다.
+   주간 레포트 → 공개의 「공개 직전 한 줄」이 이 함수를 쓴다.
    ============================================================ */
 
 (function (global) {
@@ -20,18 +20,19 @@
   function toReportData(student, common, entry, week) {
     common = common || {};
     entry = entry || {};
-    /* 복습테스트 (migration-013 · 025 · 027) — 시험마다 「10/22(목) 복습 TEST」처럼 날짜 이름으로.
-       선생님이 확인한 것만 점수, 학생이 냈지만 아직 확인 전이면 「제출 완료」만 (학부모 화면에 확인 전 점수는 안 나간다).
+    /* 복습테스트 (migration-013 · 025 · 027 · 030) — 시험마다 「10/22(목) 복습 TEST」처럼 날짜 이름으로.
+       학생이 낸 점수를 그대로 쓴다 (「확인」 단계는 없앴다 · 20261030a). 이상하면 코치룸에서 「고치기」.
        예전 수기 「리뷰테스트」 점수(common.tests · entry.scores)는 지우지 않고 레포트에서만 뺀다 (20261029g)
-       미응시면 「미응시 · 결석」 사유 이름만 (메모는 넣지 않는다 · migration-028 · 20261029h) */
+       미응시면 「미응시 · 결석」 사유 이름만 (메모는 넣지 않는다 · migration-028 · 20261029h)
+       낸 것도 사유도 없으면 「미응시」 (migration-030 이 status missing 줄을 준다) */
     var tests = [];
     var rvs = global.Store && global.Store.reviewsOf ? global.Store.reviewsOf(student.id, week.start) : [];
     rvs.forEach(function (rv) {
       var rvName = rv.label || ('복습테스트 ' + rv.round_no + '회');
       if (tests.some(function (t) { return t.name === rvName; })) return;
       if (rv.status === 'absent') tests.push({ name: rvName, kind: 'review', absent: String(rv.reason_label || '').trim() || '미응시' });
-      else if (rv.status && rv.status !== 'confirmed') tests.push({ name: rvName, kind: 'review', submitted: true });
-      else tests.push({ name: rvName, score: clampPct(rv.score), correct: rv.correct, total: rv.q_count, kind: 'review', confirmed: true });
+      else if (rv.status === 'missing') tests.push({ name: rvName, kind: 'review', absent: '미응시' });
+      else tests.push({ name: rvName, score: clampPct(rv.score), correct: rv.correct, total: rv.q_count, kind: 'review' });
     });
 
     /* 수업일 · 과제 기간 (반 수업 요일을 정했을 때만 · migration-011). 예전 레포트에는 없다 */
@@ -66,14 +67,10 @@
   }
 
   /* ============================================================
-     작성 완료 판정
-       출결        언제나 필수
-       집중도      1점 이상. 결석이면 면제
-       코멘트      반 공통이든 개별이든 비어 있지 않을 것
-       그리고 (20261026b) — 그 학생 개별 코멘트(선생님 한마디)가 한 글자라도 있거나, 출결을 지각 · 결석으로 바꿨을 때만 작성 완료.
-                  출결 · 집중도 기본값(출석 · 5)과 반 공통 내용만 있는 학생은 작성 완료가 아니다 (작성 중).
-     state  none(미작성) · partial(작성 중) · done(작성 완료)
-     「오늘」 반 카드 · 주간 레포트 → 작성 · 주간 레포트 → 공개가 모두 이 함수 하나를 쓴다 (주차 현황은 서버 staff_class_weeks 가 같은 규칙 · migration-021)
+     빠진 칸 (20261030a) — 「작성 중 / 작성 완료」 구분은 없앴다.
+       출결 · 집중도(결석이면 면제) · 코멘트(반 공통이든 개별이든) 중 정말 비어 있는 것만 알려 준다.
+       개별 코멘트는 선택이다 — 비어 있으면 반 공통 코멘트가 나간다. 막지는 않는다 (공개 직전에 한 줄로만).
+       비어 있는 칸은 레포트에서 숨긴다 (report-view.js · hub.js)
      ============================================================ */
 
   function isAbsent(entry) {
@@ -88,29 +85,28 @@
     return out;
   }
 
-  function entryStatus(common, entry) {
+  /* ['출결', '집중도', '코멘트'] 중 빈 것 */
+  function gapsOf(common, entry) {
     var e = entry || {};
-    var att = String(e.attendStatus || '').trim();
-    var absent = isAbsent(e);
-    var missing = [];
-
-    if (!att) missing.push('출결');
-    if (!absent) {
-      if (!(Number(e.focusScore) > 0)) missing.push('집중도');
-    }
-    if (!commentFor(common, e)) missing.push('코멘트');
-    /* 그 학생 몫을 직접 쓴 흔적 — 개별 코멘트 또는 지각 · 결석 */
-    var own = !!String(e.comment || '').trim() || att === 'late' || att === 'absent';
-    if (!own && missing.indexOf('코멘트') === -1) missing.push('개별 코멘트(또는 지각 · 결석)');
-
-    /* 수기 점수 · 과제 체크는 작성 완료 · 진행률에 넣지 않는다 (20261029g) */
-    var touched = !!att || Number(e.focusScore) > 0 || !!String(e.comment || '').trim();
-
-    return { state: !missing.length ? 'done' : (touched ? 'partial' : 'none'), missing: missing };
+    var out = [];
+    if (!String(e.attendStatus || '').trim()) out.push('출결');
+    if (!isAbsent(e) && !(Number(e.focusScore) > 0)) out.push('집중도');
+    if (!commentFor(common, e)) out.push('코멘트');
+    return out;
   }
 
-  var STATUS_LABEL = { none: '미작성', partial: '작성 중', done: '작성 완료' };
-  function statusLabel(state) { return STATUS_LABEL[state] || '미작성'; }
+  /* 공개 직전 한 줄 — 「출결 안 넣은 학생 2명: 김OO, 이OO」. 빠진 게 없으면 ''
+     rows: [{ name, common, entry }] */
+  var GAP_TEXT = { '출결': '출결 안 넣은', '집중도': '집중도 안 넣은', '코멘트': '코멘트 없는' };
+  function gapLine(rows) {
+    var by = {};
+    (rows || []).forEach(function (r) {
+      gapsOf(r.common, r.entry).forEach(function (g) { (by[g] = by[g] || []).push(r.name || ''); });
+    });
+    return ['출결', '집중도', '코멘트'].filter(function (g) { return by[g]; }).map(function (g) {
+      return GAP_TEXT[g] + ' 학생 ' + by[g].length + '명: ' + by[g].join(', ');
+    }).join(' · ');
+  }
 
   /* ============================================================
      과제 — 반 공통에 항목 이름, 학생마다 항목별 월~금 체크
@@ -158,8 +154,8 @@
     countOf: countOf,
     DAYS: DAYS,
     daysDone: daysDone,
-    entryStatus: entryStatus,
-    statusLabel: statusLabel,
+    gapsOf: gapsOf,
+    gapLine: gapLine,
     isAbsent: isAbsent,
     namedTests: namedTests
   };

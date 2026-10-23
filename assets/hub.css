@@ -789,7 +789,8 @@ label.hub-btn { cursor: pointer; text-align: center; }
 .tw-card .card-title { margin-bottom: 10px; }
 .tw-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 /* 세 칸 — 출결 · 집중도 위 한 줄, 복습테스트는 아래 한 줄 넓게 (20261029g) */
-.tw-tiles--3 > .tw-tile:nth-child(3) { grid-column: 1 / -1; }
+.tw-tile--wide { grid-column: 1 / -1; }
+.tw-tile--wide .tw-tile__v { white-space: normal; }
 .tw-tile { padding: 8px 10px; border-radius: 14px; background: var(--grad-soft); min-width: 0; }
 .tw-tile__k { font-size: 12px; font-weight: 800; color: var(--ink-light); }
 .tw-tile__v { margin-top: 2px; font-size: 16px; font-weight: 800; color: var(--ink-deep); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -913,7 +914,10 @@ label.hub-btn { cursor: pointer; text-align: center; }
 .rv-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 4px; font-size: 12.5px; font-weight: 700; color: var(--ink-mid); }
 .rv-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
 .rv-hist__sum { flex-wrap: wrap; row-gap: 4px; }
-.tw-rvs { display: grid; gap: 2px; }
+/* 「복습 TEST 8/10 · 화작문 TEST 10/10」 — 한 줄에 이어서, 넘치면 다음 줄 (20261030a) */
+.tw-rvs { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; }
+.tw-rvs > span { white-space: nowrap; }
+.tw-dot { color: var(--muted); font-weight: 700; }
 
 /* ---------- 레포트 칸 (20261029i) ---------- */
 .rw-sum { margin-bottom: 16px; }
@@ -987,3 +991,38 @@ label.hub-btn { cursor: pointer; text-align: center; }
 .fc--ppt { --fc-bg: #FCEFE8; --fc-ink: #D04A1E; }
 .fc--xls { --fc-bg: #E9F5EE; --fc-ink: #217346; }
 .fc--img { --fc-bg: #F1EEFB; --fc-ink: #7858E8; }
+
+/* ---------- 과제 상세 — 앱 세부 기록 (20261030a) ---------- */
+.ap-seg { display: flex; gap: 6px; margin: 2px 0 6px; }
+.ap-seg__b { flex: 1 1 0; min-width: 0; padding: 8px 6px; border: 1.5px solid #E2E0F4; border-radius: 999px; background: #fff; font: inherit; font-size: 13.5px; font-weight: 800; color: var(--ink-mid); cursor: pointer; }
+.ap-seg__b.is-on { border-color: #7858E8; background: #7858E8; color: #fff; }
+.ap-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 6px; }
+.ap-stat { padding: 9px 11px; border-radius: 14px; background: var(--grad-soft); min-width: 0; }
+.ap-stat__k { font-size: 12px; font-weight: 800; color: var(--ink-light); }
+.ap-stat__v { margin-top: 2px; font-size: 20px; font-weight: 900; color: var(--ink-deep); }
+.ap-stat__v small { font-size: 12.5px; font-weight: 700; color: var(--ink-light); }
+.ap-stat__s { font-size: 12px; font-weight: 700; color: var(--ink-mid); }
+.ap-muted { font-size: 12.5px; font-weight: 700; color: var(--ink-light); }
+.ap-top { margin: 2px 0 12px; padding: 10px 12px; border-radius: 14px; background: #FFF4F1; }
+.ap-top__t { font-size: 12.5px; font-weight: 900; color: #A9473A; }
+.ap-top__list { margin: 4px 0 0; padding-left: 20px; font-size: 14px; color: var(--ink-deep); }
+.ap-top__list li { margin: 2px 0; }
+.ap-day { border-top: 1px solid #EEEDF7; }
+.ap-day:first-of-type { border-top: 0; }
+.ap-day > summary { display: flex; align-items: center; gap: 8px; padding: 10px 2px; cursor: pointer; list-style: none; font-size: 14px; }
+.ap-day > summary::-webkit-details-marker { display: none; }
+.ap-day > summary::after { content: '▾'; margin-left: auto; color: var(--ink-light); font-size: 12px; transition: transform .15s; }
+.ap-day:not([open]) > summary::after { transform: rotate(-90deg); }
+.ap-day__d { font-weight: 900; color: var(--ink-deep); min-width: 64px; }
+.ap-day__r { font-weight: 900; color: var(--ink-deep); }
+.ap-day__body { padding: 0 0 12px; }
+.ap-lec { margin: 0 0 8px; font-size: 13.5px; font-weight: 700; color: var(--ink-mid); }
+.app-tag--none { background: #F0F0F5; color: #6B7086; }
+.ap-lecs > summary { cursor: pointer; list-style: none; }
+.ap-lecs > summary::-webkit-details-marker { display: none; }
+.ap-table { width: 100%; margin-top: 8px; border-collapse: collapse; font-size: 13.5px; }
+.ap-table th { text-align: left; font-size: 12px; font-weight: 800; color: var(--ink-light); padding: 4px 6px; border-bottom: 1px solid #EEEDF7; }
+.ap-table td { padding: 7px 6px; border-bottom: 1px solid #F3F2FA; color: var(--ink-deep); vertical-align: top; }
+.ap-table td.num { white-space: nowrap; }
+.ap-shape > summary { cursor: pointer; list-style: none; }
+.ap-shape ul { margin: 8px 0 0; padding-left: 18px; font-size: 12.5px; color: var(--ink-mid); word-break: break-all; }

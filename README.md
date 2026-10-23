@@ -103,6 +103,7 @@ supabase/
   functions/text-polish/index.ts    글 칸 다듬기 · 코멘트 초안 Edge Function — Claude(Haiku 5.5) · 칸 글(초안은 화면이 모은 자료)만 보냄 · 자리표시 · 링크 · 숫자 · 요일 검사 (직원만 · 키는 Secrets 에만)
   migration-027-review-status.sql   레포트 · 러닝노트 복습테스트 칸 — 확인 전 제출은 「제출 완료」만 (review_week_scores 에 status · 새 hub_review_week · 점수는 안 나감)
   migration-029-file-thumbs.sql     파일 카드 첫 페이지 그림 (class_files.thumb_path · thumb_bytes · class_file_thumbs · 지우기 권한 · 저장 공간에 그림 용량)
+  migration-030-review-no-confirm.sql  복습테스트 「확인」 단계 없애기 — 평균 · 그래프 · 누적 추이 · 주차 현황이 낸 점수 그대로 · 사유 없는 미제출은 레포트에 「미응시」(status missing)
   migration-028-review-absent.sql   복습테스트 미응시 사유 (review_absences 표 · review_absent_set / clear · 제출하면 저절로 풀림 · 「오늘」 미제출에서 빠짐 · 학부모에게는 사유 이름만)
   migration-024-student-login.sql   학생 공용 입구 — 반 · 이름 목록 · 휴대폰 번호 로그인(맞음/틀림 + 학생 링크 코드만) · 로그인 기록(직원만)
   kakao/template.txt · kakao/HOW-TO.md  알림톡 템플릿 초안 · 솔라피 등록 방법
@@ -369,6 +370,22 @@ delete from public.staff where email = '조교이메일@example.com';
 - 파일 카드 — 한 줄 두 개 정사각형 · 필수 → 선택 → 배부 · 「필수」 · 「선택」 표시 · 첫 페이지 그림(PDF) · 그 그림(JPG · PNG) · 그 밖은 색 아이콘.
   그림은 코치룸이 올릴 때 브라우저에서 만들어 같은 폴더 「원래이름.thumb.jpg」로 둔다 (다른 이름은 SQL 이 막는다). 반 공지 /notice/ 도 같은 카드.
 
+### 5-27. 20261030a — 「작성 중 / 작성 완료」 없애기 · 복습테스트 「확인」 없애기 · 과제 상세 (migration-030 + app-report 다시 배포)
+1. 029 다음에 SQL Editor → **New query** → `supabase/migration-030-review-no-confirm.sql` 전체 → **Run** (세 줄 모두 `true`)
+2. Edge Functions → **app-report** → **Code** 탭 → 새 `supabase/functions/app-report/index.ts` 전체로 바꾸기 → **Deploy updates** (shape — 앱이 보내는 항목 이름만)
+- 「작성 중 / 작성 완료」 구분 없음 — 학생 카드 딱지 · 「작성 완료 n / 전체」 · 「작성 중 n명은 빠집니다」 · 「아직 덜 쓴 학생만」 · 공개의 「작성 중도 포함」을 없앴다.
+  [공개 단계로] = 반 학생 전원. 개인 코멘트는 선택(비면 반 공통 코멘트). 비어 있는 칸(출결 · 집중도 · 코멘트 · 복습테스트)은 레포트에서 숨는다.
+  공개 직전 확인 창에 정말 빠진 것만 한 줄(「출결 안 넣은 학생 2명: 김OO, 이OO」 · 출결 · 집중도 · 코멘트) — 막지 않는다. report.js gapsOf · gapLine.
+  단계 숫자 · 「오늘」 반 카드 · 주차 현황은 공개 n/전체 · 발송 n/전체만. (staff_class_weeks 의 written 값은 남아 있지만 화면이 안 쓴다)
+- 복습테스트 「확인」 없음 — [확인] 버튼 · 「확인 전 / 확인 완료 / 확인 0」 표시를 없앴다. 낸 값 그대로 쓰고 이상하면 [고치기] (고친 기록 · review_log 그대로).
+  예전 확인 여부(status · confirmed_by · confirmed_at)는 지우지 않는다. 고치거나 대신 넣은 시험은 학생이 더 못 고친다(예전처럼 잠김).
+  레포트 복습테스트 칸 「복습 TEST 8/10 · 화작문 TEST 10/10」 (▲▼ 는 문항 수가 같을 때 맞은 개수 차이).
+- 사유 없는 미제출 — 수업일이 오늘이거나 지난 시험에 제출 · 대신 입력 · 미응시 사유가 모두 없으면 review_week_scores 가 status missing 줄을 주고,
+  공개하면 학부모 · 학생 화면에 「미응시」. 「아직 입력 전」 · 「미제출」은 학부모 화면에 쓰지 않는다 (비면 칸을 숨긴다).
+- 과제 상세 — 이번 주(진행 중) 요약 · 기간별 기록(지난 일주일 · 이번 달 · 전체: 제출 · 정시 · 늦게 · 미제출 · 평균 정답률 · 강의 시청 · 날짜별 과제 펼치기) ·
+  영역별 정답률 막대 · 자주 틀리는 영역 TOP 3 · 차시별 진도. 코치룸 학생 카드(명단 · 작성) [과제 상세 보기] = 미리보기의 그 탭.
+  app-report 가 넘기는 것만 쓴다. 문항별 정오 · 오답 문항 · 풀이 시간 · 시청 시간(분)은 앱이 주지 않아 없다.
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.
@@ -459,7 +476,7 @@ delete from public.staff where email = '조교이메일@example.com';
   꼬리표 「앱 과제 3/6일」(제출일 / 과제 있던 날) · 누르면 「10/15~10/21 · 정시 2일 · 늦게 1일 · 미제출 3일」. 과제 있던 날이 없거나 수업 요일을 안 정한 반은 꼬리표 없음.
 - 반별 카드(학원 → 반): 출결 · 작성/공개/발송 · 앱 과제 평균(실패 수) · 필기 · 미납 · 재고 부족 · 확인 필요. 누르면 학생 목록, 이름을 누르면 상담 카드.
 - [설정](teacher 만 바꿈): 조교에게 교재비 금액 보이기(기본 보임 · 이 화면에만 적용), 결석 기준(몇 주 · 몇 회).
-- 계산은 서버 함수 coach_today() 한 번. '작성 완료'는 주간 레포트 → 작성 탭과 같은 규칙. 앱 과제는 화면이 뜬 뒤 차례로 불러온다.
+- 계산은 서버 함수 coach_today() 한 번. 반 카드는 공개 · 발송 수만 센다 (20261030a — 작성 완료 판정 없음). 앱 과제는 화면이 뜬 뒤 차례로 불러온다.
 - `migration-007-dashboard.sql` 은 002 ~ 006 다음에 실행한다.
 
 ## 필기 노트 (러닝노트 「필기 노트」 · 코치룸 학생 → 필기 노트)

@@ -106,16 +106,8 @@
     if (!$('#rstepWrite')) return;
     if (REPORT.indexOf(cur) === -1) return;
     var list = classStudents(), n = list.length;
-    var d = Store.read(Store.KEYS.draft, null) || {};
-    var written = 0;
-    if (window.Report && Report.entryStatus) {
-      list.forEach(function (s) {
-        var common = (d.common || {})[(s.className || '').trim()] || (d.common || {})[s.className || ''] || { lessons: [], tests: [] };
-        var st = Report.entryStatus(common, (d.entries || {})[s.id]);
-        if (st && st.state === 'done') written++;
-      });
-    }
-    $('#rstepWrite').textContent = n ? written + '/' + n : '';
+    /* 「작성 중 / 작성 완료」 구분은 없앴다 — 단계 숫자는 공개 · 발송 두 개만 (20261030a) */
+    $('#rstepWrite').textContent = '';
     var w = weekNow();
     if (!w || !window.DB || !DB.weekSendData) { $('#rstepPublish').textContent = $('#rstepSend').textContent = ''; return; }
     var run = ++counts.run;

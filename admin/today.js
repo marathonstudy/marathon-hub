@@ -2,13 +2,13 @@
    today.js — 마라톤 코치룸 「오늘」 총괄 (로그인 첫 화면)
 
    · 서버 함수 coach_today() 한 번으로 반·학생별 숫자를 받는다 (새 표 없음).
-   · '작성 완료' 는 주간 레포트 → 작성과 같은 규칙(report.js Report.entryStatus)으로 센다.
+   · 반 카드 숫자는 공개 · 발송 두 가지만 센다 (「작성 중 / 작성 완료」 구분은 없앴다 · 20261030a).
    · 앱 과제는 바깥 앱 서버 자료라 화면이 뜬 뒤 app-report 함수로 4명씩 차례로 불러온다.
      날짜별 기록으로 그 반 지난 수업(L) 전 일주일 L-7 ~ L-1 의 「제출일 / 과제 있던 날」을 센다 (러닝노트 레포트와 같은 AppWeek.lastWeek · 20261029h).
      불러온 값은 30분 동안 이 화면 메모리에만 둔다(브라우저에 저장하지 않는다).
    · 조교 금액 숨김이 켜져 있으면 서버가 금액을 보내지 않는다 (이 화면에만 적용).
    · 머리는 「오늘 · 10/23(금)」 · ⓘ 를 누르면 급함 · 살펴보기 기준 (20261029e).
-   · 맨 위 「오늘 할 일」 — 반마다 주기 순서로 레포트 작성·공개·발송 · 오늘 수업 복습테스트 · 복습 미제출 · 확인 필요 상담 · 교재비 미납(인원만).
+   · 맨 위 「오늘 할 일」 — 반마다 주기 순서로 레포트 공개·발송 · 오늘 수업 복습테스트 · 복습 미제출 · 확인 필요 상담 · 교재비 미납(인원만).
      예전 숫자 카드 5개(재원생 · 레포트 미발송 · 교재비 미납 · 확인 필요 상담 · 필기 미제출)는 이 목록으로 바뀌었다.
    · 첫 화면은 반 카드 — 다음 수업이 가까운 반부터. 카드를 누르면 그 반 학생(급함 → 살펴보기 → 나머지)이 펼쳐진다.
    · 「오늘」 탭 이름 옆 숫자 = 급함 학생 수. 금액은 이 화면에 넣지 않는다.
@@ -85,15 +85,8 @@
     });
   }
 
-  /* 서버 값 + 화면 계산(작성 완료 · 챙길 이유) */
+  /* 서버 값 그대로 (작성 완료 판정은 없앴다 · 20261030a) */
   function prepare(d) {
-    var entries = {}, commons = {};
-    (d.entries || []).forEach(function (r) { entries[r.student_id] = DB.fromDbEntry(r); });
-    (d.commons || []).forEach(function (r) { commons[r.class_name] = DB.fromDbCommon(r); });
-    d.students.forEach(function (s) {
-      var common = commons[s.class_name] || { lessons: [], tests: [] };
-      s.written = Report.entryStatus(common, entries[s.id]).state === 'done';
-    });
     return d;
   }
 
@@ -195,7 +188,7 @@
 
   /* ---------- 반마다 수업 주기 (20261027a · migration-022) ----------
      지난 수업일 L = 오늘 이하의 가장 최근 수업(휴강 반영) · 지금 주기 = L ~ 다음 수업 전날 · 직전 주기 = 그 앞 수업 ~ L 전날
-     레포트   L 이 든 주의 레포트. L ~ L+1일은 「작성 중」(급함 아님), L+[설정 · 기본 2]일부터 아직 안 보낸 학생 = 급함
+     레포트   L 이 든 주의 레포트. L ~ L+1일은 「발송 전」(급함 아님), L+[설정 · 기본 2]일부터 아직 안 보낸 학생 = 급함
      복습     그 반 그 주에 실제로 만든 시험만. 시험 수업일 밤 12시(마감)가 지나도 안 낸 학생 = 급함
      필기     지금 주기 · 직전 주기 모두 사진이 없으면 살펴보기 (설정에서 켰을 때만) */
   function lessonDates(cls) {
@@ -325,7 +318,7 @@
 
   /* ---------- 「오늘 할 일」 · 반 카드 둘째 줄 (20261029e) ----------
      반마다 주기 순서(가까운 수업 순 = 반 카드 순서)로:
-       지난 수업일 레포트를 아직 다 안 보냄 → 「고2반 · 10/22 레포트 작성·공개·발송 3/12 [작성하기]」 (수업일부터 · 수업일 +[설정 2]일부터 빨간 급함)
+       지난 수업일 레포트를 아직 다 안 보냄 → 「고2반 · 10/22 레포트 공개·발송 3/12 [작성하기]」 (수업일부터 · 수업일 +[설정 2]일부터 빨간 급함)
        오늘 수업 → 「반포반 · 오늘 수업 · 복습테스트 진행 중 3/12 [제출 현황]」
        마감 지난 복습 미제출 → 「복습테스트 미제출 n명 [확인하기]」 · 확인 필요 상담 n건 [보기] · 교재비 미납 n명 [교재] (금액 없음)
      할 일이 없으면 「지금 처리할 일이 없습니다 ✓」 */
@@ -363,11 +356,11 @@
       if (n && cls !== '(반 없음)') {
         if (cy && cy.L && cd) {
           var sent = rows.filter(function (s) { return (cd.by[s.id] || {}).sent; }).length;
-          if (sent < n) add(cy.since >= dv.grace, cls + ' · ' + Lesson.md(cy.L, false) + ' 레포트 작성·공개·발송 ' + sent + '/' + n, '작성하기', 'data-todo="write"' + a + ' data-todo-week="' + esc(cy.week) + '"');
+          if (sent < n) add(cy.since >= dv.grace, cls + ' · ' + Lesson.md(cy.L, false) + ' 레포트 공개·발송 ' + sent + '/' + n, '작성하기', 'data-todo="write"' + a + ' data-todo-week="' + esc(cy.week) + '"');
         } else if (!cd && !(cy && !cy.L)) {
           /* 수업 요일을 안 정한 반 · 022 전 — 예전처럼 달력 이번 주 */
           var sent2 = rows.filter(function (s) { return s.sent; }).length;
-          if (sent2 < n) add(false, cls + ' · 이번 주 레포트 작성·공개·발송 ' + sent2 + '/' + n, '작성하기', 'data-todo="write"' + a + ' data-todo-week="' + esc(d.week.start) + '"');
+          if (sent2 < n) add(false, cls + ' · 이번 주 레포트 공개·발송 ' + sent2 + '/' + n, '작성하기', 'data-todo="write"' + a + ' data-todo-week="' + esc(d.week.start) + '"');
         }
         if (c.next && c.next.dday === 0) {
           var t = cd && cd.test, live = t && DDay.today() <= String(t.lesson_date).slice(0, 10);
@@ -439,21 +432,21 @@
         var urgent = rows.filter(function (s) { return why[s.id].urgent.length; });
         var watch = rows.filter(function (s) { return !why[s.id].urgent.length && why[s.id].watch.length; });
         var rest = rows.filter(function (s) { return !why[s.id].urgent.length && !why[s.id].watch.length; });
-        var written = rows.filter(function (s) { return s.written; }).length;
         var pub = rows.filter(function (s) { return s.published; }).length;
+        var sentN = rows.filter(function (s) { return s.published && s.sent; }).length;
         var cy = c.cy, cd = st.cycle && st.cycle[c.name];
-        var meta = '작성 ' + written + '/' + n + ' · 공개 ' + pub + '/' + n;
+        var meta = '공개 ' + pub + '/' + n + ' · 발송 ' + sentN + '/' + n;
         var status = '';
         if (cy && !cy.L) status = '<span class="tdc-status">첫 수업 전</span>';
         else if (cy && cd && n) {
-          /* 그 반 상태 한마디 — 레포트 미발송(급함) → 복습테스트 진행 중 → 작성 중 → 발송 완료 */
+          /* 그 반 상태 한마디 — 레포트 미발송(급함) → 복습테스트 진행 중 → 발송 전 → 발송 완료 */
           var cpub = rows.filter(function (s) { return (cd.by[s.id] || {}).published; }).length;
           var csent = rows.filter(function (s) { return (cd.by[s.id] || {}).sent; }).length;
           meta = '지난 레포트 공개 ' + cpub + '/' + n + ' · 발송 ' + csent + '/' + n;
           var t = cd.test, open2 = t && DDay.today() <= String(t.lesson_date).slice(0, 10);
           if (cy.since >= dv.grace && csent < n) status = '<span class="tdc-status tdc-status--bad">' + esc(Lesson.md(cy.L, false)) + ' 수업 레포트 미발송 ' + (n - csent) + '명</span>';
           else if (open2) status = '<span class="tdc-status tdc-status--live">복습테스트 진행 중 ' + rvCount(rows, cd, ' 제출') + '</span>';
-          else if (csent < n) status = '<span class="tdc-status">' + esc(Lesson.md(cy.L, false)) + ' 레포트 작성 중</span>';
+          else if (csent < n) status = '<span class="tdc-status">' + esc(Lesson.md(cy.L, false)) + ' 레포트 발송 전 ' + (n - csent) + '명</span>';
           else status = '<span class="tdc-status tdc-status--ok">' + esc(Lesson.md(cy.L, false)) + ' 레포트 발송 완료 ✓</span>';
         }
         var nx = c.next;

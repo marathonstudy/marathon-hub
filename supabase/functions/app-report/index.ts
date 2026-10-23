@@ -17,6 +17,8 @@
 //    과제 기록 전부(제목·날짜·지각 여부·정답률·강 번호) — 러닝노트가 레포트 주차의 과제 기간만 잘라 보여 준다.
 //    (예전 화면을 위해 최근 10건 recent 도 함께)
 //    제출 사진 주소, 선생님 피드백, 학생이 쓴 글, 프로필 사진은 빼고 보낸다.
+//    shape — 앱이 실제로 보내는 항목 「이름」만 (값은 없다 · 20261030a). 코치룸 미리보기 「과제 상세」 맨 아래에서
+//    문항별 정오 · 풀이 시간 같은 항목이 앱에 생겼는지 확인하는 용도.
 //
 //  키
 //    이 파일에는 어떤 키도 적지 않는다. Supabase 가 함수에 자동으로 넣어 주는
@@ -59,6 +61,28 @@ type Any = any;
 function num(v: unknown): number {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
+}
+
+/* 항목 이름만 — 영문 · 숫자 · _ 로 된 이름 40개까지 (값 · 내용은 넣지 않는다) */
+function keysOf(o: Any): string[] {
+  if (!o || typeof o !== "object" || Array.isArray(o)) return [];
+  return Object.keys(o).filter((k) => /^[A-Za-z0-9_]{1,40}$/.test(k)).slice(0, 40);
+}
+function itemKeys(list: Any): string[] {
+  const set = new Set<string>();
+  (Array.isArray(list) ? list.slice(0, 30) : []).forEach((x: Any) => keysOf(x).forEach((k) => set.add(k)));
+  return [...set].slice(0, 40);
+}
+function shapeOf(src: Any) {
+  return {
+    top: keysOf(src),
+    stats: keysOf(src?.stats),
+    classInfo: keysOf(src?.classInfo),
+    lectures: itemKeys(src?.lectures),
+    calendarData: itemKeys(src?.calendarData),
+    categoryStats: itemKeys(src?.categoryStats),
+    homeworkHistory: itemKeys(src?.homeworkHistory),
+  };
 }
 
 function pick(src: Any) {
@@ -115,6 +139,7 @@ function pick(src: Any) {
     })),
     history: hw,
     recent: hw.slice().reverse().slice(0, 10),
+    shape: shapeOf(src),
   };
 }
 

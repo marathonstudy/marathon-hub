@@ -519,7 +519,7 @@ dialog.modal::backdrop { background: rgba(51, 58, 87, .38); backdrop-filter: blu
   border-bottom: 1px solid var(--line-soft);
 }
 .modal__title { font-size: 16px; font-weight: 800; color: var(--ink-deep); }
-.modal__desc { font-size: 12.5px; color: var(--ink-light); margin-top: 3px; line-height: 1.6; }
+.modal__desc { font-size: 12.5px; color: var(--ink-light); margin-top: 3px; line-height: 1.6; white-space: pre-line; }
 .modal__body { padding: 16px 20px; }
 .modal__foot {
   padding: 12px 20px 18px;
@@ -632,8 +632,6 @@ dialog.modal::backdrop { background: rgba(51, 58, 87, .38); backdrop-filter: blu
   color: var(--ink-light);
 }
 .chip.is-on .chip__count { background: rgba(255,255,255,.26); color: #fff; }
-.chip.is-done:not(.is-on) { border-color: #CBE6DA; }
-.chip.is-done:not(.is-on) .chip__count { background: #E6F5EE; color: #35806A; }
 
 /* 반 공통 — 차시·테스트 행 */
 .sub { margin-top: 16px; }
@@ -688,23 +686,6 @@ dialog.modal::backdrop { background: rgba(51, 58, 87, .38); backdrop-filter: blu
   background: var(--surface-2);
 }
 .entry__name { font-size: 14.5px; font-weight: 800; color: var(--ink-deep); }
-.entry__badge {
-  font-size: 11px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 999px;
-  white-space: nowrap;
-  /* 기본은 미작성(회색). 아래에서 상태별로 덮는다. */
-  background: #EFF1F8;
-  color: var(--ink-light);
-  cursor: default;
-}
-/* 미작성 — 아직 아무것도 안 건드림 */
-.entry__badge--none    { background: #EFF1F8; color: var(--ink-light); }
-/* 작성 중 — 건드렸지만 빠진 게 있음. 마우스를 올리면 무엇이 빠졌는지 나온다 */
-.entry__badge--partial { background: #FFF6E8; color: #97701F; cursor: help; }
-/* 작성 완료 — 필수가 다 채워짐 */
-.entry__badge--done    { background: #E6F5EE; color: #35806A; }
 .entry__caret { margin-left: auto; color: var(--ink-light); font-size: 11px; transition: transform .15s; }
 .entry.is-collapsed .entry__caret { transform: rotate(-90deg); }
 .entry.is-collapsed .entry__body { display: none; }
