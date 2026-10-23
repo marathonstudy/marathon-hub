@@ -1,5 +1,5 @@
 /* ============================================================
-   write.js — 주간 레포트 → 작성
+   write.js — 레포트 발송 → 1 작성
 
    주차 선택 · 반 공통 입력 · 학생별 입력 · 실시간 미리보기
    자동 저장 · 지난주 불러오기 · 코멘트 상용구 · 맞춤법 경고
@@ -304,7 +304,7 @@
   }
 
   /* ---------- 이미 보낸 주를 고쳤을 때 — 「고친 내용은 다시 공개해야 학부모에게 반영됩니다 [다시 공개]」 (20261029g) ----------
-     그 반 그 주에 보낸 학생이 있고, 이 화면에서 무엇이든 고치면 띠를 보인다. [다시 공개] → 주간 레포트 → 공개 */
+     그 반 그 주에 보낸 학생이 있고, 이 화면에서 무엇이든 고치면 띠를 보인다. [다시 공개] → 레포트 발송 → 2 공개 */
   var rePub = { key: '', sent: 0, edited: {} };
   function rePubKey() { return (currentClass || '') + '|' + (draft.weekStart || ''); }
   function checkSent() {
@@ -354,7 +354,6 @@
   /* ---------- 머리 띠 — [← 주차 목록] · 반 · 주차 · 수업일 · [◀ 지난주] [다음주 ▶] ---------- */
 
   function monOf(iso) { return Lesson.addDays(iso, -((Lesson.dowOf(iso) + 6) % 7)); }
-  function daysFrom(a, b) { return Math.round((Date.parse(a + 'T00:00:00Z') - Date.parse(b + 'T00:00:00Z')) / 86400000); }
   /* 옆 주로 갈 수 있는가 — 첫 수업일이 든 주 ~ 이번 주의 다음 주 (주차 현황과 같은 범위) */
   function stepOk(start, dir) {
     var to = monOf(Lesson.addDays(start, 7 * dir));
@@ -368,11 +367,10 @@
     var start = draft.weekStart;
     var s = Store.schedOf(currentClass);
     var L = s ? Lesson.of(s, start) : null;
-    var n = s && s.first ? Math.floor(daysFrom(monOf(start), monOf(s.first)) / 7) + 1 : 0;
-    /* 휴강 주는 「9주차」 + 휴강 표시만 (주차 번호가 없으면 시작일) */
-    var when = L && L.date ? Lesson.md(L.date) + ' 수업' : (L && L.canceled && n >= 1) ? '' : Store.lessonLabel(currentClass, start);
+    /* 작성 · 공개 · 발송 맨 위에 늘 크게 「고2 선수능반 · 10/22(목) 수업」 — 반 하나 + 수업 하나 (20261030e) */
+    var when = L && L.date && !L.canceled ? Store.dateWithDow(L.date) + ' 수업' : Store.lessonLabel(currentClass, start);
     now.innerHTML = '<span class="wbar__cls">' + escapeHtml(currentClass || '반 없음') + ' · </span>' +
-      '<b>' + escapeHtml(((n >= 1 ? n + '주차 ' : '') + when).trim()) + '</b>' +
+      '<b>' + escapeHtml(when) + '</b>' +
       (L && L.canceled ? ' <span class="wbar__off">휴강</span>' : '');
     $('#btnWbarPrev').disabled = !stepOk(start, -1);
     $('#btnWbarNext').disabled = !stepOk(start, 1);
@@ -387,7 +385,7 @@
     var wrap = $('#writeBarWrap'), bar = $('#writeBar'), top = $('#topbar');
     if (!wrap || !bar) return;
     var topH = top && !top.hidden ? top.offsetHeight : 0;
-    /* 띠는 주간 레포트 머리에 있고 작성 · 공개 · 발송이 함께 쓴다 (20261029a) — 지금 보이는 단계 화면 끝까지 붙어 있다 */
+    /* 띠는 레포트 발송 머리에 있고 작성 · 공개 · 발송이 함께 쓴다 (20261029a) — 지금 보이는 단계 화면 끝까지 붙어 있다 */
     var panel = ['#panel-write', '#panel-publish', '#panel-send'].map(function (id) { return $(id); }).filter(function (el) { return el && !el.hidden; })[0];
     var r = wrap.getBoundingClientRect(), main = panel ? panel.getBoundingClientRect() : { bottom: 0 };
     var on = !!panel && r.height > 0 && r.top < topH && main.bottom > topH + bar.offsetHeight;
@@ -781,7 +779,7 @@
 
     /* 「작성 중 / 작성 완료」 구분 없이 반 학생 전원이 공개에 올라간다 (20261030a) */
     $('#queueInfo').textContent = list.length
-      ? list.length + '명 모두 주간 레포트 → 공개에 올라갑니다 · 비어 있는 칸은 레포트에서 숨습니다'
+      ? list.length + '명 모두 레포트 발송 → 2 공개에 올라갑니다 · 비어 있는 칸은 레포트에서 숨습니다'
       : '';
 
     $('#btnEnqueue').disabled = !list.length;
@@ -1494,7 +1492,7 @@
     if (!$('#panel-write').hidden) refreshAll();
   });
 
-  /* 주간 레포트 → 공개이 목록을 만들기 전에 마지막 입력까지 저장해 둔다 */
+  /* 레포트 발송 → 2 공개이 목록을 만들기 전에 마지막 입력까지 저장해 둔다 */
   /* ============================================================
      「AI로 다듬기」 · 「AI로 초안 쓰기」 (aipolish.js · text-polish · 20261029g)
        반 공통 코멘트 · 학생 코멘트(코멘트 창) — 다듬기 + 초안 · 수업 내용(차시 줄 묶음) — 다듬기

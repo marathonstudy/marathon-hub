@@ -944,6 +944,11 @@
   }
 
   /* 레포트 한 편 — latest: 가장 최근 레포트 (다른 주 과제 · 자료와 지난 공지까지) */
+  /* 공개한 뒤 고쳐 다시 공개했을 때 — 「10/24 업데이트 · 복습테스트 결과 추가」 (코치룸 publish.js 가 report_data._upd 에 남긴다 · 바뀐 게 없으면 없음 · 20261030e) */
+  function updHtml(u) {
+    if (!u || !/^\d{4}-\d{2}-\d{2}/.test(String(u.date || '')) || !String(u.what || '').trim()) return '';
+    return '<p class="rw-upd">' + esc(Lesson.md(String(u.date).slice(0, 10), false) + ' 업데이트 · ' + String(u.what).trim()) + '</p>';
+  }
   function reportHtml(r, data, latest) {
     var ld = lessonDateOf(r, data);
     var d2 = {};
@@ -955,6 +960,7 @@
     var files = filesOf(w);
     return (r.draft ? '<div class="pv-draft">아직 공개 전 — 지금 작성 내용으로 공개하면 이렇게 보입니다</div>' : '') +
       ReportView.partsHtml(d2, ['header'], { noPeriod: true }) +
+      updHtml(d2._upd) +
       sumHtml(r, d2) +
       '<div id="rwNotes"></div>' +
       '<div id="rwApp"></div>' +

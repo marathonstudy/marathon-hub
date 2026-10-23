@@ -491,6 +491,18 @@
       });
   }
 
+  /* 다시 공개 전 — 지금 공개된 레포트 내용 (바뀐 내용 알리기 · 20261030e) */
+  function publishedDataOf(weekStart, ids) {
+    if (!ids.length) return Promise.resolve({});
+    return sb().from('published').select('student_id,report_data,visible').eq('week_start', weekStart).in('student_id', ids)
+      .then(function (r) {
+        check(r);
+        var out = {};
+        r.data.forEach(function (row) { out[row.student_id] = row.report_data || {}; });
+        return out;
+      });
+  }
+
   function publishedWeeks() {
     return sb().from('published').select('week_start').eq('visible', true)
       .order('week_start', { ascending: false })
@@ -506,7 +518,7 @@
       });
   }
 
-  /* 주간 레포트 → 발송 — 그 주차에 공개한 학생 + 보냄 표시 + 종료일 */
+  /* 레포트 발송 → 3 발송 — 그 주차에 공개한 학생 + 보냄 표시 + 종료일 */
   function weekSendData(weekStart) {
     var c = sb();
     return Promise.all([
@@ -519,7 +531,7 @@
       res[0].data.forEach(function (r) { published[r.student_id] = true; });
       var sent = {};
       res[1].data.forEach(function (r) {
-        sent[r.student_id] = { at: r.sent_at, via: r.via, by: r.sent_by };
+        sent[r.student_id] = { at: r.sent_at, via: r.via, by: r.sent_by, notifyN: r.notify_n || 0, notifyAt: r.notify_at || '' };
       });
       var weekEnd = res[2].data.length ? res[2].data[0].week_end : '';
       return { published: published, sent: sent, weekEnd: weekEnd };
@@ -646,6 +658,7 @@
     getSetting: getSetting,
     saveSetting: saveSetting,
     publishReports: publishReports,
+    publishedDataOf: publishedDataOf,
     setPublishedVisible: setPublishedVisible,
     publishedOfWeek: publishedOfWeek,
     publishedWeeks: publishedWeeks,

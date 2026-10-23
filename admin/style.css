@@ -1052,12 +1052,32 @@ kbd { display: inline-block; padding: 0 6px; border: 1px solid var(--line); bord
 body.report-step-write.write-weeks #writeBarWrap { display: none; }
 /* 「오늘」 반 카드 (today.js) */
 .tdc-rule { margin: 6px 0 10px; }
-.tdc-list-wrap { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 10px; align-items: start; }
+.tdc-list-wrap { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; align-items: start; }   /* 반 카드 위아래로 촘촘하게 (20261030e) */
 .tdc-card { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); overflow: hidden; }
 .tdc-card.is-open { grid-column: 1 / -1; }
 .tdc-card.is-today { border-color: var(--indigo); box-shadow: 0 0 0 1px var(--indigo) inset; }
 .tdc-head { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; }
-.tdc-toggle { appearance: none; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; flex: 1 1 auto; min-width: 0; display: grid; gap: 4px; padding: 0; }
+.tdc-main { flex: 1 1 auto; min-width: 0; display: grid; gap: 5px; }
+.tdc-btns { flex: none; display: flex; gap: 6px; align-items: flex-start; }
+.tdc-toggle { appearance: none; border: 0; border-top: 1px solid var(--line-soft); background: #FAFAFE; font: inherit; font-size: 13px; font-weight: 700; color: var(--ink-mid);
+  text-align: left; cursor: pointer; width: 100%; padding: 7px 12px; }
+.tdc-toggle:hover { background: #F1EFFC; color: #4A34B8; }
+.tdc-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.tdc-chip { appearance: none; font: inherit; font-size: 12.5px; font-weight: 800; padding: 3px 9px; border-radius: 999px; border: 1px solid transparent; cursor: pointer; line-height: 1.3; }
+.tdc-chip--ok   { background: #E3F4EC; color: #1F6E52; border-color: #BFE3D2; }
+.tdc-chip--part { background: #FFF1E0; color: #A3611A; border-color: #F4D3A8; }
+.tdc-chip--none { background: #FDECEF; color: #B03A55; border-color: #F3C3CE; }
+.tdc-chip--wip  { background: #F1F2F6; color: #7A7F95; border-color: #E1E3EC; }
+.tdc-chip:hover { filter: brightness(.96); box-shadow: 0 0 0 2px rgba(90,63,208,.15); }
+.tdc-when { display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 13.5px; color: var(--ink-mid); }
+.tdc-when__d { font-weight: 700; }
+.tdc-when__dd { font-weight: 900; color: #4A34B8; }
+.tdc-when__dd.is-today { color: #C2410C; }
+.tdc-sched { justify-self: start; }
+.tdc-app { padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 800; background: #F1F2F6; color: var(--ink-mid); }
+.tdc-app--ok { background: #E3F4EC; color: #1F6E52; }
+.tdc-app--low { background: #FFF1E0; color: #A3611A; }
+.tdc-app--wait, .tdc-app--none { color: var(--ink-light); font-weight: 700; }
 .tdc-title { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
 .tdc-name { font-size: 16px; font-weight: 800; color: var(--ink-deep); }
 .tdc-card.is-open .class-head__caret { transform: rotate(180deg); }
@@ -1088,7 +1108,8 @@ body.report-step-write.write-weeks #writeBarWrap { display: none; }
 @media (max-width: 720px) {
   .tdc-list-wrap { grid-template-columns: minmax(0, 1fr); }
   .tdc-head { flex-wrap: wrap; }
-  .tdc-write { width: 100%; }
+  .tdc-btns { width: 100%; }
+  .tdc-btns .btn { flex: 1 1 0; }
   .tdc-st__acts { width: 100%; }
   .tdc-st__acts .btn { flex: 1 1 0; }
 }
@@ -1099,17 +1120,17 @@ body.report-step-write.write-weeks #writeBarWrap { display: none; }
   background: rgba(251, 250, 255, .96); backdrop-filter: blur(8px); z-index: 25; box-sizing: border-box; }
 .wbar.is-stuck { position: fixed; border-radius: 0 0 12px 12px; box-shadow: 0 6px 16px rgba(47, 61, 119, .12); }
 .wbar__back { flex: none; min-height: 36px; border: 2px solid var(--indigo); color: #4A34B8; background: var(--surface); font-size: 15px; font-weight: 800; padding: 4px 12px; }
-.wbar__now { flex: 1 1 auto; min-width: 0; text-align: center; font-size: 14px; color: var(--ink-mid); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wbar__now b { color: var(--ink-deep); font-weight: 800; }
+.wbar__now { flex: 1 1 auto; min-width: 0; text-align: center; font-size: 17px; font-weight: 800; color: var(--ink-deep); line-height: 1.3; word-break: keep-all; }
+.wbar__now b { color: #4A34B8; font-weight: 900; }   /* 「고2 선수능반 · 10/22(목) 수업」 크게 (20261030e) */
 .wbar__off { display: inline-block; padding: 1px 7px; border-radius: 999px; background: #F3EEF0; color: #8E5F6B; font-size: 12px; font-weight: 800; }
 .wbar__nav { flex: none; display: flex; gap: 4px; }
 .wbar__step { min-height: 36px; min-width: 36px; }
 .wbar__step:disabled { opacity: .4; }
 @media (max-width: 480px) {
   .wbar { gap: 6px; padding: 5px 6px; }
-  .wbar__t, .wbar__cls { display: none; }
+  .wbar__t { display: none; }
   .wbar__back { padding: 4px 10px; }
-  .wbar__now { font-size: 13.5px; }
+  .wbar__now { font-size: 15px; }
 }
 #writeMain.is-weeks .chip__count { display: none; }
 .wkv-head { flex-wrap: wrap; row-gap: 8px; }
@@ -2524,14 +2545,22 @@ body.pv-open { overflow: hidden; }
 .tab .tab__t { vertical-align: middle; }
 .rhead { margin-top: 12px; }
 .rhead .wbar-wrap { margin: 0 0 8px; }
-.rsteps { display: flex; align-items: center; gap: 6px; margin: 0 0 12px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
-.rstep { appearance: none; border: 0; background: none; font: inherit; cursor: pointer; display: inline-flex; align-items: baseline; gap: 6px;
-  padding: 7px 12px; border-radius: 999px; font-weight: 800; color: var(--ink-light); white-space: nowrap; }
-.rstep:hover { background: var(--surface-2); color: var(--ink-mid); }
-.rstep[aria-selected="true"] { background: var(--grad-strong); color: #fff; }
-.rstep__n { font-size: 12px; font-weight: 700; opacity: .85; }
+/* 단계 버튼 (20261030e) — 테두리 · 배경이 있는 큰 버튼 「1 작성」 → 「2 공개 11/11 ✓」 → 「3 발송 11/11 ✓」 */
+.rsteps { display: flex; align-items: stretch; gap: 6px; margin: 0 0 12px; }
+.rstep { appearance: none; font: inherit; cursor: pointer; flex: 1 1 0; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 10px 12px; border: 1.5px solid #CFC8F3; border-radius: 12px; background: #F6F4FE; font-size: 15px; font-weight: 800; color: #4A34B8; white-space: nowrap;
+  box-shadow: 0 1px 0 rgba(74,52,184,.08); transition: background .12s, border-color .12s; }
+.rstep:hover { background: #E7E1FC; border-color: #9F8FE8; color: #3B279E; }
+.rstep[aria-selected="true"] { background: #4A34B8; border-color: #4A34B8; color: #fff; }
+.rstep[aria-selected="true"]:hover { background: #3B279E; }
+.rstep__no { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #fff; color: #4A34B8; font-size: 12.5px; font-weight: 900; box-shadow: inset 0 0 0 1.5px #CFC8F3; }
+.rstep[aria-selected="true"] .rstep__no { box-shadow: none; }
+.rstep__n { font-size: 12.5px; font-weight: 800; }
 .rstep__n:empty { display: none; }
-.rstep__line { flex: 1 1 18px; min-width: 10px; height: 2px; background: var(--line); border-radius: 2px; }
+.rstep__arrow { flex: none; align-self: center; color: #9F8FE8; font-weight: 900; font-size: 16px; }
+.rstep.is-done .rstep__no { background: #1F8A5B; color: #fff; box-shadow: none; }
+.rnext { display: flex; justify-content: flex-end; margin: 14px 0 4px; }
+.rnext__btn { font-size: 15.5px; padding: 12px 22px; border-radius: 12px; min-height: 46px; }
 .subnav { display: flex; gap: 6px; margin: 12px 0 0; }
 .subnav__btn { appearance: none; border: 1px solid var(--line); background: var(--surface); font: inherit; font-weight: 800; color: var(--ink-light);
   padding: 8px 16px; border-radius: 999px; cursor: pointer; }
@@ -2552,9 +2581,12 @@ body.pv-open { overflow: hidden; }
   /* 머리의 흐림(backdrop-filter)은 그 안의 fixed 탭 줄을 머리 상자에 붙여 버린다 (크롬 · 안드로이드) — 탭 줄이 머리를 덮던 것 (20261030b) */
   .topbar { backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(250, 251, 255, .98); }
   body.is-app { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
-  .rsteps { gap: 4px; padding: 5px; }
-  .rstep { padding: 7px 9px; gap: 4px; }
-  .rstep__line { min-width: 4px; }
+  .rsteps { gap: 2px; }
+  .rstep { padding: 8px 4px; gap: 3px; font-size: 13.5px; border-radius: 10px; }
+  .rstep__no { width: 19px; height: 19px; font-size: 11.5px; }
+  .rstep__n { font-size: 11.5px; letter-spacing: -0.02em; }
+  .rstep__arrow { font-size: 13px; }
+  .rnext__btn { width: 100%; }
 }
 
 /* 작성 화면 순서 (20261029b) — 반 고르기 → 주차 띠 → 반 공통 → 학생별 작성 · 반 고르기는 작성 단계에서만 */
@@ -2674,8 +2706,8 @@ dialog > .toast-host { position: fixed; }
 .sms-st--prev { background: #E3F4EC; color: #1F6E52; }
 .sms-full td { background: #FAFAFE; }
 /* 단계 표시 — 다 보냈으면 「발송 11/11 ✓」 초록 */
-.rstep__n.is-done { background: #E3F4EC; color: #1F6E52; opacity: 1; padding: 1px 7px; border-radius: 999px; font-weight: 800; }
-.rstep[aria-selected="true"] .rstep__n.is-done { background: #fff; }
+.rstep__ok { color: #1F8A5B; font-weight: 900; }
+.rstep[aria-selected="true"] .rstep__ok { color: #9BE7BF; }
 /* 문자 표 — 휴대폰에서도 네 칸이 한 화면에 (번호 · 상태는 줄바꿈) */
 .sms-table { table-layout: fixed; }
 .sms-table th:first-child, .sms-table td.sms-c--chk { width: 26px; padding-left: 4px; padding-right: 2px; }
@@ -2688,3 +2720,19 @@ dialog > .toast-host { position: fixed; }
   .sms-st { font-size: 11px; padding: 0 4px; margin-left: 0; }
 }
 .td-transition .btn { margin-left: 4px; vertical-align: middle; }   /* 글과 버튼을 한 문단으로 (flex 로 글이 조각나던 것) */
+
+/* ---------- 20261030e — 바뀐 내용 알리기 · 레포트 안내 공개 전 · 알림 횟수 ---------- */
+.notify-list { display: grid; gap: 6px; margin: 0 0 10px; max-height: 50vh; overflow: auto; }
+.notify-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; font-size: 14px; }
+.notify-row__what { flex: 1 1 160px; min-width: 0; color: #7B5A12; font-size: 13px; font-weight: 700; }
+.sms-r.is-blocked td { background: #F6F6F9; color: var(--ink-light); }
+.sms-st--blocked { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 999px; background: #ECEDF2; color: #6F7388; font-size: 11.5px; font-weight: 800; }
+.sms-st--chg { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 999px; background: #FFF3DA; color: #8A5A10; font-size: 11.5px; font-weight: 800; }
+.sms-blocked-note { margin: 0 0 6px; padding: 6px 10px; border-radius: 10px; background: #F4F4F8; color: #5E6278; font-size: 13px; font-weight: 700; }
+.snd-tag--notify { background: #FFF3DA; color: #8A5A10; }
+/* 「오늘」 머리 — 휴대폰에서도 [설정] [새로고침]은 작게 한 줄 (지금 할 일이 먼저 보이게 · 20261030e) */
+@media (max-width: 480px) {
+  #panel-today > .panel > .panel__head { flex-wrap: nowrap; align-items: center; }
+  #panel-today > .panel > .panel__head .btn { width: auto; flex: none; padding: 4px 9px; min-height: 30px; }
+  #tdTitle { white-space: nowrap; font-size: 17px; }
+}

@@ -1,5 +1,5 @@
 /* ============================================================
-   weekly.js — 주간 레포트 → 작성 「반 공통」 안의 수업일 · 수업 영상 · 배부 자료/과제 파일 (migration-011)
+   weekly.js — 레포트 발송 → 1 작성 「반 공통」 안의 수업일 · 수업 영상 · 배부 자료/과제 파일 (migration-011)
 
    반과 주차(시작일)마다
      · 수업일      반마다 한 번 「수업 요일 · 첫 수업일」을 정하면 주차마다 저절로 계산 (assets/lesson.js)
@@ -822,7 +822,10 @@
     return saveVideo(v).then(function () { return !!v.id; });
   }
 
+  /* 「오늘」 [수업일 미정 · 수업 요일 정하기] — 닫혀 있으면 연다 (20261030e) */
+  function openSchedNow() { if ($('#wkSchedEdit').hidden) openSched(); }
   window.Weekly = { render: render, classify: classify, normalizeYoutube: normalizeYoutube, reload: load,
+                    openSched: openSchedNow,
                     videos: function () { return st.videos.slice(); }, addVideoUrl: addVideoUrl,
                     where: function () { return { cls: st.cls, week: st.week }; },
                     /* 코멘트 「AI로 초안 쓰기」 자료 — 그 반 그 주 파일 이름 · 분류 (write.js · 20261029g) */

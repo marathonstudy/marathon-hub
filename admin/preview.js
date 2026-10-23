@@ -6,7 +6,7 @@
        staff_hub_get 등 직원 전용 함수로 대신 받아 넘긴다 (hub.js 의 HUB_PREVIEW).
      · 아무것도 바뀌지 않는다 — 제출 · 사진 올리기 · 지우기는 눌러도 「미리보기에서는 바뀌지 않습니다」.
      · 학생 · 학부모 쪽 열람 기록은 남지 않는다 (그런 기록 자체가 없고, 직원 함수도 남기지 않는다).
-     · 기본은 「이 주차」 — 주간 레포트 → 작성에서 고른 주(예: 10/22 수업)를 지금 입력된 그대로, 첫 화면 「레포트」로 보여 준다.
+     · 기본은 「이 주차」 — 레포트 발송 → 1 작성에서 고른 주(예: 10/22 수업)를 지금 입력된 그대로, 첫 화면 「레포트」로 보여 준다.
        공개 전이면 띠에 「아직 공개 전입니다 · 공개하면 학부모에게 이렇게 보입니다」. 위 [이 주차] / [지금 학부모가 보는 화면] 으로 바꾼다.
        「지금 학부모가 보는 화면」은 공개된 레포트만 (실제 /me/ 와 같다) (20261029g)
      · [휴대폰 크기로 보기]
@@ -30,7 +30,7 @@
   function student() { return Store.getStudents().find(function (x) { return x.id === cur.sid; }) || null; }
   function today() { return DDay.today(); }
 
-  /* 작성 화면에서 고른 주의 레포트 — 주간 레포트 → 작성 내용으로 (그 학생 입력이나 반 공통이 있을 때만) */
+  /* 작성 화면에서 고른 주의 레포트 — 레포트 발송 → 1 작성 내용으로 (그 학생 입력이나 반 공통이 있을 때만) */
   function draftReport() {
     var d = window.Writer && Writer.current();
     var s = student();
@@ -277,7 +277,7 @@
     document.body.classList.remove('pv-open');
   }
 
-  /* 명단 · 주간 레포트 → 작성 · 주간 레포트 → 발송의 [학부모 화면] [학생 화면] · [과제 상세 보기](data-pv-view="app") 단추
+  /* 명단 · 레포트 발송 → 1 작성 · 레포트 발송 → 3 발송의 [학부모 화면] [학생 화면] · [과제 상세 보기](data-pv-view="app") 단추
      data-pv 가 parent · student 인 것만 (교재비 표의 체크 칸 data-pv="0" 같은 것은 건드리지 않는다) */
   document.addEventListener('click', function (e) {
     var b = e.target.closest('[data-pv]');

@@ -1,5 +1,5 @@
 /* ============================================================
-   weeks.js — 주간 레포트 → 작성 → 반을 고르면 처음 나오는 「주차 현황」 (migration-018)
+   weeks.js — 레포트 발송 → 1 작성 → 반을 고르면 처음 나오는 「주차 현황」 (migration-018)
 
    · 그 반의 첫 주부터 다음 주까지 모든 주차 — 최신 주가 위. 최근 8주만 펼치고 나머지는 [이전 주 더 보기]
    · 주차마다: 수업일(휴강 · 바뀐 날), 레포트(공개 전 · 공개 n/전체 · 발송 n/전체 · 보냄), 수업 내용 첫 줄 · 초안,
@@ -130,7 +130,7 @@
     if (!h) return;
     var d = st.data;
     var head = '<div class="panel__head wkv-head">' +
-        '<div class="wkv-head__text"><h2 class="panel__title">' + esc(st.cls || '반을 골라 주세요') + ' · 주차 현황</h2>' +
+        '<div class="wkv-head__text"><h2 class="panel__title">' + esc(st.cls || '반을 골라 주세요') + ' · 수업일 고르기</h2>' +
         '<p class="panel__hint">' + (d ? esc(schedText(d.schedule)) + ' · 학생 ' + d.total + '명' : '') + '</p></div>' +
         '<div class="spacer"></div>' +
         (st.cls ? '<button class="btn btn--primary" type="button" id="wkvThisWeek">이번 주 작성하기</button>' : '') +
@@ -178,7 +178,7 @@
         Writer.openWeek(e.target.dataset.wo);
       }
     });
-    /* 주간 레포트 → 작성을 열 때 · 주차 현황으로 오거나 반을 바꾸면 새로 */
+    /* 레포트 발송 → 1 작성을 열 때 · 주차 현황으로 오거나 반을 바꾸면 새로 */
     document.addEventListener('jt:tab', function (e) {
       if (e.detail.index === 1 && Writer.mode() === 'weeks') load(Writer.currentClass());
     });

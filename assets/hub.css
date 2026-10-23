@@ -847,7 +847,7 @@ label.hub-btn { cursor: pointer; text-align: center; }
   font-size: 11px; line-height: 1.15; font-weight: 700; letter-spacing: -0.04em; color: #ADAAC2; background: #F9F8FC; box-shadow: inset 0 0 0 1px #EEEDF5; }
 .aw-cell.aw-wk b { color: #7B6CC4; font-weight: 900; }
 .aw-sum { padding-left: 6px; font-size: 12px; font-weight: 800; color: var(--ink-deep); white-space: nowrap; text-align: right; line-height: 1.25; }
-.aw-sum small { display: block; font-size: 10.5px; font-weight: 700; color: var(--ink-light); }
+.aw-sum small { display: block; font-size: 11px; font-weight: 700; color: var(--ink-light); }
 .aw-legend { margin: 6px 0 0; font-size: 11px; line-height: 1.5; color: var(--ink-light); }
 .aw-card { padding: 16px; }
 
@@ -1041,3 +1041,6 @@ label.hub-btn { cursor: pointer; text-align: center; }
 .app-tag--wk { background: #F4F3F9; color: #9C99B3; }
 .app-tag--wkdone { color: #6E5FC0; }
 .ap-day--wk > summary { color: var(--ink-light); }
+
+/* 다시 공개로 바뀐 내용 — 레포트 위에 작게 「10/24 업데이트 · 복습테스트 결과 추가」 (20261030e) */
+.rw-upd { margin: -4px 0 10px; font-size: 12px; font-weight: 700; color: #7B6CC4; text-align: right; }

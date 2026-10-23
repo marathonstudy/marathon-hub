@@ -97,7 +97,7 @@
   function table(list, empty) {
     if (!list.length) return '<p class="panel__hint">' + empty + '</p>';
     return '<div class="roster-scroll"><table class="roster tb-table ca-table"><thead><tr>' +
-      '<th>반</th><th>재원</th><th>퇴원</th><th>기록</th><th title="반 수업일마다 저절로 생기는 복습테스트 — 쉼표로 나눠 순서대로 (예: 복습 TEST, 화작문 TEST). 그 주만 끄기 · 더 넣기는 주간 레포트 → 작성 반 공통에서">복습 시험 (순서대로)</th><th></th></tr></thead><tbody>' +
+      '<th>반</th><th>재원</th><th>퇴원</th><th>기록</th><th title="반 수업일마다 저절로 생기는 복습테스트 — 쉼표로 나눠 순서대로 (예: 복습 TEST, 화작문 TEST). 그 주만 끄기 · 더 넣기는 레포트 발송 → 1 작성 반 공통에서">복습 시험 (순서대로)</th><th></th></tr></thead><tbody>' +
       list.map(row).join('') + '</tbody></table></div>';
   }
 

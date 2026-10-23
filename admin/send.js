@@ -1,5 +1,5 @@
 /* ============================================================
-   send.js — 주간 레포트 → 발송 (20261028a — 반마다 카드)
+   send.js — 레포트 발송 → 3 발송 (20261028a — 반마다 카드 · 20261030e — 고른 반 하나만, 늘 펼침 · 「알림 n회」)
 
    공개한 레포트를 학부모에게 알린다.
    문자에 들어가는 주소는 학생 개인 페이지(/me/#코드/report)다.
@@ -158,6 +158,14 @@
     }
     return { cls: k, text: LABEL[k], title: '' };
   }
+  /* 고친 레포트 알림 — 「알림 2회 · 마지막 10/24 10:12」 (migration-032 · 20261030e) */
+  function notifyTag(s) {
+    var x = state.sent[s.id];
+    if (!x || !x.notifyN) return '';
+    var d = x.notifyAt ? new Date(x.notifyAt) : null;
+    var when = d ? (d.getMonth() + 1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') : '';
+    return '<span class="snd-tag snd-tag--notify num" title="고친 레포트를 다시 알린 횟수">알림 ' + x.notifyN + '회' + (when ? ' · 마지막 ' + esc(when) : '') + '</span>';
+  }
   /* 안 보낸 학생은 회색 「안 보냄」 · 보낸 학생은 초록 「보냄 18:09」 (20261030b) */
   var LABEL = { unpublished: '공개 전', ready: '안 보냄', nolink: '링크 없음', nophone: '번호 없음' };
   var VIA = { kakao: '알림톡', sms: '내 폰 문자', sitesms: '사이트 문자', copy: '문구 복사', share: '공유' };
@@ -171,9 +179,11 @@
     });
   }
 
+  /* 고른 반 하나만 (반 하나 + 수업 하나 · 다른 반은 보이지 않는다 · 20261030e) — 반을 안 골랐으면 예전처럼 모든 반 */
+  function curClass() { return (window.Writer && Writer.currentClass && Writer.currentClass()) || ''; }
   function groups() {
-    var by = {};
-    students().forEach(function (s) { (by[clsOf(s)] = by[clsOf(s)] || []).push(s); });
+    var by = {}, cur = curClass();
+    students().forEach(function (s) { if (!cur || clsOf(s) === cur) (by[clsOf(s)] = by[clsOf(s)] || []).push(s); });
     var names = Object.keys(by).filter(function (n) { return n === NOCLS || !Store.isArchivedClass(n); });
     return orderClasses(names).map(function (n) {
       var rows = by[n].slice().sort(byName);
@@ -191,6 +201,7 @@
   }
 
   function isOpen(g) {
+    if (curClass()) return true;                 /* 반 하나만 보일 때는 늘 펼친다 */
     if (state.open) return !!state.open[g.name];
     return !!state.defOpen[g.name];      /* 기본 — 남은 일이 있는 반만 */
   }
@@ -240,6 +251,7 @@
         '<div class="snd-row__line">' +
           '<button class="snd-row__name" type="button" data-expand aria-expanded="' + open + '">' + esc(s.name || '') + '</button>' +
           '<span class="snd-tag snd-tag--' + t.cls + '"' + (t.title ? ' title="' + esc(t.title) + '"' : '') + '>' + esc(t.text) + '</span>' +
+          notifyTag(s) +
           main +
           '<button class="btn btn--sm btn--ghost snd-more" type="button" data-more aria-label="' + esc(s.name || '') + ' 더 보기">⋯</button>' +
         '</div>' +
@@ -292,7 +304,7 @@
 
     if (!state.loaded) { host.innerHTML = '<div class="empty-state">불러오는 중…</div>'; return; }
     if (!state.week) {
-      host.innerHTML = '<div class="empty-state">아직 공개한 레포트가 없습니다.<br>주간 레포트 → 공개에서 먼저 공개해 주세요.</div>';
+      host.innerHTML = '<div class="empty-state">아직 공개한 레포트가 없습니다.<br>레포트 발송 → 2 공개에서 먼저 공개해 주세요.</div>';
       return;
     }
     if (!gs.length) { host.innerHTML = '<div class="empty-state">다니는 학생이 없습니다.</div>'; return; }
@@ -368,7 +380,7 @@
       return;
     }
 
-    if (!state.published[sid]) { toast('아직 공개 전입니다. 주간 레포트 → 공개에서 먼저 공개해 주세요', 'bad'); return; }
+    if (!state.published[sid]) { toast('아직 공개 전입니다. 레포트 발송 → 2 공개에서 먼저 공개해 주세요', 'bad'); return; }
     if (!url) { toast('개인 링크가 없습니다. 학생 → 명단에서 발급해 주세요', 'bad'); return; }
 
     if (act === 'copymsg' || act === 'copykakao') {
@@ -465,7 +477,7 @@
     setTimeout(function () { if (opening) window.dispatchEvent(new CustomEvent('jt:write-nav')); else if (window.Nav) Nav.replace(); }, 0);
   }
 
-  /* [공개하러 가기] — 주간 레포트 → 공개는 주간 레포트 → 작성의 주차를 쓴다. 이 주로 맞춘 뒤 연다 */
+  /* [공개하러 가기] — 레포트 발송 → 2 공개는 레포트 발송 → 1 작성의 주차를 쓴다. 이 주로 맞춘 뒤 연다 */
   function goPublish() {
     var w = state.week;
     var p = (window.Writer && Writer.current && Writer.current() && Writer.current().weekStart !== w && Writer.switchWeek)
@@ -611,7 +623,7 @@
       state.greetingAt = (res[1] && res[1].updated_at) || '';
       state.greeting = (g && (g.sms || g.kakao)) || DEFAULT_GREETING;
 
-      /* 주간 레포트의 주차 띠와 같은 주 (20261029a — 작성 · 공개 · 발송이 같은 주를 본다) */
+      /* 레포트 발송의 주차 띠와 같은 주 (20261029a — 작성 · 공개 · 발송이 같은 주를 본다) */
       var wk = writerWeek();
       if (wk) {
         if (wk !== state.week) { state.open = null; state.defOpen = {}; state.rowOpen = {}; }

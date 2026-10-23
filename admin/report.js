@@ -3,7 +3,7 @@
 
    레포트를 '그리는' 코드는 assets/report-view.js 한 곳에 있다.
    여기서는 그릴 데이터를 만들고, 비어 있는 칸(출결 · 집중도 · 코멘트)을 알려 준다.
-   주간 레포트 → 공개의 「공개 직전 한 줄」이 이 함수를 쓴다.
+   레포트 발송 → 2 공개의 「공개 직전 한 줄」이 이 함수를 쓴다.
    ============================================================ */
 
 (function (global) {
@@ -145,7 +145,38 @@
     return Math.round(c.done / c.total * 100);
   }
 
+  /* ============================================================
+     다시 공개할 때 무엇이 바뀌었나 (20261030e) — 학부모가 보는 칸만 비교한다
+       복습테스트 결과 추가 · 복습테스트 점수 변경 · 출결 변경 · 집중도 변경 · 코멘트 수정 · 수업 내용 수정
+       필기 사진 · 수업 영상 · 자료는 러닝노트가 그때그때 읽어 와서 다시 공개 없이도 바로 바뀐다 (여기서는 세지 않는다)
+     old · next = report_data · 바뀐 것이 없으면 []
+     ============================================================ */
+  function changesOf(old, next) {
+    if (!old || !next) return [];
+    var out = [];
+    var add = function (t) { if (out.indexOf(t) === -1) out.push(t); };
+    var ot = {}, nt = {};
+    (old.tests || []).forEach(function (t) { ot[t.name] = t; });
+    (next.tests || []).forEach(function (t) { nt[t.name] = t; });
+    var scored = function (t) { return !!t && !t.absent && t.score != null; };
+    Object.keys(nt).forEach(function (k) {
+      var a = ot[k], b = nt[k];
+      if (scored(b) && !scored(a)) add('복습테스트 결과 추가');
+      else if (scored(a) && scored(b) && (a.score !== b.score || a.correct !== b.correct || a.total !== b.total)) add('복습테스트 점수 변경');
+      else if (scored(a) && !scored(b)) add('복습테스트 결과 변경');
+      else if (!a && b) add('복습테스트 결과 추가');
+    });
+    Object.keys(ot).forEach(function (k) { if (!nt[k] && scored(ot[k])) add('복습테스트 결과 변경'); });
+    var oa = old.attendance || {}, na = next.attendance || {};
+    if ((oa.status || '') !== (na.status || '') || (oa.note || '') !== (na.note || '')) add('출결 변경');
+    if ((Number(old.focusScore) || 0) !== (Number(next.focusScore) || 0)) add('집중도 변경');
+    if (String(old.comment || '').trim() !== String(next.comment || '').trim()) add('코멘트 수정');
+    if (JSON.stringify(old.lessons || []) !== JSON.stringify(next.lessons || [])) add('수업 내용 수정');
+    return out;
+  }
+
   global.Report = {
+    changesOf: changesOf,
     toReportData: toReportData,
     commentFor: commentFor,
     homeworkItems: homeworkItems,

@@ -1,7 +1,7 @@
 /* ============================================================
    kakao.js — 카카오 알림톡 발송 (솔라피 · Edge Function kakao-send · migration-020)
 
-   주간 레포트 → 발송 (send.js 가 그린다 · 20261028a)
+   레포트 발송 → 3 발송 (send.js 가 그린다 · 20261028a)
      · 학생마다 상태: 보낼 수 있음 / 보냄 / 실패(이유) — 이 파일은 상태 자료(kakao_status)만 불러온다
      · 반 카드 [알림톡 n명 보내기] · 학생 줄 [알림톡] → 「n명에게 알림톡을 보냅니다. 예상 비용 약 n원」 확인
        → 함수가 DB 에서 번호를 찾아 보낸다 (화면은 학생 id 만 넘긴다). 이미 보낸 학생은 건너뛰고,
@@ -98,7 +98,7 @@
 
   function after() {
     st.busy = false;
-    if (window.SendView) SendView.refresh();     /* 주간 레포트 → 발송의 「보냄」 표시도 새로 */
+    if (window.SendView) SendView.refresh();     /* 레포트 발송 → 3 발송의 「보냄」 표시도 새로 */
     else load();
   }
 

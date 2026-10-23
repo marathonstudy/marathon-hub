@@ -187,7 +187,7 @@
     state.files = ((!opts.noLinks && src && src.materials) || []).map(function (m) { return { name: m.name || '', url: m.url || '' }; });
     state.videos = ((!opts.noLinks && src && src.videos) || []).map(function (v) { return { title: v.title || '', url: v.url || '' }; });
     /* 예전 「자료 · 다시보기」 링크 칸 — 이미 링크를 넣어 올린 공지를 고칠 때만 보인다.
-       새 공지의 영상 · 자료 파일은 주간 레포트 → 작성 → 반 공통 (weekly.js) */
+       새 공지의 영상 · 자료 파일은 레포트 발송 → 1 작성 → 반 공통 (weekly.js) */
     $('#ntFileSub').hidden = !state.files.length;
     $('#ntVideoSub').hidden = !state.videos.length;
     $('#ntVisible').checked = !src || src.visible !== false;

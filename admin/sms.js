@@ -8,7 +8,7 @@
      · 미리보기 = 학생 한 줄씩의 표 (학생 · 학부모 · 학생 본인) — 줄 · 번호마다 체크로 빼고 보내기 · 이름을 누르면 전문
      · 보낸 뒤 창 맨 위 큰 띠 「✓ 보냄 완료 · 22건 · 10/23 18:09」(실패면 빨간 띠 · 실패만 다시 보내기) · 칸마다 「보냄 18:09」/「실패(사유)」
        [n건 보내기] → 「보냄 완료」(못 누름) · 같은 사람에게 또 보내려면 [다시 보내기] → 확인
-     · 그 주 레포트를 이미 보낸 학생(주간 레포트 → 발송에서 열었을 때)은 「이미 보냄 18:09」 · 처음부터 체크를 꺼 둔다
+     · 그 주 레포트를 이미 보낸 학생(레포트 발송 → 3 발송에서 열었을 때)은 「이미 보냄 18:09」 · 처음부터 체크를 꺼 둔다
      · 내용: #{이름} #{반} #{링크}(학부모에겐 학부모 링크, 학생에겐 학생 링크) #{수업일}
        단문(90바이트까지) · 장문 표시 · 예상 비용 · 「자주 쓰는 문구」(직원 공용) 저장 · 불러오기
      · 같은 번호는 한 번만 — 형제가 같은 번호를 쓰면 「따로 보내기」를 직접 켰을 때만 따로
@@ -16,7 +16,7 @@
      · 보내기 전 「n명 · 예상 약 n원」 확인 · [나에게 시험 발송](시험 번호가 없으면 「설정에 내 시험 번호를 먼저 넣어 주세요 · 설정 열기」) · 한 번 · 하루 상한(설정)
      · 화면은 학생 id 와 보낼 곳만 함수에 넘긴다. 번호는 함수가 DB 에서 찾는다 (화면의 번호는 미리보기 · 셈에만 쓴다)
    여는 곳 — 받는 사람이 미리 채워진다
-     · 주간 레포트 → 발송 반 카드 [반 전체 문자] · 학생 ⋯ [사이트에서 문자] → 그 주 수업일 · 「보냄」 표시 칸
+     · 레포트 발송 → 3 발송 반 카드 [반 전체 문자] · 학생 ⋯ [사이트에서 문자] → 그 주 수업일 · 「보냄」 표시 칸
      · 「오늘」 반 카드 [문자] · 그 안 학생 줄 [문자] · 학생 → 명단 학생 줄 [문자] (data-sms-cls · data-sms-sid)
    「AI로 다듬기」 — 공통 부품 aipolish.js (내용 칸 글만 text-polish 로 · 길이 짧게/보통/자세히 · 원래 글과 나란히 · 되돌리기 · migration-026)
    「문자 보낸 기록」 창 — 반 · 학생 · 날짜로 찾기 (직원, 시각, 받는 사람, 번호 뒤 4자리, 내용 앞부분, 성공 · 실패)
@@ -48,10 +48,12 @@
     busy: false,
     off: {},               /* 체크를 끈 학생 id (그 줄 전체를 빼고 보낸다) */
     offNum: {},            /* 체크를 끈 번호 '학생id|parent1' … */
-    prev: {},              /* 그 주 레포트를 이미 보낸 학생 id → 보낸 시각 (주간 레포트 → 발송에서 열었을 때) */
+    prev: {},              /* 그 주 레포트를 이미 보낸 학생 id → 보낸 시각 (레포트 발송 → 3 발송에서 열었을 때) */
     expand: {},            /* 이름을 눌러 전문을 펼친 학생 */
     res: null,             /* 보낸 결과 { at, by: { '학생id|대상': { ok, error } } } */
-    done: false            /* 보냈다 — [보냄 완료] (다시 보내려면 [다시 보내기]) */
+    done: false,           /* 보냈다 — [보냄 완료] (다시 보내려면 [다시 보내기]) */
+    pubBy: null,           /* 주 시작일 → { 학생 id: true } — 공개된 레포트 (레포트 안내 문자에서 공개 전 학생을 막는다 · 20261030e) */
+    notify: null           /* 「바뀐 내용 알리기」 — 학생 id → 바뀐 내용 (publish.js · 20261030e) */
   };
 
   function invoke(body, fn) {
@@ -118,7 +120,7 @@
     var d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
     return (+m[2]) + '월 ' + (+m[3]) + '일(' + DOW[d.getUTCDay()] + ')';
   }
-  /* #{수업일} — 주간 레포트 → 발송에서 열면 그 주 수업일, 아니면 다음 수업일 (휴강은 건너뛴다) */
+  /* #{수업일} — 레포트 발송 → 3 발송에서 열면 그 주 수업일, 아니면 다음 수업일 (휴강은 건너뛴다) */
   function lessonText(cls) {
     if (cls === NOCLS) return '';
     if (st.week) {
@@ -149,6 +151,7 @@
     var txt = body.split('#{이름}').join(s.name || '')
       .split('#{반}').join((s.className || '').trim())
       .split('#{수업일}').join(String(lessons[(s.className || '').trim()] || '').slice(0, 30))
+      .split('#{바뀐 내용}').join(st.notify ? String(st.notify[s.id] || '내용') : '')
       .split('#{링크}').join(linkFor(s, t));
     if ($('#smsAd').checked) txt = '(광고)' + cfg().adName + '\n' + txt + '\n무료수신거부 ' + cfg().optout;
     return txt;
@@ -191,10 +194,35 @@
   }
   function targetsOfList(list, sid) { return list.filter(function (x) { return x.s.id === sid; }).map(function (x) { return x.t; }); }
 
+  /* ---------- 레포트 안내 — 공개 전 학생은 보내지 않는다 (20261030e) ----------
+     내용에 「레포트」와 #{링크}가 있으면 레포트 안내로 본다. 학생마다 그 반 그 수업(3 발송에서 열면 그 주 · 아니면 그 반 가장 최근 수업)의
+     레포트가 공개 전이면 「공개 전 · 발송 불가」(회색 · 체크 꺼짐 · 못 켬) */
+  function isReportBody() { var b = $('#smsBody').value; return /레포트/.test(b) && hasLink(b); }
+  function reportWeekOf(s) {
+    if (st.week) return st.week;
+    var c = clsOf(s);
+    return c !== NOCLS && window.TodayView && TodayView.lastLessonWeek ? TodayView.lastLessonWeek(c) : '';
+  }
+  function blocked(s) {
+    if (st.notify || !st.pubBy || !isReportBody()) return false;
+    var w = reportWeekOf(s);
+    if (!w) return false;
+    return !(st.pubBy[w] && st.pubBy[w][s.id]);
+  }
+  function loadPub() {
+    var from = Lesson.addDays(DDay.today(), -49);
+    return sb().from('published').select('week_start,student_id').eq('visible', true).gte('week_start', st.week && st.week < from ? st.week : from).then(function (r) {
+      if (r.error) { st.pubBy = null; return; }
+      var m = {};
+      (r.data || []).forEach(function (x) { (m[x.week_start] = m[x.week_start] || {})[x.student_id] = true; });
+      st.pubBy = m;
+    }, function () { st.pubBy = null; });
+  }
+
   function listFromPicks() {
     var ts = targets(), out = [];
     pickedStudents().forEach(function (s) {
-      if (st.off[s.id]) return;
+      if (st.off[s.id] || blocked(s)) return;
       ts.forEach(function (t) { if (!st.offNum[s.id + '|' + t]) out.push({ s: s, t: t }); });
     });
     return out;
@@ -300,11 +328,14 @@
         var prev = st.prev[s.id];
         var mine = ((plan && plan.items) || []).filter(function (x) { return x.s.id === s.id; });
         var open = !!st.expand[s.id];
-        return '<tr class="sms-r' + (st.off[s.id] ? ' is-off' : '') + '" data-sid="' + esc(s.id) + '">' +
-            '<td class="sms-c--chk"><input type="checkbox" data-smsrow="' + esc(s.id) + '"' + (st.off[s.id] ? '' : ' checked') + (st.done ? ' disabled' : '') + ' aria-label="' + esc(s.name || '') + ' 보내기"></td>' +
+        var blk = blocked(s), off = st.off[s.id] || blk;
+        return '<tr class="sms-r' + (off ? ' is-off' : '') + (blk ? ' is-blocked' : '') + '" data-sid="' + esc(s.id) + '">' +
+            '<td class="sms-c--chk"><input type="checkbox" data-smsrow="' + esc(s.id) + '"' + (off ? '' : ' checked') + (st.done || blk ? ' disabled' : '') + ' aria-label="' + esc(s.name || '') + ' 보내기"></td>' +
             '<td class="sms-c--name"><button type="button" class="sms-name" data-smsname="' + esc(s.id) + '" aria-expanded="' + open + '">' + esc(s.name || '') + '</button>' +
               (st.mode === 'student' || Object.keys(st.classes).length > 1 ? '<span class="muted-note"> ' + esc(clsOf(s)) + '</span>' : '') +
-              (prev ? '<span class="sms-st sms-st--prev">이미 보냄 ' + esc(fmtPrev(prev)) + '</span>' : '') + '</td>' +
+              (prev ? '<span class="sms-st sms-st--prev">이미 보냄 ' + esc(fmtPrev(prev)) + '</span>' : '') +
+              (blk ? '<span class="sms-st sms-st--blocked" title="이 수업 레포트를 아직 공개하지 않았습니다 — 레포트 발송 → 2 공개에서 먼저 공개하세요">공개 전 · 발송 불가</span>' : '') +
+              (st.notify && st.notify[s.id] ? '<span class="sms-st sms-st--chg">' + esc(st.notify[s.id]) + '</span>' : '') + '</td>' +
             cellHtml(s, 'parent', items, why) + cellHtml(s, 'student', items, why) +
           '</tr>' +
           (open ? '<tr class="sms-full"><td></td><td colspan="3">' + (mine.length ? mine.map(function (x) {
@@ -337,9 +368,11 @@
     var c = cfg();
     var items = planKeyMap(), why = reasonMap();
     var par = plan.items.filter(function (x) { return x.t !== 'student'; }).length, stu = plan.items.length - par;
-    var people = list.filter(function (s) { return !st.off[s.id]; }).length;
+    var people = list.filter(function (s) { return !st.off[s.id] && !blocked(s); }).length;
+    var blockedN = list.filter(blocked).length;
     /* 「11명 · 학부모 n통 · 학생 n통 · 번호 없음 n · 총 n통 · 약 n원」 */
-    var html = '<p class="sms-sum"><b class="num">' + people + '</b>명 · 학부모 <b class="num">' + par + '</b>통 · 학생 <b class="num">' + stu + '</b>통 · 번호 없음 <b class="num">' + plan.noPhone.length + '</b> · 총 <b class="num">' + plan.items.length + '</b>통 · 약 <b class="num">' + plan.won.toLocaleString() + '</b>원' +
+    var html = (blockedN ? '<p class="sms-blocked-note">레포트 공개 전인 학생 ' + blockedN + '명은 보내지 않습니다 (회색 「공개 전 · 발송 불가」)</p>' : '') +
+      '<p class="sms-sum"><b class="num">' + people + '</b>명 · 학부모 <b class="num">' + par + '</b>통 · 학생 <b class="num">' + stu + '</b>통 · 번호 없음 <b class="num">' + plan.noPhone.length + '</b> · 총 <b class="num">' + plan.items.length + '</b>통 · 약 <b class="num">' + plan.won.toLocaleString() + '</b>원' +
       ' <span class="muted-note">단문 ' + c.smsWon + '원 · 장문 ' + c.lmsWon + '원</span></p>';
     if (plan.sib.length) {
       html += '<label class="check-line sms-sib"><input type="checkbox" id="smsSib"' + (sibOn ? ' checked' : '') + (st.done ? ' disabled' : '') + '> <span>같은 번호를 쓰는 형제 ' + plan.sib.length + '명에게도 따로 보내기 <span class="field__opt">' +
@@ -478,6 +511,11 @@
     st.failed = [];
     st.busy = false;
     st.off = {}; st.offNum = {}; st.prev = {}; st.expand = {}; st.res = null; st.done = false;
+    /* 「바뀐 내용 알리기」 (publish.js) — 학생마다 바뀐 내용 · 문구 기본값 · 보냄 표시는 하지 않고 알림 횟수만 (20261030e) */
+    st.notify = opts.notify || null;
+    $('#smsTitle').textContent = st.notify ? '바뀐 내용 알리기' : '문자 보내기';
+    $('#smsVarChange').hidden = !st.notify;
+    if (st.notify && opts.body) $('#smsBody').value = opts.body;
     $('#smsFind').value = '';
     $('#smsResult').innerHTML = '';
     banner('', '');
@@ -492,10 +530,10 @@
     renderPreview();
     if (window.AiPolish) AiPolish.reset($('#smsBody'));
     $('#smsModal').showModal();
-    Promise.all([loadCfg(), loadTemplates(), window.AiPolish ? AiPolish.loadLeft() : null, loadPrev()]).then(function () {
+    Promise.all([loadCfg(), loadTemplates(), window.AiPolish ? AiPolish.loadLeft() : null, st.notify ? null : loadPrev(), st.notify ? null : loadPub()]).then(function () {
       $('#smsMissing').hidden = !st.missing;
       $('#smsMissing').textContent = st.missing ? 'migration-023 SQL 을 실행하고 Edge Function sms-send 를 배포하면 사이트에서 문자를 보낼 수 있습니다.' : '';
-      /* 주간 레포트 → 발송에서 열었고 내용이 비어 있으면 「레포트 안내」 문구로 */
+      /* 레포트 발송 → 3 발송에서 열었고 내용이 비어 있으면 「레포트 안내」 문구로 */
       if (st.from === 'send' && !$('#smsBody').value.trim()) {
         var t = st.templates.find(function (x) { return /레포트/.test(x.title || ''); });
         if (t) { $('#smsBody').value = t.body || ''; $('#smsTplName').value = t.title || ''; $('#smsTpl').value = t.id; $('#smsTplDel').disabled = false; }
@@ -542,20 +580,55 @@
       (prevN ? ' 이 레포트를 이미 보낸 학생 ' + prevN + '명에게도 다시 보냅니다.' : '') +
       ($('#smsAd').checked ? ' 광고 문자입니다 — (광고) · 발신처 · 무료수신거부 안내가 붙습니다.' : '') +
       (!retryList && p.sib.length ? (sibOn ? ' 같은 번호를 쓰는 형제 ' + p.sib.length + '명에게도 따로 보냅니다.' : ' 같은 번호를 쓰는 형제 ' + p.sib.length + '명은 번호마다 한 번만 보냅니다.') : '') +
-      (payload(p.items).markWeek ? ' 보낸 학생은 주간 레포트 → 발송에 「보냄」으로 표시합니다.' : '') +
+      (payload(p.items).markWeek ? ' 보낸 학생은 레포트 발송 → 3 발송에 「보냄」으로 표시합니다.' : '') +
+      (st.notify ? ' 바뀐 내용 알림입니다 — 3 발송의 「보냄」은 그대로 두고 「알림 n회」만 늘어납니다.' : '') +
       ' 오늘 ' + ((st.cfg && st.cfg.today) || 0) + ' / ' + cfg().dailyMax + '건.';
     UI.confirmAsk(retryList ? '실패만 다시 보내기' : again ? '다시 보내기' : '문자 보내기', desc, '보내기').then(function (yes) {
       if (!yes) return;
       st.busy = true; updateButtons();
       var pl = payload(p.items);
       if (retryList) pl.siblings = true;           /* 다시 보내기는 실패한 줄 그대로 */
-      invoke(Object.assign({ action: 'send' }, pl)).then(function (res) {
+      (st.notify ? sendNotify(pl, p.items) : invoke(Object.assign({ action: 'send' }, pl))).then(function (res) {
         st.busy = false;
         showResult(res, !!retryList);
+        if (st.notify) recordNotify(res);
         loadCfg().then(renderPreview);
         if (pl.markWeek && window.SendView) SendView.refresh();
         if (pl.markWeek) window.dispatchEvent(new CustomEvent('jt:remote', { detail: { table: 'sent' } }));
       });
+    });
+  }
+
+  /* 「바뀐 내용 알리기」 — #{바뀐 내용}은 학생마다 달라서 바뀐 내용이 같은 학생끼리 묶어 한 번씩 보낸다 (함수는 그대로) */
+  function sendNotify(pl, items) {
+    var body = pl.body, groups = {}, order = [];
+    items.forEach(function (x) {
+      var k = String(st.notify[x.s.id] || '내용');
+      if (!groups[k]) { groups[k] = []; order.push(k); }
+      groups[k].push({ student_id: x.s.id, to: x.t });
+    });
+    var all = { ok: true, sent: 0, failed: 0, results: [], skipped: [] };
+    return order.reduce(function (p, k) {
+      return p.then(function () {
+        if (!all.ok) return null;
+        return invoke(Object.assign({ action: 'send' }, pl, { items: groups[k], body: body.split('#{바뀐 내용}').join(k), markWeek: '' })).then(function (r) {
+          if (!r || !r.ok) { all = r || { ok: false, message: '보내지 못했습니다.' }; return; }
+          all.sent += r.sent || 0; all.failed += r.failed || 0;
+          all.results = all.results.concat(r.results || []); all.skipped = all.skipped.concat(r.skipped || []);
+        });
+      });
+    }, Promise.resolve()).then(function () { return all; });
+  }
+  /* 알림 횟수 · 마지막 시각 — 3 발송 표에 「알림 2회 · 마지막 10/24 10:12」 (migration-032 report_notified) */
+  function recordNotify(res) {
+    if (!res || !res.ok || !st.week) return;
+    var ids = [];
+    (res.results || []).forEach(function (x) { if (x.ok && ids.indexOf(x.student_id) === -1) ids.push(x.student_id); });
+    if (!ids.length) return;
+    sb().rpc('report_notified', { p_week: st.week, p_ids: ids }).then(function (r) {
+      if (r.error) { toast(isMissing(r.error) ? '알림 횟수를 남기려면 migration-032 SQL 을 실행해 주세요' : '알림 횟수를 남기지 못했습니다 — ' + r.error.message, 'bad'); return; }
+      if (window.SendView) SendView.refresh();
+      window.dispatchEvent(new CustomEvent('jt:remote', { detail: { table: 'sent' } }));
     });
   }
 
@@ -803,7 +876,7 @@
     $('#smsLogFind').addEventListener('click', findLog);
     $('#smsLogClose').addEventListener('click', function () { $('#smsLogModal').close(); });
 
-    /* [문자] 단추 — 「오늘」 반 카드(data-sms-cls) · 학생 줄 · 학생 → 명단(data-sms-sid, 비어 있으면 줄의 data-id) · 주간 레포트 → 발송 [반 전체 문자] */
+    /* [문자] 단추 — 「오늘」 반 카드(data-sms-cls) · 학생 줄 · 학생 → 명단(data-sms-sid, 비어 있으면 줄의 data-id) · 레포트 발송 → 3 발송 [반 전체 문자] */
     document.addEventListener('click', function (e) {
       var b = e.target.closest('[data-sms-cls], [data-sms-sid]');
       if (!b || b.disabled) return;

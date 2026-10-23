@@ -1,16 +1,16 @@
 /* ============================================================
-   rtabs.js — 위쪽 탭 5개 (20261029a)
+   rtabs.js — 위쪽 탭 5개 (20261029a · 「레포트 발송」 단계 버튼 20261030e)
 
-   오늘 · 주간 레포트 · 학생 · 교재 · 더보기 (번호 없음)
+   오늘 · 레포트 발송 · 학생 · 교재 · 더보기 (번호 없음)
      · 화면(panel)은 예전 그대로 8개다. app.js 의 UI.selectTab(번호)도 그대로 쓴다
        (0 명단 · 1 작성 · 2 공개 · 3 발송 · 4 반 공지 · 5 교재 · 6 필기 노트 · 7 오늘).
        예전 탭 단추(#tab-write …)는 같은 id 로 안쪽 단계 · 화면 단추가 되었다 — 주소(#tab=write …)와 뒤로가기도 그대로 맞는다.
-     · 주간 레포트 = 작성 · 공개 · 발송 세 단계. 맨 위 주차 띠(write.js)를 세 단계가 함께 쓰고, 그 아래 「작성 ── 공개 ── 발송」.
+     · 레포트 발송 = 작성 · 공개 · 발송 세 단계. 맨 위 주차 띠(write.js)를 세 단계가 함께 쓰고, 그 아래 「작성 ── 공개 ── 발송」.
        지금 단계만 강조하고, 단계마다 그 반 그 주 진행(작성 n/전체 · 공개 n/전체 · 발송 n/전체)을 작게.
        주를 바꾸면(띠 ◀ ▶ · 날짜 직접 고르기 · 이번 주로) 세 단계가 같은 주를 본다 (jt:report-week).
      · 학생 = 명단 / 필기 노트 두 화면.
      · 더보기 = 반 공지 · 시험 관리 · 설정 · 사용 설명서.
-     · 배지 — 「오늘」 급함 학생 수(today.js) · 주간 레포트 = 수업일 +n일(설정)이 지나도 안 보낸 학생 수(today.js · 「오늘」 급함과 같은 기준 · 20261029f)
+     · 배지 — 「오늘」 급함 학생 수(today.js) · 레포트 발송 = 수업일 +n일(설정)이 지나도 안 보낸 학생 수(today.js · 「오늘」 급함과 같은 기준 · 20261029f)
    ============================================================ */
 
 (function () {
@@ -115,10 +115,15 @@
       if (run !== counts.run) return;
       var pub = list.filter(function (s) { return x.published[s.id]; }).length;
       var sent = list.filter(function (s) { return x.published[s.id] && x.sent[s.id]; }).length;
-      $('#rstepPublish').textContent = n ? pub + '/' + n : '';
-      /* 다 보냈으면 「11/11 ✓」 초록 (20261030b) */
-      $('#rstepSend').textContent = n ? sent + '/' + n + (sent === n ? ' ✓' : '') : '';
-      $('#rstepSend').classList.toggle('is-done', !!n && sent === n);
+      /* 「2 공개 11/11 ✓」 「3 발송 11/11 ✓」 — 끝난 단계는 초록 ✓ (작성은 반 전원이 공개되면 끝난 것으로 · 20261030e) */
+      var mark = function (el, btn, a, done) {
+        el.innerHTML = a === null ? '' : a + (done ? ' <b class="rstep__ok">✓</b>' : '');
+        el.classList.toggle('is-done', done);
+        $(btn).classList.toggle('is-done', done);
+      };
+      mark($('#rstepWrite'), '#tab-write', n && pub === n ? '' : null, !!n && pub === n);
+      mark($('#rstepPublish'), '#tab-publish', n ? pub + '/' + n : null, !!n && pub === n);
+      mark($('#rstepSend'), '#tab-send', n ? sent + '/' + n : null, !!n && sent === n);
     }, function () {});
   }
 
@@ -140,7 +145,7 @@
       sync(active()); lastWeek = weekNow();
     }, 0);
   });
-  /* 주간 레포트 → 작성에서 입력하면 작성 수가 바뀐다 (저장된 뒤 1초 안에 한 번) */
+  /* 레포트 발송 → 1 작성에서 입력하면 작성 수가 바뀐다 (저장된 뒤 1초 안에 한 번) */
   var t0 = null;
   document.addEventListener('input', function () {
     if (cur !== 1) return;

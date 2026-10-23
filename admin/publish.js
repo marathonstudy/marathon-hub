@@ -1,5 +1,5 @@
 /* ============================================================
-   publish.js — 주간 레포트 → 공개
+   publish.js — 레포트 발송 → 2 공개
 
    깃허브에 파일을 올리지 않는다. 학생 정보가 공개 저장소에 남으면 안 되기 때문이다.
    '공개' 는 그 순간의 레포트 내용을 Supabase(published)에 고정해 두고
@@ -15,6 +15,10 @@
   var $ = function (s, r) { return (r || document).querySelector(s); };
 
   function toast(m, k) { UI.toast(m, k); }
+  function esc(v) {
+    return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
 
   var state = {
     week: '', weekEnd: '',
@@ -27,7 +31,7 @@
     return Store.read(Store.KEYS.draft, null);
   }
 
-  /* 지금 고른 반 (주간 레포트 → 작성의 반 고르기) — 공개 화면은 이 반 학생만 (20261030b) */
+  /* 지금 고른 반 (레포트 발송 → 1 작성의 반 고르기) — 공개 화면은 이 반 학생만 (20261030b) */
   function curClass() { return (window.Writer && Writer.currentClass && Writer.currentClass()) || ''; }
   function grpOf(s) { return (s.className || '').trim() || '(반 없음)'; }
   /* 반 체크 칸이 기준으로 삼는 학생 — 아직 공개 안 한 학생, 없으면 반 전원 */
@@ -36,18 +40,18 @@
     return fresh.length ? fresh : rows;
   }
 
-  /* 「작성 중 / 작성 완료」 구분 없이 반 학생 전원 (20261030a) — 비어 있는 칸은 레포트에서 숨는다
-     미리 체크는 지금 고른 반의 아직 공개 안 한 학생만 (다른 반은 맨 아래 「다른 반도 함께 공개」에서 직접 고른다) */
+  /* 고른 반 학생 전원 (반 하나 + 수업 하나 · 다른 반은 보이지 않는다 · 20261030e) — 비어 있는 칸은 레포트에서 숨는다
+     미리 체크는 아직 공개 안 한 학생만 */
   function buildRows(d) {
     var cur = curClass();
-    return UI.activeStudents().map(function (s) {
+    return UI.activeStudents().filter(function (s) { return !cur || grpOf(s) === cur; }).map(function (s) {
       var common = (d.common || {})[s.className || ''] || { lessons: [], tests: [] };
       var pub = state.published[s.id] || null;
       return {
         student: s, common: common, entry: (d.entries || {})[s.id] || {},
         pub: pub, eligible: true,
-        /* 아직 공개 안 한 학생은 미리 체크해 둔다 (지금 고른 반만) */
-        checked: !pub && (!cur || grpOf(s) === cur)
+        /* 아직 공개 안 한 학생은 미리 체크해 둔다 */
+        checked: !pub
       };
     }).sort(function (a, b) {
       var c = (a.student.className || '').localeCompare(b.student.className || '', 'ko');
@@ -76,7 +80,7 @@
 
     if (!state.week) {
       $('#pubWeekHint').textContent = '';
-      host.innerHTML = '<div class="empty-state">주간 레포트 → 작성에서 주차를 먼저 정해 주세요.</div>';
+      host.innerHTML = '<div class="empty-state">레포트 발송 → 1 작성에서 주차를 먼저 정해 주세요.</div>';
       refreshButton();
       return;
     }
@@ -98,8 +102,7 @@
 
     var frag = document.createDocumentFragment();
     var cur = curClass();
-    var mine = cur ? groups.filter(function (g) { return g.name === cur; }) : groups;
-    var others = cur ? groups.filter(function (g) { return g.name !== cur; }) : [];
+    var mine = groups;
     if (cur && !mine.length) {
       var em = document.createElement('div');
       em.className = 'empty-state';
@@ -153,16 +156,6 @@
       });
     }
     mine.forEach(function (g) { groupInto(frag, g); });
-    /* 여러 반을 한 번에 — 맨 아래 접힌 메뉴에서만 */
-    if (others.length) {
-      var box = document.createElement('details');
-      box.className = 'pub-others';
-      box.open = others.some(function (g) { return g.rows.some(function (r) { return r.checked; }); }) || !!state.othersOpen;
-      box.innerHTML = '<summary>다른 반도 함께 공개 <span class="muted-note">' + others.length + '개 반</span></summary>';
-      box.addEventListener('toggle', function () { state.othersOpen = box.open; });
-      others.forEach(function (g) { groupInto(box, g); });
-      frag.appendChild(box);
-    }
     host.appendChild(frag);
     refreshButton();
   }
@@ -258,24 +251,70 @@
 
       var rows = picked.map(function (r) {
         return {
-          studentId: r.student.id,
+          studentId: r.student.id, name: r.student.name,
           data: Report.toReportData(r.student, r.common, r.entry, { start: state.week, end: state.weekEnd })
         };
       });
+      var again = rows.filter(function (r) { return state.published[r.studentId]; }).map(function (r) { return r.studentId; });
+      var changed = [];
 
-      DB.publishReports(state.week, rows, UI.whoami()).then(function () {
+      /* 다시 공개 — 지금 공개된 내용과 견줘 바뀐 것을 레포트 위에 「10/24 업데이트 · 복습테스트 결과 추가」로 남긴다 (20261030e) */
+      DB.publishedDataOf(state.week, again).then(function (old) {
+        rows.forEach(function (r) {
+          var o = old[r.studentId];
+          if (!o) return;
+          var ch = Report.changesOf(o, r.data);
+          if (ch.length) {
+            r.data._upd = { date: DDay.today(), what: ch.join(', ') };
+            changed.push({ id: r.studentId, name: r.name, what: ch.join(', ') });
+          } else if (o._upd) r.data._upd = o._upd;          /* 바뀐 게 없으면 지난 표시를 그대로 */
+        });
+        return DB.publishReports(state.week, rows, UI.whoami());
+      }).then(function () {
         var all = Store.read(Store.KEYS.published, {});
         all[state.week] = all[state.week] || {};
         rows.forEach(function (r) { all[state.week][r.studentId] = { visible: true, publishedAt: new Date().toISOString() }; });
         Store.writeLocal(Store.KEYS.published, all);
-        toast(rows.length + '명 공개했습니다. 주간 레포트 → 발송에서 링크를 보내세요', 'good');
-        return load();
+        toast(rows.length + '명 공개했습니다. 레포트 발송 → 3 발송에서 링크를 보내세요', 'good');
+        if (window.RTabs) RTabs.counts();           /* 단계 버튼 「2 공개 11/11 ✓」 바로 */
+        return load().then(function () { return changed.length ? askNotify(changed) : null; });
       }).catch(function (e) {
         showError('공개하지 못했습니다 — ' + e.message);
         refreshButton();
       });
     });
   });
+
+  /* ---------- 바뀐 내용 알리기 (20261030e) ----------
+     이미 보낸 학생 중 다시 공개로 내용이 실제로 바뀐 학생만 — 학생마다 바뀐 것 한 줄 · 체크로 일부만
+     [바뀐 학생에게 알리기] → 문자 창(바뀐 내용 알리기 · 보낼 곳 · 결과 표시는 일반 발송과 같다) · [알리지 않고 공개만] → 닫기 */
+  var NOTIFY_BODY = '#{수업일} 수업 #{이름} 학생 레포트에 #{바뀐 내용}이 반영되었습니다. #{링크}';
+  var notifyList = [];
+  function askNotify(changed) {
+    return DB.weekSendData(state.week).then(function (x) {
+      notifyList = changed.filter(function (c) { return x.sent && x.sent[c.id]; });
+      if (!notifyList.length) return;
+      $('#notifyDesc').textContent = '이미 레포트를 보낸 학생 중 내용이 바뀐 ' + notifyList.length + '명입니다. 알릴 학생만 체크하세요.';
+      $('#notifyList').innerHTML = notifyList.map(function (c) {
+        return '<label class="notify-row"><input type="checkbox" data-nt="' + esc(c.id) + '" checked> <b>' + esc(c.name) + '</b> <span class="notify-row__what">' + esc(c.what) + '</span></label>';
+      }).join('');
+      $('#notifyModal').showModal();
+    }, function () {});
+  }
+  $('#notifyNo').addEventListener('click', function () { $('#notifyModal').close(); toast('알리지 않고 공개만 했습니다'); });
+  $('#notifyYes').addEventListener('click', function () {
+    var ids = Array.prototype.map.call(document.querySelectorAll('#notifyList [data-nt]:checked'), function (b) { return b.dataset.nt; });
+    if (!ids.length) { toast('알릴 학생을 하나 이상 체크해 주세요', 'bad'); return; }
+    var what = {};
+    notifyList.forEach(function (c) { if (ids.indexOf(c.id) !== -1) what[c.id] = c.what; });
+    $('#notifyModal').close();
+    setTimeout(function () {
+      if (window.Sms) Sms.open({ students: ids, week: state.week, from: 'notify', notify: what, body: NOTIFY_BODY });
+    }, 60);
+  });
+
+  /* 다음 단계로 — 「발송하러 가기 →」 */
+  $('#btnGoSend').addEventListener('click', function () { UI.selectTab(3); });
 
   $('#btnPubRefresh').addEventListener('click', function () {
     load().then(function () { toast('다시 읽었습니다'); });
@@ -285,7 +324,7 @@
     if (e.detail.index === 2) load();
   });
 
-  /* 주간 레포트 주차 띠에서 주를 바꾸면 (rtabs.js · 20261029a) */
+  /* 레포트 발송 주차 띠에서 주를 바꾸면 (rtabs.js · 20261029a) */
   window.addEventListener('jt:report-week', function () {
     if (!$('#panel-publish').hidden) load();
   });
