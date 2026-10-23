@@ -1429,7 +1429,7 @@
   <div class="modal__head"><h2 class="modal__title">더보기</h2></div>
   <div class="modal__body sheet__list">
     <button class="btn sheet__btn" role="tab" id="tab-notice" aria-controls="panel-notice" aria-selected="false"><span>반 공지</span><span class="sheet__hint">반 단톡방 공지 올리기</span></button>
-    <button class="btn sheet__btn" type="button" data-more="exams"><span>시험 관리</span><span class="sheet__hint">D-day 띠의 시험</span></button>
+    <button class="btn sheet__btn" type="button" data-more="exams"><span>D-day 시험 등록</span><span class="sheet__hint">학생·학부모 화면 위에 '수능 D-21'처럼 띄울 시험을 등록합니다</span></button>
     <button class="btn sheet__btn" type="button" data-more="course"><span>과정 관리</span><span class="sheet__hint">여러 반이 같은 회차를 요일만 다르게 듣는 과정 · 담당 조교</span></button>
     <button class="btn sheet__btn" type="button" data-more="settings"><span>설정</span><span class="sheet__hint">결석 기준 · 알림톡 · 문자 · 직원 관리</span></button>
     <a class="btn sheet__btn" href="../guide/" target="_blank" rel="noopener" data-more="guide"><span>사용 설명서</span><span class="sheet__hint">새 창</span></a>
@@ -1895,23 +1895,13 @@
 <dialog class="modal modal--wide" id="examModal">
   <form method="dialog" id="examForm">
     <div class="modal__head">
-      <h2 class="modal__title">주요 시험</h2>
-      <p class="modal__desc">학생·학부모 개인 페이지와 반 공지 페이지 위에 그 반 기준 D-day 가 보입니다. 지난 시험은 저절로 숨겨집니다</p>
+      <h2 class="modal__title">D-day 시험 등록</h2>
+      <p class="modal__desc">학생·학부모 화면 위에 '수능 D-21'처럼 띄울 시험을 등록합니다. 띠에는 그 반에 드는 시험 중 오늘 이후 가장 가까운 하나가 저절로 보이고, 날이 지나면 다음 시험으로 넘어갑니다</p>
     </div>
     <div class="modal__body">
-      <div class="sub__head"><span class="sub__title">시험 목록</span><button class="btn btn--sm" type="button" id="btnExamAdd">+ 시험 추가</button></div>
       <div id="exList"></div>
-
-      <div class="extra-head" style="margin-top:16px"><span class="extra-head__title">전체 기본</span></div>
-      <div class="toolbar" id="exMode">
-        <label class="chk-inline"><input type="radio" name="exMode" value="auto"> 가장 가까운 시험 자동</label>
-        <label class="chk-inline"><input type="radio" name="exMode" value="fixed"> 특정 시험 고정</label>
-        <select class="select" id="exFixed" aria-label="고정할 시험"></select>
-      </div>
-      <p class="field__hint">고정한 시험이 지나면 다음으로 가까운 시험으로 저절로 넘어갑니다.</p>
-
-      <div class="extra-head" style="margin-top:16px"><span class="extra-head__title">반별로 띄울 시험</span></div>
-      <div class="ex-classes" id="exByClass"></div>
+      <button class="btn btn--sm ex-add" type="button" id="btnExamAdd">+ 줄 추가</button>
+      <p class="field__hint">대상을 누르면 전체 반 / 반 · 과정을 고를 수 있습니다 (기본 전체 반). 등록된 시험이 하나도 없으면 띠가 숨겨집니다.</p>
       <div class="modal__error" id="exError"></div>
     </div>
     <div class="modal__foot">

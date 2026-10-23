@@ -2838,3 +2838,22 @@ dialog > .toast-host { position: fixed; }
 .tdc-app--wait { display: inline-flex; align-items: center; }
 .tdc-app--fail { appearance: none; border: 1px solid #F4D3A8; background: #FFF1E0; color: #A3611A; font: inherit; font-size: 12px; font-weight: 800; padding: 1px 8px; border-radius: 999px; cursor: pointer; }
 .tdc-app--fail:hover { background: #FFE6C7; }
+
+/* D-day 시험 등록 — 줄마다 「시험 이름 · 날짜 · 대상 · 지우기」 (exams.js · 20261031c) */
+.ex-head { display: grid; grid-template-columns: minmax(0, 1.4fr) 150px minmax(0, 1.2fr) 56px 64px; gap: 8px; font-size: 12px; font-weight: 800; color: var(--ink-light); padding: 0 0 4px; }
+#exList .ex-row { display: grid; grid-template-columns: minmax(0, 1.4fr) 150px minmax(0, 1.2fr) 56px 64px; gap: 8px; align-items: start; }
+#exList .ex-row .ex-name, #exList .ex-row .ex-date { width: 100%; }
+.ex-scope { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.ex-scope__sum { padding: 8px 10px; cursor: pointer; font-size: 13.5px; font-weight: 700; color: #4A34B8; list-style: none; }
+.ex-scope__sum::-webkit-details-marker { display: none; }
+.ex-scope__sum::after { content: ' ▾'; color: var(--ink-light); }
+.ex-scope__box { padding: 4px 10px 10px; display: grid; gap: 6px; }
+.ex-scope__grp { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; }
+.ex-add { margin-top: 8px; }
+.ex-row .ex-badge { padding-top: 9px; }
+@media (max-width: 640px) {
+  .ex-head { display: none; }
+  #exList .ex-row { grid-template-columns: minmax(0, 1fr) 128px; }
+  #exList .ex-row .ex-scope { grid-column: 1 / -1; }
+  #exList .ex-row .ex-badge { padding-top: 0; text-align: left; }
+}

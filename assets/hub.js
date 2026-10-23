@@ -156,14 +156,30 @@
 
   /* 주요 시험 D-day — hub_get · class_notice_get 이 돌려준 그 반 시험 하나 (이름 · 날짜).
      한국 날짜 기준, 자정마다 다시 센다. 지났거나 없으면 줄을 숨긴다. */
+  /* D-day 띠 — 「6월 모의평가 D-42」 (당일 「D-day」 · 지나면 다음 시험 · 그 반에 드는 시험이 없으면 숨김 · migration-034)
+     누르면 그 반에 드는 시험 전체가 날짜순으로 작게 펼쳐진다 (지난 시험은 회색 · 20261031c) */
   function renderDday(exam, who) {
     var el = $('#hubDday');
     if (!el || !global.DDay) return;
-    function draw() {
-      var text = exam ? DDay.sentence(exam, DDay.today()) : '';
-      el.hidden = !text;
-      el.textContent = text ? (who ? who + ' · ' : '') + text : '';
+    var open = false;
+    function pickNow() {
+      var t = DDay.today(), list = (exam && exam.list) || (exam ? [exam] : []);
+      return list.filter(function (x) { return x && x.date >= t; })[0] || null;
     }
+    function draw() {
+      var t = DDay.today(), cur = pickNow();
+      el.hidden = !cur;
+      if (!cur) { el.innerHTML = ''; return; }
+      var list = (exam && exam.list) || [cur];
+      el.innerHTML = '<button type="button" class="dd-btn" aria-expanded="' + open + '">' + esc((who ? who + ' · ' : '') + cur.name + ' ' + DDay.badge(cur, t)) +
+          (list.length > 1 ? ' <span class="dd-caret" aria-hidden="true">▾</span>' : '') + '</button>' +
+        (open && list.length > 1 ? '<ul class="dd-list">' + list.map(function (x) {
+          var past = x.date < t;
+          return '<li class="dd-item' + (past ? ' is-past' : '') + (x === cur || (x.name === cur.name && x.date === cur.date) ? ' is-cur' : '') + '"><span>' + esc(x.name) + '</span><span class="num">' +
+            esc(global.Lesson && Lesson.md ? Lesson.md(x.date) : x.date) + ' · ' + (past ? '지남' : esc(DDay.badge(x, t))) + '</span></li>';
+        }).join('') + '</ul>' : '');
+    }
+    el.onclick = function (e) { if (e.target.closest('.dd-btn')) { open = !open; draw(); } };
     draw();
     DDay.everyMidnight(draw);
   }
