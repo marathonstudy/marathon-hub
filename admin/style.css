@@ -2454,7 +2454,7 @@ body.rv-live-open { overflow: hidden; }
 @media (max-width: 720px) { .dnv-cols { grid-template-columns: 1fr; } }
 
 /* 「오늘」 — 링크 전환 기간 알림 (migration-015) */
-.td-transition { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; margin-bottom: 12px; padding: 10px 12px;
+.td-transition { display: block; line-height: 1.7; margin-bottom: 12px; padding: 10px 12px;
   border-radius: 12px; background: #FFF6E8; border: 1px solid #F3D9B0; color: #7A4A0E; font-size: 13.5px; line-height: 1.6; }
 
 /* ============================================================
@@ -2687,3 +2687,4 @@ dialog > .toast-host { position: fixed; }
   .sms-c--name { white-space: normal; width: 22%; }
   .sms-st { font-size: 11px; padding: 0 4px; margin-left: 0; }
 }
+.td-transition .btn { margin-left: 4px; vertical-align: middle; }   /* 글과 버튼을 한 문단으로 (flex 로 글이 조각나던 것) */

@@ -1346,7 +1346,7 @@
               '<ul class="rp-list">' + reports.map(function (r, i) {
                 return '<li><button type="button" class="rp-item' + (r.draft ? ' rp-item--draft' : '') + '" data-i="' + i + '">' +
                          '<span class="rp-item__week num">' + esc(reportLabel(r)) + '</span>' +
-                         '<span class="rp-item__label">' + (r.draft ? '공개하면 이렇게 보입니다 (미리보기)' : '수업 레포트') + '</span>' +
+                         '<span class="rp-item__label">' + (r.draft ? '공개하면 이렇게 보입니다 (미리보기)' : '레포트')     /* 「10/15(목) 수업 레포트」 — 「수업 수업 레포트」로 겹치지 않게 (20261030b) */ + '</span>' +
                          (i === RP.latest ? '<span class="rp-item__new">NEW</span>' : '') +
                          '<span class="rp-item__go" aria-hidden="true">›</span>' +
                        '</button></li>';

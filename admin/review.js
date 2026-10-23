@@ -179,7 +179,8 @@
     var left = on.filter(function (t) { return !(x.subs && x.subs[t.id]); });
     var tr = '<tr data-sid="' + esc(x.student_id) + '">' +
       '<td><span class="roster__name">' + esc(x.name) + '</span>' +
-        (left.length ? ' <button class="btn btn--sm btn--ghost rv-allabs" type="button" data-rv="absent-all" title="이번 주 아직 안 낸 시험 ' + left.length + '개에 같은 사유">이번 주 전부 미응시</button>' : '') + '</td>' +
+        /* 안 낸 시험이 둘 이상일 때만 — 하나면 그 칸 [미응시]와 같은 일이라 겹친다 (20261030b) */
+        (left.length > 1 ? ' <button class="btn btn--sm btn--ghost rv-allabs" type="button" data-rv="absent-all" title="이번 주 아직 안 낸 시험 ' + left.length + '개에 같은 사유">이번 주 전부 미응시</button>' : '') + '</td>' +
       on.map(function (t) { return cellHtml(x, t); }).join('') +
       '<td>' + (ph.length ? '<button class="btn btn--sm btn--ghost" type="button" data-rv="photo">사진 ' + ph.length + '장</button>' : '<span class="muted-note">없음</span>') + '</td></tr>';
     if (editing) tr += '<tr class="rv-edit-row" data-sid="' + esc(x.student_id) + '"><td colspan="' + (on.length + 2) + '">' + editorHtml() + '</td></tr>';
