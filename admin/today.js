@@ -129,8 +129,11 @@
       return AppFetch.get(s.code).then(function (res) {
         /* 날짜별 기록만 남긴다 — 반마다 지난 수업 전 일주일(D-7 ~ D-1)을 AppWeek.compute 로 센다 (러닝노트 레포트 과제 요약과 같은 계산) */
         var dt = res && res.ok && res.data ? res.data : null;
+        var why = (res && res.reason) || '';
+        /* 앱 링크가 없음(nolink) · 앱에서 만료됨(expired) = 「과제 링크 연결 필요」, 그 밖의 실패 = 「과제 기록 못 불러옴 · 다시 시도」 (20261031d) */
         app[s.id] = dt ? { ok: true, data: { calendar: dt.calendar || [], lectures: dt.lectures || [], history: dt.history || dt.recent || [] }, at: Date.now() }
-                       : { ok: false, failed: true, data: null, at: Date.now() };
+                       : why === 'nolink' || why === 'expired' ? { ok: false, need: true, reason: why, data: null, at: Date.now() }
+                       : { ok: false, failed: true, reason: why, data: null, at: Date.now() };
         appProg.done++;
         paintApp(s.id);
         renderApp();
@@ -138,7 +141,12 @@
       });
     }
     Promise.all([one(), one(), one(), one(), one(), one()]).then(function () {
-      if (run === appRun) { clearInterval(appProg.timer); renderApp(); }
+      if (run !== appRun) return;
+      clearInterval(appProg.timer);
+      renderApp();
+      /* 다 받은 뒤 한 번 — 과제 많이 한 순 · 적게 한 순으로 학생 줄을 다시 세운다 (받는 동안에는 칸만 바꿔서 줄이 뛰지 않게) */
+      if (todo.length && !$('#appRoot').hidden) render();
+      window.dispatchEvent(new CustomEvent('jt:app', { detail: { done: true } }));
     });
   }
 
@@ -159,6 +167,7 @@
     Array.prototype.forEach.call(document.querySelectorAll('#tdBody .tdc-st[data-id="' + sid + '"] .tdc-app-slot'), function (el) {
       el.innerHTML = appCell(s, (st.cyBy || {})[s.class_name || '(반 없음)']);
     });
+    window.dispatchEvent(new CustomEvent('jt:app', { detail: { sid: sid } }));
   }
 
   /* ---------- 그리기 ---------- */
@@ -305,17 +314,69 @@
     return out;
   }
 
-  /* 과제 「n/5일」 — 그 반 지난 수업 레포트 기간(D-7 ~ D-1)의 평일 중 제출한 날 (토 · 일은 세지 않는다) */
-  function appCell(s, cy) {
-    if (!s.app) return '';
+  /* 과제 칸 상태 (20261031d)
+       need  과제 링크 연결 필요 — 앱 공유 링크가 없음 · 학부모 링크 코드가 없음(과제 기록을 그 코드로 부른다) · 앱에서 링크가 만료됨
+             (예전에는 앱 링크가 없으면 칸이 아예 비었고, 학부모 링크 코드가 없으면 「불러오는 중」에 멈춰 있었다)
+       wait  불러오는 중 · fail  링크는 있는데 못 불러옴(시간 초과 · 앱 서버 오류) → 다시 시도
+       ok    그 기간 과제 n/5일 (w) · none  그 기간 과제 없음 */
+  function appState(s, cy, lessonDate) {
+    if (!s.app || !s.code) return { k: 'need', why: !s.app ? 'nolink' : 'nohub' };
     var a = app[s.id];
-    if (!a) return '<span class="tdc-app tdc-app--wait" title="과제 기록 불러오는 중"><i class="spin" aria-hidden="true"></i>과제 불러오는 중</span>';
-    if (a.failed) return '<button type="button" class="tdc-app tdc-app--fail" data-app-retry="' + esc(s.id) + '">과제 기록 못 불러옴 · 다시 시도</button>';
-    var w = appWeekOf(s, cy);
+    if (!a) return { k: 'wait' };
+    if (a.need) return { k: 'need', why: a.reason };
+    if (a.failed) return { k: 'fail' };
+    var w = appWeekOf(s, cy, lessonDate);
+    return w ? { k: 'ok', w: w } : { k: 'none' };
+  }
+  var NEED_TIP = { nolink: '앱 공유 링크가 아직 없습니다', nohub: '학부모 링크가 없어 과제 기록을 못 부릅니다', expired: '앱 공유 링크가 만료되었습니다 — 새 링크를 붙여 넣어 주세요' };
+  /* 과제 「n/5일」 — 그 반 지난 수업 레포트 기간(D-7 ~ D-1)의 평일 중 제출한 날 (토 · 일은 세지 않는다) */
+  function appCell(s, cy, lessonDate) {
+    var x = appState(s, cy, lessonDate);
+    if (x.k === 'need') return '<button type="button" class="tdc-app tdc-app--need" data-app-link="' + esc(s.id) + '" title="' + esc((NEED_TIP[x.why] || NEED_TIP.nolink) + ' · 누르면 링크 넣는 칸') + '">과제 링크 연결 필요</button>';
+    if (x.k === 'wait') return '<span class="tdc-app tdc-app--wait" title="과제 기록 불러오는 중"><i class="spin" aria-hidden="true"></i>과제 불러오는 중</span>';
+    if (x.k === 'fail') return '<button type="button" class="tdc-app tdc-app--fail" data-app-retry="' + esc(s.id) + '">과제 기록 못 불러옴 · 다시 시도</button>';
+    var w = x.w;
     if (!w) return '<span class="tdc-app tdc-app--none" title="이 기간 과제 없음">과제 —</span>';
     var k = w.hwDone >= w.hwDays ? 'ok' : w.hwDone >= 3 ? 'mid' : 'low';
     return '<span class="tdc-app tdc-app--' + k + ' num" title="' + esc(md(w.from) + '~' + md(w.to) + ' 평일 ' + w.hwDays + '일 중 제출 ' + w.hwDone + '일 · 정시 ' + w.hwOnTime + '일') + '">과제 ' + w.hwDone + '/' + w.hwDays + '일</span>';
   }
+  /* ---------- 학생 줄 정렬 — 「과제 많이 한 순」(기본) · 「과제 적게 한 순」 (20261031d) ----------
+     그 기간 제출한 날 수로 · 같으면 이름순 · 아직 숫자가 없는 학생(불러오는 중 · 못 불러옴 · 과제 없음)은 그 아래 ·
+     「과제 링크 연결 필요」는 어느 정렬이든 맨 아래. 고른 정렬은 이 기기에 기억 (레포트 발송 학생 줄도 같은 정렬) */
+  var SORT_KEY = 'mhub.appSort';
+  function appSort() { try { return localStorage.getItem(SORT_KEY) === 'least' ? 'least' : 'most'; } catch (e) { return 'most'; } }
+  function setAppSort(v) {
+    try { localStorage.setItem(SORT_KEY, v === 'least' ? 'least' : 'most'); } catch (e) {}
+    window.dispatchEvent(new CustomEvent('jt:appsort'));
+  }
+  function sortRows(rows, cy, lessonDate) {
+    var dir = appSort() === 'least' ? 1 : -1;
+    return rows.map(function (s) {
+      var x = appState(s, cy, lessonDate);
+      return { s: s, g: x.k === 'need' ? 2 : x.k === 'ok' ? 0 : 1, n: x.w ? x.w.hwDone : 0 };
+    }).sort(function (a, b) {
+      if (a.g !== b.g) return a.g - b.g;
+      if (a.g === 0 && a.n !== b.n) return (a.n - b.n) * dir;
+      return byName(a.s, b.s);
+    }).map(function (x) { return x.s; });
+  }
+  function sortBarHtml() {
+    var v = appSort();
+    return '<div class="app-sort" role="group" aria-label="학생 줄 정렬"><span class="app-sort__t">학생 정렬</span>' +
+      [['most', '과제 많이 한 순'], ['least', '과제 적게 한 순']].map(function (o) {
+        return '<button type="button" class="app-sort__b' + (v === o[0] ? ' is-on' : '') + '" data-app-sort="' + o[0] + '" aria-pressed="' + (v === o[0]) + '">' + o[1] + '</button>';
+      }).join('') + '</div>';
+  }
+  /* 반 카드 위 「과제 링크 연결 필요 n명」 — 누르면 그 학생들만 차례로 링크 넣기 (applink.js) */
+  function needIds(rows, cy) { return rows.filter(function (s) { return appState(s, cy).k === 'need'; }).map(function (s) { return s.id; }); }
+  function needBtn(ids) {
+    return ids.length ? '<button type="button" class="tdc-need num" data-app-need="' + esc(ids.join(',')) + '" title="누르면 그 학생들 앱 공유 링크를 차례로 넣습니다">과제 링크 연결 필요 ' + ids.length + '명</button>' : '';
+  }
+  function openAppLink(ids) {
+    if (!window.AppLink || !st.data) return;
+    AppLink.open(ids.map(function (id) { var s = rowById(id); return s ? { id: s.id, name: s.name, cls: s.class_name || '' } : null; }));
+  }
+
   function studentRow(s, cy) {
     return '<div class="tdc-st" data-id="' + esc(s.id) + '">' +
       '<div class="tdc-st__main">' + (window.Profile ? Profile.avatar({ id: s.id, name: s.name }, 's') : '') + '<button type="button" class="roster__name roster__name-btn" data-card="' + esc(s.id) + '">' + esc(s.name) + '</button><span class="tdc-app-slot">' + appCell(s, cy) + '</span></div>' +
@@ -426,9 +487,11 @@
         }).join('') + '</div>';
     }
     var n = cls.reduce(function (a, c) { return a + c.rows.length; }, 0);
+    var need = [];
+    cls.forEach(function (c) { need = need.concat(needIds(c.rows, c.cy)); });
     return '<div class="tdc-card tdc-card--course' + (open ? ' is-open' : '') + '" data-cls="' + esc(ckey) + '">' +
       '<div class="tdc-head"><div class="tdc-main">' +
-        '<div class="tdc-title"><span class="tdc-name">📚 ' + esc(co.name) + '</span><span class="tdc-round">' + esc(Course.label(co, no)) + '</span><span class="muted-note num tdc-n">' + n + '명</span></div>' +
+        '<div class="tdc-title"><span class="tdc-name">📚 ' + esc(co.name) + '</span><span class="tdc-round">' + esc(Course.label(co, no)) + '</span><span class="muted-note num tdc-n">' + n + '명</span>' + needBtn(need) + '</div>' +
         '<div class="tdw" aria-label="이번 회차 일주일">' + days + '</div>' +
         cls.map(function (c) {
           var chips = chipsOf(c);
@@ -439,7 +502,7 @@
       '</div><div class="tdc-btns"><button type="button" class="btn btn--sm btn--primary tdc-write" data-write-course="' + esc(ckey) + '">이번 회차 작성하기</button></div></div>' +
       (n ? '<button type="button" class="tdc-toggle" data-toggle aria-expanded="' + open + '">학생 ' + n + '명 ' + (open ? '접기 ▴' : '보기 ▾') + '</button>' : '') +
       (open ? '<div class="tdc-list">' + cls.map(function (c) {
-        return '<div class="tdc-sub"><div class="tdc-sub__t">' + esc(c.name) + ' · ' + c.rows.length + '명</div>' + c.rows.slice().sort(byName).map(function (s) { return studentRow(s, c.cy); }).join('') + '</div>';
+        return '<div class="tdc-sub"><div class="tdc-sub__t">' + esc(c.name) + ' · ' + c.rows.length + '명</div>' + sortRows(c.rows, c.cy).map(function (s) { return studentRow(s, c.cy); }).join('') + '</div>';
       }).join('') + '</div>' : '') +
     '</div>';
   }
@@ -451,7 +514,7 @@
       '<div class="tdc-head">' +
         '<div class="tdc-main">' +
           '<div class="tdc-title"><span class="tdc-name">' + esc(c.name) + '</span>' + (c.academy ? '<span class="muted-note">' + esc(c.academy) + '</span>' : '') +
-            '<span class="muted-note num tdc-n">' + n + '명</span></div>' +
+            '<span class="muted-note num tdc-n">' + n + '명</span>' + needBtn(needIds(rows, c.cy)) + '</div>' +
           (chips.length ? '<div class="tdc-chips" aria-label="최근 3번 수업 레포트 발송">' + chips.map(function (x) { return chipHtml(c, x); }).join('') + '</div>' : '') +
           classWhen(c) +
         '</div>' +
@@ -461,7 +524,7 @@
         '</div>' +
       '</div>' +
       (n ? '<button type="button" class="tdc-toggle" data-toggle aria-expanded="' + open + '">학생 ' + n + '명 ' + (open ? '접기 ▴' : '보기 ▾') + '</button>' : '') +
-      (open ? '<div class="tdc-list">' + rows.slice().sort(byName).map(function (s) { return studentRow(s, c.cy); }).join('') + '</div>' : '') +
+      (open ? '<div class="tdc-list">' + sortRows(rows, c.cy).map(function (s) { return studentRow(s, c.cy); }).join('') + '</div>' : '') +
     '</div>';
   }
   /* 카드 차례 — 과정은 한 묶음 (가장 가까운 반 수업일 자리) · 담당 조교의 반(또는 그 반이 든 과정)이 맨 위 */
@@ -505,11 +568,12 @@
     setTimeout(renderApp, 0);
     $('#tdBody').innerHTML = transitionHtml() +
       '<div class="td-rules" id="tdRules"' + (st.rulesOpen ? '' : ' hidden') + '><p class="panel__hint tdc-rule">반 이름 아래 칩 = 최근 3번 수업 레포트를 보낸 학생 비율 (초록 100% · 주황 일부 · 빨강 0% · 회색 수업 당일 작성 중). 칩을 누르면 그 수업 발송 화면으로 갑니다. ' +
-        '학생 줄 「과제 n/5일」 = 지난 수업 레포트 기간(수업 전 일주일) 평일 중 과제를 낸 날 (토 · 일은 세지 않음). ' +
+        '학생 줄 「과제 n/5일」 = 지난 수업 레포트 기간(수업 전 일주일) 평일 중 과제를 낸 날 (토 · 일은 세지 않음). 회색 「과제 링크 연결 필요」 = 마라톤 앱 공유 링크가 없는 학생(누르면 링크 넣는 칸). ' +
         '챙길 학생 = 마감이 지났는데 복습테스트를 안 낸 학생(그 수업 레포트를 보내면 사라짐) · 결석이 기준(설정)을 넘은 학생(그 뒤 상담 기록을 남기면 사라짐).</p></div>' +
       todoHtml(unsent) +
       careHtml(careItems(d)) +
       '<div class="td-appbar" id="tdAppBar" hidden role="status" aria-live="polite"></div>' +
+      (classes.some(function (c) { return c.rows.length; }) ? sortBarHtml() : '') +
       '<div class="tdc-list-wrap">' + cardsOf(classes).map(function (it) { return it.course ? courseCardHtml(it.course, it.cls) : classCardHtml(it.c); }).join('') + '</div>';
   }
 
@@ -546,6 +610,23 @@
       out.최근결석 = '최근 ' + (set.absentWeeks || 4) + '주 ' + (s.absent_n || 0) + '회';
       return out;
     },
+    /* 레포트 발송 학생 줄 — 같은 과제 칸 · 같은 정렬 (send.js · 20261031d). lessonDate = 그 레포트 수업일 */
+    appCell: function (sid, lessonDate) { var s = rowById(sid); return s ? appCell(s, cycleOf(s.class_name || ''), lessonDate) : ''; },
+    appNeed: function (sid) { var s = rowById(sid); return !!s && appState(s, null).k === 'need'; },
+    sortStudents: function (list, lessonDate) {
+      if (!st.data) return list.slice().sort(byName);
+      var known = [], rest = [];
+      list.forEach(function (x) { (rowById(x.id) ? known : rest).push(x); });
+      var by = {};
+      list.forEach(function (x) { by[x.id] = x; });
+      var cy = known.length ? cycleOf(rowById(known[0].id).class_name || '') : null;
+      return sortRows(known.map(function (x) { return rowById(x.id); }), cy, lessonDate).map(function (s) { return by[s.id]; }).concat(rest.sort(byName));
+    },
+    sortBarHtml: sortBarHtml,
+    setAppSort: setAppSort,
+    appSort: appSort,
+    retryApp: function (sid) { loadApp(sid); },
+    openAppLink: openAppLink,
     classApp: function (cls, lessonDate) {
       if (!st.data) return null;
       var ws = st.data.students.filter(function (s) { return (s.class_name || '') === cls; }).map(function (s) { return appFactsOf(s, lessonDate); }).filter(Boolean);
@@ -558,6 +639,12 @@
   $('#tdBody').addEventListener('click', function (e) {
     var rt = e.target.closest('[data-app-retry]');
     if (rt) { loadApp(rt.dataset.appRetry); return; }
+    var al = e.target.closest('[data-app-link]');
+    if (al) { openAppLink([al.dataset.appLink]); return; }
+    var an = e.target.closest('[data-app-need]');
+    if (an) { openAppLink(an.dataset.appNeed.split(',')); return; }
+    var so = e.target.closest('[data-app-sort]');
+    if (so) { setAppSort(so.dataset.appSort); return; }
     var ca = e.target.closest('[data-care]');
     if (ca) { careGo(ca.dataset.care, ca.dataset.careCls, ca.dataset.careWeek, ca.dataset.careSid); return; }
     var wc = e.target.closest('[data-write-course]');
@@ -708,6 +795,18 @@
   window.addEventListener('jt:roster-changed', function () { if (st.data && !$('#appRoot').hidden) render(); });
   /* 과정 · 담당 조교를 불러오면 카드 묶음 · 차례를 다시 (course.js) */
   window.addEventListener('jt:courses', function () { if (st.data && !$('#appRoot').hidden) render(); });
+  /* 정렬을 바꾸면 다시 세운다 (레포트 발송에서 바꿔도 같이) */
+  window.addEventListener('jt:appsort', function () { if (st.data && !$('#appRoot').hidden) render(); });
+  /* 과제 링크를 넣으면 (applink.js) 그 학생 과제 기록을 바로 불러온다 */
+  window.addEventListener('jt:applink', function (e) {
+    var s = e.detail && rowById(e.detail.sid);
+    if (!s) return;
+    s.app = true;
+    if (e.detail.hubCode) s.code = e.detail.hubCode;
+    delete app[s.id];
+    render();
+    loadApp(s.id);
+  });
   /* 학생 얼굴 사진을 불러오면 학생 줄 동그라미를 다시 (profile.js) */
   window.addEventListener('jt:profiles', function () { if (st.data && !$('#appRoot').hidden) render(); });
 

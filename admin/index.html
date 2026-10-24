@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" as="style" crossorigin
       href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
-<link rel="stylesheet" href="style.css?v=20261031c">
+<link rel="stylesheet" href="style.css?v=20261031d">
 </head>
 <body class="is-locked">
 
@@ -1564,6 +1564,28 @@
   <div class="modal__foot"><div class="spacer"></div><button class="btn" type="button" id="smsLogClose">닫기</button></div>
 </dialog>
 
+<!-- 과제 링크(마라톤 앱 공유 링크) 연결 — 「과제 링크 연결 필요」 칩 · n명 (applink.js · 20261031d) -->
+<dialog class="modal" id="appLinkModal">
+  <form method="dialog">
+    <div class="modal__head">
+      <h2 class="modal__title" id="appLinkTitle">과제 링크 연결</h2>
+      <p class="modal__desc"><b id="appLinkWho"></b> — 마라톤 앱에서 그 학생의 공유 링크를 복사해 붙여 넣으면 과제 기록을 불러옵니다. 학생 수정 창의 「마라톤 앱 공유 링크」 칸과 같습니다.</p>
+    </div>
+    <div class="modal__body">
+      <label class="field">
+        <span class="field__label">마라톤 앱 공유 링크</span>
+        <input class="input" id="appLinkInput" type="text" autocomplete="off" spellcheck="false" placeholder="https://marathonstudy.com/share/report/… 또는 코드만">
+      </label>
+      <div class="modal__error" id="appLinkErr" role="alert" hidden></div>
+    </div>
+    <div class="modal__foot">
+      <button class="btn" type="button" id="btnAppLinkClose">닫기</button>
+      <button class="btn" type="button" id="btnAppLinkSkip" hidden>건너뛰기</button>
+      <button class="btn btn--primary" type="button" id="btnAppLinkSave">저장</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog class="modal" id="phonePickModal">
   <form method="dialog">
     <div class="modal__head">
@@ -2059,51 +2081,52 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
 <!-- config.js 와 brand.js 가 먼저 와야 한다. 나머지가 이 값을 읽는다. -->
-<script src="../assets/config.js?v=20261031c"></script>
-<script src="../assets/brand.js?v=20261031c"></script>
-<script src="../assets/lesson.js?v=20261031c"></script>
-<script src="supabase.js?v=20261031c"></script>
-<script src="db.js?v=20261031c"></script>
-<script src="store.js?v=20261031c"></script>
-<script src="report.js?v=20261031c"></script>
-<script src="aipolish.js?v=20261031c"></script>
-<script src="app.js?v=20261031c"></script>
-<script src="import.js?v=20261031c"></script>
-<script src="appfetch.js?v=20261031c"></script>
-<script src="profile.js?v=20261031c"></script>
-<script src="course.js?v=20261031c"></script>
-<script src="write.js?v=20261031c"></script>
-<script src="publish.js?v=20261031c"></script>
-<script src="send.js?v=20261031c"></script>
-<script src="kakao.js?v=20261031c"></script>
-<script src="sms.js?v=20261031c"></script>
-<script src="contacts.js?v=20261031c"></script>
-<script src="notice.js?v=20261031c"></script>
-<script src="tb.js?v=20261031c"></script>
-<script src="tb-dash.js?v=20261031c"></script>
-<script src="tb-issue.js?v=20261031c"></script>
-<script src="tb-stock.js?v=20261031c"></script>
-<script src="tb-bill.js?v=20261031c"></script>
-<script src="../assets/dday.js?v=20261031c"></script>
-<script src="../assets/app-week.js?v=20261031c"></script>
-<script src="card.js?v=20261031c"></script>
-<script src="exams.js?v=20261031c"></script>
-<script src="photo.js?v=20261031c"></script>
-<script src="today.js?v=20261031c"></script>
-<script src="staff.js?v=20261031c"></script>
-<script src="classes.js?v=20261031c"></script>
-<script src="weekly.js?v=20261031c"></script>
-<script src="filethumb.js?v=20261031c"></script>
-<script src="ytbm.js?v=20261031c"></script>
-<script src="summary.js?v=20261031c"></script>
-<script src="weeks.js?v=20261031c"></script>
-<script src="../assets/photos.js?v=20261031c"></script>
-<script src="review.js?v=20261031c"></script>
-<script src="draftguard.js?v=20261031c"></script>
-<script src="preview.js?v=20261031c"></script>
-<script src="rtabs.js?v=20261031c"></script>
-<script src="nav.js?v=20261031c"></script>
-<script src="sync.js?v=20261031c"></script>
-<script src="auth.js?v=20261031c"></script>
+<script src="../assets/config.js?v=20261031d"></script>
+<script src="../assets/brand.js?v=20261031d"></script>
+<script src="../assets/lesson.js?v=20261031d"></script>
+<script src="supabase.js?v=20261031d"></script>
+<script src="db.js?v=20261031d"></script>
+<script src="store.js?v=20261031d"></script>
+<script src="report.js?v=20261031d"></script>
+<script src="aipolish.js?v=20261031d"></script>
+<script src="app.js?v=20261031d"></script>
+<script src="import.js?v=20261031d"></script>
+<script src="appfetch.js?v=20261031d"></script>
+<script src="profile.js?v=20261031d"></script>
+<script src="course.js?v=20261031d"></script>
+<script src="write.js?v=20261031d"></script>
+<script src="publish.js?v=20261031d"></script>
+<script src="send.js?v=20261031d"></script>
+<script src="kakao.js?v=20261031d"></script>
+<script src="sms.js?v=20261031d"></script>
+<script src="contacts.js?v=20261031d"></script>
+<script src="notice.js?v=20261031d"></script>
+<script src="tb.js?v=20261031d"></script>
+<script src="tb-dash.js?v=20261031d"></script>
+<script src="tb-issue.js?v=20261031d"></script>
+<script src="tb-stock.js?v=20261031d"></script>
+<script src="tb-bill.js?v=20261031d"></script>
+<script src="../assets/dday.js?v=20261031d"></script>
+<script src="../assets/app-week.js?v=20261031d"></script>
+<script src="card.js?v=20261031d"></script>
+<script src="exams.js?v=20261031d"></script>
+<script src="photo.js?v=20261031d"></script>
+<script src="applink.js?v=20261031d"></script>
+<script src="today.js?v=20261031d"></script>
+<script src="staff.js?v=20261031d"></script>
+<script src="classes.js?v=20261031d"></script>
+<script src="weekly.js?v=20261031d"></script>
+<script src="filethumb.js?v=20261031d"></script>
+<script src="ytbm.js?v=20261031d"></script>
+<script src="summary.js?v=20261031d"></script>
+<script src="weeks.js?v=20261031d"></script>
+<script src="../assets/photos.js?v=20261031d"></script>
+<script src="review.js?v=20261031d"></script>
+<script src="draftguard.js?v=20261031d"></script>
+<script src="preview.js?v=20261031d"></script>
+<script src="rtabs.js?v=20261031d"></script>
+<script src="nav.js?v=20261031d"></script>
+<script src="sync.js?v=20261031d"></script>
+<script src="auth.js?v=20261031d"></script>
 </body>
 </html>

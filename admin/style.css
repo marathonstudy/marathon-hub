@@ -2881,3 +2881,16 @@ dialog > .toast-host { position: fixed; }
 .face-tile__name { font-size: 13.5px; font-weight: 800; color: var(--ink-deep); text-align: center; word-break: keep-all; }
 .tdc-st__main .av, .snd-row__line .av { margin-right: 2px; }
 td .av--s { margin-right: 6px; }
+
+/* ---------- 과제 링크 연결 필요 · 학생 정렬 (applink.js · today.js · send.js · 20261031d) ---------- */
+.tdc-app--need { appearance: none; border: 1px dashed #C9CCD8; background: #F4F5F8; color: #6B7085; font: inherit; font-size: 12px; font-weight: 800; padding: 1px 8px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
+.tdc-app--need:hover { background: #ECEEF3; }
+.tdc-need { appearance: none; border: 0; background: #F1F2F6; color: #6B7085; font: inherit; font-size: 12px; font-weight: 800; padding: 2px 8px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
+.tdc-need:hover { background: #E7E9F0; }
+.app-sort { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0 8px; }
+.app-sort__t { font-size: 12.5px; font-weight: 700; color: var(--ink-light); margin-right: 2px; }
+.app-sort__b { appearance: none; border: 1px solid var(--line-soft); background: var(--surface); color: var(--ink-mid); font: inherit; font-size: 12.5px; font-weight: 700;
+  padding: 4px 10px; min-height: 32px; border-radius: 999px; cursor: pointer; }
+.app-sort__b.is-on { background: var(--ink-deep); border-color: var(--ink-deep); color: #fff; }
+.snd-row__app { padding: 0 0 8px 32px; margin-top: -6px; }
+.snd-row__app:empty { display: none; }

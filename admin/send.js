@@ -192,11 +192,18 @@
       names.sort(function (a, b) { return order.indexOf(a) - order.indexOf(b); });
     } else names = orderClasses(names);
     return names.map(function (n) {
-      var rows = by[n].slice().sort(byName);
+      var rows = sortRows(by[n], lessonOf(n));
       var pub = rows.filter(function (s) { return state.published[s.id]; }).length;
       var sent = rows.filter(function (s) { return state.published[s.id] && state.sent[s.id]; }).length;
       return { name: n, rows: rows, pub: pub, sent: sent, done: rows.length > 0 && sent === rows.length, lesson: lessonOf(n) };
     });
+  }
+
+  /* 학생 줄 차례 — 「오늘」과 같은 「과제 많이 한 순」 · 「과제 적게 한 순」(같으면 이름순 · 과제 링크 연결 필요는 맨 아래 · 20261031d)
+     과제는 그 레포트 수업일 D 의 D-7 ~ D-1 (레포트 과제 요약과 같은 기간) */
+  function appDate(lesson) { return lesson && !lesson.canceled ? lesson.date || '' : ''; }
+  function sortRows(rows, lesson) {
+    return window.Today && Today.sortStudents ? Today.sortStudents(rows, appDate(lesson)) : rows.slice().sort(byName);
   }
 
   /* 그 반의 이 주 수업일 { date, canceled } (요일을 안 정했으면 null) */
@@ -243,7 +250,7 @@
     return list.sort();
   }
 
-  function rowHtml(s) {
+  function rowHtml(s, lesson) {
     var k = rowState(s);
     var t = tagOf(s, k);
     var main = '';
@@ -263,6 +270,7 @@
           main +
           '<button class="btn btn--sm btn--ghost snd-more" type="button" data-more aria-label="' + esc(s.name || '') + ' 더 보기">⋯</button>' +
         '</div>' +
+        (window.Today && Today.appCell ? '<div class="snd-row__app tdc-app-slot">' + Today.appCell(s.id, appDate(lesson)) + '</div>' : '') +
         (open ? '<div class="snd-row__phones num">' + esc(phones.length ? phones.map(function (p) { return p.label + ' ' + Store.phoneMask(p.number); }).join(' · ') : '번호 없음 — 학생 → 명단에서 넣어 주세요') + '</div>' : '') +
       '</div>';
   }
@@ -280,11 +288,13 @@
           : '<div class="snd-unpub">아직 공개 전입니다 <button class="btn btn--sm" type="button" data-gopub>공개하러 가기</button></div>';
       } else {
         var targets = kakaoOn() ? g.rows.filter(function (s) { var k = rowState(s); return k === 'ready' || k === 'failed'; }) : [];
+        var need = window.Today && Today.appNeed ? g.rows.filter(function (s) { return Today.appNeed(s.id); }).map(function (s) { return s.id; }) : [];
         body = '<div class="snd-acts">' +
             (kakaoOn() ? '<button class="btn btn--sm btn--primary" type="button" data-kk-class' + (targets.length && !Kakao.busy() ? '' : ' disabled') + '>알림톡 ' + targets.length + '명 보내기</button>' : '') +
             (g.name === NOCLS ? '' : '<button class="btn btn--sm" type="button" data-sms-cls="' + esc(g.name) + '" data-sms-week="' + esc(state.week) + '" title="문자 창 — 보낼 표 · 이 수업 레포트를 누구에게 언제 보냈는지도 표에 나옵니다">반 전체 문자 · 보낸 표</button>') +
+            (need.length ? '<button type="button" class="tdc-need num" data-app-need="' + esc(need.join(',')) + '" title="누르면 그 학생들 앱 공유 링크를 차례로 넣습니다">과제 링크 연결 필요 ' + need.length + '명</button>' : '') +
           '</div>' +
-          g.rows.map(rowHtml).join('');
+          g.rows.map(function (s) { return rowHtml(s, g.lesson); }).join('');
       }
     }
     return '<section class="snd-card' + (open ? ' is-open' : '') + (g.done ? ' is-done' : '') + '" data-cls="' + esc(g.name) + '">' +
@@ -321,7 +331,7 @@
       return;
     }
     if (!gs.length) { host.innerHTML = '<div class="empty-state">다니는 학생이 없습니다.</div>'; return; }
-    host.innerHTML = gs.map(cardHtml).join('');
+    host.innerHTML = (window.Today && Today.sortBarHtml ? Today.sortBarHtml() : '') + gs.map(cardHtml).join('');
   }
 
   /* ============================================================
@@ -444,6 +454,15 @@
   function findStudent(sid) { return students().find(function (x) { return x.id === sid; }); }
 
   $('#sendList').addEventListener('click', function (ev) {
+    /* 과제 칸 · 정렬 (「오늘」과 같은 동작 · today.js · applink.js) */
+    var ap = ev.target.closest('[data-app-sort], [data-app-link], [data-app-need], [data-app-retry]');
+    if (ap && window.Today) {
+      if (ap.dataset.appSort) Today.setAppSort(ap.dataset.appSort);
+      else if (ap.dataset.appLink) Today.openAppLink([ap.dataset.appLink]);
+      else if (ap.dataset.appNeed) Today.openAppLink(ap.dataset.appNeed.split(','));
+      else if (ap.dataset.appRetry) Today.retryApp(ap.dataset.appRetry);
+      return;
+    }
     var card = ev.target.closest('.snd-card');
     if (!card) return;
     var cls = card.dataset.cls;
@@ -692,6 +711,22 @@
 
   window.addEventListener('jt:kakao', function () { if (state.loaded) render(); });
   window.addEventListener('jt:profiles', function () { if (state.loaded) render(); });
+  /* 과제 기록을 받거나 · 정렬을 바꾸거나 · 과제 링크를 넣으면 (today.js · applink.js) — 보고 있을 때만, 받는 동안은 0.4초에 한 번 */
+  var appTimer = null;
+  function appRender() {
+    clearTimeout(appTimer);
+    appTimer = setTimeout(function () { if (state.loaded && !$('#panel-send').hidden) render(); }, 400);
+  }
+  window.addEventListener('jt:app', function (e) {
+    if (!state.loaded || $('#panel-send').hidden) return;
+    var sid = e.detail && e.detail.sid;
+    if (!sid) { appRender(); return; }               /* 다 받았다 — 정렬까지 다시 */
+    /* 한 명 받을 때마다 그 학생 칸만 (줄이 뛰지 않게) */
+    var s = findStudent(sid), el = document.querySelector('#sendList .snd-row[data-id="' + sid + '"] .snd-row__app');
+    if (s && el) el.innerHTML = Today.appCell(sid, appDate(lessonOf(clsOf(s))));
+  });
+  window.addEventListener('jt:appsort', function () { if (state.loaded) render(); });
+  window.addEventListener('jt:applink', appRender);
   /* 수업 요일 · 반이 바뀌면 제목 · 순서도 */
   window.addEventListener('jt:schedule-changed', function () { if (state.loaded) render(); });
   window.addEventListener('jt:roster-changed', function () { if (state.loaded && !$('#panel-send').hidden) render(); });
