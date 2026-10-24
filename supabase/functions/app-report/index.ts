@@ -8,6 +8,9 @@
 //
 //  무엇을 받나
 //    ?code=개인링크코드   ← 앱 공유 코드가 아니다
+//    ?codes=코드,코드,…   반 단위로 한 번에 (30명까지 · 20261031g) — 함수 안에서 8명씩 동시에 받아 한 번에 돌려준다.
+//                        「오늘」 첫 화면용 가벼운 기록만 (날짜별 제출 · 강의 · 과제 제목 · 제출 시각 — 최근 120일)
+//                        { ok: true, items: { 코드: { ok, data } | { ok: false, reason } } }
 //    함수가 그 학생의 앱 공유 코드를 DB 함수(hub_app_code)로 찾는다.
 //    그래서 아무 공유 코드나 넣어 남의 자료를 받아 가는 통로가 되지 않는다.
 //    퇴원 학생이면 빈 결과를 돌려준다.
@@ -143,24 +146,81 @@ function pick(src: Any) {
   };
 }
 
+/* 「오늘」 첫 화면용 — 날짜별 제출 · 강의 · 과제 기록 중 최근 120일만 (통계 · 영역별 · shape 는 뺀다) */
+function lite(full: Any) {
+  const cut = new Date(Date.now() - 120 * 86400000).toISOString().slice(0, 10);
+  const cal = (full.calendar || []).filter((c: Any) => c.date >= cut);
+  const orders = new Set(cal.map((c: Any) => c.order));
+  return {
+    calendar: cal,
+    lectures: (full.lectures || []).filter((l: Any) => orders.has(l.order)).map((l: Any) => ({ order: l.order, title: l.title, videosDone: l.videosDone, videosTotal: l.videosTotal })),
+    history: (full.history || []).filter((h: Any) => orders.has(h.order) || String(h.submittedAt).slice(0, 10) >= cut)
+      .map((h: Any) => ({ title: h.title, order: h.order, submittedAt: h.submittedAt, late: h.late })),
+  };
+}
+
+/* 개인 링크 코드 하나 → { ok, data } | { ok: false, reason } (한 명 · 반 단위 모두 이것을 쓴다) */
+async function fetchOne(code: string, base: string, headers: Record<string, string>): Promise<Any> {
+  let share: string | null = null;
+  try {
+    const r = await fetch(`${base}/rest/v1/rpc/hub_app_code`, { method: "POST", headers, body: JSON.stringify({ p_code: code }) });
+    if (!r.ok) return { ok: false, reason: "lookup" };
+    share = await r.json();
+  } catch {
+    return { ok: false, reason: "lookup" };
+  }
+  if (!share || !/^[A-Za-z0-9_-]{8,128}$/.test(share)) return { ok: false, reason: "nolink" };
+  try {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 12000);
+    const r = await fetch(APP_API + encodeURIComponent(share), { headers: { "Accept": "application/json" }, signal: ctl.signal });
+    clearTimeout(t);
+    if (r.status === 404) return { ok: false, reason: "expired" };
+    if (!r.ok) return { ok: false, reason: "upstream" };
+    return { ok: true, data: pick(await r.json()) };
+  } catch {
+    return { ok: false, reason: "upstream" };
+  }
+}
+
 Deno.serve(async (req: Request) => {
   const cors = corsHeaders(req.headers.get("origin"));
 
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
   if (req.method !== "GET") return json({ ok: false, reason: "method" }, 405, cors);
 
-  const code = new URL(req.url).searchParams.get("code") ?? "";
-  if (!/^[A-Za-z0-9]{20,64}$/.test(code)) {
-    return json({ ok: false, reason: "invalid" }, 400, cors);
-  }
+  const params = new URL(req.url).searchParams;
+  const code = params.get("code") ?? "";
+  const many = (params.get("codes") ?? "").split(",").map((x) => x.trim()).filter(Boolean);
 
   const base = Deno.env.get("SUPABASE_URL") ?? "";
   const key = Deno.env.get("SUPABASE_ANON_KEY") || req.headers.get("apikey") || "";
   if (!base || !key) return json({ ok: false, reason: "config" }, 500, cors);
-
-  // 1. 개인 링크 코드 → 앱 공유 코드 (퇴원·미등록이면 null)
   const headers: Record<string, string> = { "apikey": key, "Content-Type": "application/json" };
   if (key.startsWith("eyJ")) headers["Authorization"] = `Bearer ${key}`;
+
+  // 반 단위 — 코드마다 따로 찾고 받는다 (8명씩 동시에 · 한 명이 늦어도 12초에서 끊는다)
+  if (many.length) {
+    const codes = [...new Set(many)];
+    if (codes.length > 30 || codes.some((c) => !/^[A-Za-z0-9]{20,64}$/.test(c))) return json({ ok: false, reason: "invalid" }, 400, cors);
+    const items: Record<string, Any> = {};
+    let i = 0;
+    const worker = async () => {
+      while (i < codes.length) {
+        const c = codes[i++];
+        const r = await fetchOne(c, base, headers);
+        items[c] = r.ok ? { ok: true, data: lite(r.data) } : r;
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(8, codes.length) }, worker));
+    return json({ ok: true, items }, 200, cors, "private, max-age=60");
+  }
+
+  if (!/^[A-Za-z0-9]{20,64}$/.test(code)) {
+    return json({ ok: false, reason: "invalid" }, 400, cors);
+  }
+
+  // 1. 개인 링크 코드 → 앱 공유 코드 (퇴원·미등록이면 null)
 
   let share: string | null = null;
   try {

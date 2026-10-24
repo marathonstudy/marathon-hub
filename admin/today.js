@@ -99,58 +99,141 @@
     return d;
   }
 
-  /* ---------- 과제 제출률 (app-report, 4명씩) ---------- */
-
-  /* 과제 기록 — 학생마다 app-report 를 6명씩 동시에 (앱 서버가 한꺼번에 주는 주소가 없다) · 미리보기와 같은 기록을 같이 쓴다 (appfetch.js)
-     예전에는 4명씩 부르고 마지막 학생이 끝나야 학생 줄을 다시 그려서, 그때까지 모두 「앱 …」이었다 → 한 명 받을 때마다 그 학생 칸만 바로 (20261031b)
-     15초 안에 답이 없거나 실패하면 「과제 기록 못 불러옴 · 다시 시도」 */
+  /* ---------- 과제 기록 불러오기 (20261031g) ----------
+     예전: 학생마다 app-report 를 따로(6명씩) → 32명이면 약 6초 · 다시 열어도 처음부터
+     지금: 반마다 한 번(app-report ?codes= · 함수 안에서 8명씩 동시에) · 반 여러 개를 함께
+           받은 기록은 이 기기에 10분 동안 기억(mhub.appCache · 최근 70일만) → 10분 안에 다시 열면 바로 보이고, 뒤에서 조용히 새로 받아 바뀐 칸만 고친다
+           「오늘」을 보고 있는 동안 5분마다 다시 받는다(다른 탭 · 다른 창이면 멈춤) · 반 카드 오른쪽 위 「과제 10:35 기준 · 새로고침」
+           다시 받는 동안에는 칸만 바꾼다(깜빡이거나 줄 순서가 바뀌지 않게) · 처음 받을 때만 「과제 기록 불러오는 중 3/11」
+     [다시 시도] · 링크를 새로 넣은 학생 한 명은 예전처럼 학생 하나로 (appfetch.js · 미리보기와 같은 기록) */
+  var CACHE_KEY = 'mhub.appCache', CACHE_TTL = 10 * 60 * 1000, REFRESH_MS = 5 * 60 * 1000, KEEP_DAYS = 70;
+  var appMeta = { at: 0, shown: 0, busy: false, cacheRead: false };     /* at = 마지막으로 새로 받은 때 · shown = 지금 보이는 기록의 때(기억한 것이면 그때) */
   var appProg = { done: 0, total: 0, start: 0, timer: null };
-  function loadApp(only) {
+  function readCache() { try { var m = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}'); return m && typeof m === 'object' ? m : {}; } catch (e) { return {}; } }
+  function writeCache(m) {
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(m)); }
+    catch (e) { try { localStorage.removeItem(CACHE_KEY); } catch (e2) {} }        /* 가득 차면 비운다 (다음에 새로 받는다) */
+  }
+  /* 기억할 때는 최근 70일만 (세 기간 · 날짜별 표에 충분) */
+  function trimData(d) {
+    var cutD = Lesson.addDays(DDay.today(), -KEEP_DAYS);
+    var cal = (d.calendar || []).filter(function (c) { return c && c.date >= cutD; });
+    var orders = {};
+    cal.forEach(function (c) { if (c.order) orders[c.order] = 1; });
+    return {
+      calendar: cal,
+      lectures: (d.lectures || []).filter(function (l) { return l && orders[l.order]; }).map(function (l) { return { order: l.order, title: l.title, videosDone: l.videosDone, videosTotal: l.videosTotal }; }),
+      history: (d.history || d.recent || []).filter(function (h) { return h && (orders[h.order] || String(h.submittedAt || '').slice(0, 10) >= cutD); })
+        .map(function (h) { return { title: h.title, order: h.order, submittedAt: h.submittedAt, late: h.late }; })
+    };
+  }
+  /* app-report 답 → 학생 칸 상태 · 앱 링크가 없음(nolink) · 만료(expired) = 「+ 과제 링크 연결」 · 그 밖의 실패 = 「못 불러옴 · 다시 시도」 */
+  function entryOf(res) {
+    var dt = res && res.ok && res.data ? res.data : null, why = (res && res.reason) || '';
+    return dt ? { ok: true, data: trimData(dt), at: Date.now() }
+      : why === 'nolink' || why === 'expired' ? { ok: false, need: true, reason: why, data: null, at: Date.now() }
+      : { ok: false, failed: true, reason: why, data: null, at: Date.now() };
+  }
+  function sameEntry(a, b) { return !!a && !!b && a.ok === b.ok && !!a.need === !!b.need && !!a.failed === !!b.failed && JSON.stringify(a.data) === JSON.stringify(b.data); }
+  function setEntry(s, e) {
+    var old = app[s.id];
+    app[s.id] = e;
+    if (!e.failed) {
+      var m = readCache();
+      m[s.code] = { at: e.at, ok: e.ok, need: !!e.need, reason: e.reason || '', data: e.data };
+      writeCache(m);
+    }
+    if (!sameEntry(old, e)) paintApp(s.id);
+  }
+  /* 처음 한 번 — 10분 안의 기억으로 바로 채운다 */
+  function fromCache(list) {
+    if (appMeta.cacheRead) return;
+    appMeta.cacheRead = true;
+    var m = readCache(), now = Date.now(), oldest = now;
+    list.forEach(function (s) {
+      var c = m[s.code];
+      if (!c || now - c.at > CACHE_TTL || app[s.id]) return;
+      app[s.id] = { ok: c.ok, need: c.need, reason: c.reason, data: c.data, at: c.at, cached: true };
+      if (c.at < oldest) oldest = c.at;
+    });
+    if (oldest < now) appMeta.shown = oldest;            /* at 은 그대로 0 — 기억한 것을 보여 준 뒤 곧바로 뒤에서 새로 받는다 */
+  }
+  function liveList() { return st.data ? st.data.students.filter(function (s) { return s.app && s.code; }) : []; }
+  function loadApp(only, force) {
     var d = st.data;
     if (!d) return;
-    var run = ++appRun;
-    var all = d.students.filter(function (s) { return s.app && s.code; });
-    var todo = all.filter(function (s) {
-      if (only) return s.id === only;
-      var a = app[s.id];
-      return !a || a.failed || Date.now() - a.at > APP_TTL;
-    });
-    todo.forEach(function (s) { delete app[s.id]; paintApp(s.id); });
-    appProg.total = all.length;
-    appProg.done = all.length - all.filter(function (s) { return !app[s.id]; }).length;
-    appProg.start = Date.now();
+    var all = liveList();
+    if (only) {
+      var one = all.find(function (s) { return s.id === only; });
+      if (!one) return;
+      delete app[one.id]; paintApp(one.id);
+      AppFetch.get(one.code, true).then(function (res) { setEntry(one, entryOf(res)); paintAvg(); window.dispatchEvent(new CustomEvent('jt:app', { detail: { done: true } })); });
+      return;
+    }
+    fromCache(all);
+    var missing = all.filter(function (s) { return !app[s.id] || app[s.id].failed; });
+    if (appMeta.busy) return;
+    if (!force && !missing.length && Date.now() - appMeta.at < REFRESH_MS) return;     /* 5분 안이면 그대로 */
+    appMeta.busy = true;
+    paintStamp();
+    /* 처음 받는 학생이 있을 때만 위에 「과제 기록 불러오는 중 3/11」 */
+    appProg.total = missing.length; appProg.done = 0; appProg.start = Date.now();
     clearInterval(appProg.timer);
-    appProg.timer = setInterval(function () { renderApp(); }, 1000);     /* 10초가 넘으면 「조금 오래 걸리고 있습니다」 */
+    if (missing.length) appProg.timer = setInterval(function () { renderApp(); }, 1000);
     renderApp();
-    var i = 0;
-    function one() {
-      if (run !== appRun || i >= todo.length) return Promise.resolve();
-      var s = todo[i++];
-      return AppFetch.get(s.code).then(function (res) {
-        /* 날짜별 기록만 남긴다 — 반마다 지난 수업 전 일주일(D-7 ~ D-1)을 AppWeek.compute 로 센다 (러닝노트 레포트 과제 요약과 같은 계산) */
-        var dt = res && res.ok && res.data ? res.data : null;
-        var why = (res && res.reason) || '';
-        /* 앱 링크가 없음(nolink) · 앱에서 만료됨(expired) = 「과제 링크 연결 필요」, 그 밖의 실패 = 「과제 기록 못 불러옴 · 다시 시도」 (20261031d) */
-        app[s.id] = dt ? { ok: true, data: { calendar: dt.calendar || [], lectures: dt.lectures || [], history: dt.history || dt.recent || [] }, at: Date.now() }
-                       : why === 'nolink' || why === 'expired' ? { ok: false, need: true, reason: why, data: null, at: Date.now() }
-                       : { ok: false, failed: true, reason: why, data: null, at: Date.now() };
-        appProg.done++;
-        paintApp(s.id);
+    var firstFill = missing.length > 0;
+    /* 반마다 한 번 — 반 4개씩 함께 */
+    var by = {}, groups = [];
+    all.forEach(function (s) { var k = s.class_name || '(반 없음)'; if (!by[k]) { by[k] = []; groups.push(k); } by[k].push(s); });
+    var gi = 0;
+    function nextGroup() {
+      if (gi >= groups.length) return Promise.resolve();
+      var rows = by[groups[gi++]];
+      return AppFetch.getMany(rows.map(function (s) { return s.code; })).then(function (res) {
+        rows.forEach(function (s) {
+          var wasMissing = !app[s.id] || app[s.id].failed;
+          var e = entryOf(res[s.code]);
+          if (e.failed && app[s.id] && !app[s.id].failed) return;          /* 다시 받다 실패하면 원래 값을 둔다 */
+          setEntry(s, e);
+          if (wasMissing) appProg.done++;
+        });
         renderApp();
-        return one();
+        paintAvg();
+        return nextGroup();
       });
     }
-    Promise.all([one(), one(), one(), one(), one(), one()]).then(function () {
-      if (run !== appRun) return;
+    Promise.all([nextGroup(), nextGroup(), nextGroup(), nextGroup()]).then(function () {
+      appMeta.busy = false;
+      appMeta.at = appMeta.shown = Date.now();
       clearInterval(appProg.timer);
+      appProg.total = 0;
       renderApp();
-      /* 다 받은 뒤 한 번 — 과제 많이 한 순 · 적게 한 순으로 학생 줄을 다시 세운다 (받는 동안에는 칸만 바꿔서 줄이 뛰지 않게) */
-      if (todo.length && !$('#appRoot').hidden) render();
+      paintStamp();
+      /* 처음 채웠을 때만 한 번 — 펼친 반을 정렬대로 다시 세운다 (다시 받을 때는 줄 순서를 바꾸지 않는다) */
+      if (firstFill && !$('#appRoot').hidden && Object.keys(st.open).length) render();
       window.dispatchEvent(new CustomEvent('jt:app', { detail: { done: true } }));
     });
   }
+  /* 5분마다 — 「오늘」이 보일 때만 (다른 탭 · 숨긴 창이면 멈춤) */
+  function todayVisible() { var p = $('#panel-today'); return !document.hidden && !$('#appRoot').hidden && !!p && !p.hidden; }
+  function autoRefresh() { if (st.data && todayVisible() && !appMeta.busy && Date.now() - appMeta.at >= REFRESH_MS) loadApp(null, true); }
+  setInterval(autoRefresh, 30000);
+  document.addEventListener('visibilitychange', autoRefresh);
 
-  /* 반 카드 위 「과제 기록 불러오는 중 3/11」 (다 불러오면 사라짐 · 10초가 넘으면 「조금 오래 걸리고 있습니다」) */
+  /* 반 카드 오른쪽 위 「과제 10:35 기준 · 새로고침」 */
+  function stampHtml() { return '<div class="td-appstamp" id="tdAppStamp" aria-live="polite"></div>'; }
+  function paintStamp() {
+    var el = $('#tdAppStamp');
+    if (!el) return;
+    if (!liveList().length) { el.hidden = true; return; }
+    el.hidden = false;
+    var t = appMeta.shown ? new Date(appMeta.shown) : null;
+    el.innerHTML = (appMeta.busy ? '<span class="td-appstamp__t">과제 받는 중…</span>'
+      : '<span class="td-appstamp__t num">' + (t ? '과제 ' + String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0') + ' 기준' : '과제') + '</span>') +
+      ' · <button type="button" class="td-appstamp__b" data-app-refresh' + (appMeta.busy ? ' disabled' : '') + '>새로고침</button>';
+  }
+
+  /* 반 카드 위 「과제 기록 불러오는 중 3/11」 (처음 받는 학생이 있을 때만 · 10초가 넘으면 「조금 오래 걸리고 있습니다」) */
   function renderApp() {
     var el = $('#tdAppBar');
     var t = appProg.total, n = Math.min(appProg.done, t);
@@ -160,15 +243,25 @@
     el.hidden = !busy;
     el.innerHTML = busy ? '<i class="spin" aria-hidden="true"></i> ' + (Date.now() - appProg.start > 10000 ? '조금 오래 걸리고 있습니다 · ' : '') + '과제 기록 불러오는 중 <span class="num">' + n + '/' + t + '</span>' : '';
   }
-  /* 그 학생 줄의 과제 칸만 다시 */
+  /* 그 학생 줄의 과제 칸만 다시 (세 칸 · 레포트 발송 · 명단도 jt:app 으로) */
   function paintApp(sid) {
     var s = st.data && st.data.students.find(function (x) { return x.id === sid; });
     if (!s) return;
+    var c = (st.clsBy || {})[s.class_name || '(반 없음)'];
     Array.prototype.forEach.call(document.querySelectorAll('#tdBody .tdc-st[data-id="' + sid + '"] .tdc-app-slot'), function (el) {
-      el.innerHTML = appCell(s, (st.cyBy || {})[s.class_name || '(반 없음)']);
+      el.innerHTML = c ? triHtml(s, c) : appCell(s, (st.cyBy || {})[s.class_name || '(반 없음)']);
     });
     if (det.sid === sid) paintDetail();
     window.dispatchEvent(new CustomEvent('jt:app', { detail: { sid: sid } }));
+  }
+  /* 과제 평균 줄만 다시 (반 카드 · 과정 카드의 반마다) */
+  function paintAvg() {
+    Array.prototype.forEach.call(document.querySelectorAll('#tdBody .tdc-line--app[data-cls]'), function (el) {
+      var c = (st.clsBy || {})[el.dataset.cls];
+      if (!c) return;
+      var h = avgLineHtml(c);
+      if (h) el.outerHTML = h;
+    });
   }
 
   /* ---------- 그리기 ---------- */
@@ -262,7 +355,7 @@
     Store.getClasses().forEach(function (c) { if (!by[c.name]) by[c.name] = { name: c.name, academy: '', rows: [] }; });
     return Object.keys(by).map(function (k) { return by[k]; })
       .filter(function (c) { return !Store.isArchivedClass(c.name); })
-      .map(function (c) { c.next = c.name === '(반 없음)' ? null : nextLesson(c.name); c.cy = c.name === '(반 없음)' ? null : cycleOf(c.name); return c; })
+      .map(function (c) { var no = c.name === '(반 없음)'; c.next = no ? null : nextLesson(c.name); c.cy = no ? null : cycleOf(c.name); c.per = no ? null : periodsOf(c.name); return c; })
       .sort(function (x, y) {
         if (!!x.next !== !!y.next) return x.next ? -1 : 1;               /* 수업일 미정은 맨 아래 */
         if (x.next && y.next && x.next.date !== y.next.date) return x.next.date < y.next.date ? -1 : 1;
@@ -353,8 +446,8 @@
     var k = hwTone(w.hwDone, w.hwDays);
     /* 누르면 그 학생 줄 아래 기간 · 날짜별 표 (마우스를 올리면 한 줄 말풍선 · 20261031f) */
     var L = lessonDate || (cy && cy.L) || '', tip = tipOf(w);
-    return '<button type="button" class="tdc-app tdc-app--' + k + ' tdc-app--btn num" data-app-detail="' + esc(s.id) + '" data-app-date="' + esc(L) + '" data-tip="' + esc(tip) + '"' +
-      ' aria-expanded="' + (det.sid === s.id && det.date === L) + '" aria-label="' + esc('과제 ' + w.hwDone + '/' + w.hwDays + '일 · ' + tip + ' · 누르면 날짜별 표') + '">과제 ' + w.hwDone + '/' + w.hwDays + '일</button>';
+    return '<button type="button" class="tdc-app tdc-app--' + k + ' tdc-app--btn num" data-app-detail="' + esc(s.id) + '" data-app-from="' + esc(w.from) + '" data-app-to="' + esc(w.to) + '" data-app-lesson="' + esc(L) + '" data-tip="' + esc(tip) + '"' +
+      ' aria-expanded="' + (det.sid === s.id && det.from === w.from) + '" aria-label="' + esc('과제 ' + w.hwDone + '/' + w.hwDays + '일 · ' + tip + ' · 누르면 날짜별 표') + '">과제 ' + w.hwDone + '/' + w.hwDays + '일</button>';
   }
 
   /* ---------- 과제 칩 → 기간 · 날짜별 표 (20261031f) ----------
@@ -366,7 +459,8 @@
   var DOWK = ['일', '월', '화', '수', '목', '금', '토'];
   function mdw(iso) { return md(iso) + '(' + DOWK[Lesson.dowOf(iso)] + ')'; }
   function tipOf(w) { return mdw(w.from) + ' ~ ' + mdw(w.to) + ' · 평일 ' + w.hwDays + '일 중 ' + w.hwDone + '일 제출'; }
-  var det = { sid: '', date: '', day: '' };
+  var det = { sid: '', from: '', to: '', lesson: '', live: false, day: '' };
+  function closedDet() { return { sid: '', from: '', to: '', lesson: '', live: false, day: '' }; }
   /* 제출 시각 「23:40」 — 시간대가 붙은 값은 한국 시각으로, 없으면 적힌 그대로 */
   function hhmm(v) {
     var x = String(v || '');
@@ -400,11 +494,11 @@
   var HW_MARK = { onTime: '●', late: '◐', none: '○', off: '', future: '' };
   var HW_NAME = { onTime: '정시 제출', late: '늦게 제출', none: '미제출', off: '과제 없음', future: '아직' };
   var LEC_MARK = { done: '✓', todo: '–', off: '', future: '' };
-  function detailHtml(sid, L) {
+  /* 진행 중 기간은 어제까지만 센다 (오늘 마감이 아직 안 지났으므로 오늘 칸은 흐리게) */
+  function detailHtml(sid, from, to, lesson, live) {
     var a = app[sid];
-    var p = window.AppWeek && AppWeek.lastWeek(L);
-    if (!a || !a.ok || !a.data || !p) return '';
-    var w = AppWeek.compute(a.data, p.from, p.to, DDay.today());
+    if (!a || !a.ok || !a.data || !from || !to || !window.AppWeek) return '';
+    var w = AppWeek.compute(a.data, from, to, live ? Lesson.addDays(DDay.today(), -1) : DDay.today());
     if (!w) return '';
     var n = w.days.length, cells = '<span class="hd-lab" style="grid-column:1;grid-row:2">과제</span><span class="hd-lab" style="grid-column:1;grid-row:3">강의</span>';
     var pick = null;
@@ -423,7 +517,7 @@
         '<span class="hd-l hd-l--' + d.lec + '" style="' + col + 'grid-row:3">' + LEC_MARK[d.lec] + '</span>';
     });
     return '<div class="hd-box" data-hd-box="' + esc(sid) + '">' +
-      '<div class="hd-head num">' + esc(mdw(w.from) + ' ~ ' + mdw(w.to) + ' · ' + mdw(p.lesson) + ' 수업 레포트 기준') + '</div>' +
+      '<div class="hd-head num">' + esc(mdw(w.from) + ' ~ ' + mdw(w.to) + (live ? ' · 진행 중' + (lesson ? ' (' + mdw(lesson) + ' 수업 레포트 기간)' : '') : lesson ? ' · ' + mdw(lesson) + ' 수업 레포트 기준' : '')) + '</div>' +
       '<div class="hd-grid" style="grid-template-columns:2.4em repeat(' + n + ', minmax(0, 1fr))">' + cells + '</div>' +
       (pick ? '<p class="hd-pick">' + esc(dayInfo(a.data, pick)) + '</p>' : '') +
       '<p class="hd-legend">● 정시 제출 ◐ 늦게 제출 ○ 미제출 · 빈칸 그날 과제 없음 / ✓ 강의 다 봄 – 안 봄 · 토 · 일은 주중 복습 · 칸을 누르면 그날 과제</p>' +
@@ -434,13 +528,13 @@
   function paintDetail() {
     Array.prototype.forEach.call(document.querySelectorAll('.hd-box, .hd-tr'), function (el) { el.parentNode.removeChild(el); });
     Array.prototype.forEach.call(document.querySelectorAll('[data-app-detail]'), function (b) {
-      b.setAttribute('aria-expanded', String(b.dataset.appDetail === det.sid && b.dataset.appDate === det.date));
+      b.setAttribute('aria-expanded', String(b.dataset.appDetail === det.sid && b.dataset.appFrom === det.from));
     });
     if (!det.sid) return;
-    var html = detailHtml(det.sid, det.date);
+    var html = detailHtml(det.sid, det.from, det.to, det.lesson, det.live);
     if (!html) return;
     Array.prototype.forEach.call(document.querySelectorAll('[data-app-detail="' + det.sid + '"]'), function (b) {
-      if (b.dataset.appDate !== det.date) return;
+      if (b.dataset.appFrom !== det.from) return;
       var row = b.closest('.tdc-st, .snd-row, tr');
       if (!row) return;
       if (row.tagName === 'TR') {
@@ -457,41 +551,138 @@
     e.preventDefault();
     e.stopPropagation();
     if (b.hasAttribute('data-hd-day')) { det.day = det.day === b.dataset.hdDay ? '' : b.dataset.hdDay; paintDetail(); return; }
-    var same = det.sid === b.dataset.appDetail && det.date === b.dataset.appDate;
-    det = same ? { sid: '', date: '', day: '' } : { sid: b.dataset.appDetail, date: b.dataset.appDate, day: '' };
+    var same = det.sid === b.dataset.appDetail && det.from === b.dataset.appFrom;
+    det = same ? closedDet() : { sid: b.dataset.appDetail, from: b.dataset.appFrom, to: b.dataset.appTo, lesson: b.dataset.appLesson || '', live: b.dataset.appLive === '1', day: '' };
     paintDetail();
   }, true);
-  /* ---------- 학생 줄 정렬 — 「과제 많이 한 순」(기본) · 「과제 적게 한 순」 (20261031d) ----------
-     그 기간 제출한 날 수로 · 같으면 이름순 · 아직 숫자가 없는 학생(불러오는 중 · 못 불러옴 · 과제 없음)은 그 아래 ·
-     「과제 링크 연결 필요」는 어느 정렬이든 맨 아래. 고른 정렬은 이 기기에 기억 (레포트 발송 학생 줄도 같은 정렬) */
-  var SORT_KEY = 'mhub.appSort';
+  /* ---------- 세 기간 (20261031g) ----------
+     반마다 — 지지난 레포트 기간 「10/8~14」 · 가장 최근 레포트 기간 「10/15~21」 · 진행 중 「진행 중 10/22~」
+       레포트 기간 = 그 수업 전 일주일 (D-7 ~ D-1 · AppWeek.lastWeek) — 가장 최근 수업 L1(오늘 포함) · 그 앞 수업 L0
+       진행 중 = L1 ~ 오늘 (다음 수업 전날까지의 기간 · 분모는 어제까지 지난 평일 — 오늘 마감은 아직 안 지났다 · 토 · 일은 세지 않는다)
+     반이 사이트를 쓰기 시작한 날(첫 수업일) 앞 수업은 넣지 않는다 (칩과 같다) */
+  function periodsOf(cls) {
+    var ds = lessonDates(cls);
+    if (!ds || !window.AppWeek) return null;
+    var today = DDay.today(), sc = Store.schedOf(cls), first = (sc && sc.first) || '';
+    var past = ds.filter(function (d) { return d <= today && (!first || d >= first); });
+    var L1 = past[past.length - 1] || '', L0 = past[past.length - 2] || '';
+    var N = ds.filter(function (d) { return d > today; })[0] || '';
+    if (!L1 && !N) return null;
+    var rep = function (L) { if (!L) return null; var x = AppWeek.lastWeek(L); return { from: x.from, to: x.to, lesson: L, live: false }; };
+    return {
+      prev: rep(L0), recent: rep(L1),
+      now: L1 ? { from: L1, to: N ? Lesson.addDays(N, -1) : Lesson.addDays(L1, 6), lesson: N, live: true } : null
+    };
+  }
+  var PKEYS = ['prev', 'recent', 'now'];
+  function dayOf(iso) { return +iso.slice(8, 10); }
+  function perLabel(p) { return p.live ? '진행 중 ' + md(p.from) + '~' : md(p.from) + '~' + (p.from.slice(5, 7) === p.to.slice(5, 7) ? dayOf(p.to) : md(p.to)); }
+  function perShort(p) { return p.live ? '진행' : md(p.from) + '~'; }
+  function perTip(p) {
+    return p.live ? mdw(p.from) + ' ~ 오늘 · 진행 중' + (p.lesson ? ' (' + mdw(p.lesson) + ' 수업 레포트 기간)' : '')
+      : mdw(p.from) + ' ~ ' + mdw(p.to) + ' · ' + mdw(p.lesson) + ' 수업 레포트 기간';
+  }
+  /* 학생 한 명 · 한 기간 — { k: ok | none | pre, done, days, from, to } */
+  function perVal(s, p) {
+    var a = app[s.id];
+    if (!p || !a || !a.ok || !a.data) return null;
+    if (p.live) {
+      var y = Lesson.addDays(DDay.today(), -1), to = p.to < y ? p.to : y;
+      if (to < p.from || !weekdays(p.from, to)) return { k: 'pre' };
+      var wl = AppWeek.compute(a.data, p.from, to, y);
+      return wl && wl.hwDays ? { k: 'ok', done: wl.hwDone, days: wl.hwDays, from: p.from, to: to } : { k: 'none' };
+    }
+    var w = AppWeek.compute(a.data, p.from, p.to, DDay.today());
+    return w && w.hwDays ? { k: 'ok', done: w.hwDone, days: w.hwDays, from: p.from, to: p.to } : { k: 'none' };
+  }
+
+  /* ---------- 학생 줄 정렬 — 머리칸을 누르면 그 기간 기준 (많이 한 순 ↔ 적게 한 순 · 20261031g) ----------
+     기본은 가장 최근 레포트 기간 · 많이 한 순. 비율 → 제출한 날 → 이름순 · 숫자가 없는 학생은 그 아래 · 「+ 과제 링크 연결」은 맨 아래
+     모든 반에 같이 적용 · 이 기기에 기억 (mhub.appSort = most | least · mhub.appSortP = prev | recent | now)
+     레포트 발송 학생 목록은 그 레포트 기간 하나로 같은 방향(sortStudents) */
+  var SORT_KEY = 'mhub.appSort', SORTP_KEY = 'mhub.appSortP';
   function appSort() { try { return localStorage.getItem(SORT_KEY) === 'least' ? 'least' : 'most'; } catch (e) { return 'most'; } }
-  function setAppSort(v) {
-    try { localStorage.setItem(SORT_KEY, v === 'least' ? 'least' : 'most'); } catch (e) {}
+  function appSortP() { try { var v = localStorage.getItem(SORTP_KEY); return PKEYS.indexOf(v) !== -1 ? v : 'recent'; } catch (e) { return 'recent'; } }
+  function setAppSort(v, pk) {
+    try {
+      localStorage.setItem(SORT_KEY, v === 'least' ? 'least' : 'most');
+      if (pk) localStorage.setItem(SORTP_KEY, pk);
+    } catch (e) {}
     window.dispatchEvent(new CustomEvent('jt:appsort'));
   }
-  function sortRows(rows, cy, lessonDate) {
+  /* 머리칸 — 같은 칸이면 방향만 바꾸고, 다른 칸이면 그 칸 · 많이 한 순 */
+  function sortByHead(pk) { setAppSort(appSortP() === pk ? (appSort() === 'most' ? 'least' : 'most') : 'most', pk); }
+  function sortKeyOf(s, c) {
+    var x = appState(s, c.cy);
+    if (x.k === 'need') return { g: 3 };
+    var v = c.per ? perVal(s, c.per[appSortP()]) : null;
+    return v && v.k === 'ok' ? { g: 0, r: v.done / v.days, n: v.done } : { g: x.k === 'wait' || x.k === 'fail' ? 2 : 1 };
+  }
+  function sortRows(rows, c) {
+    var dir = appSort() === 'least' ? 1 : -1;
+    return rows.map(function (s) { return { s: s, k: sortKeyOf(s, c) }; }).sort(function (a, b) {
+      if (a.k.g !== b.k.g) return a.k.g - b.k.g;
+      if (a.k.g === 0 && a.k.r !== b.k.r) return (a.k.r - b.k.r) * dir;
+      if (a.k.g === 0 && a.k.n !== b.k.n) return (a.k.n - b.k.n) * dir;
+      return byName(a.s, b.s);
+    }).map(function (x) { return x.s; });
+  }
+  /* 레포트 발송 — 그 레포트 기간 칩 하나 (예전과 같은 정렬 · 방향만 같이 씀) */
+  function sortByLesson(rows, cy, lessonDate) {
     var dir = appSort() === 'least' ? 1 : -1;
     return rows.map(function (s) {
       var x = appState(s, cy, lessonDate);
-      return { s: s, g: x.k === 'need' ? 2 : x.k === 'ok' ? 0 : 1, n: x.w ? x.w.hwDone : 0 };
+      return { s: s, g: x.k === 'need' ? 2 : x.k === 'ok' ? 0 : 1, r: x.w ? x.w.hwDone / x.w.hwDays : 0, n: x.w ? x.w.hwDone : 0 };
     }).sort(function (a, b) {
       if (a.g !== b.g) return a.g - b.g;
+      if (a.g === 0 && a.r !== b.r) return (a.r - b.r) * dir;
       if (a.g === 0 && a.n !== b.n) return (a.n - b.n) * dir;
       return byName(a.s, b.s);
     }).map(function (x) { return x.s; });
   }
-  /* 「학생 12명 접기 ▴」 띠 오른쪽 끝 작은 글자 버튼 두 개 — 고른 쪽만 진하게 (펼쳤을 때만 · 20261031e) */
+  /* 레포트 발송 목록 머리줄의 작은 글자 버튼 두 개 (그 화면은 기간이 하나라 예전처럼) */
   function sortBarHtml() {
     var v = appSort();
     return '<span class="app-sort" role="group" aria-label="학생 줄 정렬">' +
       [['most', '많이 한 순'], ['least', '적게 한 순']].map(function (o) {
-        return '<button type="button" class="app-sort__b' + (v === o[0] ? ' is-on' : '') + '" data-app-sort="' + o[0] + '" aria-pressed="' + (v === o[0]) + '" title="과제 ' + o[1] + ' (모든 반 같이 · 이 기기에 기억)">' + o[1] + '</button>';
+        return '<button type="button" class="app-sort__b' + (v === o[0] ? ' is-on' : '') + '" data-app-sort="' + o[0] + '" aria-pressed="' + (v === o[0]) + '" title="과제 ' + o[1] + ' (이 기기에 기억)">' + o[1] + '</button>';
       }).join('') + '</span>';
   }
-  function toggleBar(key, n, open) {
-    return '<div class="tdc-togglebar"><button type="button" class="tdc-toggle" data-toggle aria-expanded="' + open + '">학생 ' + n + '명 ' + (open ? '접기 ▴' : '보기 ▾') + '</button>' +
-      (open ? sortBarHtml() : '') + '</div>';
+  /* 세 기간 머리칸 — 마우스를 올리면 전체 기간 · 누르면 그 기간 정렬 · 지금 기준 칸에 ▼(많이 한 순) ▲(적게 한 순) */
+  function headHtml(c) {
+    if (!c.per) return '<span class="tdc-tri tdc-tri--head" aria-hidden="true"></span>';
+    var pk = appSortP(), dir = appSort();
+    return '<span class="tdc-tri tdc-tri--head" role="group" aria-label="과제 기간 (누르면 그 기간으로 정렬)">' + PKEYS.map(function (k) {
+      var p = c.per[k];
+      if (!p) return '<span class="tdc-th tdc-th--empty"></span>';
+      var on = pk === k, tip = perTip(p);
+      return '<button type="button" class="tdc-th' + (p.live ? ' is-live' : '') + (on ? ' is-on' : '') + '" data-app-sortp="' + k + '" data-tip="' + esc(tip) + '" aria-pressed="' + on + '"' +
+        ' aria-label="' + esc(tip + (on ? ' · 지금 ' + (dir === 'most' ? '많이 한 순' : '적게 한 순') : '') + ' · 누르면 이 기간으로 정렬') + '">' +
+        '<span class="hd-full">' + esc(perLabel(p)) + '</span><span class="hd-short">' + esc(perShort(p)) + '</span>' + (on ? '<i class="tdc-th__dir">' + (dir === 'most' ? '▼' : '▲') + '</i>' : '') + '</button>';
+    }).join('') + '</span>';
+  }
+  /* 학생 줄 세 칸 — 숫자 칩만 「4/5」 (100% 초록 · 60~80% 파랑 · 20~40% 주황 · 0% 빨강) · 진행 중은 점선 ·
+     링크 없는 학생은 세 칸을 합쳐 [+ 과제 링크 연결] 하나 · 불러오는 중 · 못 불러옴 · 수업일 미정도 세 칸을 합친다 */
+  function triHtml(s, c) {
+    var x = appState(s, c.cy);
+    var span = function (h) { return '<span class="tdc-tri__span">' + h + '</span>'; };
+    if (x.k === 'need' || x.k === 'wait' || x.k === 'fail') return span(appCell(s, c.cy));
+    if (!c.per) return span('<span class="tdc-app tdc-app--none">과제 · 수업일 정하면 보임</span>');
+    if (!c.per.recent && !c.per.now) return span('<span class="tdc-app tdc-app--none">과제 · 첫 수업 뒤부터 보임</span>');
+    return PKEYS.map(function (k) {
+      var p = c.per[k];
+      if (!p) return '<span class="tdc-tc tdc-tc--empty" aria-hidden="true"></span>';
+      var v = perVal(s, p), live = p.live ? ' is-live' : '';
+      if (!v || v.k === 'pre') return '<span class="tdc-tc tdc-tc--muted' + live + '" title="' + esc(perTip(p)) + '">시작 전</span>';
+      if (v.k === 'none') return '<span class="tdc-tc tdc-tc--muted' + live + '" title="' + esc(perTip(p) + ' — 앱 과제 없음') + '">없음</span>';
+      var tip = mdw(v.from) + ' ~ ' + mdw(v.to) + ' · 평일 ' + v.days + '일 중 ' + v.done + '일 제출' + (p.live ? ' (진행 중 · 어제까지)' : '');
+      return '<button type="button" class="tdc-tc tdc-app--btn tdc-app--' + hwTone(v.done, v.days) + live + ' num" data-app-detail="' + esc(s.id) + '" data-app-from="' + esc(p.from) + '" data-app-to="' + esc(p.to) + '" data-app-lesson="' + esc(p.lesson || '') + '"' + (p.live ? ' data-app-live="1"' : '') +
+        ' data-tip="' + esc(tip) + '" aria-expanded="' + (det.sid === s.id && det.from === p.from) + '" aria-label="' + esc(v.done + '/' + v.days + ' · ' + tip + ' · 누르면 날짜별 표') + '">' + v.done + '/' + v.days + '</button>';
+    }).join('');
+  }
+  function toggleBar(key, n, open, c) {
+    return '<div class="tdc-togglebar' + (open && c ? ' tdc-grid' : '') + '"><button type="button" class="tdc-toggle" data-toggle aria-expanded="' + open + '">학생 ' + n + '명 ' + (open ? '접기 ▴' : '보기 ▾') + '</button>' +
+      (open && c ? headHtml(c) + '<span class="tdc-grid__rest" aria-hidden="true"></span>' : '') + '</div>';
   }
   /* 반 카드 위 「+ 과제 링크 연결 필요 n명」 — 누르면 그 학생들 링크 칸이 차례로 펼쳐진다 (applink.js) */
   function needIds(rows, cy) { return rows.filter(function (s) { return appState(s, cy).k === 'need'; }).map(function (s) { return s.id; }); }
@@ -500,72 +691,68 @@
   }
   function openAppLink(ids) { if (window.AppLink) AppLink.open(ids); }
 
-  /* ---------- 과제 평균 (20261031e) ----------
-     레포트 발송 칩과 같은 수업일들 — 그 레포트 기간(수업 전 일주일 · 평일)의 반 평균 과제율 (학생마다 제출한 날 / 과제 있던 날의 평균)
-     80% 이상 초록 · 50~79% 파랑 · 50% 미만 주황. 「+ 과제 링크 연결」 학생 · 못 불러온 학생은 빼고 「(링크 없는 2명 제외)」
-     이번 주 진행 중 — 다음 수업의 기간(다음 수업 D-7 ~ D-1) 중 어제까지 지난 평일만 「이번 주 진행 중 40% · 2/5일 지남」 */
-  function avgOf(rows, cy, date) {
-    var rates = [], need = 0, wait = 0, fail = 0;
+  /* ---------- 과제 평균 (20261031g) ----------
+     세 기간과 같다 — 「과제 평균  10/8~14 62% · 10/15~21 58% · 진행 중 40%」 (학생마다 제출한 날 / 과제 있던 날의 평균)
+     80% 이상 초록 · 50~79% 파랑 · 50% 미만 주황 · 진행 중은 점선. 「+ 과제 링크 연결」 학생 · 못 불러온 학생은 빼고 「(링크 없는 2명 제외)」 */
+  function avgOfPer(rows, cy, p) {
+    var rates = [], need = 0, wait = 0, fail = 0, pre = true;
     rows.forEach(function (s) {
-      var x = appState(s, cy, date);
-      if (x.k === 'need') need++; else if (x.k === 'wait') wait++; else if (x.k === 'fail') fail++;
-      else if (x.k === 'ok') rates.push(x.w.hwDone / x.w.hwDays);
+      var x = appState(s, cy);
+      if (x.k === 'need') { need++; return; }
+      if (x.k === 'wait') { wait++; return; }
+      if (x.k === 'fail') { fail++; return; }
+      var v = perVal(s, p);
+      if (v && v.k !== 'pre') pre = false;
+      if (v && v.k === 'ok') rates.push(v.done / v.days);
     });
-    return { need: need, wait: wait, fail: fail, pct: rates.length ? Math.round(rates.reduce(function (a, b) { return a + b; }, 0) / rates.length * 100) : null };
+    return { need: need, wait: wait, fail: fail, pre: pre, pct: rates.length ? Math.round(rates.reduce(function (a, b) { return a + b; }, 0) / rates.length * 100) : null };
   }
   function avgTone(p) { return p >= 80 ? 'ok' : p >= 50 ? 'mid' : 'low'; }
   function weekdays(from, to) { var n = 0; for (var d = from; d <= to; d = Lesson.addDays(d, 1)) { var w = Lesson.dowOf(d); if (w !== 0 && w !== 6) n++; } return n; }
-  function progressOf(c) {
-    var ds = lessonDates(c.name), today = DDay.today();
-    var N = ds && ds.filter(function (d) { return d > today; })[0];
-    if (!N || !window.AppWeek) return null;
-    var p = AppWeek.lastWeek(N), y = Lesson.addDays(today, -1);
-    var tot = weekdays(p.from, p.to), el = y < p.from ? 0 : weekdays(p.from, y < p.to ? y : p.to);
-    var rates = [], wait = 0;
-    c.rows.forEach(function (s) {
-      var x = appState(s, c.cy, N);
-      if (x.k === 'wait') { wait++; return; }
-      var a = app[s.id];
-      if (x.k === 'need' || x.k === 'fail' || !a || !a.ok || !a.data || !el) return;
-      var w = AppWeek.compute(a.data, p.from, p.to, y);
-      if (w && w.hwDays) rates.push(w.hwDone / w.hwDays);
-    });
-    return { tot: tot, el: el, wait: wait, pct: rates.length ? Math.round(rates.reduce(function (a, b) { return a + b; }, 0) / rates.length * 100) : null };
-  }
-  function linesHtml(c, chips) {
-    if (c.name === '(반 없음)' || !c.rows.length) return '';
-    var out = chips.length ? '<div class="tdc-line"><span class="tdc-line__t">레포트 발송</span><span class="tdc-chips" aria-label="최근 수업 레포트 발송">' + chips.map(function (x) { return chipHtml(c, x); }).join('') + '</span></div>' : '';
-    var pr = progressOf(c);
-    if (!chips.length && !pr) return out;
-    var avgs = chips.map(function (x) { return { x: x, a: avgOf(c.rows, c.cy, x.date) }; });
-    var waiting = avgs.some(function (v) { return v.a.wait; }) || (pr && pr.wait);
+  function avgLineHtml(c) {
+    if (c.name === '(반 없음)' || !c.rows.length || !c.per) return '';
+    var ps = PKEYS.map(function (k) { return c.per[k]; }).filter(Boolean);
+    if (!ps.length) return '';
+    var avgs = ps.map(function (p) { return { p: p, a: avgOfPer(c.rows, c.cy, p) }; });
     var body;
-    if (waiting) body = '<span class="tdc-avg tdc-avg--wait"><i class="spin" aria-hidden="true"></i>불러오는 중</span>';
+    if (avgs.some(function (v) { return v.a.wait; })) body = '<span class="tdc-avg tdc-avg--wait"><i class="spin" aria-hidden="true"></i>불러오는 중</span>';
     else {
       body = '<span class="tdc-chips">' + avgs.map(function (v) {
-        var day = Store.dateWithDow(v.x.date);
+        var name = v.p.live ? '진행 중' : perLabel(v.p), live = v.p.live ? ' is-live' : '', tip = perTip(v.p);
+        if (v.p.live && v.a.pre) return '<span class="tdc-avg tdc-avg--none' + live + ' num" title="' + esc(tip) + '">진행 중 시작 전</span>';
         return v.a.pct === null
-          ? '<span class="tdc-avg tdc-avg--none num" title="' + esc(day + ' 수업 전 일주일 — 과제 기록이 있는 학생이 없습니다') + '">' + esc(day) + ' 과제 없음</span>'
-          : '<span class="tdc-avg tdc-avg--' + avgTone(v.a.pct) + ' num" title="' + esc(day + ' 수업 전 일주일 평일 — 반 평균 과제율') + '">' + esc(day + ' ' + v.a.pct + '%') + '</span>';
+          ? '<span class="tdc-avg tdc-avg--none' + live + ' num" title="' + esc(tip + ' — 과제 기록이 있는 학생이 없습니다') + '">' + esc(name) + ' 과제 없음</span>'
+          : '<span class="tdc-avg tdc-avg--' + avgTone(v.a.pct) + live + ' num" title="' + esc(tip + ' — 반 평균 과제율') + '">' + esc(name + ' ' + v.a.pct + '%') + '</span>';
       }).join('') + '</span>';
-      var a0 = avgs.length ? avgs[avgs.length - 1].a : avgOf(c.rows, c.cy, null);
-      var ex = [];
+      var a0 = avgs[0].a, ex = [];
       if (a0.need) ex.push('링크 없는 ' + a0.need + '명');
       if (a0.fail) ex.push('못 불러온 ' + a0.fail + '명');
       if (ex.length) body += '<span class="tdc-line__note">(' + ex.join(' · ') + ' 제외)</span>';
-      if (pr) body += '<span class="tdc-prog num">이번 주 진행 중 ' + (pr.pct !== null ? pr.pct + '% · ' : pr.el ? '· 과제 없음 · ' : '· ') + pr.el + '/' + pr.tot + '일 지남</span>';
     }
-    return out + '<div class="tdc-line tdc-line--app"><span class="tdc-line__t">과제 평균</span>' + body + '</div>';
+    return '<div class="tdc-line tdc-line--app" data-cls="' + esc(c.name) + '"><span class="tdc-line__t">과제 평균</span>' + body + '</div>';
+  }
+  function linesHtml(c, chips) {
+    if (c.name === '(반 없음)' || !c.rows.length) return '';
+    return (chips.length ? '<div class="tdc-line"><span class="tdc-line__t">레포트 발송</span><span class="tdc-chips" aria-label="최근 수업 레포트 발송">' + chips.map(function (x) { return chipHtml(c, x); }).join('') + '</span></div>' : '') +
+      avgLineHtml(c);
   }
 
-  function studentRow(s, cy) {
-    return '<div class="tdc-st" data-id="' + esc(s.id) + '">' +
-      '<div class="tdc-st__main">' + (window.Profile ? Profile.avatar({ id: s.id, name: s.name }, 's') : '') + '<button type="button" class="roster__name roster__name-btn" data-card="' + esc(s.id) + '">' + esc(s.name) + '</button><span class="tdc-app-slot">' + appCell(s, cy) + '</span></div>' +
+  /* 학생 줄 — 이름 | 세 칸 | 버튼 (휴대폰에서는 버튼을 「⋯」 하나로 묶는다 · 20261031g) */
+  function actsHtml(s) {
+    var id = esc(s.id);
+    var btns = '<button type="button" class="btn btn--sm" data-card="' + id + '">상담 카드</button>' +
+      '<button type="button" class="btn btn--sm" data-sms-sid="' + id + '">문자</button>' +
+      '<button type="button" class="btn btn--sm btn--ghost" data-pv="parent" data-sid="' + id + '">학부모 화면 미리보기</button>' +
+      '<button type="button" class="btn btn--sm btn--ghost" data-pv="student" data-sid="' + id + '">학생 화면 미리보기</button>';
+    return '<div class="tdc-st__acts">' + btns +
+      '<details class="tdc-more"><summary class="btn btn--sm tdc-more__b" aria-label="' + esc(s.name) + ' 더 보기">⋯</summary><div class="tdc-more__menu">' + btns + '</div></details></div>';
+  }
+  function studentRow(s, c) {
+    return '<div class="tdc-st tdc-grid" data-id="' + esc(s.id) + '">' +
+      '<div class="tdc-st__main">' + (window.Profile ? Profile.avatar({ id: s.id, name: s.name }, 's') : '') + '<button type="button" class="roster__name roster__name-btn" data-card="' + esc(s.id) + '">' + esc(s.name) + '</button></div>' +
+      '<span class="tdc-app-slot tdc-tri">' + triHtml(s, c) + '</span>' +
+      actsHtml(s) +
       (window.AppLink ? AppLink.boxHtml(s.id) : '') +
-      '<div class="tdc-st__acts"><button type="button" class="btn btn--sm" data-card="' + esc(s.id) + '">상담 카드</button>' +
-        '<button type="button" class="btn btn--sm" data-sms-sid="' + esc(s.id) + '">문자</button>' +
-        '<button type="button" class="btn btn--sm btn--ghost" data-pv="parent" data-sid="' + esc(s.id) + '">학부모 화면 미리보기</button>' +
-        '<button type="button" class="btn btn--sm btn--ghost" data-pv="student" data-sid="' + esc(s.id) + '">학생 화면 미리보기</button></div>' +
     '</div>';
   }
 
@@ -705,9 +892,11 @@
             linesHtml(c, chipsOf(c)) + '</div>';
         }).join('') +
       '</div><div class="tdc-btns"><button type="button" class="btn btn--sm btn--primary tdc-write" data-write-course="' + esc(ckey) + '">레포트 작성</button></div></div>' +
-      (n ? toggleBar(ckey, n, open) : '') +
+      (n ? toggleBar(ckey, n, open, null) : '') +
+      /* 과정 — 반마다 수업일이 달라 반별 목록마다 머리칸을 따로 */
       (open ? '<div class="tdc-list">' + cls.map(function (c) {
-        return '<div class="tdc-sub"><div class="tdc-sub__t">' + esc(c.name) + ' · ' + c.rows.length + '명</div>' + sortRows(c.rows, c.cy).map(function (s) { return studentRow(s, c.cy); }).join('') + '</div>';
+        return '<div class="tdc-sub"><div class="tdc-sub__t tdc-grid"><span class="tdc-sub__n">' + esc(c.name) + ' · ' + c.rows.length + '명</span>' + headHtml(c) + '<span class="tdc-grid__rest" aria-hidden="true"></span></div>' +
+          sortRows(c.rows, c).map(function (s) { return studentRow(s, c); }).join('') + '</div>';
       }).join('') + '</div>' : '') +
     '</div>';
   }
@@ -728,8 +917,8 @@
           (c.name === '(반 없음)' ? '' : '<button type="button" class="btn btn--sm btn--primary tdc-write" data-write="' + esc(c.name) + '">레포트 작성</button>') +
         '</div>' +
       '</div>' +
-      (n ? toggleBar(c.name, n, open) : '') +
-      (open ? '<div class="tdc-list">' + sortRows(rows, c.cy).map(function (s) { return studentRow(s, c.cy); }).join('') + '</div>' : '') +
+      (n ? toggleBar(c.name, n, open, c) : '') +
+      (open ? '<div class="tdc-list">' + sortRows(rows, c).map(function (s) { return studentRow(s, c); }).join('') + '</div>' : '') +
     '</div>';
   }
   /* 카드 차례 — 과정은 한 묶음 (가장 가까운 반 수업일 자리) · 담당 조교의 반(또는 그 반이 든 과정)이 맨 위 */
@@ -752,8 +941,8 @@
     var d = st.data;
     if (!d) return;
     var classes = classList(d);
-    st.cyBy = {};
-    classes.forEach(function (c) { st.cyBy[c.name] = c.cy; });
+    st.cyBy = {}; st.clsBy = {};
+    classes.forEach(function (c) { st.cyBy[c.name] = c.cy; st.clsBy[c.name] = c; });
     var unsent = unsentOf(classes);
     var unsentN = unsent.reduce(function (a, u) { return a + u.x.left; }, 0);
 
@@ -777,9 +966,10 @@
         '챙길 학생 = 마감이 지났는데 복습테스트를 안 낸 학생(그 수업 레포트를 보내면 사라짐) · 결석이 기준(설정)을 넘은 학생(그 뒤 상담 기록을 남기면 사라짐).</p></div>' +
       todoHtml(unsent) +
       careHtml(careItems(d)) +
-      '<div class="td-appbar" id="tdAppBar" hidden role="status" aria-live="polite"></div>' +
+      '<div class="td-appbar" id="tdAppBar" hidden role="status" aria-live="polite"></div>' + stampHtml() +
       '<div class="tdc-list-wrap">' + cardsOf(classes).map(function (it) { return it.course ? courseCardHtml(it.course, it.cls) : classCardHtml(it.c); }).join('') + '</div>';
     paintDetail();
+    paintStamp();
   }
 
 
@@ -825,11 +1015,13 @@
       var by = {};
       list.forEach(function (x) { by[x.id] = x; });
       var cy = known.length ? cycleOf(rowById(known[0].id).class_name || '') : null;
-      return sortRows(known.map(function (x) { return rowById(x.id); }), cy, lessonDate).map(function (s) { return by[s.id]; }).concat(rest.sort(byName));
+      return sortByLesson(known.map(function (x) { return rowById(x.id); }), cy, lessonDate).map(function (s) { return by[s.id]; }).concat(rest.sort(byName));
     },
     sortBarHtml: sortBarHtml,
     paintDetail: paintDetail,
-    detailOpen: function () { return { sid: det.sid, date: det.date, day: det.day }; },
+    /* 과제 칸이 모두 채워졌나 (불러오는 중인 학생이 없음) — 시험 · 로딩 시간 재기 */
+    appReady: function () { return !!st.data && liveList().every(function (s) { return !!app[s.id]; }); },
+    detailOpen: function () { return { sid: det.sid, from: det.from, day: det.day }; },
     setAppSort: setAppSort,
     appSort: appSort,
     retryApp: function (sid) { loadApp(sid); },
@@ -856,6 +1048,9 @@
     if (e.target.closest('[data-care-hist]')) { st.careHist = !st.careHist; render(); return; }
     var uc = e.target.closest('[data-care-undo]');
     if (uc) { if (window.Skips) Skips.uncheck(uc.dataset.careUndo); return; }
+    var sp = e.target.closest('[data-app-sortp]');
+    if (sp) { sortByHead(sp.dataset.appSortp); return; }
+    if (e.target.closest('[data-app-refresh]')) { loadApp(null, true); return; }
     var so = e.target.closest('[data-app-sort]');
     if (so) { setAppSort(so.dataset.appSort); return; }
     var ca = e.target.closest('[data-care]');
@@ -881,7 +1076,8 @@
       render();
     }
   });
-  $('#tdRefresh').addEventListener('click', function () { app = {}; if (window.AppFetch) AppFetch.clear(); load(true); loadLinks(); });
+  /* [새로고침] — 칸을 비우지 않고 다시 받는다 (깜빡이지 않게) */
+  $('#tdRefresh').addEventListener('click', function () { if (window.AppFetch) AppFetch.clear(); load(true); loadLinks(); loadApp(null, true); });
 
   /* [레포트 작성] — 레포트 발송 → 1 작성에서 그 반 이번 주 작성 화면 */
   function writeWeek(cls, week) {
@@ -1008,6 +1204,13 @@
   window.addEventListener('jt:roster-changed', function () { if (st.data && !$('#appRoot').hidden) render(); });
   /* 과정 · 담당 조교를 불러오면 카드 묶음 · 차례를 다시 (course.js) */
   window.addEventListener('jt:courses', function () { if (st.data && !$('#appRoot').hidden) render(); });
+  /* 휴대폰 「⋯」 메뉴 — 바깥을 누르거나 메뉴 안 버튼을 누르면 닫는다 · 한 번에 하나만 */
+  document.addEventListener('click', function (e) {
+    var mine = e.target.closest && e.target.closest('details.tdc-more');
+    Array.prototype.forEach.call(document.querySelectorAll('details.tdc-more[open]'), function (d) {
+      if (d !== mine || e.target.closest('.tdc-more__menu button')) d.open = false;
+    });
+  });
   /* 건너뛰기 · 확인함 (skips.js) · 과제 링크 칸을 펼치거나 접으면 (applink.js) 다시 그린다 */
   window.addEventListener('jt:skips', function () { if (st.data && !$('#appRoot').hidden) render(); });
   window.addEventListener('jt:applink-ui', function () { if (st.data && !$('#appRoot').hidden) render(); });

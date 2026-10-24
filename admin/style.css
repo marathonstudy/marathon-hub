@@ -3026,7 +3026,67 @@ td .av--s { margin-right: 6px; }
   .hd-box { padding: 8px 6px; }
   .hd-grid { gap: 2px; grid-template-columns: 2em repeat(7, minmax(0, 1fr)) !important; }
   .hd-c { min-height: 28px; font-size: 13px; border-radius: 6px; }
-  .hd-c--wk { font-size: 9.5px; letter-spacing: -.02em; }
-  .hd-h { font-size: 10.5px; }
+  .hd-c--wk { font-size: 11px; letter-spacing: -.06em; line-height: 1.1; }
+  .hd-h { font-size: 11px; }
   .hd-h b { font-size: 12px; }
+}
+
+/* ---------- 세 기간 과제 — 이름 | 세 칸 | 버튼 (today.js · 20261031g) ----------
+   머리칸(「학생 11명 접기 ▴」 줄 · 과정 카드는 반별 목록마다)과 학생 줄이 같은 칸 나눔이라 숫자가 세로로 줄 맞는다 */
+.tdc-grid { display: grid; grid-template-columns: 11.5em repeat(3, 92px) minmax(0, 1fr); column-gap: 6px; align-items: center; }
+.tdc-st.tdc-grid { display: grid; row-gap: 2px; }
+.tdc-st.tdc-grid .tdc-st__main { min-width: 0; flex-wrap: nowrap; }
+.tdc-st.tdc-grid .roster__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tdc-st.tdc-grid .tdc-st__acts { justify-content: flex-end; flex-wrap: wrap; width: auto; }
+.tdc-st.tdc-grid .tdc-st__acts > .btn { flex: none; }
+.tdc-st.tdc-grid > .al-box, .tdc-st.tdc-grid > .hd-box { grid-column: 1 / -1; }
+.tdc-tri { display: contents; }
+.tdc-tri__span { grid-column: 2 / span 3; min-width: 0; display: flex; align-items: center; }
+.tdc-tri--head { display: contents; }
+.tdc-togglebar.tdc-grid { padding-right: 8px; }
+.tdc-togglebar.tdc-grid .tdc-toggle { grid-column: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tdc-th { appearance: none; border: 1px solid transparent; background: none; font: inherit; font-size: 11.5px; font-weight: 700; color: var(--ink-mid);
+  padding: 4px 2px; border-radius: 7px; cursor: pointer; text-align: center; white-space: nowrap; position: relative; min-width: 0; }
+.tdc-th:hover { background: #F1EFFC; color: #4A34B8; }
+.tdc-th.is-on { color: var(--ink-deep); font-weight: 800; }
+.tdc-th.is-live { border: 1px dashed #B9BDD0; }
+.tdc-th__dir { font-style: normal; font-size: 11px; margin-left: 2px; }
+.tdc-th--empty { min-height: 1px; }
+.hd-short { display: none; }
+.tdc-tc { justify-self: stretch; text-align: center; padding: 2px 0; border-radius: 999px; font-size: 12.5px; font-weight: 800; line-height: 1.45; border: 1px solid transparent; }
+button.tdc-tc { appearance: none; font: inherit; font-size: 12.5px; font-weight: 800; cursor: pointer; position: relative; }
+.tdc-tc.is-live { border-style: dashed !important; border-color: #9DA2B8; }
+.tdc-tc--muted { background: #EEF0F5; color: #565B73; font-size: 11.5px; font-weight: 700; }
+.tdc-tc--empty { min-height: 1px; }
+.tdc-avg.is-live { border-style: dashed; border-color: #9DA2B8; }
+.tdc-sub__t.tdc-grid { margin: 6px 0 2px; }
+.tdc-sub__n { grid-column: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tdc-grid__rest { min-height: 1px; }
+@media (hover: hover) {
+  .tdc-th[data-tip]:hover::after { content: attr(data-tip); position: absolute; left: 0; bottom: calc(100% + 5px); white-space: nowrap; background: #2C3566; color: #fff;
+    font-size: 12px; font-weight: 600; padding: 4px 8px; border-radius: 6px; z-index: 30; pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,.18); }
+}
+/* 반 카드 오른쪽 위 「과제 10:35 기준 · 새로고침」 */
+.td-appstamp { display: flex; justify-content: flex-end; align-items: center; gap: 2px; margin: -4px 0 6px; font-size: 12px; color: var(--ink-light); }
+.td-appstamp__b { appearance: none; border: 0; background: none; font: inherit; font-size: 12px; font-weight: 700; color: #5A3FD0; cursor: pointer; padding: 2px; }
+.td-appstamp__b:disabled { color: var(--ink-light); cursor: default; }
+/* 휴대폰 「⋯」 — 컴퓨터에서는 버튼 그대로 */
+.tdc-more { display: none; position: relative; }
+.tdc-more > summary { list-style: none; min-width: 34px; padding-left: 6px; padding-right: 6px; font-weight: 800; }
+.tdc-more > summary::-webkit-details-marker { display: none; }
+.tdc-more__menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 40; display: grid; gap: 4px; min-width: 168px; padding: 6px;
+  background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px rgba(20,22,40,.16); }
+.tdc-more__menu .btn { width: 100%; justify-content: flex-start; }
+.tdc-card.is-open, .tdc-card:has(details.tdc-more[open]) { overflow: visible; }
+@media (max-width: 390px) {
+  .tdc-grid { grid-template-columns: minmax(0, 1fr) repeat(3, 44px) 34px; column-gap: 4px; }
+  .hd-full { display: none; }
+  .hd-short { display: inline; }
+  .tdc-th { font-size: 11px; padding: 4px 0; }
+  .tdc-tc, button.tdc-tc { font-size: 12px; }
+  .tdc-tc--muted { font-size: 11px; letter-spacing: -.05em; }
+  .tdc-st.tdc-grid .tdc-st__acts > .btn { display: none; }
+  .tdc-more { display: block; }
+  .tdc-st.tdc-grid .tdc-st__acts { width: auto !important; }
+  .tdc-tri__span .tdc-app, .tdc-tri__span .tdc-link-btn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 }

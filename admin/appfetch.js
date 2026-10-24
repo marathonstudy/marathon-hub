@@ -40,8 +40,47 @@
     flying[code] = p;
     return p;
   }
+  /* 반 단위로 한 번에 (?codes= · 30명까지 · 20261031g) — 「오늘」 첫 화면용 가벼운 기록 { 코드: res }
+     함수가 아직 예전 것(codes 를 모름)이면 한 명씩 부르는 것으로 돌아간다 (6명씩 동시에) */
+  var manyOff = false;
+  function getMany(codes) {
+    codes = (codes || []).filter(Boolean);
+    if (!codes.length) return Promise.resolve({});
+    if (codes.length > 30) {
+      var parts = [];
+      for (var i = 0; i < codes.length; i += 30) parts.push(codes.slice(i, i + 30));
+      return Promise.all(parts.map(getMany)).then(function (rs) { return Object.assign.apply(null, [{}].concat(rs)); });
+    }
+    if (manyOff) return oneByOne(codes);
+    var ctl = global.AbortController ? new AbortController() : null;
+    var timer = setTimeout(function () { if (ctl) ctl.abort(); }, TIMEOUT + 10000);
+    var u = CONFIG.supabase.url + '/functions/v1/' + CONFIG.appFunction + '?codes=' + encodeURIComponent(codes.join(','));
+    return Promise.resolve().then(function () { return fetch(u, { headers: { apikey: CONFIG.supabase.key }, signal: ctl ? ctl.signal : undefined }); })
+      .then(function (r) { return r.json(); })
+      .catch(function () { return null; })
+      .then(function (j) {
+        clearTimeout(timer);
+        if (j && j.ok && j.items) {
+          var out = {};
+          codes.forEach(function (c) { out[c] = j.items[c] || { ok: false, reason: 'upstream' }; });
+          return out;
+        }
+        if (j && j.reason === 'invalid') manyOff = true;      /* 예전 함수 — 반 단위를 모른다 */
+        return oneByOne(codes);
+      });
+  }
+  function oneByOne(codes) {
+    var out = {}, i = 0;
+    function next() {
+      if (i >= codes.length) return Promise.resolve();
+      var c = codes[i++];
+      return get(c).then(function (res) { out[c] = res; return next(); });
+    }
+    return Promise.all([next(), next(), next(), next(), next(), next()]).then(function () { return out; });
+  }
+
   function peek(code) { var c = cache[code]; return c && Date.now() - c.at < TTL ? c.res : null; }
   function clear() { cache = {}; }
 
-  global.AppFetch = { get: get, peek: peek, clear: clear, TIMEOUT: TIMEOUT };
+  global.AppFetch = { get: get, getMany: getMany, peek: peek, clear: clear, TIMEOUT: TIMEOUT, manyOff: function () { return manyOff; } };
 })(window);

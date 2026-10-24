@@ -134,8 +134,9 @@
   }
 
   /* 누적 추이용 — 제출한 날 / 과제가 있던 날 (%) */
-  /* 과제 칩 색 — 다 냄(5일) 초록 ok · 3~4일 파랑 mid · 1~2일 주황 low · 0일 빨강 zero (「오늘」 · 레포트 발송 · 과제 상세가 같이 · 20261031e) */
-  function tone(done, days) { return done >= days ? 'ok' : done >= 3 ? 'mid' : done >= 1 ? 'low' : 'zero'; }
+  /* 과제 칩 색 — 비율로 (20261031g): 100% 초록 ok · 50% 이상(60~80%) 파랑 mid · 0% 초과(20~40%) 주황 low · 0% 빨강 zero
+     (5일 기준이면 5일 초록 · 3~4일 파랑 · 1~2일 주황 · 0일 빨강 — 「오늘」 · 레포트 발송 · 과제 상세가 같이) */
+  function tone(done, days) { var r = days ? done / days : 0; return r >= 1 ? 'ok' : r >= 0.5 ? 'mid' : r > 0 ? 'low' : 'zero'; }
   function hwRate(w) { return w && w.hwDays ? Math.round(w.hwDone / w.hwDays * 100) : null; }
 
   var HW_MARK = { onTime: '●', late: '◐', none: '○', future: '·', off: '' };
