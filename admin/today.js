@@ -65,6 +65,7 @@
       st.classes = classList(st.data);
       render();
       loadApp();
+      window.dispatchEvent(new CustomEvent('jt:today'));       /* 레포트 발송 — 반 고르기 「안 보냄 n」 · 지금 보낼 차례 (write.js · weeks.js · 20261031h) */
     }).catch(function (e) {
       st.loading = false;
       $('#tdBody').innerHTML = '<div class="empty-state">' + (isMissing(e)
@@ -535,7 +536,7 @@
     if (!html) return;
     Array.prototype.forEach.call(document.querySelectorAll('[data-app-detail="' + det.sid + '"]'), function (b) {
       if (b.dataset.appFrom !== det.from) return;
-      var row = b.closest('.tdc-st, .snd-row, tr');
+      var row = b.closest('.tdc-st, .snd-row, .fieldline--app, tr');
       if (!row) return;
       if (row.tagName === 'TR') {
         var tr = document.createElement('tr');
@@ -993,6 +994,27 @@
     }
     return out;
   }
+  /* ---------- 레포트 발송 차례 (20261031h) ----------
+     반(여럿이면 과정) — 「오늘」 반 카드 칩과 같은 최근 3번 수업 기준 · 수업 당일 · 건너뛴 수업 · 첫 수업일 앞 수업은 빠진다
+       unsent  안 보낸 지난 수업 (오래된 것부터) { cls, date, week, left } · left = 안 보낸 학생 합 · done = 다 보냄(보낼 것이 없고 지난 수업이 있음)
+       chips   그 반 최근 수업 칩 전부 { cls, date, week, kind } */
+  function sendStateOf(names) {
+    var out = { unsent: [], chips: [], left: 0, done: false };
+    if (!st.data || !st.classes) return out;
+    var ok = 0;
+    (names || []).forEach(function (n) {
+      var c = st.classes.find(function (x) { return x.name === n; });
+      if (!c) return;
+      chipsOf(c).forEach(function (x) {
+        out.chips.push({ cls: n, date: x.date, week: x.week, kind: x.kind });
+        if (x.kind === 'part' || x.kind === 'none') { out.unsent.push({ cls: n, date: x.date, week: x.week, left: x.left }); out.left += x.left; }
+        else if (x.kind === 'ok' || x.kind === 'skip') ok++;
+      });
+    });
+    out.unsent.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+    out.done = !out.unsent.length && ok > 0;
+    return out;
+  }
   function rowById(sid) { return st.data ? st.data.students.find(function (x) { return x.id === sid; }) || null : null; }
   window.Today = {
     studentFacts: function (sid, lessonDate) {
@@ -1026,6 +1048,12 @@
     appSort: appSort,
     retryApp: function (sid) { loadApp(sid); },
     openAppLink: openAppLink,
+    /* 레포트 발송 (write.js · weeks.js · 20261031h) — ready = 「오늘」 자료를 받았나 · sendState([반]) · nextToSend = 모든 반에서 가장 급한 것 */
+    ready: function () { return !!(st.data && st.classes); },
+    sendState: sendStateOf,
+    nextToSend: function () { return st.classes ? sendStateOf(st.classes.map(function (c) { return c.name; })).unsent[0] || null : null; },
+    /* 작성 화면 학생 카드 「과제」 — known = 「오늘」 명단에 있는 학생인가 */
+    appKnown: function (sid) { return !!rowById(sid); },
     classApp: function (cls, lessonDate) {
       if (!st.data) return null;
       var ws = st.data.students.filter(function (s) { return (s.class_name || '') === cls; }).map(function (s) { return appFactsOf(s, lessonDate); }).filter(Boolean);

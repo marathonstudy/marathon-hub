@@ -47,7 +47,11 @@
   }
 
   /* ---------- 위쪽 묶음 탭 ---------- */
-  $('#grp-report').addEventListener('click', function () { UI.selectTab(last.report); });
+  /* 「레포트 발송」 — 다른 화면에서 들어올 때, 그날 처음이거나 보던 레포트를 다 보냈으면 보낼 차례인 레포트를 연다 (write.js · 20261031h) */
+  $('#grp-report').addEventListener('click', function () {
+    if (REPORT.indexOf(cur) === -1 && window.Writer && Writer.autoOpen && Writer.autoOpen()) return;
+    UI.selectTab(last.report);
+  });
   $('#grp-students').addEventListener('click', function () { UI.selectTab(last.students); });
   $('#grp-more').addEventListener('click', function () { $('#moreMenu').showModal(); });
 

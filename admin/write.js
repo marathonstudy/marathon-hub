@@ -290,7 +290,7 @@
       b.type = 'button';
       b.className = 'chip chip--course' + (k === currentClass ? ' is-on' : '');
       b.dataset.cls = k;
-      b.innerHTML = '<span class="chip__name"></span><span class="chip__count num">' + ms.length + '반</span>';
+      b.innerHTML = '<span class="chip__name"></span><span class="chip__count num">' + ms.length + '반</span>' + sendBadge(ms.map(function (m) { return m.cls; }));
       b.querySelector('.chip__name').textContent = '📚 ' + co.name;
       b.title = ms.map(function (m) { return m.cls; }).join(' · ');
       frag.appendChild(b);
@@ -303,13 +303,22 @@
       b.className = 'chip' + (c.name === currentClass ? ' is-on' : '');
       b.dataset.cls = c.name;
       b.innerHTML = '<span class="chip__name"></span>' +
-                    '<span class="chip__count num">' + list.length + '명</span>';
+                    '<span class="chip__count num">' + list.length + '명</span>' + sendBadge([c.name]);
       b.querySelector('.chip__name').textContent = c.name;
       frag.appendChild(b);
     });
     host.appendChild(frag);
 
     $('#classPickerHint').textContent = '전체 ' + students().length + '명';
+  }
+
+  /* 반 버튼 — 안 보낸 지난 수업 레포트가 있으면 빨간 「안 보냄 12」(안 보낸 학생 합) · 다 보냈으면 초록 ✓ · 순서는 그대로 (20261031h)
+     「오늘」 반 카드 칩과 같은 기준 (최근 3번 수업 · 수업 당일 · 건너뛴 수업 · 첫 수업일 앞 수업은 빼고 · today.js) */
+  function sendBadge(names) {
+    if (!window.Today || !Today.ready || !Today.ready()) return '';
+    var x = Today.sendState(names);
+    if (x.left) return '<span class="chip__send chip__send--no num" title="' + escapeHtml('안 보낸 레포트 ' + x.unsent.length + '개 · ' + x.unsent.map(function (u) { return Store.dateWithDow(u.date) + ' ' + u.left + '명'; }).join(' · ')) + '">안 보냄 ' + x.left + '</span>';
+    return x.done ? '<span class="chip__send chip__send--ok" title="최근 수업 레포트를 다 보냈습니다" aria-label="다 보냄">✓</span>' : '';
   }
 
   $('#classPicker').addEventListener('click', function (e) {
@@ -320,6 +329,104 @@
     refreshAll();
     if (mode === 'weeks') setMode('weeks');                   /* 주차 현황이면 그 반 주차로 */
     window.dispatchEvent(new CustomEvent('jt:write-nav'));     /* 뒤로가기 기록 (nav.js) */
+  });
+
+  /* ============================================================
+     레포트 발송 첫 화면 (20261031h)
+       「레포트 발송」 탭을 열 때 — 이 기기에서 그날 처음이거나, 마지막으로 보던 레포트를 다 보냈으면
+         모든 반에서 가장 급한 레포트(수업이 지났는데 안 보낸 것 중 가장 오래된 것 · 건너뛴 것 · 첫 수업일 앞 수업은 빼고)의 반 · 수업일을 연다
+         (다 공개했으면 3 발송, 아니면 1 작성) · 위에 「보낼 차례인 10/22(목) 고2 선수능반 레포트를 열었습니다 · 다른 반 고르기」
+         보낼 게 없으면 그 반 가장 최근 수업일
+       그 밖에는 마지막으로 보던 반 · 수업일 그대로 (mhub.reportLast · 새로고침해도) · 「오늘」에서 [보내기] · 칩으로 오면 그 반 · 수업일
+     ============================================================ */
+  var MEM_KEY = 'mhub.reportLast';
+  var autoNote = null;          /* { cls, week, text, armed } */
+  function readMem() { try { var m = JSON.parse(localStorage.getItem(MEM_KEY) || 'null'); return m && m.cls ? m : null; } catch (e) { return null; } }
+  function saveMem() {
+    if (!currentClass || !draft || !draft.weekStart || !window.DDay) return;
+    try { localStorage.setItem(MEM_KEY, JSON.stringify({ day: DDay.today(), cls: currentClass, week: draft.weekStart, mode: mode })); } catch (e) {}
+  }
+  function validClass(cls) {
+    return !!cls && (Store.getClasses().some(function (c) { return c.name === cls; }) || (isCourse(cls) && !!Course.byKey(cls)));
+  }
+  function namesOf(cls, week) {
+    if (!isCourse(cls)) return [cls];
+    var co = Course.byKey(cls);
+    return co ? Course.membersAt(co, Course.roundOfWeek(co, week)).map(function (m) { return m.cls; }) : [];
+  }
+  /* 마지막으로 보던 레포트를 다 보냈나 (건너뛴 것도 끝난 것으로) — 그 주 칩이 없으면(수업 당일 · 오래된 주) 아니다 */
+  function memDone(m) {
+    var cs = Today.sendState(namesOf(m.cls, m.week)).chips.filter(function (x) { return x.week === m.week; });
+    return cs.length > 0 && cs.every(function (x) { return x.kind === 'ok' || x.kind === 'skip'; });
+  }
+  function lastLessonWeek(cls) {
+    if (isCourse(cls)) { var co = Course.byKey(cls); return co ? Course.weekOfRound(co, Course.roundNow(co)) : ''; }
+    return (window.TodayView && TodayView.lastLessonWeek && TodayView.lastLessonWeek(cls)) || Store.thisWeek().start;
+  }
+  /* true = 열었다 (rtabs.js 가 그 밖의 기본 동작을 하지 않는다) */
+  function autoOpen() {
+    if (!window.Today || !Today.ready || !Today.ready() || !window.DDay) return false;
+    var m = readMem();
+    if (m && m.day === DDay.today() && validClass(m.cls) && !memDone(m)) return false;
+    var t = Today.nextToSend(), cls = '', week = '';
+    autoNote = null;
+    if (t && validClass(t.cls)) {
+      cls = t.cls; week = t.week;
+      /* 과정에 든 반이고 그 회차를 같은 주에 쓰면 과정 화면으로 */
+      var r = window.Course && Course.roundOfClassWeek ? Course.roundOfClassWeek(t.cls, t.week) : null;
+      if (r) {
+        var k = Course.keyOf(r.course), wk = Course.weekOfRound(r.course, r.no);
+        if (Course.inScope(k, t.cls, wk)) { cls = k; week = wk; }
+      }
+      autoNote = { cls: cls, week: week, armed: false, text: '보낼 차례인 ' + Store.dateWithDow(t.date) + ' ' + t.cls + ' 레포트를 열었습니다' };
+    } else {
+      cls = m && validClass(m.cls) ? m.cls : (validClass(currentClass) ? currentClass : ((Store.getClasses()[0] || {}).name || ''));
+      if (!cls) return false;
+      week = lastLessonWeek(cls);
+    }
+    UI.selectTab(1);
+    flushDraft();
+    currentClass = cls;
+    selectedId = '';
+    refreshAll();
+    var note = autoNote;
+    Promise.resolve(openWeek(week)).then(function () {
+      if (note) note.armed = true;
+      renderAuto();
+      if (!note || !window.DB || !DB.weekSendData) return;
+      /* 반 전원이 공개됐으면 3 발송, 아니면 1 작성 그대로 */
+      return DB.weekSendData(draft.weekStart).then(function (x) {
+        var list = studentsOfClass(currentClass);
+        if (autoNote === note && list.length && list.every(function (s) { return x.published && x.published[s.id]; })) UI.selectTab(3);
+      }, function () {});
+    });
+    return true;
+  }
+  function renderAuto() {
+    var el = $('#rAutoNote');
+    if (!el) return;
+    var on = !!autoNote && autoNote.cls === currentClass && !!draft && autoNote.week === draft.weekStart;
+    if (!on && autoNote && autoNote.armed) autoNote = null;           /* 다른 반 · 수업일로 옮기면 지운다 */
+    el.hidden = !on;
+    el.innerHTML = on ? '<span class="rauto__t">' + escapeHtml(autoNote.text) + '</span> · <button type="button" class="rauto__b" data-auto-pick>다른 반 고르기</button>' : '';
+  }
+  if ($('#rAutoNote')) $('#rAutoNote').addEventListener('click', function (e) {
+    if (!e.target.closest('[data-auto-pick]')) return;
+    UI.selectTab(1);
+    setTimeout(function () {
+      var p = $('#classPanel');
+      if (p && p.scrollIntoView) p.scrollIntoView({ block: 'start' });
+      var c = $('#classPicker .chip.is-on') || $('#classPicker .chip');
+      if (c) c.focus();
+    }, 0);
+  });
+  window.addEventListener('jt:write-nav', function () { setTimeout(function () { saveMem(); renderAuto(); }, 0); });
+  /* 레포트 발송 밖으로 나가면 지운다 (「오늘」에서 [보내기]로 다시 와도 이 줄은 나오지 않는다) */
+  document.addEventListener('jt:tab', function (e) { if ([1, 2, 3].indexOf(e.detail.index) === -1 && autoNote) { autoNote = null; renderAuto(); } });
+  /* 「오늘」 자료가 오면 반 버튼 「안 보냄 n」 · 학생 카드 과제 · 현황 줄 */
+  window.addEventListener('jt:today', function () {
+    /* 반 고르기는 작성 단계에서만 보인다 — 공개 · 발송에서 다시 그리면 반을 안 고른 화면(모든 반)이 첫 반으로 바뀐다 */
+    if (!$('#panel-write').hidden) { renderClassPicker(); paintApps(); renderStatus(); }
   });
 
   /* ============================================================
@@ -353,7 +460,7 @@
     if (n) n.hidden = !(mode === 'edit' && rePub.key === rePubKey() && rePub.sent > 0 && rePub.edited[rePubKey()]);
   }
   function markEdited(ev) {
-    if (!ev.target.closest || !ev.target.closest('#commonPanel, #entryList, #commentModal')) return;
+    if (!ev.target.closest || !ev.target.closest('#commonPanel, #entryList, #commentModal') || ev.target.closest('.al-box')) return;
     /* 누르기는 출결 · 별점 · 차시 지우기만 고친 것으로 (펼치기 · 상담 기록 · 미리보기는 아님) */
     if (ev.type === 'click' && !ev.target.closest('[data-act="status"], [data-act="star"], [data-del]')) return;
     rePub.edited[rePubKey()] = true;
@@ -409,17 +516,30 @@
       '<b>' + escapeHtml(when) + '</b>' +
       (L && L.canceled ? ' <span class="wbar__off">휴강</span>' : '');
     renderStatus();
+    renderAuto();
     $('#btnWbarPrev').disabled = !stepOk(start, -1);
     $('#btnWbarNext').disabled = !stepOk(start, 1);
     stickBar();
   }
   /* 과정 — 반별 현황 한 줄 「목동 10/24(토) 제출 11/12 · 반포 10/25(일) 수업 전」 (작성 · 공개 · 발송 위 · 20261031a) */
+  /* 「과제 연동 전 n명」 — 작성 화면에서만 (누르면 그 학생 카드로 차례로 · 20261031h) */
+  function needIds() {
+    if (!window.Today || !Today.appNeed || !currentClass || !draft) return [];
+    return studentsOfClass(currentClass).filter(function (s) { return Today.appNeed(s.id); }).map(function (s) { return s.id; });
+  }
+  function needHtml() {
+    var n = mode === 'edit' ? needIds().length : 0;
+    return n ? '<button type="button" class="rstatus__need num" data-wr-need title="앱 과제 링크가 없는 학생 — 누르면 그 학생 카드로 차례로">과제 연동 전 ' + n + '명</button>' : '';
+  }
   function renderStatus() {
     var el = $('#rStatus');
     if (!el) return;
-    if (!isCourse(currentClass) || !draft || !draft.weekStart) { el.hidden = true; el.textContent = ''; return; }
+    if (!draft || !draft.weekStart) { el.hidden = true; el.textContent = ''; return; }
+    var nh = needHtml();
+    if (!isCourse(currentClass)) { el.className = 'rstatus rstatus--needonly'; el.hidden = !nh; el.innerHTML = nh; return; }
     var co = Course.byKey(currentClass);
     if (!co) { el.hidden = true; return; }
+    el.className = 'rstatus';
     var t = DDay.today(), ms = Course.membersAt(co, Course.roundOfWeek(co, draft.weekStart));
     el.hidden = !ms.length;
     el.innerHTML = ms.map(function (m) {
@@ -428,9 +548,34 @@
       var list = students().filter(function (s) { return s.className === m.cls; });
       var sub = list.filter(function (s) { return Store.reviewsOf(s.id, m.week).some(function (x) { return x.status === 'submitted' || x.status === 'confirmed'; }); }).length;
       return '<span class="rstatus__i">' + head + ' 제출 <span class="num">' + sub + '/' + list.length + '</span>' + (m.week !== draft.weekStart ? ' <span class="muted-note">(다른 주 · 반을 골라 따로)</span>' : '') + '</span>';
-    }).join('<span class="rstatus__dot">·</span>');
+    }).join('<span class="rstatus__dot">·</span>') + (nh ? '<span class="rstatus__dot">·</span>' + nh : '');
   }
   window.addEventListener('jt:review-scores', function () { renderStatus(); });
+  var needAt = -1;
+  $('#rStatus').addEventListener('click', function (e) {
+    if (!e.target.closest('[data-wr-need]')) return;
+    var ids = needIds();
+    if (!ids.length) return;
+    needAt = (needAt + 1) % ids.length;
+    goEntry(ids[needAt]);
+  });
+  /* 그 학생 카드로 — 과정이면 그 반 칸을 펼치고, 접힌 카드는 펼친다 */
+  function goEntry(id) {
+    var s = students().find(function (x) { return x.id === id; });
+    if (!s) return;
+    var redraw = false;
+    if (isCourse(currentClass) && !openGroup[s.className]) { openGroup[s.className] = true; redraw = true; }
+    if (collapsedEntries[id]) { collapsedEntries[id] = false; redraw = true; }
+    if (redraw) renderEntries();
+    var card = $('#entryList .entry[data-id="' + id + '"]');
+    if (!card) return;
+    if (card.scrollIntoView) card.scrollIntoView({ block: 'center' });
+    $$('#entryList .entry.is-flash').forEach(function (x) { x.classList.remove('is-flash'); });
+    card.classList.add('is-flash');
+    setTimeout(function () { card.classList.remove('is-flash'); }, 1600);
+    var b = card.querySelector('[data-app-link]');
+    if (b) try { b.focus({ preventScroll: true }); } catch (x) { b.focus(); }
+  }
   window.addEventListener('jt:courses', function () { if (!$('#panel-write').hidden || $('#reportHead') && !$('#reportHead').hidden) { renderClassPicker(); renderBar(); } });
 
   function step(dir) {
@@ -703,6 +848,12 @@
             '<span class="entry__rv" data-role="rv"></span>' +
             '<button type="button" class="btn btn--sm btn--ghost" data-act="rvfix">고치기</button>' +
           '</div>' +
+          /* 과제 — 그 레포트 기간(수업 전 일주일) 「과제 3/5일」 · 누르면 아래 7칸 표 · 링크 없으면 「과제 연동 전」 [+ 과제 링크 연결] (20261031h) */
+          '<div class="fieldline fieldline--app">' +
+            '<span class="fieldline__label">과제</span>' +
+            '<span class="entry__app tdc-app-slot" data-role="app"></span>' +
+            '<div class="entry__albox" data-role="albox"></div>' +
+          '</div>' +
           '<div class="fieldline">' +
             '<span class="fieldline__label">코멘트 <span class="say-note">학부모 화면의 \'선생님 한마디\'에 나옵니다</span></span>' +
             '<button type="button" class="comment-btn" data-act="comment">' +
@@ -742,6 +893,7 @@
     if (note) note.value = e.attendNote || '';
 
     fillReview(el, s.id);
+    fillApp(el, s);
 
     var c = commentOf(s.id);
     var txt = c.text;
@@ -770,6 +922,46 @@
     host.textContent = line == null ? '불러오는 중…' : line;
     host.classList.toggle('is-none', line === '아직 제출 안 함');
   }
+  /* 학생 카드 「과제」 — 「오늘」이 받아 둔 과제 기록을 그대로 (반마다 한 번 · 10분 기억 · 새로 부르지 않는다 · today.js) */
+  function lessonDateOf(s) {
+    if (!draft || !draft.weekStart || !s) return '';
+    if (isCourse(currentClass)) {
+      var m = Course.split(currentClass, draft.weekStart).same.find(function (x) { return x.cls === s.className; });
+      return (m && m.date) || '';
+    }
+    var L = window.Lesson && Store.lessonOf ? Lesson.reportFields(Store.lessonOf(currentClass, draft.weekStart)) : {};
+    return (L && L.lessonDate) || '';
+  }
+  function appHtml(s) {
+    if (!window.Today || !Today.ready || !Today.ready()) return '<span class="tdc-app tdc-app--wait"><i class="spin" aria-hidden="true"></i>과제 불러오는 중</span>';
+    if (!Today.appKnown(s.id)) return '<span class="tdc-app tdc-app--none">과제 —</span>';
+    var cell = Today.appCell(s.id, lessonDateOf(s));
+    return Today.appNeed(s.id) ? '<span class="tdc-app tdc-app--pre">과제 연동 전</span>' + cell : cell;
+  }
+  function fillApp(el, s) {
+    var h = el.querySelector('[data-role="app"]'), box = el.querySelector('[data-role="albox"]');
+    if (h) h.innerHTML = appHtml(s);
+    if (box) { var bx = window.AppLink ? AppLink.boxHtml(s.id) : ''; if (box.innerHTML !== bx || !bx) box.innerHTML = bx; }
+  }
+  /* sid 가 있으면 그 학생 카드만 — 칸만 바꾸고 카드는 다시 그리지 않는다 (쓰던 글 · 커서를 지킨다) */
+  function paintApps(sid) {
+    var any = false;
+    $$('#entryList .entry').forEach(function (el) {
+      if (sid && el.dataset.id !== sid) return;
+      var s = students().find(function (x) { return x.id === el.dataset.id; });
+      if (s) { fillApp(el, s); any = true; }
+    });
+    if (any && window.Today && Today.detailOpen && Today.detailOpen().sid) Today.paintDetail();
+  }
+  window.addEventListener('jt:app', function (e) {
+    if ($('#panel-write').hidden) return;
+    paintApps(e.detail && e.detail.sid);
+    renderStatus();
+  });
+  /* 링크 칸을 펼치거나 접을 때 · 저장한 뒤 (applink.js) — 링크 칸에 쓰던 글은 applink.js 가 기억한다 */
+  window.addEventListener('jt:applink-ui', function () { if (!$('#panel-write').hidden) paintApps(); });
+  window.addEventListener('jt:applink', function () { if (!$('#panel-write').hidden) { paintApps(); renderStatus(); } });
+
   window.addEventListener('jt:review-drawn', function () {
     $$('#entryList .entry').forEach(function (el) { fillReview(el, el.dataset.id); });
   });
@@ -831,6 +1023,9 @@
     var card = ev.target.closest('.entry');
     if (!card) return;
     var id = card.dataset.id;
+    if (ev.target.closest('.al-box, .hd-box')) return;           /* 과제 링크 칸 (applink.js) · 과제 표 (today.js) */
+    var rt = ev.target.closest('[data-app-retry]');
+    if (rt) { if (window.Today) Today.retryApp(rt.dataset.appRetry); return; }
     var e = entryOf(id);
     var btn = ev.target.closest('[data-act]');
     if (!btn) return;
@@ -902,7 +1097,7 @@
 
   $('#entryList').addEventListener('input', function (ev) {
     var card = ev.target.closest('.entry');
-    if (!card) return;
+    if (!card || ev.target.closest('.al-box')) return;
     var id = card.dataset.id;
     var e = entryOf(id);
     var act = ev.target.dataset.act;
@@ -1623,6 +1818,12 @@
     draft = loadDraft();
     selectedId = '';
     collapsedEntries = {};
+    /* 마지막으로 보던 반 (주소에 반이 있으면 nav.js 가 그 반으로 다시 바꾼다 · 20261031h) */
+    var mem = readMem();
+    if (mem && validClass(mem.cls)) {
+      currentClass = mem.cls;
+      if (mem.mode === 'edit' && mem.week === draft.weekStart) setMode('edit');
+    }
     renderWeek();
     if (!$('#panel-write').hidden) refreshAll();
     SB.getSession().then(function (sess) {
@@ -1765,6 +1966,8 @@
     setMode: setMode,
     openWeek: openWeek,
     openWeeks: openWeeks,
+    autoOpen: autoOpen,
+    autoNote: function () { return autoNote ? { cls: autoNote.cls, week: autoNote.week, text: autoNote.text } : null; },
     /* 뒤로가기 · 새로고침으로 반을 되돌릴 때 (nav.js) */
     selectClass: function (cls) {
       if (!cls || cls === currentClass) return;

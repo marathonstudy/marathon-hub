@@ -118,16 +118,19 @@
     var lessonDay = L && L.date && !L.canceled ? L.date : '';
     var skipped = !!lessonDay && total > 0 && w.sent < total && !!(window.Skips && Skips.skipped(st.cls, lessonDay));
     var canSkip = !!lessonDay && !isNext && !skipped && total > 0 && w.sent < total && lessonDay <= DDay.today();
+    /* 「지금 보낼 차례」 — 이 반에서 안 보낸 지난 수업 중 가장 오래된 것 (「오늘」 반 카드 칩과 같은 기준 · 줄 순서는 그대로 · 20261031h) */
+    var isTurn = !!lessonDay && !!st.turn && st.turn.date === lessonDay;
     var miss = skipped ? [] : missingOf(w, L, d);
     /* 줄 이름 = 수업일 「10/22(목) 수업」 (주 시작일 대신 · 수업 요일이 없으면 「10/12~10/18」 · 20261030b) */
     var nm = L && L.date && !L.canceled ? Lesson.md(L.date) + ' 수업' : Lesson.md(w.week_start, false) + '~' + Lesson.md(Lesson.addDays(w.week_start, 6), false);
     /* 과정에 든 회차면 「7회차 · 10/24(토) ~ 10/25(일)」를 함께 (20261031a) */
     var cr = window.Course ? Course.roundOfClassWeek(st.cls, w.open_start) : null;
     if (cr) nm = Course.label(cr.course, cr.no) + ' · ' + nm;
-    return '<div class="wkv-row' + (isNow ? ' is-now' : '') + (isNext ? ' is-next' : '') + (skipped ? ' is-skipped' : '') + '" role="button" tabindex="0" data-wo="' + esc(w.open_start) + '" aria-label="' + esc(nm) + ' 작성 화면 열기">' +
+    return '<div class="wkv-row' + (isNow ? ' is-now' : '') + (isNext ? ' is-next' : '') + (skipped ? ' is-skipped' : '') + (isTurn ? ' is-turn' : '') + '" role="button" tabindex="0" data-wo="' + esc(w.open_start) + '" aria-label="' + esc(nm) + ' 작성 화면 열기">' +
       '<div class="wkv-wk">' +
         '<div class="wkv-wk__name"><b>' + esc(nm) + '</b>' +
-          (isNow ? ' <span class="wkv-tag wkv-tag--now">이번 주</span>' : isNext ? ' <span class="wkv-tag">다음 주</span>' : '') + '</div>' +
+          (isNow ? ' <span class="wkv-tag wkv-tag--now">이번 주</span>' : isNext ? ' <span class="wkv-tag">다음 주</span>' : '') +
+          (isTurn ? ' <span class="wkv-tag wkv-tag--turn">지금 보낼 차례</span>' : '') + '</div>' +
         '<div class="wkv-wk__date">' + dateHtml(L) + '</div>' +
       '</div>' +
       '<div class="wkv-status">' + (skipped ? '<span class="wkv-st wkv-st--skip">건너뜀</span>' : statusHtml(w, total)) + '</div>' +
@@ -167,6 +170,7 @@
     if (st.err) { h.innerHTML = head + '<p class="panel__hint">' + esc(st.err) + '</p>'; return; }
     if (!d) { h.innerHTML = head + '<p class="panel__hint">불러오는 중…</p>'; return; }
     var sched = schedOf(d);
+    st.turn = window.Today && Today.ready && Today.ready() ? Today.sendState([st.cls]).unsent[0] || null : null;
     var shown = st.more ? d.weeks : d.weeks.slice(0, SHOW);
     var rest = d.weeks.length - shown.length;
     h.innerHTML = head +
@@ -225,6 +229,9 @@
     });
     window.addEventListener('jt:courses', function () {
       if (window.Writer && Writer.mode() === 'weeks' && !$('#panel-write').hidden) load(Writer.currentClass());
+    });
+    window.addEventListener('jt:today', function () {
+      if (window.Writer && Writer.mode() === 'weeks' && !$('#panel-write').hidden && st.data) render();
     });
     window.addEventListener('jt:skips', function () {
       if (window.Writer && Writer.mode() === 'weeks' && !$('#panel-write').hidden && st.data) render();

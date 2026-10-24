@@ -3090,3 +3090,42 @@ button.tdc-tc { appearance: none; font: inherit; font-size: 12.5px; font-weight:
   .tdc-st.tdc-grid .tdc-st__acts { width: auto !important; }
   .tdc-tri__span .tdc-app, .tdc-tri__span .tdc-link-btn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 }
+
+/* ============================================================
+   20261031h — 레포트 발송 첫 화면 · 작성 화면 학생 카드 「과제」
+   ============================================================ */
+/* 자동으로 연 레포트 한 줄 */
+.rauto { margin: 0 0 8px; padding: 7px 11px; border-radius: 10px; background: #FFF6E5; border: 1px solid #F3D9A6; color: #6B4A12; font-size: 13px; line-height: 1.5; }
+.rauto__t { font-weight: 700; }
+.rauto__b { appearance: none; border: 0; background: none; padding: 0; font: inherit; font-weight: 800; color: #4A34B8; text-decoration: underline; cursor: pointer; }
+/* 반 고르기 — 「안 보냄 12」 · ✓ */
+.chip__send { font-size: 11.5px; font-weight: 800; padding: 1px 7px; border-radius: 999px; line-height: 1.5; }
+.chip__send--no { background: #FDE4E4; color: #A12626; }
+.chip__send--ok { background: #DDF3E8; color: #135C3B; }
+.chip.is-on .chip__send--no { background: #fff; color: #A12626; }
+.chip.is-on .chip__send--ok { background: #fff; color: #135C3B; }
+/* 수업일 고르기 — 지금 보낼 차례 */
+.wkv-tag--turn { background: #FDE4E4; color: #A12626; font-weight: 800; }
+.wkv-row.is-turn { box-shadow: inset 3px 0 0 #D64545; }
+/* 현황 줄 「과제 연동 전 n명」 — 작성 화면에서만 */
+.rstatus__need { appearance: none; border: 1px solid #C9CCDA; background: #fff; color: #4F5470; font: inherit; font-size: 12px; font-weight: 700; padding: 0 8px; border-radius: 999px; cursor: pointer; }
+.rstatus__need:hover, .rstatus__need:focus-visible { border-color: #5A3FD0; color: #3B2A99; }
+body:not(.report-step-write) .rstatus__need, body.write-weeks .rstatus__need { display: none; }
+body:not(.report-step-write) .rstatus--needonly, body.write-weeks .rstatus--needonly { display: none; }
+.rstatus--needonly { background: #F7F8FB; border-color: #E2E4EC; }
+/* 학생 카드 「과제」 */
+.fieldline--app .entry__app { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.fieldline--app .tdc-app--btn { cursor: pointer; font: inherit; font-size: 12px; font-weight: 800; }
+.tdc-app--pre { background: #EEF0F5; color: #565B73; font-weight: 700; }
+.entry__albox { flex: 1 1 100%; min-width: 0; }
+.entry__albox:empty { display: none; }
+.entry__albox .al-box { margin: 0; }
+.fieldline--app > .hd-box { margin: 0; }
+.entry.is-flash { border-color: #5A3FD0; box-shadow: 0 0 0 3px rgba(90,63,208,.22); transition: box-shadow .3s; }
+@media (max-width: 720px) {
+  .fieldline--app { align-items: center; }
+  .fieldline--app .fieldline__label { width: auto; margin-bottom: 0; }
+  .fieldline--app .entry__app { flex: 1 1 auto; }
+  .al-box .al-row { flex-wrap: wrap; }
+  .al-box .al-input { min-width: 0; flex: 1 1 100%; }
+}

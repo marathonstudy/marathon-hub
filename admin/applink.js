@@ -47,7 +47,9 @@
   }
   function focusSoon() {
     setTimeout(function () {
-      var el = document.querySelector('[data-al-box="' + cur() + '"] [data-al-input]');
+      /* 「오늘」 · 레포트 발송 · 작성 화면에 같은 칸이 있을 수 있다 — 지금 보이는 화면의 칸 (20261031h) */
+      var all = Array.prototype.slice.call(document.querySelectorAll('[data-al-box="' + cur() + '"] [data-al-input]'));
+      var el = all.filter(function (x) { return !x.closest('[hidden]'); })[0] || all[0];
       if (!el) return;
       if (el.scrollIntoView) el.scrollIntoView({ block: 'center' });
       try { el.focus({ preventScroll: true }); } catch (e) { el.focus(); }
