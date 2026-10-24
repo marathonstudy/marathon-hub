@@ -27,7 +27,7 @@
   var $  = function (s, r) { return (r || document).querySelector(s); };
 
   function toast(m, k) { if (window.UI) UI.toast(m, k); }
-  function students() { return (window.UI ? UI.activeStudents() : Store.activeStudents()); }
+  function students() { return (window.UI ? UI.activeStudents(state.week) : Store.activeStudents(state.week)); }     /* 퇴원일 뒤 수업은 빠짐 (20261031i) */
   function copyText(t) { return UI.copyText(t); }
   function linkFor(s) { return Store.hubUrl(Store.linkOf(s.id).hubCode, 'report'); }
   function esc(v) {

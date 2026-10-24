@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" as="style" crossorigin
       href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
-<link rel="stylesheet" href="style.css?v=20261031h">
+<link rel="stylesheet" href="style.css?v=20261031i">
 </head>
 <body class="is-locked">
 
@@ -214,6 +214,7 @@
   <nav class="subnav" id="studentsNav" aria-label="학생 화면" hidden>
     <button class="subnav__btn" role="tab" id="tab-roster" aria-controls="panel-roster" aria-selected="false">명단</button>
     <button class="subnav__btn" role="tab" id="tab-photo"  aria-controls="panel-photo"  aria-selected="false">필기 노트</button>
+    <button class="subnav__btn" role="tab" id="tab-attbook" aria-controls="panel-attbook" aria-selected="false">출석부</button>
   </nav>
 
   <!-- ============================================================
@@ -281,7 +282,7 @@
           <option value="">전체 반</option>
         </select>
         <label class="chk-inline">
-          <input type="checkbox" id="showArchived"> 퇴원생도 보기
+          <input type="checkbox" id="showArchived"> 퇴원생 보기
         </label>
         <button class="btn btn--sm" id="btnExpandAll" type="button">모두 펼치기</button>
         <button class="btn btn--sm" id="btnFaceView" type="button" aria-pressed="false">얼굴 사진으로 보기</button>
@@ -367,6 +368,8 @@
       <!-- 이미 보낸 주를 고쳤을 때 (write.js · 20261029g) -->
       <!-- 건너뛴 수업 (skips.js · 20261031e) -->
       <div class="skip-note" id="skipNote" hidden></div>
+      <!-- 출석 체크 (attend.js · write.js · 20261031i) — 그 수업 [출석 체크] · 「출석 체크 완료 · 결석 2 · 지각 1 · 고치기」 -->
+      <div class="wr-att" id="wrAttend" hidden></div>
       <div class="repub-note" id="rePubNote" hidden>
         <span>고친 내용은 다시 공개해야 학부모에게 반영됩니다</span>
         <button class="btn btn--sm btn--primary" id="btnRePublish" type="button">다시 공개</button>
@@ -1000,6 +1003,25 @@
   </section>
 
   <!-- ============================================================
+       학생 → 출석부 — 정산용 (attbook.js · 20261031i) · 반 · 월을 고르면 학생 줄 × 그 달 수업일 칸
+       ============================================================ -->
+  <section id="panel-attbook" role="tabpanel" aria-labelledby="tab-attbook" hidden>
+    <div class="panel">
+      <div class="panel__head ab-head">
+        <h2 class="panel__title">출석부</h2>
+        <p class="panel__hint">정산용 — 출석 ● · 결석 빨강 · 지각 주황 · 결석 칸의 작은 「자」 = 자료 미배부 · 「영」 = 보강 영상 미신청</p>
+      </div>
+      <div class="ab-tools">
+        <label class="ab-field"><span class="field__label">반</span><select class="input" id="abClass"></select></label>
+        <label class="ab-field"><span class="field__label">월</span>
+          <span class="ab-month"><button class="btn btn--sm" type="button" id="abPrev" aria-label="지난달">◀</button><input class="input" id="abMonth" type="month"><button class="btn btn--sm" type="button" id="abNext" aria-label="다음 달">▶</button></span></label>
+        <button class="btn btn--sm" type="button" id="abCsv">엑셀(CSV) 내려받기</button>
+      </div>
+      <div id="abBody"></div>
+    </div>
+  </section>
+
+  <!-- ============================================================
        학생 → 필기 노트 — 학생이 러닝노트에서 올린 필기 사진 (photo.js)
        ============================================================ -->
   <section id="panel-photo" role="tabpanel" aria-labelledby="tab-photo" hidden>
@@ -1027,6 +1049,20 @@
 <!-- ============================================================
      학생 추가·수정
      ============================================================ -->
+<!-- 출석 체크 (attend.js · 20261031i) — 학생 이름 타일 바둑판 · 한 번 결석 · 두 번 지각 · 세 번 출석 -->
+<dialog class="modal att-modal" id="attModal" aria-labelledby="attTitle">
+  <div class="att-head">
+    <h2 class="modal__title" id="attTitle">출석 체크</h2>
+    <p class="att-count" id="attCount" aria-live="polite"></p>
+    <p class="att-hint" id="attHint"></p>
+  </div>
+  <div class="att-grid" id="attGrid"></div>
+  <div class="att-foot">
+    <button class="btn" type="button" id="attCancel">취소</button>
+    <button class="btn btn--primary att-save" type="button" id="attSave">저장</button>
+  </div>
+</dialog>
+
 <dialog class="modal" id="studentModal">
   <form method="dialog" id="studentForm">
     <div class="modal__head">
@@ -2085,53 +2121,55 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
 <!-- config.js 와 brand.js 가 먼저 와야 한다. 나머지가 이 값을 읽는다. -->
-<script src="../assets/config.js?v=20261031h"></script>
-<script src="../assets/brand.js?v=20261031h"></script>
-<script src="../assets/lesson.js?v=20261031h"></script>
-<script src="supabase.js?v=20261031h"></script>
-<script src="db.js?v=20261031h"></script>
-<script src="store.js?v=20261031h"></script>
-<script src="report.js?v=20261031h"></script>
-<script src="aipolish.js?v=20261031h"></script>
-<script src="app.js?v=20261031h"></script>
-<script src="import.js?v=20261031h"></script>
-<script src="appfetch.js?v=20261031h"></script>
-<script src="profile.js?v=20261031h"></script>
-<script src="course.js?v=20261031h"></script>
-<script src="write.js?v=20261031h"></script>
-<script src="publish.js?v=20261031h"></script>
-<script src="send.js?v=20261031h"></script>
-<script src="kakao.js?v=20261031h"></script>
-<script src="sms.js?v=20261031h"></script>
-<script src="contacts.js?v=20261031h"></script>
-<script src="notice.js?v=20261031h"></script>
-<script src="tb.js?v=20261031h"></script>
-<script src="tb-dash.js?v=20261031h"></script>
-<script src="tb-issue.js?v=20261031h"></script>
-<script src="tb-stock.js?v=20261031h"></script>
-<script src="tb-bill.js?v=20261031h"></script>
-<script src="../assets/dday.js?v=20261031h"></script>
-<script src="../assets/app-week.js?v=20261031h"></script>
-<script src="card.js?v=20261031h"></script>
-<script src="exams.js?v=20261031h"></script>
-<script src="photo.js?v=20261031h"></script>
-<script src="applink.js?v=20261031h"></script>
-<script src="skips.js?v=20261031h"></script>
-<script src="today.js?v=20261031h"></script>
-<script src="staff.js?v=20261031h"></script>
-<script src="classes.js?v=20261031h"></script>
-<script src="weekly.js?v=20261031h"></script>
-<script src="filethumb.js?v=20261031h"></script>
-<script src="ytbm.js?v=20261031h"></script>
-<script src="summary.js?v=20261031h"></script>
-<script src="weeks.js?v=20261031h"></script>
-<script src="../assets/photos.js?v=20261031h"></script>
-<script src="review.js?v=20261031h"></script>
-<script src="draftguard.js?v=20261031h"></script>
-<script src="preview.js?v=20261031h"></script>
-<script src="rtabs.js?v=20261031h"></script>
-<script src="nav.js?v=20261031h"></script>
-<script src="sync.js?v=20261031h"></script>
-<script src="auth.js?v=20261031h"></script>
+<script src="../assets/config.js?v=20261031i"></script>
+<script src="../assets/brand.js?v=20261031i"></script>
+<script src="../assets/lesson.js?v=20261031i"></script>
+<script src="supabase.js?v=20261031i"></script>
+<script src="db.js?v=20261031i"></script>
+<script src="store.js?v=20261031i"></script>
+<script src="report.js?v=20261031i"></script>
+<script src="aipolish.js?v=20261031i"></script>
+<script src="app.js?v=20261031i"></script>
+<script src="import.js?v=20261031i"></script>
+<script src="appfetch.js?v=20261031i"></script>
+<script src="profile.js?v=20261031i"></script>
+<script src="course.js?v=20261031i"></script>
+<script src="write.js?v=20261031i"></script>
+<script src="publish.js?v=20261031i"></script>
+<script src="send.js?v=20261031i"></script>
+<script src="kakao.js?v=20261031i"></script>
+<script src="sms.js?v=20261031i"></script>
+<script src="contacts.js?v=20261031i"></script>
+<script src="notice.js?v=20261031i"></script>
+<script src="tb.js?v=20261031i"></script>
+<script src="tb-dash.js?v=20261031i"></script>
+<script src="tb-issue.js?v=20261031i"></script>
+<script src="tb-stock.js?v=20261031i"></script>
+<script src="tb-bill.js?v=20261031i"></script>
+<script src="../assets/dday.js?v=20261031i"></script>
+<script src="../assets/app-week.js?v=20261031i"></script>
+<script src="card.js?v=20261031i"></script>
+<script src="exams.js?v=20261031i"></script>
+<script src="photo.js?v=20261031i"></script>
+<script src="applink.js?v=20261031i"></script>
+<script src="skips.js?v=20261031i"></script>
+<script src="attend.js?v=20261031i"></script>
+<script src="attbook.js?v=20261031i"></script>
+<script src="today.js?v=20261031i"></script>
+<script src="staff.js?v=20261031i"></script>
+<script src="classes.js?v=20261031i"></script>
+<script src="weekly.js?v=20261031i"></script>
+<script src="filethumb.js?v=20261031i"></script>
+<script src="ytbm.js?v=20261031i"></script>
+<script src="summary.js?v=20261031i"></script>
+<script src="weeks.js?v=20261031i"></script>
+<script src="../assets/photos.js?v=20261031i"></script>
+<script src="review.js?v=20261031i"></script>
+<script src="draftguard.js?v=20261031i"></script>
+<script src="preview.js?v=20261031i"></script>
+<script src="rtabs.js?v=20261031i"></script>
+<script src="nav.js?v=20261031i"></script>
+<script src="sync.js?v=20261031i"></script>
+<script src="auth.js?v=20261031i"></script>
 </body>
 </html>

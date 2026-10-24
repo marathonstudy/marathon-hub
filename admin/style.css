@@ -3129,3 +3129,91 @@ body:not(.report-step-write) .rstatus--needonly, body.write-weeks .rstatus--need
   .al-box .al-row { flex-wrap: wrap; }
   .al-box .al-input { min-width: 0; flex: 1 1 100%; }
 }
+
+/* ============================================================
+   20261031i — 출석 체크 · 결석생 챙기기 · 출석부
+   ============================================================ */
+/* 「오늘」 반 카드 · 작성 화면 위 [출석 체크] */
+.tdc-att { margin-top: 8px; }
+.att-go { min-height: 44px; padding: 10px 18px; font-size: 15px; font-weight: 800; border-radius: 12px; }
+.att-done { appearance: none; font: inherit; font-size: 13px; font-weight: 700; color: #135C3B; background: #EAF6EF; border: 1px solid #B5E0CB; border-radius: 12px; padding: 8px 12px; min-height: 40px; cursor: pointer; text-align: left; line-height: 1.45; }
+.att-done:hover, .att-done:focus-visible { border-color: #2E8A5F; }
+.att-done__ok { font-weight: 900; }
+.att-done b { color: #3B3F55; }
+.att-done u { color: #4A34B8; }
+.wr-att { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+/* 출석 체크 창 — 휴대폰에서는 화면 가득 */
+dialog.att-modal { width: min(760px, calc(100vw - 16px)); max-height: calc(100dvh - 16px); display: none; }
+dialog.att-modal[open] { display: flex; flex-direction: column; }
+.att-head { padding: 14px 16px 8px; border-bottom: 1px solid var(--line-soft); }
+.att-count { margin: 6px 0 0; font-size: 17px; font-weight: 800; color: var(--ink-deep); }
+.att-c--ab { color: #C22F2F; } .att-c--la { color: #B8620E; } .att-c--n { color: var(--ink-light); font-weight: 700; }
+.att-hint { margin: 4px 0 0; font-size: 12.5px; color: var(--ink-light); line-height: 1.5; }
+.att-hint__done { color: #135C3B; font-weight: 700; }
+.att-warn { display: block; color: #A12626; font-weight: 700; }
+.att-grid { flex: 1 1 auto; overflow-y: auto; padding: 10px 12px; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; align-content: start; }
+.att-cell { display: flex; flex-direction: column; gap: 4px; min-width: 0; border-radius: 12px; }
+.att-cell.is-flash { box-shadow: 0 0 0 3px rgba(90,63,208,.35); }
+.att-tile { appearance: none; font: inherit; display: flex; align-items: center; gap: 8px; width: 100%; min-height: 56px; padding: 8px 10px; border-radius: 12px; border: 2px solid #D9DCE6; background: #fff; color: var(--ink-deep); cursor: pointer; text-align: left; touch-action: manipulation; }
+.att-tile .av { margin: 0; width: 34px; height: 34px; }
+.att-tile .av--none { font-size: 14px; }
+.att-tile__n { flex: 1 1 auto; min-width: 0; font-size: 15.5px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.att-tile__s { flex: none; font-size: 12px; font-weight: 900; padding: 2px 7px; border-radius: 999px; background: rgba(255,255,255,.9); }
+.att-tile--absent { background: #E04848; border-color: #C22F2F; color: #fff; }
+.att-tile--absent .att-tile__s { color: #A12626; }
+.att-tile--late { background: #F29A2E; border-color: #D9801A; color: #fff; }
+.att-tile--late .att-tile__s { color: #8A4A06; }
+.att-sub { display: flex; flex-wrap: wrap; gap: 4px; }
+.att-opt { appearance: none; font: inherit; flex: 1 1 0; min-width: 0; min-height: 34px; padding: 4px 6px; border-radius: 9px; font-size: 12px; font-weight: 800; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.att-opt.is-on { background: #EAF6EF; border: 1px solid #B5E0CB; color: #135C3B; }
+.att-opt.is-off { background: #FDE4E4; border: 1px solid #F1B5B5; color: #A12626; }
+.att-note { width: 100%; min-height: 34px; font-size: 13px; padding: 4px 8px; }
+.att-foot { display: flex; gap: 8px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line-soft); }
+.att-foot .btn { min-height: 48px; }
+.att-save { flex: 1 1 auto; font-size: 16px; font-weight: 800; }
+.att-ls { display: none; }
+@media (max-width: 520px) {
+  dialog.att-modal { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; border-radius: 0; }
+  .att-head { padding: 10px 12px 6px; }
+  .att-hint { font-size: 12px; }
+  .att-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 8px; }
+  .att-tile { position: relative; flex-direction: column; justify-content: center; gap: 2px; min-height: 64px; padding: 5px 4px; text-align: center; }
+  .att-tile .av { width: 26px; height: 26px; }
+  .att-tile__n { font-size: 14px; max-width: 100%; }
+  .att-tile__s { position: absolute; top: 3px; right: 3px; font-size: 11px; padding: 0 5px; line-height: 1.5; }
+  .att-sub { flex-wrap: nowrap; }
+  .att-opt { font-size: 11.5px; min-height: 32px; padding: 2px 3px; }
+  .att-lf { display: none; } .att-ls { display: inline; }
+  .att-note { min-height: 32px; }
+  .att-count { font-size: 16px; margin-top: 4px; }
+  .att-foot .btn { min-height: 46px; }
+}
+/* 출석부 */
+.ab-tools { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 14px; margin: 0 0 12px; }
+.ab-field { display: grid; gap: 4px; min-width: 0; }
+.ab-field select { min-width: 160px; max-width: 100%; }
+.ab-month { display: inline-flex; gap: 4px; align-items: center; }
+.ab-month input { width: 150px; }
+.ab-wrap { overflow-x: auto; max-width: 100%; border: 1px solid var(--line); border-radius: 12px; -webkit-overflow-scrolling: touch; }
+.ab-table { border-collapse: separate; border-spacing: 0; font-size: 13px; min-width: 100%; }
+.ab-table th, .ab-table td { padding: 6px 6px; border-bottom: 1px solid var(--line-soft); text-align: center; white-space: nowrap; }
+.ab-table thead th { background: #F6F7FB; font-size: 12px; color: var(--ink-mid); position: sticky; top: 0; }
+.ab-d small { display: block; font-size: 11px; color: var(--ink-light); font-weight: 600; }
+.ab-name { position: sticky; left: 0; z-index: 1; background: #fff; text-align: left !important; min-width: 84px; max-width: 140px; font-weight: 800; border-right: 1px solid var(--line-soft); }
+thead .ab-name { background: #F6F7FB; z-index: 2; }
+.ab-name__t { display: block; overflow: hidden; text-overflow: ellipsis; }
+.ab-left { display: inline-block; margin-top: 2px; font-size: 11px; font-weight: 800; color: #6B6F86; background: #EEF0F5; padding: 0 6px; border-radius: 999px; }
+.ab-c { min-width: 34px; }
+.ab-cb { appearance: none; border: 0; background: none; font: inherit; font-weight: 900; min-width: 32px; min-height: 32px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 1px; }
+.ab-c--attend .ab-cb { color: #1F6E52; }
+.ab-c--absent .ab-cb { background: #E04848; color: #fff; }
+.ab-c--late .ab-cb { background: #F29A2E; color: #fff; }
+.ab-c--none .ab-cb { color: var(--ink-light); }
+.ab-c--out, .ab-c--pre { background: repeating-linear-gradient(135deg, #EEF0F5 0 6px, #F6F7FB 6px 12px); }
+.ab-c--future { background: #FAFAFD; }
+.ab-x { font-style: normal; font-size: 11px; font-weight: 900; background: #fff; color: #A12626; border-radius: 4px; padding: 0 2px; margin-left: 1px; line-height: 1.3; }
+.ab-sum { text-align: left !important; font-weight: 700; color: var(--ink-mid); font-size: 12.5px; }
+.ab-table tfoot th, .ab-table tfoot td { background: #F6F4FE; font-weight: 800; border-bottom: 0; }
+.ab-c--tot { font-size: 11.5px; color: #4A34B8; }
+.ab-total { margin: 10px 0 2px; font-weight: 800; color: var(--ink-deep); font-size: 14px; }
+.ab-legend { margin-top: 4px; }

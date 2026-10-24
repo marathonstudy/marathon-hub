@@ -96,8 +96,15 @@
   }
 
   /* 서버 값 그대로 (작성 완료 판정은 없앴다 · 20261030a) */
+  /* 퇴원 표시 · 퇴원일이 지난 학생은 「오늘」 학생 목록에서 뺀다 (퇴원일을 지우면 다시 · 20261031i) */
   function prepare(d) {
+    if (d && d.students) { st.allStudents = d.students; d.students = activeOnly(d.students); }
     return d;
+  }
+  function activeOnly(list) {
+    var by = {};
+    Store.getStudents().forEach(function (s) { by[s.id] = s; });
+    return (list || []).filter(function (s) { var x = by[s.id]; return !x || Store.isActiveOn(x); });
   }
 
   /* ---------- 과제 기록 불러오기 (20261031g) ----------
@@ -820,6 +827,8 @@
       out.push({ kind: 'absent', cls: s.class_name || '', sid: s.id, ids: [s.id], date: last || '', group: false,
         text: (s.class_name || '(반 없음)') + ' · 최근 ' + (set.absentWeeks || 4) + '번 중 결석 ' + s.absent_n + '번', names: [s.name] });
     });
+    /* 결석생 — 자료 미배부 · 보강 영상 미신청 (반 + 수업마다 · 출석 체크에서 「배부」 「신청」으로 바꾸면 사라진다 · attend.js · 20261031i) */
+    if (window.Attend) out = out.concat(Attend.careItems());
     return out;
   }
   function checked(kind, cls, date, sid) { return !!(window.Skips && Skips.checked(kind, cls, date, sid)); }
@@ -834,7 +843,7 @@
         return '<li class="td-care2__item td-care2__item--' + it.kind + '"><button type="button" class="td-care2__btn" data-care="' + it.kind + '" data-care-cls="' + esc(it.cls) + '" data-care-sid="' + esc(it.sid) + '"' +
           (it.week ? ' data-care-week="' + esc(it.week) + '"' : '') + '>' +
           '<span class="td-care2__t">' + esc(it.text) + '</span>' +
-          '<span class="td-care2__go">' + (it.kind === 'review' ? '대신 입력 · 미응시 ›' : '상담 카드 ›') + '</span></button>' +
+          '<span class="td-care2__go">' + (it.kind === 'review' ? '대신 입력 · 미응시 ›' : it.kind === 'material' || it.kind === 'makeup' ? '출석 체크에서 바꾸기 ›' : '상담 카드 ›') + '</span></button>' +
           '<div class="td-care2__foot"><span class="td-care2__names">' + it.ids.map(function (id, i) {
             return '<span class="td-care2__nm">' + esc(it.names[i]) + '<button type="button" class="td-care2__x" data-care-x' + attrs(it, id) + ' aria-label="' + esc(it.names[i]) + ' 목록에서 빼기" title="이 학생만 목록에서 빼기 (대신 입력 · 미응시를 안 해도 다시 뜨지 않음)">×</button></span>';
           }).join('') + '</span>' +
@@ -844,6 +853,7 @@
         (st.careHist ? '<ul class="td-care2__hlist">' + hist.map(function (x) {
           var nm = x.student_id ? ((rowById(x.student_id) || {}).name || '학생') : '묶음 전체';
           var what = x.kind === 'review' ? (x.class_name || '') + ' · ' + (x.basis_date ? Lesson.md(String(x.basis_date).slice(0, 10), false) + ' ' : '') + '복습테스트 안 낸 학생 · ' + nm
+            : x.kind === 'material' || x.kind === 'makeup' ? (x.class_name || '') + ' · ' + (x.basis_date ? Lesson.md(String(x.basis_date).slice(0, 10), false) + ' ' : '') + '결석 · ' + (x.kind === 'material' ? '자료 미배부' : '보강 영상 미신청') + ' · ' + nm
             : (x.class_name || '(반 없음)') + ' · 결석 잦은 학생 · ' + nm;
           var at = x.checked_at ? new Date(x.checked_at) : null;
           return '<li><span>' + esc(what) + '</span><span class="muted-note">' + esc((x.checked_name || '') + (at ? ' ' + (at.getMonth() + 1) + '/' + at.getDate() : '')) + '</span>' +
@@ -863,6 +873,13 @@
       '<b class="tdc-when__dd' + (nx.dday === 0 ? ' is-today' : '') + '">' + ddayText(nx.dday) + '</b></span>';
   }
   function byName(x, y) { return (x.name || '').localeCompare(y.name || '', 'ko'); }
+  /* [출석 체크] — 수업 당일 · 다음 날만 (과정 카드는 그날 수업하는 반마다 · attend.js · 20261031i) */
+  function attHtml(cls, label) {
+    if (!window.Attend || cls === '(반 없음)') return '';
+    var d = Attend.dayFor(cls);
+    var h = d ? Attend.buttonHtml(cls, d, label ? { label: label } : null) : '';
+    return h ? '<div class="tdc-att">' + h + '</div>' : '';
+  }
   function courseCardHtml(co, cls) {
     var no = Course.roundNow(co), ms = Course.membersAt(co, no), t = DDay.today();
     var rs = Course.roundStart(co, no), ckey = '§' + co.name, open = !!st.open[ckey];
@@ -890,7 +907,7 @@
         cls.map(function (c) {
           return '<div class="tdc-crow' + (Course.mine(c.name) ? ' is-mine' : '') + '"><div class="tdc-crow__top"><b class="tdc-crow__n">' + esc(Course.shortName(c.name)) + '</b>' + classWhen(c) +
             (c.rows.length ? '<button type="button" class="btn btn--sm tdc-sms" data-sms-cls="' + esc(c.name) + '" aria-label="' + esc(c.name) + ' 전체 문자 발송">전체 문자 발송</button>' : '') + '</div>' +
-            linesHtml(c, chipsOf(c)) + '</div>';
+            linesHtml(c, chipsOf(c)) + attHtml(c.name, Course.shortName(c.name)) + '</div>';
         }).join('') +
       '</div><div class="tdc-btns"><button type="button" class="btn btn--sm btn--primary tdc-write" data-write-course="' + esc(ckey) + '">레포트 작성</button></div></div>' +
       (n ? toggleBar(ckey, n, open, null) : '') +
@@ -912,6 +929,7 @@
             '<span class="muted-note num tdc-n">' + n + '명</span>' + needBtn(needIds(rows, c.cy)) + '</div>' +
           linesHtml(c, chips) +
           classWhen(c) +
+          attHtml(c.name, '') +
         '</div>' +
         '<div class="tdc-btns">' +
           (c.name === '(반 없음)' || !n ? '' : '<button type="button" class="btn btn--sm tdc-sms" data-sms-cls="' + esc(c.name) + '" aria-label="' + esc(c.name) + ' 전체 문자 발송">전체 문자 발송</button>') +
@@ -1118,6 +1136,8 @@
   /* 챙길 학생 — 복습테스트: 그 반 그 수업 작성 화면의 복습테스트 그 학생 줄 ([대신 입력] · [미응시]) · 결석: 상담 카드 */
   function careGo(kind, cls, week, sid) {
     if (kind === 'absent') { if (window.Card) Card.open(sid); return; }
+    /* 결석생 자료 · 보강 영상 — 출석 체크 창의 그 학생 (20261031i) */
+    if (kind === 'material' || kind === 'makeup') { if (window.Attend) Attend.open(cls, Store.lessonDayOf({ className: cls }, week), sid); return; }
     writeWeek(cls, week);
     /* 복습테스트 표가 다 그려질 때까지 (최대 5초) 기다렸다가 그 학생 줄로 */
     var tries = 0;
@@ -1260,6 +1280,10 @@
     render();
     loadApp(s.id);
   });
+  /* 출석 체크를 저장하거나 새로 읽으면 (attend.js) — 반 카드 버튼 · 챙길 학생 */
+  window.addEventListener('jt:attend', function () { if (st.data && !$('#appRoot').hidden) render(); });
+  /* 퇴원일을 넣거나 지우면 학생 목록도 (20261031i) */
+  window.addEventListener('jt:roster-changed', function () { if (st.data && st.allStudents) { st.data.students = activeOnly(st.allStudents); st.classes = classList(st.data); if (!$('#appRoot').hidden) render(); } });
   /* 학생 얼굴 사진을 불러오면 학생 줄 동그라미를 다시 (profile.js) */
   window.addEventListener('jt:profiles', function () { if (st.data && !$('#appRoot').hidden) render(); });
 

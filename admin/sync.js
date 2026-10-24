@@ -18,7 +18,8 @@
     'tb_issues', 'tb_bills', 'tb_bill_notices', 'tb_refunds', 'tb_class_dates', 'tb_stock_moves', 'tb_orders',
     'student_cards', 'student_grades', 'student_notes', 'note_photos', 'classes',
     'class_weeks', 'lesson_videos', 'class_files', 'lesson_summaries', 'review_tests', 'review_submissions',
-    'report_skips', 'care_checks'      /* 건너뛰기 · 확인함 (migration-036) */
+    'report_skips', 'care_checks',     /* 건너뛰기 · 확인함 (migration-036) */
+    'attend_checks'                    /* 출석 체크 완료 (migration-037) */
   ];
   var POLL_MS = 30000;
   var THROTTLE_MS = 3000;

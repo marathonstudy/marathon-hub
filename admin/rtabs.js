@@ -17,13 +17,13 @@
   'use strict';
 
   var $ = function (s, r) { return (r || document).querySelector(s); };
-  var REPORT = [1, 2, 3], STUDENTS = [0, 6];
+  var REPORT = [1, 2, 3], STUDENTS = [0, 6, 8];          /* 학생 = 명단 · 필기 노트 · 출석부 (20261031i) */
   var last = { report: 1, students: 0 };
   var cur = -1;
   var counts = { week: '', pub: null, run: 0 };
 
   function active() {
-    var ids = ['tab-roster', 'tab-write', 'tab-publish', 'tab-send', 'tab-notice', 'tab-book', 'tab-photo', 'tab-today'];
+    var ids = ['tab-roster', 'tab-write', 'tab-publish', 'tab-send', 'tab-notice', 'tab-book', 'tab-photo', 'tab-today', 'tab-attbook'];
     for (var i = 0; i < ids.length; i++) {
       var t = document.getElementById(ids[i]);
       if (t && t.getAttribute('aria-selected') === 'true') return i;
@@ -104,7 +104,7 @@
   /* ---------- 단계마다 진행 — 그 반 그 주 (반을 안 골랐으면 모든 학생) ---------- */
   function classStudents() {
     var cls = window.Writer && Writer.currentClass ? Writer.currentClass() : '';
-    var list = (window.UI ? UI.activeStudents() : Store.activeStudents()) || [];
+    var list = (window.UI ? UI.activeStudents(weekNow()) : Store.activeStudents(weekNow())) || [];
     /* 과정이면 그 회차에 같은 주로 쓰는 반들 (course.js · 20261031a) */
     if (cls && window.Course && Course.isKey(cls)) return list.filter(function (s) { return Course.inScope(cls, (s.className || '').trim(), weekNow()); });
     return cls ? list.filter(function (s) { return (s.className || '').trim() === cls; }) : list;

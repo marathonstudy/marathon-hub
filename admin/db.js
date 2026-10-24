@@ -25,6 +25,7 @@
 
   /* 학부모 번호 2 (students.parent_phone2 · migration-020) — 서버에 그 칸이 있을 때만 보낸다 */
   var hasP2 = false;
+  var hasLeft = false;          /* students.left_on 퇴원일 (migration-037) — 칸이 있을 때만 보낸다 */
   function hasPhone2() { return hasP2; }
 
   function toDbStudent(s) {
@@ -42,6 +43,7 @@
       sort_order: s.sortOrder || 0
     };
     if (hasP2) row.parent_phone2 = s.parentPhone2 || '';
+    if (hasLeft || s.leftOn) row.left_on = s.leftOn || null;
     return row;
   }
 
@@ -58,6 +60,7 @@
       studentPhone: r.student_phone || '',
       extra: r.extra || {},
       archived: !!r.archived,
+      leftOn: (r.left_on !== undefined && (hasLeft = true)) ? String(r.left_on || '').slice(0, 10) : '',
       sortOrder: r.sort_order || 0,
       createdAt: r.created_at,
       updatedAt: r.updated_at || ''

@@ -516,6 +516,16 @@ delete from public.staff where email = '조교이메일@example.com';
 - 작성 화면 학생 카드 「과제」 — 그 레포트 기간 「과제 3/5일」 · 누르면 7칸 표 · 「과제 연동 전」 [+ 과제 링크 연결](그 자리 링크 칸) · 현황 줄 「과제 연동 전 n명」(차례로 이동) ·
   「오늘」이 반마다 받은 기록(10분 기억)을 그대로 — 새로 부르지 않는다. 과정 화면 반별 카드도 같다.
 
+### 5-40. 20261031i — 출석 체크 · 결석생 챙기기 · 출석부 · 퇴원일 (migration-037-attendance.sql)
+1. Supabase SQL Editor 에서 `supabase/migration-037-attendance.sql` 실행 (036 다음 · 여러 번 실행해도 안전 · 기존 출결은 지우지 않음). 함수 · Storage 배포는 없다.
+   - entries 에 `att_material`(자료 배부) · `att_makeup`(보강 영상 신청 · 둘 다 기본 true) · `attend_by` · `attend_at` — 출결은 지금처럼 entries 한 곳 (출석 체크 = 레포트 학생 카드 출결)
+   - `attend_checks`(반 + 주 「출석 체크 완료」 · 누가 언제) · `attend_log`(출결을 바꿀 때마다 한 줄 · 트리거가 씀 · 직원만 읽음)
+   - `students.left_on` 퇴원일 · entry_patch 가 결석생 두 칸도 저장 · care_checks 종류에 material · makeup
+- 「오늘」 반 카드(과정은 그날 수업하는 반) · 작성 화면 위 [출석 체크] — 수업 당일 · 다음 날 · 「출석 체크 완료 · 결석 2 · 지각 1 · 고치기」 (admin/attend.js)
+  이름 타일 바둑판(전원 출석) · 한 번 결석 · 두 번 지각 · 세 번 출석 · 결석생 [✓ 자료 배부] [✓ 보강 영상 신청] · 지각 메모 · 「출석 10 · 결석 2 · 지각 0 / 12」
+- 「챙길 학생」 — 결석생 자료 미배부 · 보강 영상 미신청 (반 + 수업마다 · 누르면 출석 체크 그 학생 · 확인함 · ×). 학부모 · 학생 레포트에는 넣지 않는다.
+- 학생 → 출석부 (admin/attbook.js) — 반 · 월 · 학생 × 수업일 · 합계 · 반 전체 · CSV. 퇴원일 — 그 뒤 수업부터 출석 체크 · 레포트 · 「오늘」 · 문자에서 빠짐 (Store.isActiveOn).
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

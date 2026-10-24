@@ -148,7 +148,8 @@
     { tab: '#tab-notice',  panel: '#panel-notice'  },
     { tab: '#tab-book',    panel: '#panel-book'    },
     { tab: '#tab-photo',   panel: '#panel-photo'   },
-    { tab: '#tab-today',   panel: '#panel-today'   }     /* 7 — 화면 맨 앞 · 로그인 첫 화면 */
+    { tab: '#tab-today',   panel: '#panel-today'   },    /* 7 — 화면 맨 앞 · 로그인 첫 화면 */
+    { tab: '#tab-attbook', panel: '#panel-attbook' }     /* 8 — 학생 → 출석부 (attbook.js · 20261031i) */
   ];
 
   function selectTab(idx) {
@@ -293,7 +294,7 @@
   }
 
   function matches(s) {
-    if (s.archived && !showArchived) return false;
+    if (Store.isGone(s) && !showArchived) return false;
     if (filterClass && (s.className || '') !== filterClass) return false;
     if (!filterText) return true;
     var hay = [s.name, s.school, s.grade, s.className, s.parentPhone, s.studentPhone];
@@ -331,7 +332,7 @@
   function fillRow(tr, s) {
     tr.dataset.id = s.id;
     tr.innerHTML = rowHtml();
-    tr.classList.toggle('is-archived', !!s.archived);
+    tr.classList.toggle('is-archived', Store.isGone(s));
     var tds = tr.children;
     tds[0].querySelector('.roster__name').textContent = s.name || '';
     /* 이름 옆 작은 얼굴 사진 (없으면 첫 글자 · profile.js · 20261031c) */
@@ -412,7 +413,7 @@
 
   function render() {
     var visible = sortStudents(students).filter(matches);
-    var active = students.filter(function (s) { return !s.archived; });
+    var active = students.filter(function (s) { return !Store.isGone(s); });
 
     $('#brandCount').textContent = '학생 ' + active.length + '명';
     $('#rosterHint').textContent = (filterText || filterClass) && students.length
@@ -440,7 +441,7 @@
     var groups = [];
     var index = {};
     visible.forEach(function (s) {
-      var key = s.archived ? ARCHIVE_GROUP : ((s.className || '').trim() || '(반 없음)');
+      var key = Store.isGone(s) ? ARCHIVE_GROUP : ((s.className || '').trim() || '(반 없음)');
       if (!(key in index)) { index[key] = groups.length; groups.push({ name: key, rows: [] }); }
       groups[index[key]].rows.push(s);
     });
@@ -525,7 +526,7 @@
      「내 정보 안 채운 학생 n명 [문자로 알리기] · 사진 없는 학생 n명 [문자로 알리기]」 — 문자 창이 그 학생들 · 학생 번호 · 안내 문구로 열린다 */
   var faceView = false;
   function profileGaps() {
-    var act = students.filter(function (s) { return !s.archived; });
+    var act = students.filter(function (s) { return !Store.isGone(s); });
     return {
       info: act.filter(function (s) { return !Profile.hasInfo(s.id); }).map(function (s) { return s.id; }),
       photo: act.filter(function (s) { return !Profile.hasPhoto(s.id); }).map(function (s) { return s.id; })
@@ -565,7 +566,7 @@
 
   function missingLinkIds() {
     return students.filter(function (s) {
-      return !s.archived && !Store.linkOf(s.id).hubCode;
+      return !Store.isGone(s) && !Store.linkOf(s.id).hubCode;
     }).map(function (s) { return s.id; });
   }
 
@@ -731,7 +732,7 @@
 
     if (btn.dataset.act === 'copyclassstudent') {
       var cls = btn.dataset.cls;
-      var list = students.filter(function (x) { return !x.archived && (x.className || '') === cls; })
+      var list = students.filter(function (x) { return !Store.isGone(x) && (x.className || '') === cls; })
         .sort(function (a, b) { return (a.name || '').localeCompare(b.name || '', 'ko'); });
       if (!list.length) { toast('다니는 학생이 없습니다', 'bad'); return; }
       btn.disabled = true;
@@ -1648,7 +1649,8 @@
     entryUrl: entryUrl,
     entryNotice: function () { return ENTRY_NOTICE.split('{주소}').join(entryUrl()); },
     getStudents: function () { return students; },
-    activeStudents: function () { return students.filter(function (s) { return !s.archived; }); }
+    /* week = 그 주 수업일 기준 (퇴원일 뒤 수업부터 빠짐 · 레포트 작성 · 공개 · 발송) · 없으면 오늘 기준 (20261031i) */
+    activeStudents: function (week) { return students.filter(function (s) { return Store.isActiveOn(s, week); }); }
   };
 
 })();

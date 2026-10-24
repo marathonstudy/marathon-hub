@@ -35,7 +35,7 @@
   var collapsedEntries = {};
   var commentTargetId = '';
 
-  function students() { return (window.UI ? UI.activeStudents() : Store.activeStudents()); }
+  function students() { var w = draft && draft.weekStart; return (window.UI ? UI.activeStudents(w) : Store.activeStudents(w)); }     /* 퇴원일 뒤 수업은 빠짐 (20261031i) */
   function toast(m, k) { if (window.UI) UI.toast(m, k); }
 
   function emptyDraft() {
@@ -517,11 +517,28 @@
       (L && L.canceled ? ' <span class="wbar__off">휴강</span>' : '');
     renderStatus();
     renderAuto();
+    renderAttend();
     $('#btnWbarPrev').disabled = !stepOk(start, -1);
     $('#btnWbarNext').disabled = !stepOk(start, 1);
     stickBar();
   }
   /* 과정 — 반별 현황 한 줄 「목동 10/24(토) 제출 11/12 · 반포 10/25(일) 수업 전」 (작성 · 공개 · 발송 위 · 20261031a) */
+  /* [출석 체크] — 작성 화면 위쪽 · 그 수업일이 지났거나 오늘이면 (과정은 같은 주에 쓰는 반마다 · attend.js · 20261031i) */
+  function renderAttend() {
+    var el = $('#wrAttend');
+    if (!el) return;
+    var h = '';
+    if (mode === 'edit' && window.Attend && window.DDay && draft && draft.weekStart && currentClass) {
+      var items;
+      if (isCourse(currentClass)) items = Course.split(currentClass, draft.weekStart).same.map(function (m) { return [m.cls, m.date, Course.shortName(m.cls)]; });
+      else { var L = Store.lessonOf(currentClass, draft.weekStart); items = [[currentClass, L && L.date && !L.canceled ? L.date : '', '']]; }
+      h = items.filter(function (x) { return x[1] && x[1] <= DDay.today(); }).map(function (x) { return Attend.buttonHtml(x[0], x[1], x[2] ? { label: x[2] } : null); }).join('');
+    }
+    el.hidden = !h;
+    el.innerHTML = h;
+  }
+  window.addEventListener('jt:attend', renderAttend);
+
   /* 「과제 연동 전 n명」 — 작성 화면에서만 (누르면 그 학생 카드로 차례로 · 20261031h) */
   function needIds() {
     if (!window.Today || !Today.appNeed || !currentClass || !draft) return [];

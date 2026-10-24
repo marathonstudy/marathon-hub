@@ -211,6 +211,8 @@
         '<label class="field"><span class="field__label">학교</span><input class="input" id="cdSchool" value="' + esc(s.school) + '"></label>' +
         '<label class="field"><span class="field__label">학년</span><input class="input" id="cdGrade" list="gradeOptions" value="' + esc(s.grade) + '"></label>' +
         '<label class="field"><span class="field__label">수강 시작일</span><input class="input" id="cdStart" type="date" value="' + esc(c.start_date || '') + '"></label>' +
+        /* 퇴원일 — 그 날 뒤 수업부터 출석 체크 · 레포트 작성 · 발송 · 「오늘」 · 문자 대상에서 빠진다 · 지우면 다시 (20261031i · migration-037) */
+        '<label class="field"><span class="field__label">퇴원일 <span class="field__opt">넣으면 그 뒤 수업부터 빠짐 · 지우면 다시</span></span><input class="input" id="cdLeft" type="date" value="' + esc(s.leftOn || '') + '"></label>' +
         '<label class="field grid2__full"><span class="field__label">특이사항 <span class="field__opt">고정 메모 · 여러 줄</span></span>' +
           '<textarea class="textarea" id="cdNotesText" rows="3">' + esc(c.notes || '') + '</textarea></label>' +
       '</div>' +
@@ -226,8 +228,8 @@
     var sid = C.sid;
     var name = $('#cdName').value.trim();
     if (!name) { toast('이름은 비울 수 없습니다', 'bad'); return; }
-    var stud = { name: name, school: $('#cdSchool').value.trim(), grade: $('#cdGrade').value.trim() };
-    var stChanged = stud.name !== s.name || stud.school !== (s.school || '') || stud.grade !== (s.grade || '');
+    var stud = { name: name, school: $('#cdSchool').value.trim(), grade: $('#cdGrade').value.trim(), leftOn: ($('#cdLeft') && $('#cdLeft').value) || '' };
+    var stChanged = stud.name !== s.name || stud.school !== (s.school || '') || stud.grade !== (s.grade || '') || stud.leftOn !== (s.leftOn || '');
     var cardPatch = { start_date: $('#cdStart').value || null, notes: $('#cdNotesText').value.replace(/\s+$/, '') };
     var c = C.card || {};
     var cdChanged = (cardPatch.start_date || null) !== (c.start_date || null) || cardPatch.notes !== (c.notes || '');

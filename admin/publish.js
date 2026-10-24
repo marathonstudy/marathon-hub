@@ -57,7 +57,7 @@
     var cur = curClass(), order = {};
     if (isCourse()) Course.split(cur, state.week).same.forEach(function (m, i) { order[m.cls] = i; });
     var commonOf = function (k) { return (d.common || {})[k] || null; };
-    return UI.activeStudents().filter(function (s) { return !cur || (isCourse() ? grpOf(s) in order : grpOf(s) === cur); }).map(function (s) {
+    return UI.activeStudents(state.week).filter(function (s) { return !cur || (isCourse() ? grpOf(s) in order : grpOf(s) === cur); }).map(function (s) {
       var common = (window.Course ? Course.effectiveCommon(s.className || '', state.week, commonOf) : null) || (d.common || {})[s.className || ''] || { lessons: [], tests: [] };
       var pub = state.published[s.id] || null;
       return {

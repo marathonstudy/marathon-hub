@@ -808,8 +808,22 @@
     return Array.isArray(list) ? list : [];
   }
 
-  function activeStudents() {
-    return getStudents().filter(function (s) { return !s.archived; });
+  /* 퇴원 (20261031i) — 퇴원 표시(archived) 또는 퇴원일(left_on · migration-037)이 지난 학생
+       week 를 주면 그 반 그 주 수업일 기준 — 퇴원일 뒤 수업부터 빠진다 (퇴원일 당일 수업까지는 남는다)
+       안 주면 오늘 기준 (「오늘」 · 문자 대상 · 명단) */
+  function todayISO() { return global.DDay && global.DDay.today ? global.DDay.today() : toISO(new Date()); }
+  function lessonDayOf(s, week) {
+    var L = lessonOf(String((s && s.className) || '').trim(), week);
+    return L && L.date && !L.canceled ? L.date : week;
+  }
+  function isActiveOn(s, week) {
+    if (!s || s.archived) return false;
+    if (!s.leftOn) return true;
+    return (week ? lessonDayOf(s, week) : todayISO()) <= s.leftOn;
+  }
+  function isGone(s) { return !!s && (!!s.archived || (!!s.leftOn && todayISO() > s.leftOn)); }
+  function activeStudents(week) {
+    return getStudents().filter(function (s) { return isActiveOn(s, week); });
   }
 
   function saveStudents(list) { return write(KEYS.students, list); }
@@ -1435,7 +1449,7 @@
     var wk = parseISO(week);
     if (!wk || toISO(mondayOf(wk)) < thisWeek().start) return Promise.resolve(null);     /* 월요일 기준 — 지난 주차는 채우지 않는다 */
     if (!global.SB || !global.SB.client || !global.SB.client.rpc) return Promise.resolve(null);
-    var ids = activeStudents().filter(function (s) {
+    var ids = activeStudents(week).filter(function (s) {
       return !bw.entries[s.id] && !defaultsTried[week + '|' + s.id];
     }).map(function (s) { return s.id; });
     if (!ids.length) return Promise.resolve(null);
@@ -1589,6 +1603,9 @@
 
     getStudents: getStudents,
     activeStudents: activeStudents,
+    isActiveOn: isActiveOn,
+    isGone: isGone,
+    lessonDayOf: lessonDayOf,
     saveStudents: saveStudents,
     upsertStudent: upsertStudent,
     deleteStudent: deleteStudent,
