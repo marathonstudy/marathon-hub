@@ -490,6 +490,11 @@ delete from public.staff where email = '조교이메일@example.com';
 - 「오늘 할 일」 [건너뛰기] → report_skips (칩 회색 「건너뜀」 · 누르면 되돌리기 · 수업일 고르기 줄 옅게 · 작성 화면 「건너뛴 수업입니다 · 되돌리기」).
   「챙길 학생」 [확인함] · 이름 [×] → care_checks (같은 수업 · 같은 결석 건) · 「확인함 기록 보기」에서 되돌리기. 누가 · 언제는 서버 트리거가 채운다.
 
+### 5-37. 20261031f — 과제 칩 자세히 보기 (SQL · 함수 배포 없음)
+- 「과제 n/5일」 칩 — 마우스를 올리면 한 줄 말풍선(기간 · 평일 n일 중 n일 제출) · 누르면 그 줄 아래 7칸 표(today.js detailHtml · paintDetail · 한 번에 한 학생).
+  과제 ● ◐ ○ · 강의 ✓ – · 토 · 일은 「주중 복습」 한 칸 · 칸을 누르면 그날 과제 이름 · 제출 시각(app-report history 의 title · submittedAt) · [과제 상세 보기 →].
+- 「오늘」 · 레포트 발송 · 학생 명단 과제 칸이 같이 쓴다. 이미 불러온 기록만 쓴다 (새로 부르지 않음).
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

@@ -390,10 +390,25 @@
           : '<button class="btn btn--sm btn--primary" data-act="issue">학부모 링크 발급</button>') +
         '<button class="btn btn--sm btn--student" data-act="copystudent" title="학생 링크 복사 — 복습테스트 · 필기 사진 입력용">학생 링크</button>';
     }
-    appTd.innerHTML = link.appCode
-      ? '<span class="link-tag link-tag--on">연결됨</span>'
-      : '<span class="link-tag">없음</span>';
+    appTd.innerHTML = rosterAppCell(s, link);
   }
+  /* 과제 칸 — 「오늘」이 불러온 과제 기록이 있으면 「과제 n/5일」 칩(누르면 날짜별 표 · today.js · 20261031f), 아니면 연결됨 / 없음 */
+  function rosterAppCell(s, link) {
+    if (!s.archived && window.Today && Today.appCell && !Today.appNeed(s.id)) {
+      var h = Today.appCell(s.id);
+      if (/data-app-detail|data-app-retry|tdc-app--none|tdc-app--wait/.test(h)) return h;
+    }
+    return link.appCode ? '<span class="link-tag link-tag--on">연결됨</span>' : '<span class="link-tag">없음</span>';
+  }
+  /* 과제 기록을 받을 때마다 그 학생 칸만 · 다 받으면 표도 다시 */
+  window.addEventListener('jt:app', function (e) {
+    var sid = e.detail && e.detail.sid;
+    if (!sid) { if (window.Today && Today.paintDetail) Today.paintDetail(); }
+    Array.prototype.forEach.call(document.querySelectorAll('#rosterList tr[data-id' + (sid ? '="' + sid + '"' : '') + '] .roster__app'), function (td) {
+      var s = students.find(function (x) { return x.id === td.parentNode.dataset.id; });
+      if (s) td.innerHTML = rosterAppCell(s, Store.linkOf(s.id));
+    });
+  });
 
   function render() {
     var visible = sortStudents(students).filter(matches);
@@ -503,6 +518,7 @@
     syncExpandButton();
     renderClassInfo();
     renderProfileHint();
+    if (window.Today && Today.paintDetail) Today.paintDetail();
   }
 
   /* ---------- 학생이 채운 내 정보 · 얼굴 사진 (profile.js · 20261031c) ----------

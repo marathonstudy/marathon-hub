@@ -2986,3 +2986,47 @@ td .av--s { margin-right: 6px; }
 .sms-one__add { appearance: none; border: 0; background: none; font: inherit; font-size: 12.5px; font-weight: 700; color: #5A3FD0; cursor: pointer; padding: 2px 0; }
 .sms-one__add:hover { text-decoration: underline; }
 .sms-tail { font-size: 12.5px; color: var(--ink-mid); }
+
+/* ---------- 과제 칩 → 기간 · 날짜별 표 (today.js · 20261031f) ---------- */
+.tdc-app--btn { appearance: none; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; position: relative; }
+.tdc-app--btn:hover, .tdc-app--btn[aria-expanded="true"] { filter: brightness(.95); box-shadow: 0 0 0 2px rgba(90,63,208,.18); }
+@media (hover: hover) {
+  .tdc-app--btn[data-tip]:hover::after { content: attr(data-tip); position: absolute; left: 0; bottom: calc(100% + 5px);
+    white-space: nowrap; background: #2C3566; color: #fff; font-size: 12px; font-weight: 600; padding: 4px 8px; border-radius: 6px; z-index: 30; pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,.18); }
+}
+.hd-box { flex: 1 1 100%; min-width: 0; margin: 6px 0 4px; padding: 10px; border: 1px solid #DCDFEA; border-radius: 12px; background: #fff; display: grid; gap: 6px; }
+.snd-row .hd-box { margin: 0 0 8px; }
+.hd-tr > td { padding: 0 6px 8px; }
+.hd-head { font-size: 12.5px; font-weight: 800; color: var(--ink-deep); }
+.hd-grid { display: grid; gap: 3px; align-items: stretch; }
+.hd-h { text-align: center; font-size: 11.5px; color: var(--ink-mid); line-height: 1.2; }
+.hd-h b { display: block; font-size: 13px; color: var(--ink-deep); }
+.hd-h--wk { color: #8A8FA6; }
+.hd-lab { font-size: 11.5px; font-weight: 800; color: var(--ink-light); align-self: center; }
+.hd-c { appearance: none; font: inherit; min-width: 0; min-height: 30px; border: 1px solid #E4E6EE; border-radius: 7px; background: #FAFBFD; color: var(--ink-mid);
+  font-size: 15px; line-height: 1; display: flex; align-items: center; justify-content: center; padding: 0; cursor: pointer; }
+.hd-c--onTime { background: #E6F6EE; border-color: #B9E2CD; color: #135C3B; }
+.hd-c--late   { background: #FFF1DF; border-color: #F1CC99; color: #874A0B; }
+.hd-c--none   { background: #FDECEF; border-color: #F0B9C6; color: #9E1F3B; }
+.hd-c--off    { background: transparent; border-style: dashed; cursor: default; }
+.hd-c--future { background: #F6F7FA; color: #B3B7C6; }
+.hd-c--wk { flex-direction: column; gap: 2px; font-size: 11px; font-weight: 700; color: #6E7389; background: #F3F4F8; border-color: #E4E6EE; }
+.hd-c--wk.is-done { color: #135C3B; }
+.hd-c--wk b { font-size: 13px; }
+.hd-c.is-pick { box-shadow: 0 0 0 2px #5A3FD0; }
+.hd-l { text-align: center; font-size: 13px; font-weight: 800; min-height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 6px; background: #FAFBFD; }
+.hd-l--done { color: #135C3B; }
+.hd-l--todo { color: #8A8FA6; }
+.hd-pick { margin: 0; font-size: 12.5px; font-weight: 700; color: var(--ink-deep); background: #F6F3FF; border-radius: 8px; padding: 5px 8px; }
+.hd-legend { margin: 0; font-size: 11.5px; color: var(--ink-light); }
+.hd-foot { display: flex; justify-content: flex-end; }
+.hd-more { appearance: none; border: 0; background: none; font: inherit; font-size: 12.5px; font-weight: 800; color: #5A3FD0; cursor: pointer; padding: 2px 0; }
+.hd-more:hover { text-decoration: underline; }
+@media (max-width: 420px) {
+  .hd-box { padding: 8px 6px; }
+  .hd-grid { gap: 2px; grid-template-columns: 2em repeat(7, minmax(0, 1fr)) !important; }
+  .hd-c { min-height: 28px; font-size: 13px; border-radius: 6px; }
+  .hd-c--wk { font-size: 9.5px; letter-spacing: -.02em; }
+  .hd-h { font-size: 10.5px; }
+  .hd-h b { font-size: 12px; }
+}

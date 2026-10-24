@@ -335,6 +335,7 @@
     }
     if (!gs.length) { host.innerHTML = '<div class="empty-state">다니는 학생이 없습니다.</div>'; return; }
     host.innerHTML = gs.map(cardHtml).join('');
+    if (window.Today && Today.paintDetail) Today.paintDetail();       /* 펼친 과제 표 (today.js · 20261031f) */
   }
 
   /* ============================================================
@@ -459,7 +460,7 @@
   $('#sendList').addEventListener('click', function (ev) {
     /* 과제 칸 · 정렬 (「오늘」과 같은 동작 · today.js · applink.js) */
     /* 「+ 과제 링크 연결」 · 링크 칸은 applink.js 가 받는다 */
-    if (ev.target.closest('.al-box')) return;
+    if (ev.target.closest('.al-box, .hd-box')) return;
     var ap = ev.target.closest('[data-app-sort], [data-app-retry]');
     if (ap && window.Today) {
       if (ap.dataset.appSort) Today.setAppSort(ap.dataset.appSort);
@@ -726,7 +727,7 @@
     if (!sid) { appRender(); return; }               /* 다 받았다 — 정렬까지 다시 */
     /* 한 명 받을 때마다 그 학생 칸만 (줄이 뛰지 않게) */
     var s = findStudent(sid), el = document.querySelector('#sendList .snd-row[data-id="' + sid + '"] .snd-row__app');
-    if (s && el) el.innerHTML = Today.appCell(sid, appDate(lessonOf(clsOf(s))));
+    if (s && el) { el.innerHTML = Today.appCell(sid, appDate(lessonOf(clsOf(s)))); if (Today.detailOpen().sid === sid) Today.paintDetail(); }
   });
   window.addEventListener('jt:appsort', function () { if (state.loaded) render(); });
   window.addEventListener('jt:applink', appRender);

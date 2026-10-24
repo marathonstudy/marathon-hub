@@ -167,6 +167,7 @@
     Array.prototype.forEach.call(document.querySelectorAll('#tdBody .tdc-st[data-id="' + sid + '"] .tdc-app-slot'), function (el) {
       el.innerHTML = appCell(s, (st.cyBy || {})[s.class_name || '(반 없음)']);
     });
+    if (det.sid === sid) paintDetail();
     window.dispatchEvent(new CustomEvent('jt:app', { detail: { sid: sid } }));
   }
 
@@ -350,8 +351,116 @@
     var w = x.w;
     if (!w) return '<span class="tdc-app tdc-app--none" title="그 수업 전 일주일에 앱 과제가 하나도 없었습니다">과제 없음(이 기간)</span>';
     var k = hwTone(w.hwDone, w.hwDays);
-    return '<span class="tdc-app tdc-app--' + k + ' num" title="' + esc(md(w.from) + '~' + md(w.to) + ' 평일 ' + w.hwDays + '일 중 제출 ' + w.hwDone + '일 · 정시 ' + w.hwOnTime + '일') + '">과제 ' + w.hwDone + '/' + w.hwDays + '일</span>';
+    /* 누르면 그 학생 줄 아래 기간 · 날짜별 표 (마우스를 올리면 한 줄 말풍선 · 20261031f) */
+    var L = lessonDate || (cy && cy.L) || '', tip = tipOf(w);
+    return '<button type="button" class="tdc-app tdc-app--' + k + ' tdc-app--btn num" data-app-detail="' + esc(s.id) + '" data-app-date="' + esc(L) + '" data-tip="' + esc(tip) + '"' +
+      ' aria-expanded="' + (det.sid === s.id && det.date === L) + '" aria-label="' + esc('과제 ' + w.hwDone + '/' + w.hwDays + '일 · ' + tip + ' · 누르면 날짜별 표') + '">과제 ' + w.hwDone + '/' + w.hwDays + '일</button>';
   }
+
+  /* ---------- 과제 칩 → 기간 · 날짜별 표 (20261031f) ----------
+     칩을 누르면 그 학생 줄 바로 아래에 펼친다 (다시 누르면 접힘 · 한 번에 한 학생). 이미 불러온 과제 기록만 쓴다 (새로 부르지 않는다)
+       맨 위 「10/15(목) ~ 10/21(수) · 10/22(목) 수업 레포트 기준」
+       7칸 — 날짜 · 요일 / 과제 ● 정시 ◐ 늦게 ○ 미제출 (과제 없는 날 빈칸) / 강의 ✓ 다 봄 – 안 봄 · 토 · 일은 두 줄을 합친 「주중 복습」
+       칸을 누르면 「10/19(월) 독서 1지문 · 23:40 제출(늦게)」 · 맨 아래 [과제 상세 보기 →] (러닝노트 과제 상세)
+     「오늘」 · 레포트 발송 · 학생 명단이 같이 쓴다 — 줄을 다시 그린 뒤 paintDetail() 이 표를 다시 붙인다 */
+  var DOWK = ['일', '월', '화', '수', '목', '금', '토'];
+  function mdw(iso) { return md(iso) + '(' + DOWK[Lesson.dowOf(iso)] + ')'; }
+  function tipOf(w) { return mdw(w.from) + ' ~ ' + mdw(w.to) + ' · 평일 ' + w.hwDays + '일 중 ' + w.hwDone + '일 제출'; }
+  var det = { sid: '', date: '', day: '' };
+  /* 제출 시각 「23:40」 — 시간대가 붙은 값은 한국 시각으로, 없으면 적힌 그대로 */
+  function hhmm(v) {
+    var x = String(v || '');
+    if (!/T\d\d:\d\d/.test(x)) return '';
+    if (/(Z|[+-]\d\d:?\d\d)$/i.test(x)) { var d = new Date(Date.parse(x) + 9 * 3600000); return isNaN(d) ? '' : String(d.getUTCHours()).padStart(2, '0') + ':' + String(d.getUTCMinutes()).padStart(2, '0'); }
+    return x.slice(11, 16);
+  }
+  function kstDay(v) {
+    var x = String(v || '');
+    if (/(Z|[+-]\d\d:?\d\d)$/i.test(x) && /T/.test(x)) { var d = new Date(Date.parse(x) + 9 * 3600000); return isNaN(d) ? '' : d.toISOString().slice(0, 10); }
+    return x.slice(0, 10);
+  }
+  function dayInfo(data, d) {
+    var date = d.date;
+    var c = (data.calendar || []).find(function (x) { return x.date === date; });
+    var hs = (data.history || []).filter(function (h) { return (c && c.order && h.order === c.order) || (!(c && c.order) && kstDay(h.submittedAt) === date); });
+    var lec = c && c.order ? (data.lectures || []).find(function (l) { return l.order === c.order; }) : null;
+    var title = (hs[0] && hs[0].title) || (lec && lec.title) || (d.weekend ? '주중 복습' : '과제');
+    var h = hs.filter(function (x) { return x.submittedAt; }).pop();
+    var how = d.hw === 'onTime' ? '정시' : d.hw === 'late' ? '늦게' : '';
+    var tail = '';
+    if (h && (d.hw === 'onTime' || d.hw === 'late' || d.weekend)) {
+      var sd = kstDay(h.submittedAt);
+      tail = (sd && sd !== date ? md(sd) + ' ' : '') + hhmm(h.submittedAt) + ' 제출' + (how ? '(' + how + ')' : '');
+    } else if (d.hw === 'onTime' || d.hw === 'late') tail = '제출(' + how + ')';
+    else if (d.hw === 'none') tail = '미제출';
+    else if (d.hw === 'future') tail = '아직 오지 않은 날';
+    else if (d.weekend) tail = '제출 기록 없음';
+    return mdw(date) + ' ' + title + (tail ? ' · ' + tail.replace(/^ /, '') : '');
+  }
+  var HW_MARK = { onTime: '●', late: '◐', none: '○', off: '', future: '' };
+  var HW_NAME = { onTime: '정시 제출', late: '늦게 제출', none: '미제출', off: '과제 없음', future: '아직' };
+  var LEC_MARK = { done: '✓', todo: '–', off: '', future: '' };
+  function detailHtml(sid, L) {
+    var a = app[sid];
+    var p = window.AppWeek && AppWeek.lastWeek(L);
+    if (!a || !a.ok || !a.data || !p) return '';
+    var w = AppWeek.compute(a.data, p.from, p.to, DDay.today());
+    if (!w) return '';
+    var n = w.days.length, cells = '<span class="hd-lab" style="grid-column:1;grid-row:2">과제</span><span class="hd-lab" style="grid-column:1;grid-row:3">강의</span>';
+    var pick = null;
+    w.days.forEach(function (d, i) {
+      var col = 'grid-column:' + (i + 2) + ';';
+      var on = det.day === d.date;
+      if (on) pick = d;
+      cells += '<span class="hd-h' + (d.weekend ? ' hd-h--wk' : '') + '" style="' + col + 'grid-row:1"><b class="num">' + (+d.date.slice(8)) + '</b>' + d.dow + '</span>';
+      if (d.weekend) {
+        cells += '<button type="button" class="hd-c hd-c--wk' + (d.hw === 'wkDone' ? ' is-done' : '') + (on ? ' is-pick' : '') + '" style="' + col + 'grid-row:2 / span 2" data-hd-day="' + d.date + '" aria-label="' + esc(mdw(d.date) + ' 주중 복습' + (d.hw === 'wkDone' ? ' 제출' : '')) + '">주중<br>복습' + (d.hw === 'wkDone' ? '<b>✓</b>' : '') + '</button>';
+        return;
+      }
+      cells += (d.hw === 'off'
+        ? '<span class="hd-c hd-c--off" style="' + col + 'grid-row:2" aria-label="' + esc(mdw(d.date) + ' 과제 없음') + '"></span>'
+        : '<button type="button" class="hd-c hd-c--' + d.hw + (on ? ' is-pick' : '') + '" style="' + col + 'grid-row:2" data-hd-day="' + d.date + '" aria-label="' + esc(mdw(d.date) + ' ' + HW_NAME[d.hw]) + '">' + HW_MARK[d.hw] + '</button>') +
+        '<span class="hd-l hd-l--' + d.lec + '" style="' + col + 'grid-row:3">' + LEC_MARK[d.lec] + '</span>';
+    });
+    return '<div class="hd-box" data-hd-box="' + esc(sid) + '">' +
+      '<div class="hd-head num">' + esc(mdw(w.from) + ' ~ ' + mdw(w.to) + ' · ' + mdw(p.lesson) + ' 수업 레포트 기준') + '</div>' +
+      '<div class="hd-grid" style="grid-template-columns:2.4em repeat(' + n + ', minmax(0, 1fr))">' + cells + '</div>' +
+      (pick ? '<p class="hd-pick">' + esc(dayInfo(a.data, pick)) + '</p>' : '') +
+      '<p class="hd-legend">● 정시 제출 ◐ 늦게 제출 ○ 미제출 · 빈칸 그날 과제 없음 / ✓ 강의 다 봄 – 안 봄 · 토 · 일은 주중 복습 · 칸을 누르면 그날 과제</p>' +
+      '<div class="hd-foot"><button type="button" class="hd-more" data-pv="parent" data-pv-view="app" data-sid="' + esc(sid) + '">과제 상세 보기 →</button></div>' +
+    '</div>';
+  }
+  /* 펼친 표를 그 칩이 있는 줄 아래에 다시 붙인다 (칩의 기준 수업일이 같은 곳만) */
+  function paintDetail() {
+    Array.prototype.forEach.call(document.querySelectorAll('.hd-box, .hd-tr'), function (el) { el.parentNode.removeChild(el); });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-app-detail]'), function (b) {
+      b.setAttribute('aria-expanded', String(b.dataset.appDetail === det.sid && b.dataset.appDate === det.date));
+    });
+    if (!det.sid) return;
+    var html = detailHtml(det.sid, det.date);
+    if (!html) return;
+    Array.prototype.forEach.call(document.querySelectorAll('[data-app-detail="' + det.sid + '"]'), function (b) {
+      if (b.dataset.appDate !== det.date) return;
+      var row = b.closest('.tdc-st, .snd-row, tr');
+      if (!row) return;
+      if (row.tagName === 'TR') {
+        var tr = document.createElement('tr');
+        tr.className = 'hd-tr';
+        tr.innerHTML = '<td colspan="' + row.children.length + '">' + html + '</td>';
+        row.parentNode.insertBefore(tr, row.nextSibling);
+      } else row.insertAdjacentHTML('beforeend', html);
+    });
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-app-detail], [data-hd-day]');
+    if (!b) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (b.hasAttribute('data-hd-day')) { det.day = det.day === b.dataset.hdDay ? '' : b.dataset.hdDay; paintDetail(); return; }
+    var same = det.sid === b.dataset.appDetail && det.date === b.dataset.appDate;
+    det = same ? { sid: '', date: '', day: '' } : { sid: b.dataset.appDetail, date: b.dataset.appDate, day: '' };
+    paintDetail();
+  }, true);
   /* ---------- 학생 줄 정렬 — 「과제 많이 한 순」(기본) · 「과제 적게 한 순」 (20261031d) ----------
      그 기간 제출한 날 수로 · 같으면 이름순 · 아직 숫자가 없는 학생(불러오는 중 · 못 불러옴 · 과제 없음)은 그 아래 ·
      「과제 링크 연결 필요」는 어느 정렬이든 맨 아래. 고른 정렬은 이 기기에 기억 (레포트 발송 학생 줄도 같은 정렬) */
@@ -670,6 +779,7 @@
       careHtml(careItems(d)) +
       '<div class="td-appbar" id="tdAppBar" hidden role="status" aria-live="polite"></div>' +
       '<div class="tdc-list-wrap">' + cardsOf(classes).map(function (it) { return it.course ? courseCardHtml(it.course, it.cls) : classCardHtml(it.c); }).join('') + '</div>';
+    paintDetail();
   }
 
 
@@ -718,6 +828,8 @@
       return sortRows(known.map(function (x) { return rowById(x.id); }), cy, lessonDate).map(function (s) { return by[s.id]; }).concat(rest.sort(byName));
     },
     sortBarHtml: sortBarHtml,
+    paintDetail: paintDetail,
+    detailOpen: function () { return { sid: det.sid, date: det.date, day: det.day }; },
     setAppSort: setAppSort,
     appSort: appSort,
     retryApp: function (sid) { loadApp(sid); },
