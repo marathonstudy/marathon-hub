@@ -365,7 +365,7 @@
   window.addEventListener('jt:remote', function (e) { var t = e.detail && e.detail.table; if (t === 'sent' || t === 'published') checkSent(); });
   $('#btnRePublish').addEventListener('click', function () { flushDraft(); UI.selectTab(2); });
 
-  /* 그 주 작성 화면으로 (주차 현황의 줄 · [이번 주 작성하기]) */
+  /* 그 주 작성 화면으로 (주차 현황의 줄 · [레포트 작성]) */
   function openWeek(start) {
     setMode('edit');
     var p = (start && start !== draft.weekStart) ? switchWeek(start, 0) : Promise.resolve();
@@ -404,6 +404,7 @@
     /* 과정 — 「고3 수능국어 · 7회차 · 10/24(토) ~ 10/25(일)」 */
     var co = isCourse(currentClass) ? Course.byKey(currentClass) : null;
     if (co) when = Course.label(co, Course.roundOfWeek(co, start));
+    if (window.Skips) Skips.paintNote();             /* 건너뛴 수업이면 위에 「건너뛴 수업입니다 · 되돌리기」 (skips.js) */
     now.innerHTML = '<span class="wbar__cls">' + escapeHtml(co ? '📚 ' + co.name : (currentClass || '반 없음')) + ' · </span>' +
       '<b>' + escapeHtml(when) + '</b>' +
       (L && L.canceled ? ' <span class="wbar__off">휴강</span>' : '');

@@ -271,6 +271,7 @@
           '<button class="btn btn--sm btn--ghost snd-more" type="button" data-more aria-label="' + esc(s.name || '') + ' 더 보기">⋯</button>' +
         '</div>' +
         (window.Today && Today.appCell ? '<div class="snd-row__app tdc-app-slot">' + Today.appCell(s.id, appDate(lesson)) + '</div>' : '') +
+        (window.AppLink ? AppLink.boxHtml(s.id) : '') +
         (open ? '<div class="snd-row__phones num">' + esc(phones.length ? phones.map(function (p) { return p.label + ' ' + Store.phoneMask(p.number); }).join(' · ') : '번호 없음 — 학생 → 명단에서 넣어 주세요') + '</div>' : '') +
       '</div>';
   }
@@ -292,7 +293,9 @@
         body = '<div class="snd-acts">' +
             (kakaoOn() ? '<button class="btn btn--sm btn--primary" type="button" data-kk-class' + (targets.length && !Kakao.busy() ? '' : ' disabled') + '>알림톡 ' + targets.length + '명 보내기</button>' : '') +
             (g.name === NOCLS ? '' : '<button class="btn btn--sm" type="button" data-sms-cls="' + esc(g.name) + '" data-sms-week="' + esc(state.week) + '" title="문자 창 — 보낼 표 · 이 수업 레포트를 누구에게 언제 보냈는지도 표에 나옵니다">반 전체 문자 · 보낸 표</button>') +
-            (need.length ? '<button type="button" class="tdc-need num" data-app-need="' + esc(need.join(',')) + '" title="누르면 그 학생들 앱 공유 링크를 차례로 넣습니다">과제 링크 연결 필요 ' + need.length + '명</button>' : '') +
+            (need.length ? '<button type="button" class="tdc-link-btn tdc-need num" data-app-need="' + esc(need.join(',')) + '" title="누르면 그 학생들 링크 칸이 차례로 펼쳐집니다">+ 과제 링크 연결 필요 ' + need.length + '명</button>' : '') +
+            /* 학생 정렬 — 목록 머리줄 오른쪽 끝 (「오늘」과 같은 작은 글자 버튼 · 20261031e) */
+            (window.Today && Today.sortBarHtml ? Today.sortBarHtml() : '') +
           '</div>' +
           g.rows.map(function (s) { return rowHtml(s, g.lesson); }).join('');
       }
@@ -331,7 +334,7 @@
       return;
     }
     if (!gs.length) { host.innerHTML = '<div class="empty-state">다니는 학생이 없습니다.</div>'; return; }
-    host.innerHTML = (window.Today && Today.sortBarHtml ? Today.sortBarHtml() : '') + gs.map(cardHtml).join('');
+    host.innerHTML = gs.map(cardHtml).join('');
   }
 
   /* ============================================================
@@ -389,7 +392,7 @@
     var msg = messageFor(s, url);
 
     if (act === 'pvparent' || act === 'pvstudent') { if (window.Preview) Preview.open(sid, act === 'pvparent' ? 'parent' : 'student'); return; }
-    if (act === 'sitesms') { if (window.Sms) Sms.open({ students: [sid], week: state.week, from: 'send' }); return; }
+    if (act === 'sitesms') { if (window.Sms) Sms.open({ students: [sid], single: true, week: state.week, from: 'send' }); return; }
     if (act === 'kakao') { if (kakaoOn()) Kakao.send([sid], false); return; }
     if (act === 'kkresend') { if (kakaoOn()) Kakao.send([sid], true); return; }
     if (act === 'undo') { unmarkSent(sid); toast('되돌렸습니다'); return; }
@@ -455,11 +458,11 @@
 
   $('#sendList').addEventListener('click', function (ev) {
     /* 과제 칸 · 정렬 (「오늘」과 같은 동작 · today.js · applink.js) */
-    var ap = ev.target.closest('[data-app-sort], [data-app-link], [data-app-need], [data-app-retry]');
+    /* 「+ 과제 링크 연결」 · 링크 칸은 applink.js 가 받는다 */
+    if (ev.target.closest('.al-box')) return;
+    var ap = ev.target.closest('[data-app-sort], [data-app-retry]');
     if (ap && window.Today) {
       if (ap.dataset.appSort) Today.setAppSort(ap.dataset.appSort);
-      else if (ap.dataset.appLink) Today.openAppLink([ap.dataset.appLink]);
-      else if (ap.dataset.appNeed) Today.openAppLink(ap.dataset.appNeed.split(','));
       else if (ap.dataset.appRetry) Today.retryApp(ap.dataset.appRetry);
       return;
     }
@@ -727,6 +730,7 @@
   });
   window.addEventListener('jt:appsort', function () { if (state.loaded) render(); });
   window.addEventListener('jt:applink', appRender);
+  window.addEventListener('jt:applink-ui', function () { if (state.loaded && !$('#panel-send').hidden) render(); });
   /* 수업 요일 · 반이 바뀌면 제목 · 순서도 */
   window.addEventListener('jt:schedule-changed', function () { if (state.loaded) render(); });
   window.addEventListener('jt:roster-changed', function () { if (state.loaded && !$('#panel-send').hidden) render(); });

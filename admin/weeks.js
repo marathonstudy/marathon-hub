@@ -32,7 +32,7 @@
     if (!st.month || st.monthCls !== st.cls) { st.month = Course.range(co, no).from.slice(0, 7); st.monthCls = st.cls; }
     h.innerHTML = '<div class="panel__head wkv-head"><div class="wkv-head__text"><h2 class="panel__title">📚 ' + esc(co.name) + ' · 회차 고르기</h2>' +
         '<p class="panel__hint">지금 ' + esc(Course.label(co, no)) + ' · ' + esc(Course.membersAt(co, no).map(function (m) { return Course.shortName(m.cls); }).join(' · ')) + '</p></div>' +
-        '<div class="spacer"></div><button class="btn btn--primary" type="button" data-round="' + no + '">이번 회차 작성하기</button></div>' +
+        '<div class="spacer"></div><button class="btn btn--primary" type="button" data-round="' + no + '">레포트 작성</button></div>' +
       Course.calendarHtml(co, st.month, no);
   }
 
@@ -113,19 +113,24 @@
     var rv = w.review;
     var rvText = !rv ? '복습 —' : rv.off ? '복습 없음' :
       '복습 ' + (rv.avg != null ? '평균 <b class="num">' + rv.avg + '</b>' : '평균 —') + ' · 제출 <span class="num">' + rv.submitted + '/' + total + '</span>';
-    var miss = missingOf(w, L, d);
+    /* 건너뛴 수업 (skips.js · 20261031e) — 「공개 전」 대신 회색 「건너뜀」 · 빨간 빠진 것 숨김 · 줄 전체 옅게 · [되돌리기]
+       아직 다 안 보낸 지난 수업 · 이번 주 수업은 [건너뛰기] 작은 버튼 */
+    var lessonDay = L && L.date && !L.canceled ? L.date : '';
+    var skipped = !!lessonDay && total > 0 && w.sent < total && !!(window.Skips && Skips.skipped(st.cls, lessonDay));
+    var canSkip = !!lessonDay && !isNext && !skipped && total > 0 && w.sent < total && lessonDay <= DDay.today();
+    var miss = skipped ? [] : missingOf(w, L, d);
     /* 줄 이름 = 수업일 「10/22(목) 수업」 (주 시작일 대신 · 수업 요일이 없으면 「10/12~10/18」 · 20261030b) */
     var nm = L && L.date && !L.canceled ? Lesson.md(L.date) + ' 수업' : Lesson.md(w.week_start, false) + '~' + Lesson.md(Lesson.addDays(w.week_start, 6), false);
     /* 과정에 든 회차면 「7회차 · 10/24(토) ~ 10/25(일)」를 함께 (20261031a) */
     var cr = window.Course ? Course.roundOfClassWeek(st.cls, w.open_start) : null;
     if (cr) nm = Course.label(cr.course, cr.no) + ' · ' + nm;
-    return '<div class="wkv-row' + (isNow ? ' is-now' : '') + (isNext ? ' is-next' : '') + '" role="button" tabindex="0" data-wo="' + esc(w.open_start) + '" aria-label="' + esc(nm) + ' 작성 화면 열기">' +
+    return '<div class="wkv-row' + (isNow ? ' is-now' : '') + (isNext ? ' is-next' : '') + (skipped ? ' is-skipped' : '') + '" role="button" tabindex="0" data-wo="' + esc(w.open_start) + '" aria-label="' + esc(nm) + ' 작성 화면 열기">' +
       '<div class="wkv-wk">' +
         '<div class="wkv-wk__name"><b>' + esc(nm) + '</b>' +
           (isNow ? ' <span class="wkv-tag wkv-tag--now">이번 주</span>' : isNext ? ' <span class="wkv-tag">다음 주</span>' : '') + '</div>' +
         '<div class="wkv-wk__date">' + dateHtml(L) + '</div>' +
       '</div>' +
-      '<div class="wkv-status">' + statusHtml(w, total) + '</div>' +
+      '<div class="wkv-status">' + (skipped ? '<span class="wkv-st wkv-st--skip">건너뜀</span>' : statusHtml(w, total)) + '</div>' +
       '<div class="wkv-body">' +
         '<div class="wkv-lesson">' + (w.lesson ? esc(firstLine(w.lesson)) : '<span class="wkv-muted">수업 내용 —</span>') +
           (w.draft ? ' <span class="wkv-tag wkv-tag--draft">초안</span>' : '') + '</div>' +
@@ -136,7 +141,10 @@
         '</div>' +
         (miss.length ? '<div class="wkv-miss">' + miss.map(function (m) { return '<span class="wkv-miss__i">' + esc(m) + '</span>'; }).join('') + '</div>' : '') +
       '</div>' +
-      '<div class="wkv-act"><button class="btn btn--sm" type="button" data-wv="' + esc(w.pub_week || '') + '" data-sid="' + esc(w.pub_sid || '') + '"' +
+      '<div class="wkv-act">' +
+        (skipped ? '<button class="btn btn--sm btn--ghost wkv-skip" type="button" data-wunskip="' + esc(lessonDay) + '" title="건너뛰기를 되돌립니다">되돌리기</button>'
+          : canSkip ? '<button class="btn btn--sm btn--ghost wkv-skip" type="button" data-wskip="' + esc(lessonDay) + '" title="이 수업 레포트를 보내지 않고 넘깁니다 (기록은 남음)">건너뛰기</button>' : '') +
+        '<button class="btn btn--sm" type="button" data-wv="' + esc(w.pub_week || '') + '" data-sid="' + esc(w.pub_sid || '') + '"' +
         (w.pub_sid ? ' title="이 수업 레포트를 학부모 화면으로 미리보기"' : ' disabled title="공개된 레포트가 없습니다"') + '>보기</button></div>' +
     '</div>';
   }
@@ -149,11 +157,11 @@
         '<div class="wkv-head__text"><h2 class="panel__title">' + esc(st.cls || '반을 골라 주세요') + ' · 수업일 고르기</h2>' +
         '<p class="panel__hint">' + (d ? esc(schedText(d.schedule)) + ' · 학생 ' + d.total + '명' : '') + '</p></div>' +
         '<div class="spacer"></div>' +
-        (st.cls ? '<button class="btn btn--primary" type="button" id="wkvThisWeek">이번 주 작성하기</button>' : '') +
+        (st.cls ? '<button class="btn btn--primary" type="button" id="wkvThisWeek">레포트 작성</button>' : '') +
       '</div>';
     if (!st.cls) { h.innerHTML = head; return; }
     if (st.err === 'missing') {
-      h.innerHTML = head + '<p class="panel__hint">주차 현황용 함수가 아직 없습니다. <code>migration-018-class-weeks.sql</code> 을 실행해 주세요. 그 전에도 [이번 주 작성하기]로 작성할 수 있습니다.</p>';
+      h.innerHTML = head + '<p class="panel__hint">주차 현황용 함수가 아직 없습니다. <code>migration-018-class-weeks.sql</code> 을 실행해 주세요. 그 전에도 [레포트 작성]으로 작성할 수 있습니다.</p>';
       return;
     }
     if (st.err) { h.innerHTML = head + '<p class="panel__hint">' + esc(st.err) + '</p>'; return; }
@@ -184,6 +192,10 @@
       return;
     }
     if (e.target.closest('#wkvThisWeek')) { Writer.openWeek(thisWeekStart()); return; }
+    var sk = e.target.closest('[data-wskip]');
+    if (sk) { if (window.Skips) Skips.skip(st.cls, sk.dataset.wskip); return; }
+    var us = e.target.closest('[data-wunskip]');
+    if (us) { if (window.Skips) Skips.unskip(st.cls, us.dataset.wunskip, true); return; }
     if (e.target.closest('#wkvMore')) { st.more = true; render(); return; }
     var v = e.target.closest('[data-wv]');
     if (v) {
@@ -213,6 +225,9 @@
     });
     window.addEventListener('jt:courses', function () {
       if (window.Writer && Writer.mode() === 'weeks' && !$('#panel-write').hidden) load(Writer.currentClass());
+    });
+    window.addEventListener('jt:skips', function () {
+      if (window.Writer && Writer.mode() === 'weeks' && !$('#panel-write').hidden && st.data) render();
     });
     window.addEventListener('jt:schedule-changed', function () {
       if (Writer.mode() === 'weeks' && !$('#panel-write').hidden) load(Writer.currentClass());

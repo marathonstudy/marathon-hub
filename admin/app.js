@@ -465,9 +465,10 @@
       if (faceView) {
         var grid = document.createElement('div');
         grid.className = 'face-grid';
+        /* 사진을 누르면 화면 가운데 크게 (사진이 없으면 못 누름) · 이름을 누르면 상담 카드 (20261031e) */
         grid.innerHTML = g.rows.map(function (s) {
-          return '<button type="button" class="face-tile" data-face="' + s.id + '">' + (window.Profile ? Profile.avatar(s, 'xl') : '') +
-            '<span class="face-tile__name"></span></button>';
+          return '<div class="face-tile">' + (window.Profile ? Profile.bigBtn(s, 'xl') : '') +
+            '<button type="button" class="face-tile__name" data-face="' + s.id + '" title="상담 카드 열기"></button></div>';
         }).join('');
         Array.prototype.forEach.call(grid.querySelectorAll('.face-tile__name'), function (el, i) { el.textContent = g.rows[i].name || ''; });
         wrap.appendChild(grid);

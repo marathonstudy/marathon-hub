@@ -109,6 +109,7 @@ supabase/
   migration-033-course.sql          과정 + 회차 (courses · course_members · course_sync 가 과정 공통 내용을 반마다 복사) · 담당 조교 · 「이 반만 한 줄 추가」
   migration-034-exams.sql           D-day 시험 여러 개 · 시험마다 전체 반 / 반 · 과정 (_exam_for_class 가 가장 가까운 시험 + 목록)
   migration-035-student-profile.sql 학생이 채우는 「내 정보」 · 얼굴 사진 (student_profile · me_info_get · me_info_save · me_photo_save)
+  migration-036-skips.sql           레포트 건너뛰기 · 챙길 학생 확인함 · 마라톤 사이트 로그인 정보 (report_skips · care_checks · staff_vault · 직원만)
   check-data.sql                    데이터 점검 (읽기 전용 · 숫자만) — 반마다 번호 없음 · 번호 같음 · 수업 요일 · 이번 주 공개 · 발송
   migration-028-review-absent.sql   복습테스트 미응시 사유 (review_absences 표 · review_absent_set / clear · 제출하면 저절로 풀림 · 「오늘」 미제출에서 빠짐 · 학부모에게는 사유 이름만)
   migration-024-student-login.sql   학생 공용 입구 — 반 · 이름 목록 · 휴대폰 번호 로그인(맞음/틀림 + 학생 링크 코드만) · 로그인 기록(직원만)
@@ -473,6 +474,21 @@ delete from public.staff where email = '조교이메일@example.com';
 - 반 카드 · 과정 카드 위 「과제 링크 연결 필요 n명」 → 그 학생들만 차례로 링크 넣기 (학부모 링크 코드가 없으면 같이 발급).
 - 학생 줄 정렬 [과제 많이 한 순](기본) · [과제 적게 한 순] — 같으면 이름순 · 연결 필요는 맨 아래 · localStorage mhub.appSort 에 기억.
   레포트 발송 학생 줄도 같은 정렬 · 같은 과제 칸(이름 아래 작은 줄 · 그 레포트 수업일 D-7 ~ D-1) · 같은 n명 버튼.
+
+### 5-36. 20261031e — 반 상태 두 줄 · 건너뛰기 · 확인함 · 학생 한 명 문자 · 과제 칩 색 (migration-036 · sms-send 다시 배포)
+1. 035 다음에 SQL Editor → **New query** → `supabase/migration-036-skips.sql` 전체 → **Run** (세 줄 모두 `true`)
+2. Edge Functions → **sms-send** → `supabase/functions/sms-send/index.ts` 전체로 바꿔 **Deploy** (Verify JWT 끈 그대로) — 문자 창 「보내는 번호」.
+   다시 배포하기 전에는 그 한 줄만 안 보이고 문자는 그대로 보내진다. Storage 설정은 필요 없다.
+- 「오늘」 반 카드 · 과정 카드 — 「레포트 발송」 칩 줄 · 「과제 평균」 줄(같은 수업일 레포트 기간의 반 평균 과제율 · 80↑ 초록 · 50~79 파랑 · 50↓ 주황 ·
+  링크 없는 학생 빼고 「(링크 없는 2명 제외)」 · 「이번 주 진행 중 40% · 2/5일 지남」 · 불러오는 동안 「불러오는 중」).
+- 「+ 과제 링크 연결」 — 흰 테두리 버튼 · 누르면 그 줄 아래에 링크 칸(applink.js · 창 없음) · [마라톤 사이트 열기 ↗] · [아이디 복사] [비밀번호 복사]
+  (설정 「마라톤 사이트 로그인 정보」 → staff_vault · 직원만 · 화면에 글자로 안 나옴) · 잘못된 링크 「앱 공유 링크가 아닙니다」.
+- 학생 줄 [문자] = 그 학생 한 명 창(받는 사람 · 번호 뒤 4자리 · 기본 학부모만 · [+ 다른 학생 추가]) · 상담 카드에도 [문자]. 반 카드는 [전체 문자 발송].
+- 상담 카드 — 「학생 입구 로그인 기록」 칸 대신 이름 옆 「마지막 로그인 10/24」 · 사진을 누르면 가운데 크게(바둑판도 같이).
+- 버튼 이름 [레포트 작성](반 카드 · 과정 카드 · 수업일 고르기) · 정렬은 「학생 n명 접기 ▴」 띠 오른쪽 끝 [많이 한 순] [적게 한 순] (발송은 목록 머리줄).
+- 「과제 —」 대신 「과제 · 수업일 정하면 보임」 · 「과제 없음(이 기간)」. 과제 칩 색 5일 초록 · 3~4 파랑 · 1~2 주황 · 0 빨강 (AppWeek.tone · 과제 상세도).
+- 「오늘 할 일」 [건너뛰기] → report_skips (칩 회색 「건너뜀」 · 누르면 되돌리기 · 수업일 고르기 줄 옅게 · 작성 화면 「건너뛴 수업입니다 · 되돌리기」).
+  「챙길 학생」 [확인함] · 이름 [×] → care_checks (같은 수업 · 같은 결석 건) · 「확인함 기록 보기」에서 되돌리기. 누가 · 언제는 서버 트리거가 채운다.
 
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.

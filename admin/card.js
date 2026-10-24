@@ -85,13 +85,19 @@
     };
     $('#cardTitle').textContent = s.name + ' 상담 카드';
     /* 맨 위 얼굴 사진 — 학생이 「내 정보」에서 올린 사진 (없으면 이름 첫 글자 · migration-035 · 20261031c) */
+    /* 사진이 있으면 누르면 화면 가운데 크게 (profile.js · 20261031e) */
     var av = $('#cardAvatar');
     if (av) {
-      av.innerHTML = window.Profile ? Profile.avatar(s, 'l') : '';
+      av.innerHTML = window.Profile ? Profile.bigBtn(s, 'l') : '';
       if (window.Profile && Profile.hasPhoto(sid)) Profile.photo(sid).then(function (src) {
-        if (src && C && C.sid === sid) av.innerHTML = '<img class="av av--l" src="' + src.replace(/"/g, '') + '" alt="' + esc(s.name) + ' 얼굴 사진">';
+        var im = av.querySelector('img');
+        if (src && im && C && C.sid === sid) im.src = src;
       });
     }
+    /* 이름 옆 「마지막 로그인 10/24」 · 학생 한 명 [문자] (20261031e) */
+    $('#cardLogin').textContent = '';
+    $('#btnCardSms').setAttribute('data-sms-sid', sid);
+    $('#btnCardSms').hidden = !!s.archived;
     $('#cardDesc').textContent = [s.className, s.school, s.grade].filter(Boolean).join(' · ') +
       ' — 선생님·조교만 봅니다. 학부모 화면에는 나가지 않습니다';
     $('#cardBody').innerHTML = '<p class="panel__hint">불러오는 중…</p>';
@@ -132,7 +138,6 @@
       '<div id="cdPinned"></div>' +
       '<section class="cd-sec" id="cdBasic"></section>' +
       '<section class="cd-sec" id="cdMine"></section>' +
-      '<section class="cd-sec" id="cdLogin"></section>' +
       '<section class="cd-sec" id="cdGrades-school"></section>' +
       '<section class="cd-sec" id="cdGrades-mock"></section>' +
       '<section class="cd-sec" id="cdNotes"></section>';
@@ -165,27 +170,17 @@
       }).join('') + '</div>';
   }
 
-  /* ---------- 학생 입구 로그인 기록 (migration-024) — 학생 · 시각 · 성공/실패만 ---------- */
-
-  var LOGIN_WHY = { wrong: '비밀번호 틀림', nophone: '휴대폰 번호 없음', nolink: '학생 링크 없음' };
+  /* ---------- 학생 입구 로그인 (migration-024) — 이름 옆 「마지막 로그인 10/24」 한 줄만 (20261031e) ----------
+     예전 「학생 입구 로그인 기록」 펼침 칸은 없앴다. 기록(student_login_log)은 지우지 않는다 */
   function loadLogin() {
     var sid = C.sid;
     sb().rpc('student_login_log', { p_student: sid }).then(function (r) {
-      var host = $('#cdLogin');
-      if (!host || !C || C.sid !== sid) return;
-      if (r.error) {
-        host.innerHTML = isMissing(r.error) ? '' : '<p class="panel__hint">학생 입구 로그인 기록을 불러오지 못했습니다 — ' + esc(r.error.message) + '</p>';
-        return;
-      }
-      var rows = r.data || [];
-      var last = rows.find(function (x) { return x.ok; });
-      host.innerHTML = '<details class="cd-login"><summary>학생 입구 로그인 기록 — ' +
-          (rows.length ? '최근 ' + rows.length + '회 · 마지막 성공 ' + (last ? esc(fmtDT(last.at)) : '없음') : '아직 없음') + '</summary>' +
-        (rows.length ? '<ul>' + rows.map(function (x) {
-          return '<li><span class="num">' + esc(fmtDT(x.at)) + '</span> · ' +
-            (x.ok ? '<b class="is-ok">성공</b>' : '<b class="is-no">실패</b> ' + esc(LOGIN_WHY[x.reason] || x.reason)) + '</li>';
-        }).join('') + '</ul>' : '<p class="panel__hint">학생이 학생 입구(/s/)로 들어오면 여기에 남습니다.</p>') +
-        '</details>';
+      var el = $('#cardLogin');
+      if (!el || !C || C.sid !== sid || r.error) return;
+      var last = (r.data || []).find(function (x) { return x.ok; });
+      var d = last ? new Date(last.at) : null;
+      el.textContent = d ? '마지막 로그인 ' + (d.getMonth() + 1) + '/' + d.getDate() : '아직 로그인 안 함';
+      el.title = d ? '학생 입구(/s/) 마지막 로그인 ' + fmtDT(last.at) : '학생 입구(/s/)로 로그인한 적이 없습니다';
     }, function () {});
   }
 

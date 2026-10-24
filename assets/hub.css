@@ -1084,3 +1084,10 @@ textarea.mi-input { resize: vertical; min-height: 80px; }
 .mi-photo__btns { display: flex; gap: 6px; flex-wrap: wrap; }
 .mi-file { cursor: pointer; }
 .hub-btn--ghost { background: #fff; color: #4A34B8; border: 1px solid #CFC8F3; }
+
+/* 과제 칩 색 — 코치룸과 같은 색 (5일 초록 · 3~4일 파랑 · 1~2일 주황 · 0일 빨강 · app-week.js tone · 20261031e) */
+.aw-sum--ok, .hw-tone--ok { color: #135C3B; }
+.aw-sum--mid, .hw-tone--mid { color: #1A4A99; }
+.aw-sum--low, .hw-tone--low { color: #874A0B; }
+.aw-sum--zero, .hw-tone--zero { color: #9E1F3B; }
+.hw-tone { font-weight: 800; }

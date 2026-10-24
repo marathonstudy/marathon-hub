@@ -2,7 +2,8 @@
 //  sms-send — 사이트에서 문자 보내기 (SMS · LMS · 솔라피)
 //
 //  코치룸 「문자 보내기」 창 · [설정]의 문자 칸이 부른다. 로그인한 직원만 (조교 · 선생님 같다).
-//    action "status" — 키 세 개가 들어갔는지(있음/없음)만 돌려준다. 키 값 · 발신번호는 절대 돌려주지 않는다.
+//    action "status" — 키 세 개가 들어갔는지(있음/없음)와 발신번호(숫자만 · 문자 창 「보내는 번호: 02-…」 · 20261031e)를 돌려준다.
+//                      API 키 · 시크릿 값은 절대 돌려주지 않는다.
 //    action "send"   — { items: [{ student_id, to: "parent1" | "parent2" | "student" }], body, ad, lessons, siblings, markWeek }
 //                      화면은 학생 id 와 보낼 곳만 보낸다. 번호 · 링크 코드는 부른 직원의 로그인으로 DB 함수 sms_prepare 가 찾는다
 //                      (같은 번호는 한 번만 · 한 번 · 하루 상한 · 광고 문구). 보낸 결과는 sms_record 로 기록(번호는 뒤 4자리만).
@@ -93,7 +94,8 @@ async function handle(req: Request, cors: Record<string, string>) {
 
   const have: Record<string, boolean> = {};
   KEYS.forEach((k) => { have[k] = !!env(k); });
-  if (action === "status") return json({ ok: true, keys: have, cfg }, cors);
+  /* 발신번호는 숫자만 (받는 사람이 보는 번호라 비밀이 아니다 · 로그인한 직원에게만) */
+  if (action === "status") return json({ ok: true, keys: have, cfg, sender: env("SOLAPI_SENDER").replace(/\D/g, "") }, cors);
   if (action !== "send" && action !== "test") return json({ ok: false, reason: "input", message: "알 수 없는 요청입니다." }, cors, 400);
 
   const items = (Array.isArray(body.items) ? body.items : [])

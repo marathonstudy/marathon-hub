@@ -3,7 +3,7 @@
 
    · 서버 함수 coach_today() 한 번으로 반 · 학생을 받고, 최근 6주 보낸 표시(sent)를 한 번 더 읽는다.
    · 맨 위 「오늘 할 일」 — 발송 안 한 레포트가 있는 반만 「목동반 · 10/20 레포트 안 보냄 12명 [보내기]」, 없으면 「오늘 할 일 없음」 (20261030e)
-   · 반 카드 (촘촘하게 위아래로) — 반 이름 · 인원 / 최근 3번 수업 레포트 칩(보낸 학생 %) / 「수업일 10/29(목)」 · 「수업까지 D-3!」 / [문자] [이번 주 작성하기]
+   · 반 카드 (촘촘하게 위아래로) — 반 이름 · 인원 / 최근 3번 수업 레포트 칩(보낸 학생 %) / 「수업일 10/29(목)」 · 「수업까지 D-3!」 / [전체 문자 발송] [레포트 작성]
        칩: 100% 초록 · 1~99% 주황 「64% · 안 보냄 4명」 · 0% 빨강 · 수업 당일 회색 「작성 중」 — 누르면 그 수업 발송 화면
        수업일이 없으면 [수업일 미정 · 수업 요일 정하기] → 그 반 작성 화면의 수업 요일 칸
      「학생 11명 보기 ▾」 — 누르면 전원 (펼친 반은 이 기기에 기억). 학생 줄 = 이름 · 「과제 n/5일」 · 상담 카드 · 문자 · 미리보기 둘
@@ -177,7 +177,7 @@
 
   /* ---------- 반 카드 (20261026a) ----------
      반마다 카드: 반 이름 · 학원 · 다음 수업(「오늘 수업」 / 「D-2 10/22(목)」, 휴강 주 건너뜀) · 인원 · 이번 주 작성 · 공개 n/전체 ·
-     급함 n · 살펴보기 n · [이번 주 작성하기]. 순서 = 다음 수업이 가까운 반부터 (오늘 수업 맨 위, 같은 날은 이름 순, 수업일 미정은 맨 아래).
+     급함 n · 살펴보기 n · [레포트 작성]. 순서 = 다음 수업이 가까운 반부터 (오늘 수업 맨 위, 같은 날은 이름 순, 수업일 미정은 맨 아래).
      카드를 누르면 그 반 학생 목록이 펼쳐진다 (여러 반 함께 · 펼친 반은 이 기기에만 기억).
        급함     최근 결석 기준 이상 · 복습테스트 미제출 · 확인 필요 상담
        살펴보기 과제 제출 기준(기본 50%) 미만 — 그 반 지난 수업일 L 의 레포트와 같은 기간(L-7 ~ L-1)의 제출일 / 과제 있던 날 (20261029h)
@@ -271,7 +271,7 @@
   }
 
   /* ---------- 반 카드 (20261030e — 단순하게) ----------
-     반 이름 · 인원 / 최근 3번 수업 레포트 발송 칩 / 「수업일 10/29(목)」 · 「수업까지 D-3!」 / [문자] [이번 주 작성하기]
+     반 이름 · 인원 / 최근 3번 수업 레포트 발송 칩 / 「수업일 10/29(목)」 · 「수업까지 D-3!」 / [전체 문자 발송] [레포트 작성]
      수업일이 없으면 [수업일 미정 · 수업 요일 정하기] · 학생 목록은 접어 두고 「학생 11명 보기 ▾」 (펼친 반은 이 기기에 기억) */
   /* 최근 3번 수업 (오늘 포함 · 휴강 빼고) — 옛날 → 최근 */
   /* 「오늘 수업 D-day!」 · 「수업까지 D-3!」 (20261031c) */
@@ -292,7 +292,9 @@
     var sent = c.rows.filter(function (s) { return !!m[s.id]; }).length;
     var pct = n ? Math.round(sent / n * 100) : 0;
     var wip = date === DDay.today() && sent < n;              /* 수업 당일 — 아직 보낼 때가 아니다 */
-    var kind = wip ? 'wip' : !n ? 'wip' : sent === n ? 'ok' : sent ? 'part' : 'none';
+    /* 건너뛴 수업 (skips.js · migration-036) — 회색 「건너뜀」 · 「오늘 할 일」 · 배지에서 빠진다 (다 보냈으면 그대로 초록) */
+    var skip = sent < n && !!(window.Skips && Skips.skipped(c.name, date));
+    var kind = skip ? 'skip' : wip ? 'wip' : !n ? 'wip' : sent === n ? 'ok' : sent ? 'part' : 'none';
     return { date: date, week: week, n: n, sent: sent, pct: pct, kind: kind, left: n - sent };
   }
   function chipsOf(c) {
@@ -301,6 +303,11 @@
   }
   function chipHtml(c, x) {
     var day = Store.dateWithDow(x.date);
+    if (x.kind === 'skip') {
+      var sk = window.Skips && Skips.skipRow(c.name, x.date);
+      return '<button type="button" class="tdc-chip tdc-chip--skip num" data-unskip-cls="' + esc(c.name) + '" data-unskip-date="' + esc(x.date) + '" title="' +
+        esc(day + ' 레포트 — 보내지 않고 건너뜀' + (sk && sk.skipped_name ? ' (' + sk.skipped_name + ')' : '') + ' · 누르면 되돌리기') + '">' + esc(day + ' 건너뜀') + '</button>';
+    }
     var t = x.kind === 'wip' ? day + ' 작성 중' : x.kind === 'part' ? day + ' ' + x.pct + '% · 안 보냄 ' + x.left + '명' : day + ' ' + x.pct + '%';
     return '<button type="button" class="tdc-chip tdc-chip--' + x.kind + ' num" data-go-send="' + esc(c.name) + '" data-week="' + esc(x.week) + '" title="' +
       esc(day + ' 수업 레포트 — 보냄 ' + x.sent + '/' + x.n + ' · 누르면 발송 화면') + '">' + esc(t) + '</button>';
@@ -325,19 +332,24 @@
     if (!a) return { k: 'wait' };
     if (a.need) return { k: 'need', why: a.reason };
     if (a.failed) return { k: 'fail' };
+    /* 셀 기간이 없다 = 수업일이 정해지지 않은 반 · 기간은 있는데 앱 과제가 하나도 없다 = 과제 없음 (20261031e) */
+    if (!(window.AppWeek && AppWeek.lastWeek && AppWeek.lastWeek(lessonDate || (cy && cy.L)))) return { k: 'nosched' };
     var w = appWeekOf(s, cy, lessonDate);
     return w ? { k: 'ok', w: w } : { k: 'none' };
   }
+  /* 과제 칩 색 — 5일(다 냄) 초록 · 3~4일 파랑 · 1~2일 주황 · 0일 빨강 (레포트 발송 · 과제 상세와 같은 색 · 20261031e) */
+  function hwTone(done, days) { return AppWeek.tone ? AppWeek.tone(done, days) : done >= days ? 'ok' : done >= 3 ? 'mid' : done >= 1 ? 'low' : 'zero'; }
   var NEED_TIP = { nolink: '앱 공유 링크가 아직 없습니다', nohub: '학부모 링크가 없어 과제 기록을 못 부릅니다', expired: '앱 공유 링크가 만료되었습니다 — 새 링크를 붙여 넣어 주세요' };
   /* 과제 「n/5일」 — 그 반 지난 수업 레포트 기간(D-7 ~ D-1)의 평일 중 제출한 날 (토 · 일은 세지 않는다) */
   function appCell(s, cy, lessonDate) {
     var x = appState(s, cy, lessonDate);
-    if (x.k === 'need') return '<button type="button" class="tdc-app tdc-app--need" data-app-link="' + esc(s.id) + '" title="' + esc((NEED_TIP[x.why] || NEED_TIP.nolink) + ' · 누르면 링크 넣는 칸') + '">과제 링크 연결 필요</button>';
+    if (x.k === 'need') return '<button type="button" class="tdc-link-btn" data-app-link="' + esc(s.id) + '" aria-expanded="' + (window.AppLink && AppLink.current() === s.id) + '" title="' + esc((NEED_TIP[x.why] || NEED_TIP.nolink) + ' · 누르면 바로 아래에 링크 칸') + '">+ 과제 링크 연결</button>';
     if (x.k === 'wait') return '<span class="tdc-app tdc-app--wait" title="과제 기록 불러오는 중"><i class="spin" aria-hidden="true"></i>과제 불러오는 중</span>';
     if (x.k === 'fail') return '<button type="button" class="tdc-app tdc-app--fail" data-app-retry="' + esc(s.id) + '">과제 기록 못 불러옴 · 다시 시도</button>';
+    if (x.k === 'nosched') return '<span class="tdc-app tdc-app--none" title="수업 요일을 정하면 그 수업 전 일주일 과제를 셉니다">과제 · 수업일 정하면 보임</span>';
     var w = x.w;
-    if (!w) return '<span class="tdc-app tdc-app--none" title="이 기간 과제 없음">과제 —</span>';
-    var k = w.hwDone >= w.hwDays ? 'ok' : w.hwDone >= 3 ? 'mid' : 'low';
+    if (!w) return '<span class="tdc-app tdc-app--none" title="그 수업 전 일주일에 앱 과제가 하나도 없었습니다">과제 없음(이 기간)</span>';
+    var k = hwTone(w.hwDone, w.hwDays);
     return '<span class="tdc-app tdc-app--' + k + ' num" title="' + esc(md(w.from) + '~' + md(w.to) + ' 평일 ' + w.hwDays + '일 중 제출 ' + w.hwDone + '일 · 정시 ' + w.hwOnTime + '일') + '">과제 ' + w.hwDone + '/' + w.hwDays + '일</span>';
   }
   /* ---------- 학생 줄 정렬 — 「과제 많이 한 순」(기본) · 「과제 적게 한 순」 (20261031d) ----------
@@ -360,26 +372,87 @@
       return byName(a.s, b.s);
     }).map(function (x) { return x.s; });
   }
+  /* 「학생 12명 접기 ▴」 띠 오른쪽 끝 작은 글자 버튼 두 개 — 고른 쪽만 진하게 (펼쳤을 때만 · 20261031e) */
   function sortBarHtml() {
     var v = appSort();
-    return '<div class="app-sort" role="group" aria-label="학생 줄 정렬"><span class="app-sort__t">학생 정렬</span>' +
-      [['most', '과제 많이 한 순'], ['least', '과제 적게 한 순']].map(function (o) {
-        return '<button type="button" class="app-sort__b' + (v === o[0] ? ' is-on' : '') + '" data-app-sort="' + o[0] + '" aria-pressed="' + (v === o[0]) + '">' + o[1] + '</button>';
-      }).join('') + '</div>';
+    return '<span class="app-sort" role="group" aria-label="학생 줄 정렬">' +
+      [['most', '많이 한 순'], ['least', '적게 한 순']].map(function (o) {
+        return '<button type="button" class="app-sort__b' + (v === o[0] ? ' is-on' : '') + '" data-app-sort="' + o[0] + '" aria-pressed="' + (v === o[0]) + '" title="과제 ' + o[1] + ' (모든 반 같이 · 이 기기에 기억)">' + o[1] + '</button>';
+      }).join('') + '</span>';
   }
-  /* 반 카드 위 「과제 링크 연결 필요 n명」 — 누르면 그 학생들만 차례로 링크 넣기 (applink.js) */
+  function toggleBar(key, n, open) {
+    return '<div class="tdc-togglebar"><button type="button" class="tdc-toggle" data-toggle aria-expanded="' + open + '">학생 ' + n + '명 ' + (open ? '접기 ▴' : '보기 ▾') + '</button>' +
+      (open ? sortBarHtml() : '') + '</div>';
+  }
+  /* 반 카드 위 「+ 과제 링크 연결 필요 n명」 — 누르면 그 학생들 링크 칸이 차례로 펼쳐진다 (applink.js) */
   function needIds(rows, cy) { return rows.filter(function (s) { return appState(s, cy).k === 'need'; }).map(function (s) { return s.id; }); }
   function needBtn(ids) {
-    return ids.length ? '<button type="button" class="tdc-need num" data-app-need="' + esc(ids.join(',')) + '" title="누르면 그 학생들 앱 공유 링크를 차례로 넣습니다">과제 링크 연결 필요 ' + ids.length + '명</button>' : '';
+    return ids.length ? '<button type="button" class="tdc-link-btn tdc-need num" data-app-need="' + esc(ids.join(',')) + '" title="누르면 그 학생들 링크 칸이 차례로 펼쳐집니다">+ 과제 링크 연결 필요 ' + ids.length + '명</button>' : '';
   }
-  function openAppLink(ids) {
-    if (!window.AppLink || !st.data) return;
-    AppLink.open(ids.map(function (id) { var s = rowById(id); return s ? { id: s.id, name: s.name, cls: s.class_name || '' } : null; }));
+  function openAppLink(ids) { if (window.AppLink) AppLink.open(ids); }
+
+  /* ---------- 과제 평균 (20261031e) ----------
+     레포트 발송 칩과 같은 수업일들 — 그 레포트 기간(수업 전 일주일 · 평일)의 반 평균 과제율 (학생마다 제출한 날 / 과제 있던 날의 평균)
+     80% 이상 초록 · 50~79% 파랑 · 50% 미만 주황. 「+ 과제 링크 연결」 학생 · 못 불러온 학생은 빼고 「(링크 없는 2명 제외)」
+     이번 주 진행 중 — 다음 수업의 기간(다음 수업 D-7 ~ D-1) 중 어제까지 지난 평일만 「이번 주 진행 중 40% · 2/5일 지남」 */
+  function avgOf(rows, cy, date) {
+    var rates = [], need = 0, wait = 0, fail = 0;
+    rows.forEach(function (s) {
+      var x = appState(s, cy, date);
+      if (x.k === 'need') need++; else if (x.k === 'wait') wait++; else if (x.k === 'fail') fail++;
+      else if (x.k === 'ok') rates.push(x.w.hwDone / x.w.hwDays);
+    });
+    return { need: need, wait: wait, fail: fail, pct: rates.length ? Math.round(rates.reduce(function (a, b) { return a + b; }, 0) / rates.length * 100) : null };
+  }
+  function avgTone(p) { return p >= 80 ? 'ok' : p >= 50 ? 'mid' : 'low'; }
+  function weekdays(from, to) { var n = 0; for (var d = from; d <= to; d = Lesson.addDays(d, 1)) { var w = Lesson.dowOf(d); if (w !== 0 && w !== 6) n++; } return n; }
+  function progressOf(c) {
+    var ds = lessonDates(c.name), today = DDay.today();
+    var N = ds && ds.filter(function (d) { return d > today; })[0];
+    if (!N || !window.AppWeek) return null;
+    var p = AppWeek.lastWeek(N), y = Lesson.addDays(today, -1);
+    var tot = weekdays(p.from, p.to), el = y < p.from ? 0 : weekdays(p.from, y < p.to ? y : p.to);
+    var rates = [], wait = 0;
+    c.rows.forEach(function (s) {
+      var x = appState(s, c.cy, N);
+      if (x.k === 'wait') { wait++; return; }
+      var a = app[s.id];
+      if (x.k === 'need' || x.k === 'fail' || !a || !a.ok || !a.data || !el) return;
+      var w = AppWeek.compute(a.data, p.from, p.to, y);
+      if (w && w.hwDays) rates.push(w.hwDone / w.hwDays);
+    });
+    return { tot: tot, el: el, wait: wait, pct: rates.length ? Math.round(rates.reduce(function (a, b) { return a + b; }, 0) / rates.length * 100) : null };
+  }
+  function linesHtml(c, chips) {
+    if (c.name === '(반 없음)' || !c.rows.length) return '';
+    var out = chips.length ? '<div class="tdc-line"><span class="tdc-line__t">레포트 발송</span><span class="tdc-chips" aria-label="최근 수업 레포트 발송">' + chips.map(function (x) { return chipHtml(c, x); }).join('') + '</span></div>' : '';
+    var pr = progressOf(c);
+    if (!chips.length && !pr) return out;
+    var avgs = chips.map(function (x) { return { x: x, a: avgOf(c.rows, c.cy, x.date) }; });
+    var waiting = avgs.some(function (v) { return v.a.wait; }) || (pr && pr.wait);
+    var body;
+    if (waiting) body = '<span class="tdc-avg tdc-avg--wait"><i class="spin" aria-hidden="true"></i>불러오는 중</span>';
+    else {
+      body = '<span class="tdc-chips">' + avgs.map(function (v) {
+        var day = Store.dateWithDow(v.x.date);
+        return v.a.pct === null
+          ? '<span class="tdc-avg tdc-avg--none num" title="' + esc(day + ' 수업 전 일주일 — 과제 기록이 있는 학생이 없습니다') + '">' + esc(day) + ' 과제 없음</span>'
+          : '<span class="tdc-avg tdc-avg--' + avgTone(v.a.pct) + ' num" title="' + esc(day + ' 수업 전 일주일 평일 — 반 평균 과제율') + '">' + esc(day + ' ' + v.a.pct + '%') + '</span>';
+      }).join('') + '</span>';
+      var a0 = avgs.length ? avgs[avgs.length - 1].a : avgOf(c.rows, c.cy, null);
+      var ex = [];
+      if (a0.need) ex.push('링크 없는 ' + a0.need + '명');
+      if (a0.fail) ex.push('못 불러온 ' + a0.fail + '명');
+      if (ex.length) body += '<span class="tdc-line__note">(' + ex.join(' · ') + ' 제외)</span>';
+      if (pr) body += '<span class="tdc-prog num">이번 주 진행 중 ' + (pr.pct !== null ? pr.pct + '% · ' : pr.el ? '· 과제 없음 · ' : '· ') + pr.el + '/' + pr.tot + '일 지남</span>';
+    }
+    return out + '<div class="tdc-line tdc-line--app"><span class="tdc-line__t">과제 평균</span>' + body + '</div>';
   }
 
   function studentRow(s, cy) {
     return '<div class="tdc-st" data-id="' + esc(s.id) + '">' +
       '<div class="tdc-st__main">' + (window.Profile ? Profile.avatar({ id: s.id, name: s.name }, 's') : '') + '<button type="button" class="roster__name roster__name-btn" data-card="' + esc(s.id) + '">' + esc(s.name) + '</button><span class="tdc-app-slot">' + appCell(s, cy) + '</span></div>' +
+      (window.AppLink ? AppLink.boxHtml(s.id) : '') +
       '<div class="tdc-st__acts"><button type="button" class="btn btn--sm" data-card="' + esc(s.id) + '">상담 카드</button>' +
         '<button type="button" class="btn btn--sm" data-sms-sid="' + esc(s.id) + '">문자</button>' +
         '<button type="button" class="btn btn--sm btn--ghost" data-pv="parent" data-sid="' + esc(s.id) + '">학부모 화면 미리보기</button>' +
@@ -393,7 +466,8 @@
       (list.length ? '<ul class="td-todo__list">' + list.map(function (u) {
         return '<li class="td-todo__item' + (u.x.kind === 'none' ? ' is-urgent' : '') + '"><span class="td-todo__t">' +
           esc(u.cls + ' · ' + Lesson.md(u.x.date, false) + ' 레포트 안 보냄 ' + u.x.left + '명') + '</span>' +
-          '<button type="button" class="btn btn--sm btn--primary td-todo__btn" data-go-send="' + esc(u.cls) + '" data-week="' + esc(u.x.week) + '">보내기</button></li>';
+          '<button type="button" class="btn btn--sm btn--primary td-todo__btn" data-go-send="' + esc(u.cls) + '" data-week="' + esc(u.x.week) + '">보내기</button>' +
+          '<button type="button" class="btn btn--sm btn--ghost td-todo__btn" data-skip-cls="' + esc(u.cls) + '" data-skip-date="' + esc(u.x.date) + '" title="이 레포트를 보내지 않고 넘깁니다 (기록은 남음)">건너뛰기</button></li>';
       }).join('') + '</ul>' : '<p class="td-todo__none">오늘 할 일 없음</p>') + '</div>';
   }
 
@@ -428,13 +502,15 @@
       if (!s) return;
       var day = String(x.lesson_date).slice(0, 10), wk = weekOfDate(day);
       if ((st.recent[wk] || {})[s.id]) return;
+      /* 「확인함」 묶음 · 이름 옆 × 로 뺀 학생 (skips.js · 20261031e) — 같은 수업이면 다시 뜨지 않는다 */
+      if (checked('review', s.class_name || '', day, '') || checked('review', s.class_name || '', day, s.id)) return;
       var k = (s.class_name || '') + '|' + day;
       if (!grp[k]) { grp[k] = { cls: s.class_name || '', day: day, week: wk, ids: [] }; order.push(k); }
       if (grp[k].ids.indexOf(s.id) === -1) grp[k].ids.push(s.id);
     });
     order.forEach(function (k) {
       var g = grp[k];
-      out.push({ kind: 'review', cls: g.cls, week: g.week, sid: g.ids[0], ids: g.ids,
+      out.push({ kind: 'review', cls: g.cls, week: g.week, date: g.day, sid: g.ids[0], ids: g.ids,
         text: g.cls + ' · ' + Lesson.md(g.day, false) + ' 복습테스트 안 낸 학생 ' + g.ids.length + '명',
         names: g.ids.map(function (id) { return byId[id].name; }) });
     });
@@ -443,19 +519,40 @@
       if (!(s.absent_n >= (set.absentMin || 2))) return;
       var last = care.abs[s.id];
       if (last && care.note[s.id] && care.note[s.id] >= last) return;          /* 마지막 결석 뒤에 상담 기록이 있으면 다시 띄우지 않는다 */
-      out.push({ kind: 'absent', cls: s.class_name || '', sid: s.id,
+      if (checked('absent', s.class_name || '', last || '', s.id)) return;     /* 확인함 — 그 결석 건(마지막 결석 주)으로는 다시 뜨지 않는다 */
+      out.push({ kind: 'absent', cls: s.class_name || '', sid: s.id, ids: [s.id], date: last || '', group: false,
         text: (s.class_name || '(반 없음)') + ' · 최근 ' + (set.absentWeeks || 4) + '번 중 결석 ' + s.absent_n + '번', names: [s.name] });
     });
     return out;
   }
+  function checked(kind, cls, date, sid) { return !!(window.Skips && Skips.checked(kind, cls, date, sid)); }
+  /* 묶음마다 [확인함] · 학생 이름마다 [×] (그 학생만 빼기) · 아래 「확인함 기록 보기」에서 되돌리기 (skips.js · migration-036 · 20261031e)
+     결석은 한 줄이 학생 한 명이라 [확인함] · [×] 모두 그 학생 그 결석 건 */
   function careHtml(items) {
-    if (!items.length) return '';
-    return '<div class="td-care2"><div class="td-todo__title">챙길 학생</div><ul class="td-todo__list">' + items.map(function (it) {
-      return '<li class="td-care2__item td-care2__item--' + it.kind + '"><button type="button" class="td-care2__btn" data-care="' + it.kind + '" data-care-cls="' + esc(it.cls) + '" data-care-sid="' + esc(it.sid) + '"' +
-        (it.week ? ' data-care-week="' + esc(it.week) + '"' : '') + '>' +
-        '<span class="td-care2__t">' + esc(it.text) + '</span> <span class="td-care2__names">' + esc(it.names.join(', ')) + '</span>' +
-        '<span class="td-care2__go">' + (it.kind === 'review' ? '대신 입력 · 미응시 ›' : '상담 카드 ›') + '</span></button></li>';
-    }).join('') + '</ul></div>';
+    var hist = window.Skips ? Skips.history() : [];
+    if (!items.length && !hist.length) return '';
+    var attrs = function (it, sid) { return ' data-k="' + it.kind + '" data-cls="' + esc(it.cls) + '" data-date="' + esc(it.date || '') + '" data-sid="' + esc(sid || '') + '"'; };
+    return '<div class="td-care2"><div class="td-todo__title">챙길 학생</div>' +
+      (items.length ? '<ul class="td-todo__list">' + items.map(function (it) {
+        return '<li class="td-care2__item td-care2__item--' + it.kind + '"><button type="button" class="td-care2__btn" data-care="' + it.kind + '" data-care-cls="' + esc(it.cls) + '" data-care-sid="' + esc(it.sid) + '"' +
+          (it.week ? ' data-care-week="' + esc(it.week) + '"' : '') + '>' +
+          '<span class="td-care2__t">' + esc(it.text) + '</span>' +
+          '<span class="td-care2__go">' + (it.kind === 'review' ? '대신 입력 · 미응시 ›' : '상담 카드 ›') + '</span></button>' +
+          '<div class="td-care2__foot"><span class="td-care2__names">' + it.ids.map(function (id, i) {
+            return '<span class="td-care2__nm">' + esc(it.names[i]) + '<button type="button" class="td-care2__x" data-care-x' + attrs(it, id) + ' aria-label="' + esc(it.names[i]) + ' 목록에서 빼기" title="이 학생만 목록에서 빼기 (대신 입력 · 미응시를 안 해도 다시 뜨지 않음)">×</button></span>';
+          }).join('') + '</span>' +
+          '<button type="button" class="btn btn--sm btn--ghost td-care2__ok" data-care-ok' + attrs(it, it.kind === 'absent' ? it.sid : '') + ' title="이 묶음을 확인했습니다 — 다시 뜨지 않음">확인함</button></div></li>';
+      }).join('') + '</ul>' : '') +
+      (hist.length ? '<button type="button" class="td-care2__hist" data-care-hist aria-expanded="' + !!st.careHist + '">확인함 기록 보기 (' + hist.length + ')</button>' +
+        (st.careHist ? '<ul class="td-care2__hlist">' + hist.map(function (x) {
+          var nm = x.student_id ? ((rowById(x.student_id) || {}).name || '학생') : '묶음 전체';
+          var what = x.kind === 'review' ? (x.class_name || '') + ' · ' + (x.basis_date ? Lesson.md(String(x.basis_date).slice(0, 10), false) + ' ' : '') + '복습테스트 안 낸 학생 · ' + nm
+            : (x.class_name || '(반 없음)') + ' · 결석 잦은 학생 · ' + nm;
+          var at = x.checked_at ? new Date(x.checked_at) : null;
+          return '<li><span>' + esc(what) + '</span><span class="muted-note">' + esc((x.checked_name || '') + (at ? ' ' + (at.getMonth() + 1) + '/' + at.getDate() : '')) + '</span>' +
+            '<button type="button" class="btn btn--sm btn--ghost" data-care-undo="' + esc(x.ckey) + '">되돌리기</button></li>';
+        }).join('') + '</ul>' : '') : '') +
+    '</div>';
   }
 
   /* ---------- 과정 카드 (20261031a) ----------
@@ -494,13 +591,12 @@
         '<div class="tdc-title"><span class="tdc-name">📚 ' + esc(co.name) + '</span><span class="tdc-round">' + esc(Course.label(co, no)) + '</span><span class="muted-note num tdc-n">' + n + '명</span>' + needBtn(need) + '</div>' +
         '<div class="tdw" aria-label="이번 회차 일주일">' + days + '</div>' +
         cls.map(function (c) {
-          var chips = chipsOf(c);
-          return '<div class="tdc-crow' + (Course.mine(c.name) ? ' is-mine' : '') + '"><b class="tdc-crow__n">' + esc(Course.shortName(c.name)) + '</b>' + classWhen(c) +
-            (chips.length ? '<span class="tdc-chips">' + chips.map(function (x) { return chipHtml(c, x); }).join('') + '</span>' : '') +
-            (c.rows.length ? '<button type="button" class="btn btn--sm tdc-sms" data-sms-cls="' + esc(c.name) + '" aria-label="' + esc(c.name) + ' 문자 보내기">문자</button>' : '') + '</div>';
+          return '<div class="tdc-crow' + (Course.mine(c.name) ? ' is-mine' : '') + '"><div class="tdc-crow__top"><b class="tdc-crow__n">' + esc(Course.shortName(c.name)) + '</b>' + classWhen(c) +
+            (c.rows.length ? '<button type="button" class="btn btn--sm tdc-sms" data-sms-cls="' + esc(c.name) + '" aria-label="' + esc(c.name) + ' 전체 문자 발송">전체 문자 발송</button>' : '') + '</div>' +
+            linesHtml(c, chipsOf(c)) + '</div>';
         }).join('') +
-      '</div><div class="tdc-btns"><button type="button" class="btn btn--sm btn--primary tdc-write" data-write-course="' + esc(ckey) + '">이번 회차 작성하기</button></div></div>' +
-      (n ? '<button type="button" class="tdc-toggle" data-toggle aria-expanded="' + open + '">학생 ' + n + '명 ' + (open ? '접기 ▴' : '보기 ▾') + '</button>' : '') +
+      '</div><div class="tdc-btns"><button type="button" class="btn btn--sm btn--primary tdc-write" data-write-course="' + esc(ckey) + '">레포트 작성</button></div></div>' +
+      (n ? toggleBar(ckey, n, open) : '') +
       (open ? '<div class="tdc-list">' + cls.map(function (c) {
         return '<div class="tdc-sub"><div class="tdc-sub__t">' + esc(c.name) + ' · ' + c.rows.length + '명</div>' + sortRows(c.rows, c.cy).map(function (s) { return studentRow(s, c.cy); }).join('') + '</div>';
       }).join('') + '</div>' : '') +
@@ -515,15 +611,15 @@
         '<div class="tdc-main">' +
           '<div class="tdc-title"><span class="tdc-name">' + esc(c.name) + '</span>' + (c.academy ? '<span class="muted-note">' + esc(c.academy) + '</span>' : '') +
             '<span class="muted-note num tdc-n">' + n + '명</span>' + needBtn(needIds(rows, c.cy)) + '</div>' +
-          (chips.length ? '<div class="tdc-chips" aria-label="최근 3번 수업 레포트 발송">' + chips.map(function (x) { return chipHtml(c, x); }).join('') + '</div>' : '') +
+          linesHtml(c, chips) +
           classWhen(c) +
         '</div>' +
         '<div class="tdc-btns">' +
-          (c.name === '(반 없음)' || !n ? '' : '<button type="button" class="btn btn--sm tdc-sms" data-sms-cls="' + esc(c.name) + '" aria-label="' + esc(c.name) + ' 문자 보내기">문자</button>') +
-          (c.name === '(반 없음)' ? '' : '<button type="button" class="btn btn--sm btn--primary tdc-write" data-write="' + esc(c.name) + '">이번 주 작성하기</button>') +
+          (c.name === '(반 없음)' || !n ? '' : '<button type="button" class="btn btn--sm tdc-sms" data-sms-cls="' + esc(c.name) + '" aria-label="' + esc(c.name) + ' 전체 문자 발송">전체 문자 발송</button>') +
+          (c.name === '(반 없음)' ? '' : '<button type="button" class="btn btn--sm btn--primary tdc-write" data-write="' + esc(c.name) + '">레포트 작성</button>') +
         '</div>' +
       '</div>' +
-      (n ? '<button type="button" class="tdc-toggle" data-toggle aria-expanded="' + open + '">학생 ' + n + '명 ' + (open ? '접기 ▴' : '보기 ▾') + '</button>' : '') +
+      (n ? toggleBar(c.name, n, open) : '') +
       (open ? '<div class="tdc-list">' + sortRows(rows, c.cy).map(function (s) { return studentRow(s, c.cy); }).join('') + '</div>' : '') +
     '</div>';
   }
@@ -573,7 +669,6 @@
       todoHtml(unsent) +
       careHtml(careItems(d)) +
       '<div class="td-appbar" id="tdAppBar" hidden role="status" aria-live="polite"></div>' +
-      (classes.some(function (c) { return c.rows.length; }) ? sortBarHtml() : '') +
       '<div class="tdc-list-wrap">' + cardsOf(classes).map(function (it) { return it.course ? courseCardHtml(it.course, it.cls) : classCardHtml(it.c); }).join('') + '</div>';
   }
 
@@ -637,12 +732,18 @@
   };
 
   $('#tdBody').addEventListener('click', function (e) {
+    if (e.target.closest('.al-box')) return;                 /* 과제 링크 칸 (applink.js) */
     var rt = e.target.closest('[data-app-retry]');
     if (rt) { loadApp(rt.dataset.appRetry); return; }
-    var al = e.target.closest('[data-app-link]');
-    if (al) { openAppLink([al.dataset.appLink]); return; }
-    var an = e.target.closest('[data-app-need]');
-    if (an) { openAppLink(an.dataset.appNeed.split(',')); return; }
+    var sk = e.target.closest('[data-skip-cls]');
+    if (sk) { if (window.Skips) Skips.skip(sk.dataset.skipCls, sk.dataset.skipDate); return; }
+    var us = e.target.closest('[data-unskip-cls]');
+    if (us) { if (window.Skips) Skips.unskip(us.dataset.unskipCls, us.dataset.unskipDate, true); return; }
+    var ck = e.target.closest('[data-care-ok], [data-care-x]');
+    if (ck) { if (window.Skips) Skips.check(ck.dataset.k, ck.dataset.cls, ck.dataset.date, ck.dataset.sid || ''); return; }
+    if (e.target.closest('[data-care-hist]')) { st.careHist = !st.careHist; render(); return; }
+    var uc = e.target.closest('[data-care-undo]');
+    if (uc) { if (window.Skips) Skips.uncheck(uc.dataset.careUndo); return; }
     var so = e.target.closest('[data-app-sort]');
     if (so) { setAppSort(so.dataset.appSort); return; }
     var ca = e.target.closest('[data-care]');
@@ -670,7 +771,7 @@
   });
   $('#tdRefresh').addEventListener('click', function () { app = {}; if (window.AppFetch) AppFetch.clear(); load(true); loadLinks(); });
 
-  /* [이번 주 작성하기] — 레포트 발송 → 1 작성에서 그 반 이번 주 작성 화면 */
+  /* [레포트 작성] — 레포트 발송 → 1 작성에서 그 반 이번 주 작성 화면 */
   function writeWeek(cls, week) {
     if (!window.Writer) return;
     UI.selectTab(1);
@@ -689,7 +790,7 @@
       if (++tries < 25) setTimeout(wait, 200);
     })();
   }
-  /* 과정 [이번 회차 작성하기] — 과정 화면 그 회차 */
+  /* 과정 [레포트 작성] — 과정 화면 그 회차 */
   function writeCourse(key) {
     var co = window.Course && Course.byKey(key);
     if (!co || !window.Writer) return;
@@ -795,6 +896,15 @@
   window.addEventListener('jt:roster-changed', function () { if (st.data && !$('#appRoot').hidden) render(); });
   /* 과정 · 담당 조교를 불러오면 카드 묶음 · 차례를 다시 (course.js) */
   window.addEventListener('jt:courses', function () { if (st.data && !$('#appRoot').hidden) render(); });
+  /* 건너뛰기 · 확인함 (skips.js) · 과제 링크 칸을 펼치거나 접으면 (applink.js) 다시 그린다 */
+  window.addEventListener('jt:skips', function () { if (st.data && !$('#appRoot').hidden) render(); });
+  window.addEventListener('jt:applink-ui', function () { if (st.data && !$('#appRoot').hidden) render(); });
+  /* 「+ 과제 링크 연결 필요 n명」 — 그 반 학생 목록을 펼친다 */
+  window.addEventListener('jt:applink-need', function (e) {
+    var k = e.detail && e.detail.cls;
+    if (k && !st.open[k]) { st.open[k] = true; saveOpen(); }
+    if (st.data && !$('#appRoot').hidden) render();
+  });
   /* 정렬을 바꾸면 다시 세운다 (레포트 발송에서 바꿔도 같이) */
   window.addEventListener('jt:appsort', function () { if (st.data && !$('#appRoot').hidden) render(); });
   /* 과제 링크를 넣으면 (applink.js) 그 학생 과제 기록을 바로 불러온다 */

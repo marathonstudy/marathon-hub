@@ -706,6 +706,8 @@
       if (d.slice(0, 2) === '02') return d.slice(0, 2) + '-' + d.slice(2, 6) + '-' + d.slice(6);
       return d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6);
     }
+    if (d.length === 9 && d.slice(0, 2) === '02') return d.slice(0, 2) + '-' + d.slice(2, 5) + '-' + d.slice(5);   /* 02-123-4567 */
+    if (d.length === 8 && /^1[5-9]/.test(d)) return d.slice(0, 4) + '-' + d.slice(4);                              /* 1588-1234 */
     return d;
   }
 

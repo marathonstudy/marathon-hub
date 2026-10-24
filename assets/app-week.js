@@ -134,6 +134,8 @@
   }
 
   /* 누적 추이용 — 제출한 날 / 과제가 있던 날 (%) */
+  /* 과제 칩 색 — 다 냄(5일) 초록 ok · 3~4일 파랑 mid · 1~2일 주황 low · 0일 빨강 zero (「오늘」 · 레포트 발송 · 과제 상세가 같이 · 20261031e) */
+  function tone(done, days) { return done >= days ? 'ok' : done >= 3 ? 'mid' : done >= 1 ? 'low' : 'zero'; }
   function hwRate(w) { return w && w.hwDays ? Math.round(w.hwDone / w.hwDays * 100) : null; }
 
   var HW_MARK = { onTime: '●', late: '◐', none: '○', future: '·', off: '' };
@@ -168,7 +170,7 @@
         '<span class="aw-head"></span>' +
         '<span class="aw-label">과제</span>' + cells('hw') +
         (pending && !w.hwDays ? '<span class="aw-sum aw-sum--wait">아직 과제 시작 전</span>'
-          : '<span class="aw-sum num">' + w.hwDone + '/' + w.hwDays + '일 제출' + (w.rate != null ? '<small>정답률 ' + w.rate + '%</small>' : '') + '</span>') +
+          : '<span class="aw-sum aw-sum--' + tone(w.hwDone, w.hwDays) + ' num">' + w.hwDone + '/' + w.hwDays + '일 제출' + (w.rate != null ? '<small>정답률 ' + w.rate + '%</small>' : '') + '</span>') +
         '<span class="aw-label">강의</span>' + cells('lec') +
         (pending && !w.lecDays ? '<span class="aw-sum aw-sum--wait">아직 강의 전</span>'
           : '<span class="aw-sum num">' + w.lecDone + '/' + w.lecDays + '일 시청</span>') +
@@ -177,7 +179,7 @@
     '</div>';
   }
 
-  global.AppWeek = { compute: compute, tableHtml: tableHtml, hwRate: hwRate, LEGEND: LEGEND,
+  global.AppWeek = { compute: compute, tableHtml: tableHtml, hwRate: hwRate, tone: tone, LEGEND: LEGEND,
                      lastWeek: lastWeek, startOf: startOf, cumulative: cumulative, forLesson: forLesson,
                      isWeekend: isWeekend, subDaysOf: subDaysOf };
 

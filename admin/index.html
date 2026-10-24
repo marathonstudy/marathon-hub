@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" as="style" crossorigin
       href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
-<link rel="stylesheet" href="style.css?v=20261031d">
+<link rel="stylesheet" href="style.css?v=20261031e">
 </head>
 <body class="is-locked">
 
@@ -363,6 +363,8 @@
       <div class="panel wkv-panel" id="wkvPanel"></div>
 
       <!-- 이미 보낸 주를 고쳤을 때 (write.js · 20261029g) -->
+      <!-- 건너뛴 수업 (skips.js · 20261031e) -->
+      <div class="skip-note" id="skipNote" hidden></div>
       <div class="repub-note" id="rePubNote" hidden>
         <span>고친 내용은 다시 공개해야 학부모에게 반영됩니다</span>
         <button class="btn btn--sm btn--primary" id="btnRePublish" type="button">다시 공개</button>
@@ -1487,10 +1489,13 @@
   </div>
   <div class="modal__body">
     <div class="sms-banner" id="smsBanner" role="status" aria-live="polite" hidden></div>
+    <p class="sms-from" id="smsFrom" hidden></p>
     <p class="cp-warn" id="smsMissing" hidden></p>
     <div class="sms-sec">
-      <div class="sms-sec__title">받는 사람</div>
-      <div class="chips sms-mode" role="group" aria-label="받는 사람 고르는 방법">
+      <div class="sms-sec__title" id="smsWhoTitle">받는 사람</div>
+      <!-- 학생 줄 [문자] — 그 학생 한 명 (반 전체 / 학생 골라서 · 명단은 [+ 다른 학생 추가]를 눌러야 · 20261031e) -->
+      <div class="sms-one" id="smsOne" hidden></div>
+      <div class="chips sms-mode" id="smsMode" role="group" aria-label="받는 사람 고르는 방법">
         <button class="chip" type="button" data-smsmode="class">반 전체</button>
         <button class="chip" type="button" data-smsmode="student">학생 골라서</button>
       </div>
@@ -1504,8 +1509,8 @@
     <div class="sms-sec">
       <div class="sms-sec__title">보낼 곳</div>
       <div class="sms-to">
-        <label class="check-line"><input type="checkbox" id="smsToPa" checked> <span>학부모 <span class="field__opt">등록된 학부모 번호 모두</span></span></label>
-        <label class="check-line"><input type="checkbox" id="smsToSt" checked> <span>학생 <span class="field__opt">학부모 번호와 같으면 학부모 링크로 한 통만</span></span></label>
+        <label class="check-line"><input type="checkbox" id="smsToPa" checked> <span>학부모 <span class="sms-tail num" id="smsPaTail"></span> <span class="field__opt">등록된 학부모 번호 모두</span></span></label>
+        <label class="check-line"><input type="checkbox" id="smsToSt" checked> <span>학생 <span class="sms-tail num" id="smsStTail"></span> <span class="field__opt">학부모 번호와 같으면 학부모 링크로 한 통만</span></span></label>
       </div>
     </div>
     <div class="sms-sec">
@@ -1562,28 +1567,6 @@
     <div id="smsLogList"></div>
   </div>
   <div class="modal__foot"><div class="spacer"></div><button class="btn" type="button" id="smsLogClose">닫기</button></div>
-</dialog>
-
-<!-- 과제 링크(마라톤 앱 공유 링크) 연결 — 「과제 링크 연결 필요」 칩 · n명 (applink.js · 20261031d) -->
-<dialog class="modal" id="appLinkModal">
-  <form method="dialog">
-    <div class="modal__head">
-      <h2 class="modal__title" id="appLinkTitle">과제 링크 연결</h2>
-      <p class="modal__desc"><b id="appLinkWho"></b> — 마라톤 앱에서 그 학생의 공유 링크를 복사해 붙여 넣으면 과제 기록을 불러옵니다. 학생 수정 창의 「마라톤 앱 공유 링크」 칸과 같습니다.</p>
-    </div>
-    <div class="modal__body">
-      <label class="field">
-        <span class="field__label">마라톤 앱 공유 링크</span>
-        <input class="input" id="appLinkInput" type="text" autocomplete="off" spellcheck="false" placeholder="https://marathonstudy.com/share/report/… 또는 코드만">
-      </label>
-      <div class="modal__error" id="appLinkErr" role="alert" hidden></div>
-    </div>
-    <div class="modal__foot">
-      <button class="btn" type="button" id="btnAppLinkClose">닫기</button>
-      <button class="btn" type="button" id="btnAppLinkSkip" hidden>건너뛰기</button>
-      <button class="btn btn--primary" type="button" id="btnAppLinkSave">저장</button>
-    </div>
-  </form>
 </dialog>
 
 <dialog class="modal" id="phonePickModal">
@@ -1812,14 +1795,23 @@
 <!-- 학생 상담 카드 (card.js) -->
 <dialog class="modal modal--card" id="cardModal">
   <div class="modal__head cd-head">
-    <span class="cd-avatar" id="cardAvatar" aria-hidden="true"></span>
+    <span class="cd-avatar" id="cardAvatar"></span>
     <div class="cd-head__text">
-      <h2 class="modal__title" id="cardTitle">상담 카드</h2>
+      <h2 class="modal__title"><span id="cardTitle">상담 카드</span> <span class="cd-lastlogin" id="cardLogin"></span></h2>
       <p class="modal__desc" id="cardDesc"></p>
     </div>
+    <button class="btn btn--sm" type="button" id="btnCardSms" data-sms-sid="">문자</button>
     <button class="btn btn--sm" type="button" id="btnCardClose">닫기</button>
   </div>
   <div class="modal__body cd-body" id="cardBody"></div>
+</dialog>
+
+<!-- 얼굴 사진 크게 보기 (profile.js · 20261031e) — 바깥을 누르거나 닫기 -->
+<dialog class="modal photo-big" id="photoBigModal" aria-label="얼굴 사진">
+  <div class="photo-big__box">
+    <img class="photo-big__img" id="photoBigImg" alt="">
+    <div class="photo-big__foot"><b id="photoBigName"></b><button class="btn btn--sm" type="button" id="btnPhotoBigClose">닫기</button></div>
+  </div>
 </dialog>
 
 <!-- 반 관리 (classes.js) -->
@@ -1990,6 +1982,16 @@
         <input type="checkbox" id="tdSetPhoto">
         <span>필기 사진 2주 없음을 살펴보기에 넣기 <span class="field__opt">기본 끔</span></span>
       </label>
+      <!-- 마라톤 사이트 로그인 정보 — 「+ 과제 링크 연결」의 아이디 · 비밀번호 복사 (applink.js · staff_vault · migration-036) -->
+      <div id="mlSiteBox">
+        <div class="extra-head" style="margin-top:14px"><span class="extra-head__title">마라톤 사이트 로그인 정보</span></div>
+        <p class="field__hint">「+ 과제 링크 연결」 칸의 [아이디 복사] · [비밀번호 복사]가 이 값을 씁니다. 로그인한 직원만 읽을 수 있고, 저장소 · 학생 · 학부모 화면에는 나오지 않습니다.</p>
+        <div class="toolbar">
+          <label class="field"><span class="field__label">아이디</span><input class="input" id="mlSiteId" type="text" autocomplete="off" spellcheck="false" maxlength="100"></label>
+          <label class="field"><span class="field__label">비밀번호 <span class="field__opt" id="mlSitePwHint"></span></span><input class="input" id="mlSitePw" type="password" autocomplete="new-password" maxlength="100"></label>
+          <button class="btn btn--sm" type="button" id="mlSiteSave">로그인 정보 저장</button>
+        </div>
+      </div>
       <!-- 카카오 알림톡 설정 (kakao.js) -->
       <div id="kakaoSettings" hidden></div>
       <!-- 사이트 문자 설정 (sms.js) -->
@@ -2081,52 +2083,53 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
 <!-- config.js 와 brand.js 가 먼저 와야 한다. 나머지가 이 값을 읽는다. -->
-<script src="../assets/config.js?v=20261031d"></script>
-<script src="../assets/brand.js?v=20261031d"></script>
-<script src="../assets/lesson.js?v=20261031d"></script>
-<script src="supabase.js?v=20261031d"></script>
-<script src="db.js?v=20261031d"></script>
-<script src="store.js?v=20261031d"></script>
-<script src="report.js?v=20261031d"></script>
-<script src="aipolish.js?v=20261031d"></script>
-<script src="app.js?v=20261031d"></script>
-<script src="import.js?v=20261031d"></script>
-<script src="appfetch.js?v=20261031d"></script>
-<script src="profile.js?v=20261031d"></script>
-<script src="course.js?v=20261031d"></script>
-<script src="write.js?v=20261031d"></script>
-<script src="publish.js?v=20261031d"></script>
-<script src="send.js?v=20261031d"></script>
-<script src="kakao.js?v=20261031d"></script>
-<script src="sms.js?v=20261031d"></script>
-<script src="contacts.js?v=20261031d"></script>
-<script src="notice.js?v=20261031d"></script>
-<script src="tb.js?v=20261031d"></script>
-<script src="tb-dash.js?v=20261031d"></script>
-<script src="tb-issue.js?v=20261031d"></script>
-<script src="tb-stock.js?v=20261031d"></script>
-<script src="tb-bill.js?v=20261031d"></script>
-<script src="../assets/dday.js?v=20261031d"></script>
-<script src="../assets/app-week.js?v=20261031d"></script>
-<script src="card.js?v=20261031d"></script>
-<script src="exams.js?v=20261031d"></script>
-<script src="photo.js?v=20261031d"></script>
-<script src="applink.js?v=20261031d"></script>
-<script src="today.js?v=20261031d"></script>
-<script src="staff.js?v=20261031d"></script>
-<script src="classes.js?v=20261031d"></script>
-<script src="weekly.js?v=20261031d"></script>
-<script src="filethumb.js?v=20261031d"></script>
-<script src="ytbm.js?v=20261031d"></script>
-<script src="summary.js?v=20261031d"></script>
-<script src="weeks.js?v=20261031d"></script>
-<script src="../assets/photos.js?v=20261031d"></script>
-<script src="review.js?v=20261031d"></script>
-<script src="draftguard.js?v=20261031d"></script>
-<script src="preview.js?v=20261031d"></script>
-<script src="rtabs.js?v=20261031d"></script>
-<script src="nav.js?v=20261031d"></script>
-<script src="sync.js?v=20261031d"></script>
-<script src="auth.js?v=20261031d"></script>
+<script src="../assets/config.js?v=20261031e"></script>
+<script src="../assets/brand.js?v=20261031e"></script>
+<script src="../assets/lesson.js?v=20261031e"></script>
+<script src="supabase.js?v=20261031e"></script>
+<script src="db.js?v=20261031e"></script>
+<script src="store.js?v=20261031e"></script>
+<script src="report.js?v=20261031e"></script>
+<script src="aipolish.js?v=20261031e"></script>
+<script src="app.js?v=20261031e"></script>
+<script src="import.js?v=20261031e"></script>
+<script src="appfetch.js?v=20261031e"></script>
+<script src="profile.js?v=20261031e"></script>
+<script src="course.js?v=20261031e"></script>
+<script src="write.js?v=20261031e"></script>
+<script src="publish.js?v=20261031e"></script>
+<script src="send.js?v=20261031e"></script>
+<script src="kakao.js?v=20261031e"></script>
+<script src="sms.js?v=20261031e"></script>
+<script src="contacts.js?v=20261031e"></script>
+<script src="notice.js?v=20261031e"></script>
+<script src="tb.js?v=20261031e"></script>
+<script src="tb-dash.js?v=20261031e"></script>
+<script src="tb-issue.js?v=20261031e"></script>
+<script src="tb-stock.js?v=20261031e"></script>
+<script src="tb-bill.js?v=20261031e"></script>
+<script src="../assets/dday.js?v=20261031e"></script>
+<script src="../assets/app-week.js?v=20261031e"></script>
+<script src="card.js?v=20261031e"></script>
+<script src="exams.js?v=20261031e"></script>
+<script src="photo.js?v=20261031e"></script>
+<script src="applink.js?v=20261031e"></script>
+<script src="skips.js?v=20261031e"></script>
+<script src="today.js?v=20261031e"></script>
+<script src="staff.js?v=20261031e"></script>
+<script src="classes.js?v=20261031e"></script>
+<script src="weekly.js?v=20261031e"></script>
+<script src="filethumb.js?v=20261031e"></script>
+<script src="ytbm.js?v=20261031e"></script>
+<script src="summary.js?v=20261031e"></script>
+<script src="weeks.js?v=20261031e"></script>
+<script src="../assets/photos.js?v=20261031e"></script>
+<script src="review.js?v=20261031e"></script>
+<script src="draftguard.js?v=20261031e"></script>
+<script src="preview.js?v=20261031e"></script>
+<script src="rtabs.js?v=20261031e"></script>
+<script src="nav.js?v=20261031e"></script>
+<script src="sync.js?v=20261031e"></script>
+<script src="auth.js?v=20261031e"></script>
 </body>
 </html>

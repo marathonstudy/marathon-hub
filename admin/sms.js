@@ -230,7 +230,28 @@
 
   /* ---------- 그리기 ---------- */
 
+  /* 학생 한 명 (학생 줄 [문자] · 20261031e) — 「받는 사람: 민태현(목동반)」 · 보낼 곳 옆에 번호 뒤 4자리 · [+ 다른 학생 추가] */
+  function tail(d) { d = Store.phoneDigits(d || ''); return d ? '…' + d.slice(-4) : ''; }
+  function renderOne() {
+    var one = st.single, s = one ? pickedStudents()[0] : null;
+    $('#smsOne').hidden = !s;
+    $('#smsWhoTitle').hidden = !!s;
+    $('#smsMode').hidden = !!s;
+    $('#smsPickedHint').hidden = !!s;
+    if (!s) { $('#smsPaTail').textContent = ''; $('#smsStTail').textContent = ''; return false; }
+    $('#smsOne').innerHTML = '<div class="sms-one__who">받는 사람: <b></b></div>' +
+      '<button type="button" class="sms-one__add" data-sms-addmore>+ 다른 학생 추가</button>';
+    $('#smsOne').querySelector('b').textContent = (s.name || '') + '(' + clsOf(s) + ')';
+    var pa = [s.parentPhone, s.parentPhone2].map(tail).filter(Boolean);
+    $('#smsPaTail').textContent = '(' + (pa.length ? pa.join(' · ') : '번호 없음') + ')';
+    $('#smsStTail').textContent = '(' + (tail(s.studentPhone) || '번호 없음') + ')';
+    $('#smsClassBox').hidden = true;
+    $('#smsStudentBox').hidden = true;
+    return true;
+  }
+
   function renderPick() {
+    if (renderOne()) return;
     $$('[data-smsmode]').forEach(function (b) { b.classList.toggle('is-on', b.dataset.smsmode === st.mode); b.setAttribute('aria-pressed', String(b.dataset.smsmode === st.mode)); });
     var names = classNames();
     $('#smsClassBox').hidden = st.mode !== 'class';
@@ -467,6 +488,20 @@
 
   /* ---------- 열기 ---------- */
 
+  /* 보내는 번호 — 솔라피에 등록된 발신번호 (서버 Secrets 의 SOLAPI_SENDER 를 sms-send 함수가 읽어 번호만 준다 · 20261031e) */
+  function loadSender() {
+    var el = $('#smsFrom');
+    if (st.sender) { el.textContent = '보내는 번호: ' + st.sender; el.hidden = false; return; }
+    el.hidden = true;
+    invoke({ action: 'status' }).then(function (r) {
+      var n = r && r.ok && r.sender ? String(r.sender) : '';
+      if (!n) return;
+      st.sender = Store.phoneFormat ? Store.phoneFormat(n) : n;
+      el.textContent = '보내는 번호: ' + st.sender;
+      el.hidden = false;
+    });
+  }
+
   function loadCfg() {
     return sb().rpc('sms_settings_get').then(function (r) {
       if (r.error) { st.cfg = null; st.missing = isMissing(r.error); if (!st.missing) toast('문자 설정을 불러오지 못했습니다 — ' + r.error.message, 'bad'); return; }
@@ -503,6 +538,8 @@
     opts = opts || {};
     var ids = (opts.students || []).filter(Boolean);
     st.mode = ids.length ? 'student' : 'class';
+    /* 학생 줄 [문자] — 그 학생 한 명에게 (반 전체 / 학생 골라서 · 명단은 숨김 · 기본은 학부모만) */
+    st.single = !!opts.single && ids.length === 1;
     st.classes = {}; st.picked = {}; st.find = '';
     (opts.classes || []).forEach(function (c) { if (c) st.classes[c] = true; });
     ids.forEach(function (id) { st.picked[id] = true; });
@@ -519,6 +556,7 @@
     /* 보낼 곳을 정해서 열기 — 'student' 면 학생만 (「내 정보를 채워 주세요」 · 20261031c) */
     if (opts.to === 'student') { $('#smsToPa').checked = false; $('#smsToSt').checked = true; }
     else if (opts.to === 'parent') { $('#smsToPa').checked = true; $('#smsToSt').checked = false; }
+    else if (st.single) { $('#smsToPa').checked = true; $('#smsToSt').checked = false; }
     else { $('#smsToPa').checked = true; $('#smsToSt').checked = true; }
     $('#smsFind').value = '';
     $('#smsResult').innerHTML = '';
@@ -534,6 +572,7 @@
     renderPreview();
     if (window.AiPolish) AiPolish.reset($('#smsBody'));
     $('#smsModal').showModal();
+    loadSender();
     Promise.all([loadCfg(), loadTemplates(), window.AiPolish ? AiPolish.loadLeft() : null, st.notify ? null : loadPrev(), st.notify ? null : loadPub()]).then(function () {
       $('#smsMissing').hidden = !st.missing;
       $('#smsMissing').textContent = st.missing ? 'migration-023 SQL 을 실행하고 Edge Function sms-send 를 배포하면 사이트에서 문자를 보낼 수 있습니다.' : '';
@@ -833,6 +872,13 @@
   function init() {
     if (!$('#smsModal')) return;
     $('#smsModal').addEventListener('click', function (e) {
+      if (e.target.closest('[data-sms-addmore]')) {
+        /* 다른 학생을 더할 때만 — 학생 골라서 명단을 펼친다 */
+        st.single = false; st.mode = 'student';
+        renderPick(); renderPreview();
+        setTimeout(function () { $('#smsFind').focus(); }, 30);
+        return;
+      }
       var m = e.target.closest('[data-smsmode]');
       if (m) { st.mode = m.dataset.smsmode; renderPick(); renderPreview(); return; }
       var c = e.target.closest('[data-smscls]');
@@ -896,7 +942,7 @@
       var s = (UI.getStudents ? UI.getStudents() : active()).find(function (x) { return x.id === sid; });
       if (!s) return;
       if (s.archived) { toast('퇴원한 학생에게는 문자를 보낼 수 없습니다', 'bad'); return; }
-      open({ students: [sid], from: b.closest('#panel-roster') ? 'roster' : 'today' });
+      open({ students: [sid], single: true, from: b.closest('#panel-roster') ? 'roster' : b.closest('#cardModal') ? 'card' : 'today' });
     }, true);
 
     var set = $('#smsSettings');

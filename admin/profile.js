@@ -52,9 +52,34 @@
     }, function () { return ''; });
   }
 
+  /* 사진 크게 보기 — 화면 가운데 400px 원본 (상담 카드 맨 위 사진 · 학생 명단 「얼굴 사진으로 보기」 · 20261031e)
+     바깥을 누르거나 [닫기]로 닫힌다. 사진이 없으면 누를 수 없다 (bigBtn 이 버튼을 만들지 않는다) */
+  function showBig(sid, name) {
+    var m = document.getElementById('photoBigModal');
+    if (!m || !hasPhoto(sid)) return;
+    var img = document.getElementById('photoBigImg');
+    var p = of(sid);
+    img.src = (p && p.thumb) || '';
+    img.alt = (name || '') + ' 얼굴 사진';
+    document.getElementById('photoBigName').textContent = name || '';
+    m.showModal();
+    photo(sid).then(function (src) { if (src && m.open) img.src = src; });
+  }
+  /* 누르면 크게 보이는 동그라미 (사진이 없으면 그냥 동그라미) */
+  function bigBtn(s, size) {
+    if (!s || !hasPhoto(s.id)) return avatar(s, size);
+    return '<button type="button" class="av-big" data-photo-big="' + esc(s.id) + '" data-photo-name="' + esc(s.name || '') + '" aria-label="' + esc((s.name || '') + ' 얼굴 사진 크게 보기') + '" title="사진 크게 보기">' + avatar(s, size) + '</button>';
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-photo-big]');
+    if (b) { e.preventDefault(); e.stopPropagation(); showBig(b.dataset.photoBig, b.dataset.photoName); return; }
+    var m = document.getElementById('photoBigModal');
+    if (m && m.open && (e.target === m || e.target.id === 'btnPhotoBigClose')) m.close();
+  }, true);
+
   global.addEventListener('jt:loaded', load);
   global.addEventListener('jt:remote', function (e) { if (e.detail && e.detail.table === 'student_profile') load(); });
 
-  global.Profile = { load: load, of: of, editedText: editedText, hasInfo: hasInfo, hasPhoto: hasPhoto, avatar: avatar, photo: photo,
+  global.Profile = { load: load, of: of, editedText: editedText, hasInfo: hasInfo, hasPhoto: hasPhoto, avatar: avatar, photo: photo, showBig: showBig, bigBtn: bigBtn,
                      INFO: INFO, missing: function () { return st.missing; }, loaded: function () { return st.loaded; } };
 })(window);

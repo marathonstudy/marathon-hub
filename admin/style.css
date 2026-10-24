@@ -2882,15 +2882,107 @@ dialog > .toast-host { position: fixed; }
 .tdc-st__main .av, .snd-row__line .av { margin-right: 2px; }
 td .av--s { margin-right: 6px; }
 
-/* ---------- 과제 링크 연결 필요 · 학생 정렬 (applink.js · today.js · send.js · 20261031d) ---------- */
-.tdc-app--need { appearance: none; border: 1px dashed #C9CCD8; background: #F4F5F8; color: #6B7085; font: inherit; font-size: 12px; font-weight: 800; padding: 1px 8px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
-.tdc-app--need:hover { background: #ECEEF3; }
-.tdc-need { appearance: none; border: 0; background: #F1F2F6; color: #6B7085; font: inherit; font-size: 12px; font-weight: 800; padding: 2px 8px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
-.tdc-need:hover { background: #E7E9F0; }
-.app-sort { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0 8px; }
-.app-sort__t { font-size: 12.5px; font-weight: 700; color: var(--ink-light); margin-right: 2px; }
-.app-sort__b { appearance: none; border: 1px solid var(--line-soft); background: var(--surface); color: var(--ink-mid); font: inherit; font-size: 12.5px; font-weight: 700;
-  padding: 4px 10px; min-height: 32px; border-radius: 999px; cursor: pointer; }
-.app-sort__b.is-on { background: var(--ink-deep); border-color: var(--ink-deep); color: #fff; }
+/* ---------- 과제 칩 색 (20261031e) — 5일 초록 · 3~4일 파랑 · 1~2일 주황 · 0일 빨강 · 과제 없음 · 수업일 미정 · 불러오는 중은 회색
+   흐린 화면 · 휴대폰에서도 읽히게 글자는 진하게 (바탕 대비 4.5:1 이상) ---------- */
+.tdc-app { padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 800; background: #EEF0F5; color: #4F5470; border: 1px solid transparent; line-height: 1.45; }
+.tdc-app--ok   { background: #DDF3E8; color: #135C3B; border-color: #B5E0CB; }
+.tdc-app--mid  { background: #E2EDFD; color: #1A4A99; border-color: #BAD1F4; }
+.tdc-app--low  { background: #FFEDD6; color: #874A0B; border-color: #F1CC99; }
+.tdc-app--zero { background: #FCE4E9; color: #9E1F3B; border-color: #F0B9C6; }
+.tdc-app--wait, .tdc-app--none { background: #EEF0F5; color: #565B73; font-weight: 700; }
+.aw-sum--ok, .hw-tone--ok { color: #135C3B; }
+.aw-sum--mid, .hw-tone--mid { color: #1A4A99; }
+.aw-sum--low, .hw-tone--low { color: #874A0B; }
+.aw-sum--zero, .hw-tone--zero { color: #9E1F3B; }
+
+/* ---------- 「+ 과제 링크 연결」 — 테두리만 있는 흰 작은 버튼 (색 칩과 섞이지 않게) · 그 자리에 펼치는 링크 칸 (applink.js) ---------- */
+.tdc-link-btn { appearance: none; border: 1px solid #B9BDD0; background: #fff; color: #4A4F68; font: inherit; font-size: 12px; font-weight: 700;
+  padding: 2px 9px; border-radius: 8px; cursor: pointer; white-space: nowrap; line-height: 1.4; }
+.tdc-link-btn:hover, .tdc-link-btn:focus-visible { border-color: #5A3FD0; color: #3B2A99; background: #F6F3FF; }
+.tdc-link-btn[aria-expanded="true"] { border-color: #5A3FD0; color: #3B2A99; }
+.al-box { flex: 1 1 100%; margin: 6px 0 4px; padding: 10px; border: 1px solid #D9D4F5; border-radius: 12px; background: #FBFAFF; display: grid; gap: 8px; min-width: 0; }
+.al-help { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: 12.5px; color: var(--ink-mid); }
+.al-steps { flex: 1 1 200px; min-width: 0; }
+.al-creds { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.al-mini { appearance: none; border: 1px solid #C9C3EE; background: #fff; color: #3B2A99; font: inherit; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 8px; cursor: pointer; text-decoration: none; white-space: nowrap; }
+.al-mini:hover { background: #F1EEFF; }
+.al-mini:disabled { opacity: .5; cursor: default; }
+.al-link { appearance: none; border: 0; background: none; font: inherit; font-size: 12px; font-weight: 700; color: #5A3FD0; text-decoration: underline; cursor: pointer; padding: 0; }
+.al-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.al-input { flex: 1 1 220px; min-width: 0; }
+.al-n { font-size: 12.5px; font-weight: 800; color: #5A3FD0; }
+.al-err { margin: 0; font-size: 12.5px; font-weight: 700; color: #9E1F3B; }
 .snd-row__app { padding: 0 0 8px 32px; margin-top: -6px; }
 .snd-row__app:empty { display: none; }
+.snd-row .al-box { margin: 0 0 8px; }
+
+/* ---------- 학생 정렬 — 「학생 12명 접기 ▴」 띠 오른쪽 끝 · 레포트 발송 목록 머리줄 오른쪽 끝 ---------- */
+.tdc-togglebar { display: flex; align-items: stretch; border-top: 1px solid var(--line-soft); background: #FAFAFE; }
+.tdc-togglebar .tdc-toggle { flex: 1 1 auto; border-top: 0; width: auto; text-align: left; }
+.app-sort { display: inline-flex; align-items: center; gap: 2px; flex: none; padding: 0 8px; margin-left: auto; }
+.app-sort__b { appearance: none; border: 0; background: none; font: inherit; font-size: 12px; font-weight: 600; color: #8A8FA6; padding: 6px 6px; cursor: pointer; white-space: nowrap; }
+.app-sort__b.is-on { color: var(--ink-deep); font-weight: 800; text-decoration: underline; text-underline-offset: 3px; }
+.app-sort__b:hover { color: #4A34B8; }
+.snd-acts { align-items: center; }
+
+/* ---------- 레포트 발송 · 과제 평균 두 줄 (반 카드 · 과정 카드) ---------- */
+.tdc-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-width: 0; }
+.tdc-line__t { flex: none; min-width: 5.2em; font-size: 12px; font-weight: 800; color: var(--ink-light); }
+.tdc-line .tdc-chips { min-width: 0; }
+.tdc-line__note { font-size: 11.5px; color: var(--ink-light); }
+.tdc-prog { font-size: 11.5px; font-weight: 700; color: #565B73; }
+.tdc-avg { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 800; padding: 3px 9px; border-radius: 999px; border: 1px solid transparent; line-height: 1.3; }
+.tdc-avg--ok   { background: #DDF3E8; color: #135C3B; border-color: #B5E0CB; }
+.tdc-avg--mid  { background: #E2EDFD; color: #1A4A99; border-color: #BAD1F4; }
+.tdc-avg--low  { background: #FFEDD6; color: #874A0B; border-color: #F1CC99; }
+.tdc-avg--none, .tdc-avg--wait { background: #EEF0F5; color: #565B73; font-weight: 700; }
+.tdc-chip--skip { background: #EEF0F5; color: #565B73; border-color: #DCDFE8; }
+.tdc-crow { display: block; }
+.tdc-crow__top { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.tdc-crow .tdc-line { margin-top: 4px; }
+@media (max-width: 420px) {
+  .tdc-line__t { flex-basis: 100%; }
+  .tdc-avg, .tdc-chip { font-size: 12px; padding: 3px 8px; }
+}
+
+/* ---------- 오늘 할 일 [건너뛰기] · 챙길 학생 [확인함] · [×] · 확인함 기록 (skips.js) ---------- */
+.td-care2__item { display: grid; gap: 2px; padding: 2px 0; border-bottom: 1px dashed #F0DEC3; }
+.td-care2__item:last-child { border-bottom: 0; }
+.td-care2__foot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 0 8px 6px; }
+.td-care2__names { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.td-care2__nm { display: inline-flex; align-items: center; gap: 2px; padding: 1px 4px 1px 8px; border-radius: 999px; background: #fff; border: 1px solid #F0DEC3; font-size: 12.5px; color: var(--ink-deep); }
+.td-care2__x { appearance: none; border: 0; background: none; font: inherit; font-size: 14px; line-height: 1; color: #6E7389; cursor: pointer; padding: 3px 5px; border-radius: 50%; }
+.td-care2__x:hover { color: #9E1F3B; background: #FCE4E9; }
+.td-care2__ok { margin-left: auto; }
+.td-care2__hist { appearance: none; border: 0; background: none; font: inherit; font-size: 12px; font-weight: 700; color: #874A0B; text-decoration: underline; cursor: pointer; padding: 6px 8px 0; }
+.td-care2__hlist { list-style: none; margin: 6px 0 0; padding: 0 8px; display: grid; gap: 4px; font-size: 12.5px; }
+.td-care2__hlist li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.td-care2__hlist li > span:first-child { flex: 1 1 200px; min-width: 0; }
+
+/* 수업일 고르기 — 건너뛴 수업 줄은 옅게 */
+.wkv-row.is-skipped { opacity: .55; }
+.wkv-row.is-skipped:hover, .wkv-row.is-skipped:focus-within { opacity: .85; }
+.wkv-st--skip { background: #EEF0F5; color: #565B73; }
+.wkv-act { display: flex; gap: 4px; align-items: center; }
+.skip-note { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 10px 14px; margin: 0 0 12px; border-radius: 12px; background: #EEF0F5; color: #3F4460; font-size: 13.5px; }
+
+/* ---------- 상담 카드 — 이름 옆 「마지막 로그인 10/24」 · 사진 크게 보기 ---------- */
+.cd-lastlogin { font-size: 12.5px; font-weight: 600; color: var(--ink-light); white-space: nowrap; }
+.av-big { appearance: none; border: 0; padding: 0; background: none; border-radius: 50%; cursor: zoom-in; line-height: 0; }
+.av-big:hover .av, .av-big:focus-visible .av { box-shadow: 0 0 0 3px rgba(90,63,208,.35); }
+.photo-big { padding: 0; border: 0; background: transparent; max-width: min(440px, calc(100vw - 32px)); }
+.photo-big::backdrop { background: rgba(20, 22, 40, .7); }
+.photo-big__box { background: #fff; border-radius: 16px; padding: 12px; display: grid; gap: 10px; }
+.photo-big__img { display: block; width: min(400px, calc(100vw - 56px)); height: auto; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 12px; background: #EFEBFD; }
+.photo-big__foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.face-tile { cursor: default; }
+.face-tile__name { appearance: none; border: 0; background: none; font: inherit; font-size: 13.5px; font-weight: 800; color: var(--ink-deep); text-align: center; word-break: keep-all; cursor: pointer; padding: 2px 4px; border-radius: 6px; }
+.face-tile__name:hover { color: #4A34B8; text-decoration: underline; }
+
+/* ---------- 문자 — 보내는 번호 · 학생 한 명 ---------- */
+.sms-from { margin: 0 0 8px; font-size: 12.5px; font-weight: 700; color: var(--ink-mid); }
+.sms-one { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-bottom: 4px; }
+.sms-one__who { font-size: 14.5px; color: var(--ink-deep); }
+.sms-one__add { appearance: none; border: 0; background: none; font: inherit; font-size: 12.5px; font-weight: 700; color: #5A3FD0; cursor: pointer; padding: 2px 0; }
+.sms-one__add:hover { text-decoration: underline; }
+.sms-tail { font-size: 12.5px; color: var(--ink-mid); }

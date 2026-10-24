@@ -654,7 +654,7 @@
           ring(pctOf(w.hwDone, w.hwDays), '과제 제출') + ring(pctOf(w.hwOnTime, w.hwDays), '정시 제출') +
           (w.lecDays ? ring(pctOf(w.lecDone, w.lecDays), '강의 시청') : dashRing('강의 시청')) +
         '</div>' +
-        '<p class="app-counts num">' + w.hwDone + '/' + w.hwDays + '일 제출 · 정시 ' + w.hwOnTime + '일 · 강의 ' + w.lecDone + '/' + w.lecDays + '일</p>';
+        '<p class="app-counts num"><span class="hw-tone hw-tone--' + AppWeek.tone(w.hwDone, w.hwDays) + '">' + w.hwDone + '/' + w.hwDays + '일 제출</span> · 정시 ' + w.hwOnTime + '일 · 강의 ' + w.lecDone + '/' + w.lecDays + '일</p>';
     /* 전체 누적은 날짜별 기록으로 직접 센다 (토 · 일 주중 복습은 빼고 · 20261030d) — 날짜별 기록이 없을 때만 앱 값 그대로 */
     var tt = opt.total || ((data && data.calendar && data.calendar.length && AppWeek.cumulative) ? AppWeek.cumulative(data, todayISO(), todayISO()) : null);
     var total = tt
