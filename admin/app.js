@@ -397,10 +397,25 @@
   function rosterAppCell(s, link) {
     if (!s.archived && window.Today && Today.appCell && !Today.appNeed(s.id)) {
       var h = Today.appCell(s.id);
-      if (/data-app-detail|data-app-retry|tdc-app--none|tdc-app--wait/.test(h)) return h;
+      if (/data-app-detail|data-app-retry|data-app-relink|tdc-app--none|tdc-app--wait/.test(h)) return h;
     }
     return link.appCode ? '<span class="link-tag link-tag--on">연결됨</span>' : '<span class="link-tag">없음</span>';
   }
+  /* 「링크 바꾸기」 칸 (applink.js · 20261031k) — 명단에서는 그 학생 줄 바로 아래 한 줄로 펼친다 */
+  function paintRosterLink() {
+    Array.prototype.forEach.call(document.querySelectorAll('#rosterList .al-tr'), function (el) { el.parentNode.removeChild(el); });
+    var sid = window.AppLink ? AppLink.current() : '';
+    if (!sid) return;
+    var row = document.querySelector('#rosterList tr[data-id="' + sid + '"]');
+    var html = row ? AppLink.boxHtml(sid) : '';
+    if (!html) return;
+    var tr = document.createElement('tr');
+    tr.className = 'al-tr';
+    tr.innerHTML = '<td colspan="' + row.children.length + '">' + html + '</td>';
+    var after = row.nextSibling && row.nextSibling.classList && row.nextSibling.classList.contains('hd-tr') ? row.nextSibling : row;
+    row.parentNode.insertBefore(tr, after.nextSibling);
+  }
+  window.addEventListener('jt:applink-ui', paintRosterLink);
   /* 과제 기록을 받을 때마다 그 학생 칸만 · 다 받으면 표도 다시 */
   window.addEventListener('jt:app', function (e) {
     var sid = e.detail && e.detail.sid;
@@ -515,6 +530,7 @@
     });
 
     rosterList.appendChild(frag);
+    paintRosterLink();
     refreshClassOptions();
     syncExpandButton();
     renderClassInfo();

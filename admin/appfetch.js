@@ -81,6 +81,8 @@
 
   function peek(code) { var c = cache[code]; return c && Date.now() - c.at < TTL ? c.res : null; }
   function clear() { cache = {}; }
+  /* 한 학생만 잊는다 — 링크를 바꾸면 그 학생 기록만 새로 (20261031k) */
+  function forget(code) { if (code) { delete cache[code]; delete flying[code]; } }
 
-  global.AppFetch = { get: get, getMany: getMany, peek: peek, clear: clear, TIMEOUT: TIMEOUT, manyOff: function () { return manyOff; } };
+  global.AppFetch = { get: get, getMany: getMany, peek: peek, clear: clear, forget: forget, TIMEOUT: TIMEOUT, manyOff: function () { return manyOff; } };
 })(window);

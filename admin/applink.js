@@ -11,6 +11,8 @@
    · 아이디 · 비밀번호는 코드에 없다 — 설정 「마라톤 사이트 로그인 정보」(staff_vault · 직원만 · migration-036)에서 읽어 복사만 한다
      (화면에 글자로 내보내지 않는다). 값이 없으면 [설정에서 로그인 정보 넣기]
    펼친 칸은 화면을 다시 그려도 남는다 — 학생 줄을 그리는 쪽이 AppLink.boxHtml(학생 id)를 줄 끝에 붙인다.
+   「링크 바꾸기」 (20261031k) — 7칸 표 맨 아래 · 「링크 확인 필요」를 누르면 같은 칸이 지금 링크가 들어 있는 채로 펼쳐진다 (open(ids, { edit: true }))
+     [저장] 새 링크로 그 학생 과제 기록만 바로 다시 불러온다 (10분 기억도 그 학생만 지운다) · [링크 지우기] 앱 공유 링크를 비운다
    ============================================================ */
 
 (function () {
@@ -25,20 +27,23 @@
   function fire() { window.dispatchEvent(new CustomEvent('jt:applink-ui')); }
 
   /* q.list = [학생 id] · q.i = 지금 펼친 학생 */
-  var q = { list: [], i: 0, value: '', err: '', busy: false, saved: 0 };
+  var q = { list: [], i: 0, value: '', err: '', busy: false, saved: 0, edit: false };
   var login = { loaded: false, has: false, val: null, missing: false };
 
   function cur() { return q.list[q.i] || ''; }
 
-  function open(ids) {
+  var SHARE = 'https://marathonstudy.com/share/report/';
+  function linkUrl(sid) { var c = window.Store && Store.linkOf ? Store.linkOf(sid).appCode : ''; return c ? SHARE + c : ''; }
+  function open(ids, opt) {
     ids = (ids || []).filter(Boolean);
     if (!ids.length) return;
-    q = { list: ids, i: 0, value: '', err: '', busy: false, saved: 0 };
+    var edit = !!(opt && opt.edit) && ids.length === 1;
+    q = { list: ids, i: 0, value: edit ? linkUrl(ids[0]) : '', err: '', busy: false, saved: 0, edit: edit };
     loadLogin();
     fire();
     focusSoon();
   }
-  function close() { q = { list: [], i: 0, value: '', err: '', busy: false, saved: 0 }; fire(); }
+  function close() { q = { list: [], i: 0, value: '', err: '', busy: false, saved: 0, edit: false }; fire(); }
   function next() {
     if (q.i < q.list.length - 1) { q.i++; q.value = ''; q.err = ''; fire(); focusSoon(); return; }
     var n = q.list.length, saved = q.saved;
@@ -76,7 +81,9 @@
       ? '<button type="button" class="al-mini" data-al-copy="id"' + (login.val.id ? '' : ' disabled') + '>아이디 복사</button>' +
         '<button type="button" class="al-mini" data-al-copy="pw"' + (login.val.pw ? '' : ' disabled') + '>비밀번호 복사</button>'
       : '<button type="button" class="al-link" data-al-setup>설정에서 로그인 정보 넣기</button>';
-    return '<div class="al-box" data-al-box="' + esc(sid) + '">' +
+    var had = q.edit && !!linkUrl(sid);
+    return '<div class="al-box' + (q.edit ? ' al-box--edit' : '') + '" data-al-box="' + esc(sid) + '">' +
+      (q.edit ? '<p class="al-title">링크 바꾸기 — ' + (had ? '지금 들어 있는 링크입니다. 맞는 학생의 공유 링크로 바꿔 붙여 넣고 [저장]' : '아직 링크가 없습니다. 공유 링크를 붙여 넣고 [저장]') + '</p>' : '') +
       '<div class="al-help">' +
         '<a class="al-mini al-site" href="' + SITE + '" target="_blank" rel="noopener">마라톤 사이트 열기 ↗</a>' +
         '<span class="al-steps">로그인 → 학생 찾기 → 공유 링크 복사 → 여기 붙여 넣기</span>' +
@@ -88,6 +95,7 @@
         '<button type="button" class="btn btn--sm btn--primary" data-al-save' + (q.busy ? ' disabled' : '') + '>저장</button>' +
         (n > 1 && q.i < n - 1 ? '<button type="button" class="btn btn--sm" data-al-skip>건너뛰기</button>' : '') +
         '<button type="button" class="btn btn--sm btn--ghost" data-al-cancel>취소</button>' +
+        (had ? '<button type="button" class="btn btn--sm btn--ghost al-clear" data-al-clear' + (q.busy ? ' disabled' : '') + '>링크 지우기</button>' : '') +
       '</div>' +
       (q.err ? '<p class="al-err" role="alert">' + esc(q.err) + '</p>' : '') +
     '</div>';
@@ -111,14 +119,34 @@
       Store.setLinkLocal(sid, c);
       q.saved++;
       q.busy = false;
-      if (q.list.length === 1) toast('과제 링크를 연결했습니다', 'good');
+      var was = q.edit;
+      if (q.list.length === 1) toast(was ? '과제 링크를 바꿨습니다 — 새 링크로 과제 기록을 다시 불러옵니다' : '과제 링크를 연결했습니다', 'good');
       next();
-      window.dispatchEvent(new CustomEvent('jt:applink', { detail: { sid: sid, hubCode: c.hubCode } }));
+      window.dispatchEvent(new CustomEvent('jt:applink', { detail: { sid: sid, hubCode: c.hubCode, changed: was } }));
       window.dispatchEvent(new CustomEvent('jt:roster-changed'));
     }).catch(function (e) {
       q.busy = false;
       q.err = '저장하지 못했습니다 — ' + ((e && e.message) || e);
       fire();
+    });
+  }
+
+  /* 링크 지우기 — 앱 공유 링크만 비운다 (학부모 링크는 그대로) */
+  function clearLink() {
+    if (q.busy) return;
+    var sid = cur(), s = window.Store ? Store.getStudents().find(function (x) { return x.id === sid; }) : null;
+    UI.confirmAsk('과제 링크 지우기', ((s && s.name) || '이 학생') + ' 학생의 마라톤 앱 공유 링크를 지웁니다. 과제 칸이 「+ 과제 링크 연결」로 바뀝니다.', '링크 지우기').then(function (ok) {
+      if (!ok) return;
+      q.busy = true; fire();
+      DB.saveLink(sid, { appCode: '' }).then(function (l) {
+        var c = Store.linkOf(sid);
+        c.appCode = ''; c.appUpdatedAt = l.appUpdatedAt;
+        Store.setLinkLocal(sid, c);
+        close();
+        toast('과제 링크를 지웠습니다', 'good');
+        window.dispatchEvent(new CustomEvent('jt:applink', { detail: { sid: sid, hubCode: c.hubCode, cleared: true } }));
+        window.dispatchEvent(new CustomEvent('jt:roster-changed'));
+      }).catch(function (e) { q.busy = false; q.err = '지우지 못했습니다 — ' + ((e && e.message) || e); fire(); });
     });
   }
 
@@ -141,14 +169,16 @@
   }
 
   document.addEventListener('click', function (e) {
-    var t = e.target.closest('[data-al-save], [data-al-skip], [data-al-cancel], [data-al-copy], [data-al-setup], [data-app-link], [data-app-need]');
+    var t = e.target.closest('[data-al-save], [data-al-skip], [data-al-cancel], [data-al-clear], [data-al-copy], [data-al-setup], [data-app-link], [data-app-need], [data-app-relink]');
     if (!t) return;
+    if (t.hasAttribute('data-app-relink')) { e.preventDefault(); e.stopPropagation(); if (cur() === t.dataset.appRelink && q.edit) close(); else open([t.dataset.appRelink], { edit: true }); return; }
     if (t.hasAttribute('data-app-link')) { e.preventDefault(); e.stopPropagation(); if (cur() === t.dataset.appLink && q.list.length === 1) close(); else open([t.dataset.appLink]); return; }
     if (t.hasAttribute('data-app-need')) { e.preventDefault(); e.stopPropagation(); open(t.dataset.appNeed.split(',')); var hc = t.closest('[data-cls]'); window.dispatchEvent(new CustomEvent('jt:applink-need', { detail: { ids: q.list, cls: hc ? hc.dataset.cls : '' } })); return; }
     e.stopPropagation();
     if (t.hasAttribute('data-al-save')) save();
     else if (t.hasAttribute('data-al-skip')) next();
     else if (t.hasAttribute('data-al-cancel')) close();
+    else if (t.hasAttribute('data-al-clear')) clearLink();
     else if (t.hasAttribute('data-al-copy')) copyLogin(t.dataset.alCopy);
     else if (t.hasAttribute('data-al-setup')) openSetup();
   }, true);
@@ -190,5 +220,5 @@
     });
   });
 
-  window.AppLink = { open: open, close: close, boxHtml: boxHtml, current: cur, loadLogin: loadLogin, login: function () { return { loaded: login.loaded, has: login.has }; } };
+  window.AppLink = { open: open, close: close, boxHtml: boxHtml, current: cur, editing: function () { return q.edit; }, loadLogin: loadLogin, login: function () { return { loaded: login.loaded, has: login.has }; } };
 })();

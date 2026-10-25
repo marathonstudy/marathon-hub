@@ -534,6 +534,13 @@ delete from public.staff where email = '조교이메일@example.com';
 - 7칸 표 칸 → [고치기] → 정시 제출 · 늦게 제출 · 미제출 · 면제(셈에서 뺌) + 사유(앱 오류 · 종이로 제출 · 결석으로 면제 · 기타) → 작은 「수정」 · 「원래 앱: … → 수정: …」 · [원래대로] (admin/hwfix.js · today.js)
 - 앱 기록 위에 덮어서 센다 (AppWeek.withFix · 면제는 분모에서 뺌) — 과제 칩 · 평균 · 정렬 · 레포트 · 러닝노트 · AI 초안. 앱에서 다시 받아 와도 유지.
 
+### 5-42. 20261031k — 과제 링크 바꾸기 · 링크 확인 필요 (Edge Function app-report 다시 배포)
+1. Supabase 대시보드 → Edge Functions → `app-report` → 코드 전체를 `supabase/functions/app-report/index.ts` 로 바꿔 Deploy (Verify JWT 끔 그대로). SQL 은 없다.
+   - 앱에 등록된 학생 이름(`who` · 앱이 보낼 때만)을 함께 넘긴다 → 코치룸이 우리 학생 이름과 다르면 「링크 확인 필요」. shape 에 `student` 항목 이름도 더함
+- 7칸 표 맨 아래 [링크 바꾸기] → 「+ 과제 링크 연결」과 같은 칸에 지금 링크 · [저장] [취소] [링크 지우기] (admin/applink.js · open(ids, { edit: true }))
+- 저장하면 그 학생만 화면 메모리(AppFetch.forget) · 10분 기억(mhub.appCache)을 지우고 바로 다시 불러온다
+- 만료(expired) · 이름이 다름 → 주황 「링크 확인 필요」 (「오늘」 · 레포트 발송 · 작성 화면 학생 카드 · 학생 명단)
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

@@ -129,6 +129,7 @@
     var orders = {};
     cal.forEach(function (c) { if (c.order) orders[c.order] = 1; });
     return {
+      who: String(d.who || ''),
       calendar: cal,
       lectures: (d.lectures || []).filter(function (l) { return l && orders[l.order]; }).map(function (l) { return { order: l.order, title: l.title, videosDone: l.videosDone, videosTotal: l.videosTotal }; }),
       history: (d.history || d.recent || []).filter(function (h) { return h && (orders[h.order] || String(h.submittedAt || '').slice(0, 10) >= cutD); })
@@ -443,12 +444,39 @@
     var w = appWeekOf(s, cy, lessonDate);
     return w ? { k: 'ok', w: w } : { k: 'none' };
   }
+  /* ---------- 링크 확인 필요 (20261031k) ----------
+     앱 공유 링크가 만료됐거나(expired) · 앱에 등록된 이름(app-report 의 who)이 우리 학생 이름과 달라 보이면(다른 학생 링크를 넣은 것) — 주황 「링크 확인 필요」
+     누르면 그 자리에 「링크 바꾸기」 칸 (applink.js). 이름은 띄어쓰기 · 괄호를 빼고 비교 · 한쪽이 다른 쪽을 품으면 같다고 본다 · 「김*수」처럼 가린 글자는 건너뛴다 */
+  function normName(v) { return String(v || '').replace(/\([^)]*\)/g, '').replace(/\s+/g, ''); }
+  function nameDiffers(who, name) {
+    var a = normName(who), b = normName(name);
+    if (!a || !b || a.indexOf(b) !== -1 || b.indexOf(a) !== -1) return false;
+    if (/[*＊○●]/.test(a) && a.length === b.length) {
+      for (var i = 0; i < a.length; i++) if (!/[*＊○●]/.test(a[i]) && a[i] !== b[i]) return true;
+      return false;
+    }
+    return true;
+  }
+  function linkWarn(s) {
+    var a = app[s.id];
+    if (!a || !s.app) return '';
+    if (a.need && a.reason === 'expired') return 'expired';
+    return a.ok && a.raw && nameDiffers(a.raw.who, s.name) ? 'other' : '';
+  }
+  var WARN_TIP = { expired: '앱 공유 링크가 만료되었습니다 — 누르면 새 링크를 넣는 칸', other: '앱에 등록된 이름이 이 학생과 다릅니다 — 다른 학생 링크일 수 있습니다 · 누르면 링크 바꾸기' };
+  function warnHtml(s) {
+    var w = linkWarn(s);
+    if (!w) return '';
+    var a = app[s.id], who = w === 'other' && a && a.raw ? a.raw.who : '';
+    return '<button type="button" class="tdc-warn" data-app-relink="' + esc(s.id) + '" data-warn="' + w + '" title="' + esc(WARN_TIP[w] + (who ? ' (앱 이름: ' + who + ')' : '')) + '">링크 확인 필요</button>';
+  }
   /* 과제 칩 색 — 5일(다 냄) 초록 · 3~4일 파랑 · 1~2일 주황 · 0일 빨강 (레포트 발송 · 과제 상세와 같은 색 · 20261031e) */
   function hwTone(done, days) { return AppWeek.tone ? AppWeek.tone(done, days) : done >= days ? 'ok' : done >= 3 ? 'mid' : done >= 1 ? 'low' : 'zero'; }
   var NEED_TIP = { nolink: '앱 공유 링크가 아직 없습니다', nohub: '학부모 링크가 없어 과제 기록을 못 부릅니다', expired: '앱 공유 링크가 만료되었습니다 — 새 링크를 붙여 넣어 주세요' };
   /* 과제 「n/5일」 — 그 반 지난 수업 레포트 기간(D-7 ~ D-1)의 평일 중 제출한 날 (토 · 일은 세지 않는다) */
   function appCell(s, cy, lessonDate) {
     var x = appState(s, cy, lessonDate);
+    if (x.k === 'need' && x.why === 'expired') return warnHtml(s) || '<button type="button" class="tdc-warn" data-app-relink="' + esc(s.id) + '" data-warn="expired">링크 확인 필요</button>';
     if (x.k === 'need') return '<button type="button" class="tdc-link-btn" data-app-link="' + esc(s.id) + '" aria-expanded="' + (window.AppLink && AppLink.current() === s.id) + '" title="' + esc((NEED_TIP[x.why] || NEED_TIP.nolink) + ' · 누르면 바로 아래에 링크 칸') + '">+ 과제 링크 연결</button>';
     if (x.k === 'wait') return '<span class="tdc-app tdc-app--wait" title="과제 기록 불러오는 중"><i class="spin" aria-hidden="true"></i>과제 불러오는 중</span>';
     if (x.k === 'fail') return '<button type="button" class="tdc-app tdc-app--fail" data-app-retry="' + esc(s.id) + '">과제 기록 못 불러옴 · 다시 시도</button>';
@@ -459,7 +487,7 @@
     /* 누르면 그 학생 줄 아래 기간 · 날짜별 표 (마우스를 올리면 한 줄 말풍선 · 20261031f) */
     var L = lessonDate || (cy && cy.L) || '', tip = tipOf(w);
     return '<button type="button" class="tdc-app tdc-app--' + k + ' tdc-app--btn num" data-app-detail="' + esc(s.id) + '" data-app-from="' + esc(w.from) + '" data-app-to="' + esc(w.to) + '" data-app-lesson="' + esc(L) + '" data-tip="' + esc(tip) + '"' +
-      ' aria-expanded="' + (det.sid === s.id && det.from === w.from) + '" aria-label="' + esc('과제 ' + w.hwDone + '/' + w.hwDays + '일 · ' + tip + ' · 누르면 날짜별 표') + '">과제 ' + w.hwDone + '/' + w.hwDays + '일</button>';
+      ' aria-expanded="' + (det.sid === s.id && det.from === w.from) + '" aria-label="' + esc('과제 ' + w.hwDone + '/' + w.hwDays + '일 · ' + tip + ' · 누르면 날짜별 표') + '">과제 ' + w.hwDone + '/' + w.hwDays + '일</button>' + warnHtml(s);
   }
 
   /* ---------- 과제 칩 → 기간 · 날짜별 표 (20261031f) ----------
@@ -636,7 +664,8 @@
       '<div class="hd-grid" style="grid-template-columns:2.4em repeat(' + n + ', minmax(0, 1fr))">' + cells + '</div>' +
       (pick ? '<p class="hd-pick">' + esc(dayInfo(a.data, pick)) + '</p>' + fixHtml(sid, pick) : '') +
       '<p class="hd-legend">● 정시 제출 ◐ 늦게 제출 ○ 미제출 · 빈칸 그날 과제 없음 / ✓ 강의 다 봄 – 안 봄 · 토 · 일은 주중 복습 · 칸을 누르면 그날 과제 · 「수정」 = 조교가 고친 칸</p>' +
-      '<div class="hd-foot"><button type="button" class="hd-more" data-pv="parent" data-pv-view="app" data-sid="' + esc(sid) + '">과제 상세 보기 →</button></div>' +
+      '<div class="hd-foot"><button type="button" class="hd-relink" data-app-relink="' + esc(sid) + '" aria-expanded="' + !!(window.AppLink && AppLink.current() === sid && AppLink.editing()) + '">링크 바꾸기</button>' +
+        '<button type="button" class="hd-more" data-pv="parent" data-pv-view="app" data-sid="' + esc(sid) + '">과제 상세 보기 →</button></div>' +
     '</div>';
   }
   /* 펼친 표를 그 칩이 있는 줄 아래에 다시 붙인다 (칩의 기준 수업일이 같은 곳만) */
@@ -801,7 +830,7 @@
       (open && c ? headHtml(c) + '<span class="tdc-grid__rest" aria-hidden="true"></span>' : '') + '</div>';
   }
   /* 반 카드 위 「+ 과제 링크 연결 필요 n명」 — 누르면 그 학생들 링크 칸이 차례로 펼쳐진다 (applink.js) */
-  function needIds(rows, cy) { return rows.filter(function (s) { return appState(s, cy).k === 'need'; }).map(function (s) { return s.id; }); }
+  function needIds(rows, cy) { return rows.filter(function (s) { var x = appState(s, cy); return x.k === 'need' && x.why !== 'expired'; }).map(function (s) { return s.id; }); }
   function needBtn(ids) {
     return ids.length ? '<button type="button" class="tdc-link-btn tdc-need num" data-app-need="' + esc(ids.join(',')) + '" title="누르면 그 학생들 링크 칸이 차례로 펼쳐집니다">+ 과제 링크 연결 필요 ' + ids.length + '명</button>' : '';
   }
@@ -865,7 +894,7 @@
   }
   function studentRow(s, c) {
     return '<div class="tdc-st tdc-grid" data-id="' + esc(s.id) + '">' +
-      '<div class="tdc-st__main">' + (window.Profile ? Profile.avatar({ id: s.id, name: s.name }, 's') : '') + '<button type="button" class="roster__name roster__name-btn" data-card="' + esc(s.id) + '">' + esc(s.name) + '</button></div>' +
+      '<div class="tdc-st__main">' + (window.Profile ? Profile.avatar({ id: s.id, name: s.name }, 's') : '') + '<button type="button" class="roster__name roster__name-btn" data-card="' + esc(s.id) + '">' + esc(s.name) + '</button>' + (linkWarn(s) === 'other' ? warnHtml(s) : '') + '</div>' +
       '<span class="tdc-app-slot tdc-tri">' + triHtml(s, c) + '</span>' +
       actsHtml(s) +
       (window.AppLink ? AppLink.boxHtml(s.id) : '') +
@@ -1155,7 +1184,9 @@
     },
     /* 레포트 발송 학생 줄 — 같은 과제 칸 · 같은 정렬 (send.js · 20261031d). lessonDate = 그 레포트 수업일 */
     appCell: function (sid, lessonDate) { var s = rowById(sid); return s ? appCell(s, cycleOf(s.class_name || ''), lessonDate) : ''; },
-    appNeed: function (sid) { var s = rowById(sid); return !!s && appState(s, null).k === 'need'; },
+    appNeed: function (sid) { var s = rowById(sid); if (!s) return false; var x = appState(s, null); return x.k === 'need' && x.why !== 'expired'; },
+    /* 링크 확인 필요 — 'expired' | 'other' | '' (20261031k) */
+    linkWarn: function (sid) { var s = rowById(sid); return s ? linkWarn(s) : ''; },
     sortStudents: function (list, lessonDate) {
       if (!st.data) return list.slice().sort(byName);
       var known = [], rest = [];
@@ -1382,11 +1413,18 @@
   window.addEventListener('jt:applink', function (e) {
     var s = e.detail && rowById(e.detail.sid);
     if (!s) return;
-    s.app = true;
+    /* 링크를 바꾸거나 지우면 그 학생만 잊고 새로 (화면 메모리 · 10분 기억 — 다른 학생은 그대로 · 20261031k) */
+    if (s.code) {
+      if (window.AppFetch && AppFetch.forget) AppFetch.forget(s.code);
+      var m = readCache(); if (m[s.code]) { delete m[s.code]; writeCache(m); }
+    }
+    s.app = !e.detail.cleared;
     if (e.detail.hubCode) s.code = e.detail.hubCode;
     delete app[s.id];
+    if (det.sid === s.id) det = closedDet();
     render();
-    loadApp(s.id);
+    if (s.app) loadApp(s.id);
+    else window.dispatchEvent(new CustomEvent('jt:app', { detail: { sid: s.id } }));
   });
   /* 출석 체크를 저장하거나 새로 읽으면 (attend.js) — 반 카드 버튼 · 챙길 학생 */
   window.addEventListener('jt:attend', function () { if (st.data && !$('#appRoot').hidden) render(); });
