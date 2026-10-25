@@ -83,6 +83,9 @@
         if (args.p_week === '__draft' || (cur.mode === 'week' && dr2 && args.p_week === dr2.startDate)) return Promise.resolve(dr2);
         return sb().rpc('staff_hub_report', { p_student: cur.sid, p_week: args.p_week }).then(unwrap);
       }
+      /* 복습 노트 (migration-039 · 20261031l) — 확정된 노트 · 미리보기에서 연 것은 세지 않는다 */
+      if (name === 'hub_review_notes') return sb().rpc('staff_hub_review_notes', { p_student: cur.sid }).then(function (r) { return r.error ? [] : (r.data || []); }, function () { return []; });
+      if (name === 'hub_review_note_open') return Promise.resolve(null);
       /* 과제 수정 (migration-038 · 20261031j) — 「이 주차」(공개 전 작성 내용)는 지금 고친 값 그대로 · 그 밖에는 학부모가 지금 보는 값 */
       if (name === 'hub_hw_fix') {
         if (cur.mode === 'week' && window.HwFix) return Promise.resolve(HwFix.mapOf(cur.sid));

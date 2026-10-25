@@ -114,6 +114,8 @@
     }
     /* AI 수업 요약 (summary.js · migration-012) */
     if (window.Summary) Summary.render(st.cls, st.week);
+    /* 복습 노트 (reviewnote.js · migration-039 · 20261031l) — 과정이면 「§과정」 칸에 한 번 */
+    if (window.RNote) RNote.render(st.cls, st.week);
     /* 복습테스트 (review.js · migration-013) — 과정이면 그 회차 첫 반 시험 목록이 기준 (다른 반에 맞춰진다 · 마감은 반마다 그 반 수업일) */
     if (window.Review) {
       if (isCourseKey()) {

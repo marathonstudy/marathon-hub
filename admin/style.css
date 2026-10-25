@@ -3266,3 +3266,26 @@ thead .ab-name { background: #F6F7FB; z-index: 2; }
 @media (max-width: 520px) {
   .tdc-warn { font-size: 11.5px; padding: 3px 7px; }
 }
+
+/* ---------- 복습 노트 만들기 → 고치기 → 확정 (reviewnote.js · 20261031l) ---------- */
+.rn-ed { display: grid; gap: 12px; }
+.rn-ed__l { border: 1px solid #E1DDF3; border-radius: 12px; padding: 12px; background: #FCFBFF; display: grid; gap: 10px; }
+.rn-ed__lh { font-weight: 900; color: #4A34B8; }
+.rn-ed__f { display: grid; gap: 4px; min-width: 0; }
+.rn-ed__fh { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.rn-ed__lab { font-size: 13px; font-weight: 800; color: var(--ink-deep); }
+.rn-ed__re { margin-left: auto; }
+.rn-ed__in { width: 100%; min-width: 0; box-sizing: border-box; }
+.rn-ed__unsure { font-size: 11.5px; font-weight: 800; color: #874A0B; background: #FFF1DF; border-radius: 999px; padding: 2px 8px; }
+.rn-ed__quiz { border: 1px dashed #D5D0F2; border-radius: 12px; padding: 12px; display: grid; gap: 8px; }
+.rn-ed__qh { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.rn-ed__q { display: grid; grid-template-columns: 1.6em minmax(0, 1fr) 4em; grid-template-areas: "n q a" "n w w" "n d d"; gap: 4px 6px; align-items: start; }
+.rn-ed__qn { grid-area: n; font-weight: 900; color: #4A34B8; padding-top: 6px; }
+.rn-ed__qt { grid-area: q; min-width: 0; }
+.rn-ed__qa { grid-area: a; }
+.rn-ed__qw { grid-area: w; min-width: 0; }
+.rn-ed__q [data-rn-qdel] { grid-area: d; justify-self: end; }
+.rn-ed__warn { margin: 0; font-size: 13px; font-weight: 800; color: #874A0B; background: #FFF4E5; border-radius: 8px; padding: 6px 10px; }
+.rn-badge--warn { background: #FFF1DF; color: #874A0B; }
+.rn-make.ai-open--ok { opacity: .8; }
+.tdc-line--rn .tdc-rn { font-size: 12.5px; font-weight: 700; color: var(--ink-mid); }

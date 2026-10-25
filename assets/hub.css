@@ -731,6 +731,7 @@ label.hub-btn { cursor: pointer; text-align: center; }
 .rw-nav:empty { display: none; }
 .rw-nav { position: relative; margin-bottom: 12px; }
 .rw-bar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 6px; }
+.rw-bar2 { display: flex; justify-content: flex-end; margin-top: 6px; }                 /* 누적 추이 아래 「복습 노트 모음」 (20261031l) */
 .rw-arrow {
   appearance: none; border: 0; font: inherit; cursor: pointer;
   min-height: 44px; padding: 8px 10px; border-radius: 12px;
@@ -1093,3 +1094,97 @@ textarea.mi-input { resize: vertical; min-height: 80px; }
 .aw-sum--low, .hw-tone--low { color: #874A0B; }
 .aw-sum--zero, .hw-tone--zero { color: #9E1F3B; }
 .hw-tone { font-weight: 800; }
+
+/* ============================================================
+   복습 노트 (review-note.js · 20261031l) — 휴대폰 360~390px 세로가 먼저, 컴퓨터는 가운데 560px
+   본문 16px · 줄 간격 1.7 · 좌우 여백 16px · 표 · 2단 없이 위에서 아래로 한 칸씩
+   ============================================================ */
+.rn-card__list { margin: 4px 0 12px; padding: 0; list-style: none; display: grid; gap: 6px; font-size: 15px; line-height: 1.6; color: var(--ink-deep); }
+.rn-card__list b { color: #5A3FD0; margin-right: 4px; }
+.rn-card__open { width: 100%; min-height: 48px; font-size: 16px; }
+.rw-notes { appearance: none; border: 1px solid #DCD6F7; background: #fff; color: #4A34B8; font: inherit; font-size: 13px; font-weight: 800; border-radius: 999px; padding: 6px 10px; cursor: pointer; white-space: nowrap; }
+.rn-all { margin-bottom: 14px; }
+
+html.rn-lock, html.rn-lock body { overflow: hidden; }
+.rn-reader { position: fixed; inset: 0; z-index: 2000; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; background: #F6F5FB; }
+.rn-reader[hidden] { display: none; }
+.rn-page { max-width: 560px; margin: 0 auto; padding: 0 16px 48px; box-sizing: border-box; font-size: 16px; line-height: 1.7; color: #23263A; word-break: keep-all; overflow-wrap: anywhere; }
+.rn-top { position: sticky; top: 0; z-index: 2; margin: 0 -16px 12px; padding: 10px 16px 0; background: #F6F5FB; border-bottom: 1px solid #E6E3F3; }
+.rn-top__row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.rn-close, .rn-print { appearance: none; border: 0; background: none; font: inherit; font-size: 15px; font-weight: 800; color: #4A34B8; padding: 8px 2px; min-height: 44px; cursor: pointer; }
+.rn-print { font-size: 13.5px; color: #5C607A; }
+.rn-title { margin: 2px 0 0; font-size: 20px; line-height: 1.4; font-weight: 900; color: #1E2033; }
+.rn-meta { margin: 2px 0 8px; font-size: 14px; color: #6B6F88; }
+.rn-prog { height: 3px; background: #E4E0F6; border-radius: 2px; overflow: hidden; }
+.rn-prog i { display: block; height: 100%; width: 0; background: #6A4FE0; transition: width .15s linear; }
+.rn-tabs { display: flex; gap: 6px; padding: 8px 0; overflow-x: auto; scrollbar-width: none; }
+.rn-tabs::-webkit-scrollbar { display: none; }
+.rn-tab { flex: 0 0 auto; appearance: none; border: 1px solid #DCD6F7; background: #fff; color: #4A4F68; font: inherit; font-size: 13.5px; font-weight: 800; border-radius: 999px; padding: 5px 12px; min-height: 34px; cursor: pointer; }
+.rn-tab.is-on { background: #5A3FD0; border-color: #5A3FD0; color: #fff; }
+.rn-lesson, .rn-ox { background: #fff; border-radius: 16px; padding: 16px; margin: 0 0 14px; box-shadow: 0 1px 3px rgba(30, 32, 51, .06); }
+.rn-lesson__no { font-size: 13px; font-weight: 900; color: #5A3FD0; letter-spacing: .02em; }
+.rn-sec { margin-top: 14px; }
+.rn-lesson__no + .rn-sec { margin-top: 6px; }
+.rn-h { margin: 0 0 4px; font-size: 13.5px; font-weight: 900; color: #6B6F88; }
+.rn-one { margin: 0; font-size: 18px; line-height: 1.6; font-weight: 800; color: #1E2033; }
+.rn-ul { margin: 0; padding-left: 1.1em; }
+.rn-ul li + li { margin-top: 4px; }
+.rn-ul--pas { color: #4A4F68; font-size: 15px; }
+.rn-acts { margin: 0; padding-left: 1.5em; font-weight: 800; color: #1E2033; }
+.rn-acts li + li { margin-top: 6px; }
+.rn-acts li::marker { color: #5A3FD0; font-weight: 900; }
+.rn-fold { max-height: calc(1.7em * 2); overflow: hidden; position: relative; }
+.rn-fold.is-open { max-height: none; }
+.rn-fold.has-more:not(.is-open)::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1.2em; background: linear-gradient(rgba(255,255,255,0), #fff); }
+.rn-more { appearance: none; border: 0; background: none; font: inherit; font-size: 14px; font-weight: 800; color: #4A34B8; padding: 6px 0; min-height: 36px; cursor: pointer; }
+.rn-quote { margin: 4px 0 0; padding: 10px 12px; border-left: 4px solid #6A4FE0; background: #F3F0FF; border-radius: 0 10px 10px 0; font-weight: 700; color: #2B2160; }
+.rn-noox { text-align: center; color: #8A8EA6; font-size: 14px; }
+.rn-ox__t { margin: 0 0 6px; font-size: 18px; font-weight: 900; color: #1E2033; }
+.rn-ox__t small { font-size: 13px; color: #6B6F88; font-weight: 700; }
+.rn-ox__last { margin: 0 0 6px; font-size: 13.5px; color: #6B6F88; }
+.rn-ox__step { margin: 0; font-size: 14px; font-weight: 900; color: #5A3FD0; }
+.rn-ox__q { margin: 6px 0 12px; font-size: 17px; font-weight: 800; line-height: 1.6; }
+.rn-ox__btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.rn-ox__b { appearance: none; min-height: 64px; border-radius: 14px; border: 2px solid #DCD6F7; background: #fff; font: inherit; font-size: 28px; font-weight: 900; color: #4A34B8; cursor: pointer; touch-action: manipulation; }
+.rn-ox__b:disabled { cursor: default; opacity: .55; }
+.rn-ox__b.is-right { opacity: 1; background: #E6F6EE; border-color: #4FB386; color: #135C3B; }
+.rn-ox__b.is-wrong { opacity: 1; background: #FDECEF; border-color: #E08A9E; color: #9E1F3B; }
+.rn-ox__ans { margin-top: 12px; padding: 12px; border-radius: 12px; background: #F6F5FB; }
+.rn-ox__res { margin: 0; font-weight: 900; }
+.rn-ox__why { margin: 4px 0 0; }
+.rn-ox__next, .rn-ox__again { margin-top: 10px; width: 100%; min-height: 52px; appearance: none; border: 0; border-radius: 12px; background: #5A3FD0; color: #fff; font: inherit; font-size: 16px; font-weight: 900; cursor: pointer; }
+.rn-ox__done { text-align: center; }
+.rn-ox__score { margin: 8px 0 0; font-size: 26px; font-weight: 900; color: #1E2033; }
+.rn-ox__fold summary { cursor: pointer; font-weight: 800; color: #4A34B8; min-height: 40px; display: flex; align-items: center; }
+.rn-ox__list { margin: 8px 0 0; padding-left: 1.3em; }
+.rn-ox__list p { margin: 0; }
+.rn-ox__list li + li { margin-top: 10px; }
+.rn-ox__a { color: #4A4F68; font-size: 15px; }
+.rn-print-ox { display: none; }
+.rn-empty { color: #8A8EA6; }
+.rn-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.rn-list__i { width: 100%; text-align: left; appearance: none; border: 1px solid #E6E3F3; background: #fff; border-radius: 14px; padding: 12px 36px 12px 14px; font: inherit; cursor: pointer; position: relative; display: grid; gap: 2px; box-sizing: border-box; }
+.rn-list__d { font-size: 13px; font-weight: 900; color: #5A3FD0; }
+.rn-list__t { font-size: 15.5px; font-weight: 800; color: #1E2033; line-height: 1.5; overflow-wrap: anywhere; }
+.rn-list__m { font-size: 12.5px; color: #6B6F88; }
+.rn-list__go { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: #A3A6BD; font-size: 20px; }
+
+/* 인쇄 / PDF — A4 한 장(넘치면 두 장) · OX 정답은 맨 아래 작게 */
+@media print {
+  @page { size: A4; margin: 12mm; }
+  html.rn-printing body > *:not(#rnReader) { display: none !important; }
+  html.rn-printing, html.rn-printing body { overflow: visible !important; }
+  html.rn-printing .rn-reader { position: static; overflow: visible; background: #fff; }
+  html.rn-printing .rn-page { max-width: none; padding: 0; font-size: 10.5pt; line-height: 1.5; }
+  html.rn-printing .rn-top { position: static; border: 0; margin: 0 0 4mm; padding: 0; background: none; }
+  html.rn-printing .rn-top__row, html.rn-printing .rn-prog, html.rn-printing .rn-tabs, html.rn-printing .rn-ox, html.rn-printing .rn-more, html.rn-printing .rn-noox { display: none !important; }
+  html.rn-printing .rn-title { font-size: 14pt; }
+  html.rn-printing .rn-lesson { box-shadow: none; border: 1px solid #ccc; padding: 3mm 4mm; margin: 0 0 3mm; break-inside: avoid-page; }
+  html.rn-printing .rn-fold { max-height: none; }
+  html.rn-printing .rn-fold::after { display: none; }
+  html.rn-printing .rn-one { font-size: 12pt; }
+  html.rn-printing .rn-print-ox { display: block; }
+  html.rn-printing .rn-print-ox ol { margin: 0; padding-left: 1.3em; }
+  html.rn-printing .rn-print-ans { margin-top: 3mm; font-size: 7.5pt; color: #555; }
+  html.rn-printing .rn-print-box { white-space: nowrap; color: #555; }
+}

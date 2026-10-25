@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" as="style" crossorigin
       href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
-<link rel="stylesheet" href="style.css?v=20261031k">
+<link rel="stylesheet" href="style.css?v=20261031l">
 </head>
 <body class="is-locked">
 
@@ -417,6 +417,7 @@
             <div class="wk-btns">
               <button class="btn btn--sm btn--ghost" id="btnLessonHistory" type="button">이전 내용 보기</button>
               <button class="btn btn--sm ai-open" id="btnAiOpen" type="button" aria-expanded="false" aria-controls="aiSub">✨ 영상 자막으로 채우기</button>
+              <button class="btn btn--sm ai-open rn-make" id="btnRnMake" type="button" aria-controls="rnSub">📒 복습 노트 만들기</button>
               <button class="btn btn--sm" id="btnAddLesson" type="button">+ 차시 추가</button>
             </div>
           </div>
@@ -430,6 +431,12 @@
             <div id="aiPanel"></div>
             <div id="aiResult"></div>
           </div>
+        </div>
+
+        <!-- 복습 노트 (reviewnote.js · migration-039 · 20261031l) — 한 장 요약 + OX · 만들기 → 고치기 → 확정 -->
+        <div class="sub" id="rnSub" hidden>
+          <div class="sub__head"><span class="sub__title">복습 노트</span><span class="sub__hint">학생이 10분 안에 수업 전체를 다시 떠올리는 한 장 · 확정해야 학생 화면에 나옵니다</span></div>
+          <div id="rnBody"></div>
         </div>
 
         <!-- 수기 「리뷰테스트(테스트 이름)」 · 「필수과제」 · 「선택과제」 칸은 뺐다 (20261029g) — 시험은 아래 복습테스트(학생 QR 기록),
@@ -2121,56 +2128,57 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
 <!-- config.js 와 brand.js 가 먼저 와야 한다. 나머지가 이 값을 읽는다. -->
-<script src="../assets/config.js?v=20261031k"></script>
-<script src="../assets/brand.js?v=20261031k"></script>
-<script src="../assets/lesson.js?v=20261031k"></script>
-<script src="supabase.js?v=20261031k"></script>
-<script src="db.js?v=20261031k"></script>
-<script src="store.js?v=20261031k"></script>
-<script src="report.js?v=20261031k"></script>
-<script src="aipolish.js?v=20261031k"></script>
-<script src="app.js?v=20261031k"></script>
-<script src="import.js?v=20261031k"></script>
-<script src="appfetch.js?v=20261031k"></script>
-<script src="profile.js?v=20261031k"></script>
-<script src="course.js?v=20261031k"></script>
-<script src="write.js?v=20261031k"></script>
-<script src="publish.js?v=20261031k"></script>
-<script src="send.js?v=20261031k"></script>
-<script src="kakao.js?v=20261031k"></script>
-<script src="sms.js?v=20261031k"></script>
-<script src="contacts.js?v=20261031k"></script>
-<script src="notice.js?v=20261031k"></script>
-<script src="tb.js?v=20261031k"></script>
-<script src="tb-dash.js?v=20261031k"></script>
-<script src="tb-issue.js?v=20261031k"></script>
-<script src="tb-stock.js?v=20261031k"></script>
-<script src="tb-bill.js?v=20261031k"></script>
-<script src="../assets/dday.js?v=20261031k"></script>
-<script src="../assets/app-week.js?v=20261031k"></script>
-<script src="card.js?v=20261031k"></script>
-<script src="exams.js?v=20261031k"></script>
-<script src="photo.js?v=20261031k"></script>
-<script src="applink.js?v=20261031k"></script>
-<script src="skips.js?v=20261031k"></script>
-<script src="hwfix.js?v=20261031k"></script>
-<script src="attend.js?v=20261031k"></script>
-<script src="attbook.js?v=20261031k"></script>
-<script src="today.js?v=20261031k"></script>
-<script src="staff.js?v=20261031k"></script>
-<script src="classes.js?v=20261031k"></script>
-<script src="weekly.js?v=20261031k"></script>
-<script src="filethumb.js?v=20261031k"></script>
-<script src="ytbm.js?v=20261031k"></script>
-<script src="summary.js?v=20261031k"></script>
-<script src="weeks.js?v=20261031k"></script>
-<script src="../assets/photos.js?v=20261031k"></script>
-<script src="review.js?v=20261031k"></script>
-<script src="draftguard.js?v=20261031k"></script>
-<script src="preview.js?v=20261031k"></script>
-<script src="rtabs.js?v=20261031k"></script>
-<script src="nav.js?v=20261031k"></script>
-<script src="sync.js?v=20261031k"></script>
-<script src="auth.js?v=20261031k"></script>
+<script src="../assets/config.js?v=20261031l"></script>
+<script src="../assets/brand.js?v=20261031l"></script>
+<script src="../assets/lesson.js?v=20261031l"></script>
+<script src="supabase.js?v=20261031l"></script>
+<script src="db.js?v=20261031l"></script>
+<script src="store.js?v=20261031l"></script>
+<script src="report.js?v=20261031l"></script>
+<script src="aipolish.js?v=20261031l"></script>
+<script src="app.js?v=20261031l"></script>
+<script src="import.js?v=20261031l"></script>
+<script src="appfetch.js?v=20261031l"></script>
+<script src="profile.js?v=20261031l"></script>
+<script src="course.js?v=20261031l"></script>
+<script src="write.js?v=20261031l"></script>
+<script src="publish.js?v=20261031l"></script>
+<script src="send.js?v=20261031l"></script>
+<script src="kakao.js?v=20261031l"></script>
+<script src="sms.js?v=20261031l"></script>
+<script src="contacts.js?v=20261031l"></script>
+<script src="notice.js?v=20261031l"></script>
+<script src="tb.js?v=20261031l"></script>
+<script src="tb-dash.js?v=20261031l"></script>
+<script src="tb-issue.js?v=20261031l"></script>
+<script src="tb-stock.js?v=20261031l"></script>
+<script src="tb-bill.js?v=20261031l"></script>
+<script src="../assets/dday.js?v=20261031l"></script>
+<script src="../assets/app-week.js?v=20261031l"></script>
+<script src="card.js?v=20261031l"></script>
+<script src="exams.js?v=20261031l"></script>
+<script src="photo.js?v=20261031l"></script>
+<script src="applink.js?v=20261031l"></script>
+<script src="skips.js?v=20261031l"></script>
+<script src="reviewnote.js?v=20261031l"></script>
+<script src="hwfix.js?v=20261031l"></script>
+<script src="attend.js?v=20261031l"></script>
+<script src="attbook.js?v=20261031l"></script>
+<script src="today.js?v=20261031l"></script>
+<script src="staff.js?v=20261031l"></script>
+<script src="classes.js?v=20261031l"></script>
+<script src="weekly.js?v=20261031l"></script>
+<script src="filethumb.js?v=20261031l"></script>
+<script src="ytbm.js?v=20261031l"></script>
+<script src="summary.js?v=20261031l"></script>
+<script src="weeks.js?v=20261031l"></script>
+<script src="../assets/photos.js?v=20261031l"></script>
+<script src="review.js?v=20261031l"></script>
+<script src="draftguard.js?v=20261031l"></script>
+<script src="preview.js?v=20261031l"></script>
+<script src="rtabs.js?v=20261031l"></script>
+<script src="nav.js?v=20261031l"></script>
+<script src="sync.js?v=20261031l"></script>
+<script src="auth.js?v=20261031l"></script>
 </body>
 </html>

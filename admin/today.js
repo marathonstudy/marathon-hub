@@ -879,7 +879,8 @@
   function linesHtml(c, chips) {
     if (c.name === '(반 없음)' || !c.rows.length) return '';
     return (chips.length ? '<div class="tdc-line"><span class="tdc-line__t">레포트 발송</span><span class="tdc-chips" aria-label="최근 수업 레포트 발송">' + chips.map(function (x) { return chipHtml(c, x); }).join('') + '</span></div>' : '') +
-      avgLineHtml(c);
+      avgLineHtml(c) +
+      (window.RNote ? RNote.cardLine(c.name, c.rows.length) : '');          /* 이번 복습 노트 연 학생 8/11 — 반 전체 숫자만 (20261031l) */
   }
 
   /* 학생 줄 — 이름 | 세 칸 | 버튼 (휴대폰에서는 버튼을 「⋯」 하나로 묶는다 · 20261031g) */
@@ -1428,6 +1429,7 @@
   });
   /* 출석 체크를 저장하거나 새로 읽으면 (attend.js) — 반 카드 버튼 · 챙길 학생 */
   window.addEventListener('jt:attend', function () { if (st.data && !$('#appRoot').hidden) render(); });
+  window.addEventListener('jt:rnote', function () { if (st.data && !$('#appRoot').hidden) render(); });
   /* 퇴원일을 넣거나 지우면 학생 목록도 (20261031i) */
   window.addEventListener('jt:roster-changed', function () { if (st.data && st.allStudents) { st.data.students = activeOnly(st.allStudents); st.classes = classList(st.data); if (!$('#appRoot').hidden) render(); } });
   /* 학생 얼굴 사진을 불러오면 학생 줄 동그라미를 다시 (profile.js) */

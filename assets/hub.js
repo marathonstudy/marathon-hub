@@ -998,6 +998,56 @@
     });
   }
 
+  /* ============================================================
+     복습 노트 (review-note.js · migration-039 · 20261031l) — 확정된 노트만 (hub_review_notes · 그 학생 반)
+       레포트 수업 영상 아래 「이번 수업 복습 노트」 칸 · 레포트 위 줄 「복습 노트 모음」(수업일 순 목록)
+       학생 링크로 열면 「연 학생」 숫자에만 남는다 (hub_review_note_open · 학부모 링크 · 미리보기는 남기지 않는다)
+       OX 결과는 이 기기에만 (review-note.js) — 학부모 화면에는 풀었는지 · 점수가 없다
+     ============================================================ */
+  var RN = { code: '', p: null, list: [] };
+  function notesOf(code) {
+    if (RN.code !== code || !RN.p) {
+      RN.code = code;
+      RN.p = Promise.resolve().then(function () { return rpc('hub_review_notes', { p_code: code }); })
+        .then(function (l) { RN.list = Array.isArray(l) ? l.filter(function (x) { return x && x.note; }) : []; return RN.list; }, function () { RN.list = []; return []; });
+    }
+    return RN.p;
+  }
+  function noteRole() { return (PV ? PV.role : HUBD && HUBD.role) === 'student' ? 'student' : 'parent'; }
+  function openNote(code, week) {
+    if (!global.ReviewNote) return;
+    var it = RN.list.filter(function (x) { return x.week_start === week; })[0];
+    if (!it) return;
+    ReviewNote.open(it, {
+      role: noteRole(),
+      onOpen: function (item) {
+        if (PV || noteRole() !== 'student') return;
+        Promise.resolve().then(function () { return rpc('hub_review_note_open', { p_code: code, p_week: item.week_start }); }).catch(function () {});
+      }
+    });
+  }
+  /* 그 레포트 수업의 노트 칸 (확정하지 않은 수업은 칸 없음) */
+  function drawNote(code, r, idx) {
+    var box = $('#rwNote');
+    if (!box || !global.ReviewNote) return;
+    var mon = mondayOf(r.week_start);
+    notesOf(code).then(function (list) {
+      if (RP.cur !== idx) return;
+      var it = list.filter(function (x) { return mondayOf(x.week_start) === mon; })[0];
+      box.innerHTML = it ? ReviewNote.cardHtml(it) : '';
+    });
+  }
+  function showNotesList(code) {
+    var box = $('#reportNotes'), view = $('#reportView');
+    if (!box) return;
+    box.hidden = false;
+    if (view) view.hidden = true;
+    var body = $('#reportNotesBody');
+    body.innerHTML = '<p class="hub-muted">불러오는 중…</p>';
+    notesOf(code).then(function (list) { body.innerHTML = ReviewNote.listHtml(list); });
+    window.scrollTo(0, 0);
+  }
+
   /* 레포트 한 편 — latest: 가장 최근 레포트 (다른 주 과제 · 자료와 지난 공지까지) */
   /* 공개한 뒤 고쳐 다시 공개했을 때 — 「10/24 업데이트 · 복습테스트 결과 추가」 (코치룸 publish.js 가 report_data._upd 에 남긴다 · 바뀐 게 없으면 없음 · 20261030e) */
   function updHtml(u) {
@@ -1022,6 +1072,7 @@
       (hasLessons ? ReportView.partsHtml(d2, ['lessons']) : learnHtml(w)) +
       ReportView.partsHtml(d2, ['comment']) +
       weekVideosHtml(w) +                         /* 이 수업 영상 — 선생님 한마디 바로 아래 (영상이 없으면 칸 없음 · 20261030b) */
+      '<div id="rwNote"></div>' +                 /* 이번 수업 복습 노트 — 확정된 노트가 있을 때만 (20261031l) */
       (files ? '<div class="card tw-files rw-files"><h2 class="card-title">✏️ 이 수업 과제 · 자료</h2>' + files + '</div>' : '') +
       (latest ? otherFilesHtml(mon) : '') +
       (latest ? teacherNoticeHtml(noticeItems()) : weekNoticeHtml(mon)) +
@@ -1078,7 +1129,7 @@
   }
 
   function bootMe() {
-    if (PV) APP.p = null;                  /* 코치룸 미리보기 — 열 때마다 과제 기록 · 고친 값을 새로 (20261031j) */
+    if (PV) { APP.p = null; RN.p = null; RN.list = []; }                  /* 코치룸 미리보기 — 열 때마다 과제 기록 · 고친 값을 새로 (20261031j) */
     fromQuery();
     var root = $('#hubRoot');
     var head = $('#hubHead');
@@ -1424,6 +1475,10 @@
         '<div class="rw-nav" id="reportNav"></div>' +
         '<div id="reportBody">' + (reports.length ? '' : firstHtml()) + '</div>' +
       '</div>' +
+      '<div id="reportNotes" class="rn-all" hidden>' +
+        '<button type="button" class="hub-back" id="notesBack">‹ 레포트로</button>' +
+        '<div class="card"><h2 class="card-title">📒 복습 노트 모음<span class="card-note">수업일 순서</span></h2><div id="reportNotesBody"></div></div>' +
+      '</div>' +
       '<div id="reportOverview" hidden>' +
         '<button type="button" class="hub-back" id="reportBack">‹ 레포트로</button>' +
         '<div id="reviewHist"></div>' +
@@ -1445,6 +1500,8 @@
       kakaoNoteHtml() + homeGuideHtml();
 
     loadTrend(code);
+    /* 확정된 복습 노트가 있으면 위 줄에 「복습 노트 모음」 */
+    if (global.ReviewNote) notesOf(code).then(function (l) { if (l.length && RP.cur !== -1 && !document.querySelector('[data-rw-notes]')) drawReportNav(RP.cur); });
     bindArchive(host, noticeItems());
     bindFiles(host, code);
 
@@ -1472,6 +1529,11 @@
         if (reports[i]) { openReport(code, reports[i]); navReplace(reports[i]); }
         return;
       }
+      /* 복습 노트 — 레포트 칸 · 모음 목록에서 열기 · 모음 (20261031l) */
+      var rno = e.target.closest('[data-rn-open]');
+      if (rno) { openNote(code, rno.dataset.rnOpen); return; }
+      if (e.target.closest('[data-rw-notes]')) { showNotesList(code); return; }
+      if (e.target.closest('#notesBack')) { $('#reportNotes').hidden = true; $('#reportView').hidden = false; return; }
       if (e.target.closest('[data-rw-trend]')) {
         showReportList(); navPush('reports');
         var tc = $('#trendCard'); if (tc && tc.scrollIntoView) tc.scrollIntoView({ block: 'start' });
@@ -1545,6 +1607,7 @@
              '<button type="button" class="rw-arrow" data-rw="' + (i - 1) + '"' + (i - 1 < 0 ? ' disabled' : '') + ' aria-label="다음 수업 레포트">다음주 ▶</button>' +
              '<button type="button" class="rw-trend" data-rw-trend>누적 추이</button>' +
            '</div>' +
+           (RN.list.length ? '<div class="rw-bar2"><button type="button" class="rw-notes" data-rw-notes>📒 복습 노트 모음</button></div>' : '') +
            (n > 1 ? '<div class="rw-pick" id="rwPick" role="listbox" aria-label="공개된 수업 레포트" hidden>' + L.map(function (r, k) {
              return '<button type="button" class="rw-pick__i num' + (k === i ? ' is-on' : '') + '" role="option" aria-selected="' + (k === i) + '" data-rw="' + k + '">' + esc(name(r)) + '</button>';
            }).join('') + '</div>' : '');
@@ -1558,6 +1621,8 @@
     var body = $('#reportBody');
     var ov = $('#reportOverview');
     if (ov) ov.hidden = true;
+    var nb = $('#reportNotes');
+    if (nb) nb.hidden = true;
     $('#reportView').hidden = false;
     closePlayers(null);
     var idx = RP.list.indexOf(r);
@@ -1591,6 +1656,7 @@
       var ld = lessonDateOf(r, data);
       if (global.Photos && Photos.lessonCard && ld) Photos.lessonCard($('#rwNotes'), code, ld);
       drawReportApp($('#rwApp'), code, r, data, idx);
+      drawNote(code, r, idx);
       loadThumbs(body, code);
     }).catch(function () {
       body.innerHTML = '<div class="empty">불러오지 못했습니다. 새로고침해 주세요.</div>';

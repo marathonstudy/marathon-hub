@@ -14,6 +14,9 @@
      ① 이번 주 영상(없으면 링크 넣기) ② 유튜브에서 「마라톤 자막 가져오기」 ③ [붙여 넣기] → 초안 → [확정]
    · AI 에 보내기 전에 그 반 명단 이름을 「학생」으로 바꾼다 (바꾼 글도 저장하지 않는다)
    · [초안 지우기] · [확정 취소] — migration-019 (직원만)
+   · 복습 노트 (reviewnote.js · 20261031l) — 같은 자막을 쓴다 (Summary.source). 자막은 이 화면 메모리에만 두고 반 · 주를 바꾸면 지운다
+     (예전에는 요약을 만들면 바로 지웠다 — 이제는 이어서 복습 노트를 만들 수 있게 남겨 둔다 · 서버 · 브라우저 저장소에는 넣지 않는다)
+   · 과정(§) 칸이면 이름 가리기는 모든 학생 명단으로
    ============================================================ */
 
 (function () {
@@ -90,7 +93,7 @@
      앞뒤가 한글이 아닐 때만 (「지원하다」 같은 낱말은 그대로)
      ============================================================ */
   function rosterNames(cls) {
-    var all = (window.Store && Store.getStudents ? Store.getStudents() : []).filter(function (s) { return (s.className || '') === cls; });
+    var all = (window.Store && Store.getStudents ? Store.getStudents() : []).filter(function (s) { return String(cls || '').charAt(0) === '§' || (s.className || '') === cls; });
     var set = {};
     all.forEach(function (s) {
       var n = String(s.name || '').replace(/\s+/g, '');
@@ -449,7 +452,7 @@
         if (key === st.key) { st.row = res.summary || st.row; st.edit = null; renderResult(); }
         $('#aiPanel').hidden = true;
         $('#aiPanel').innerHTML = '';
-        st.texts = ['', '', '', ''];   /* 자막 원문은 화면에서도 지운다 */
+        /* 자막은 지우지 않고 이 화면 메모리에만 둔다 — 이어서 [복습 노트 만들기]에 쓴다 (반 · 주를 바꾸면 지운다 · 20261031l) */
         loadUsage();
         toast('초안을 만들었습니다 — 읽고 고친 뒤 [확정]을 눌러 주세요', 'good');
       });
@@ -665,6 +668,18 @@
 
   bind();
 
-  window.Summary = { render: render, captionText: captionText, reload: load };
+  /* 복습 노트가 쓰는 자막 — 지금 넣어 둔 자막 (이름은 가린 것) · 없거나 너무 짧으면 null */
+  function source() {
+    var n = st.n, texts = st.mode === 'one' ? [st.texts[0]] : st.texts.slice(0, n);
+    if (!st.cls || texts.some(function (t) { return !t || t.length < 200; })) return null;
+    return { mode: st.mode, n: n, texts: texts.map(function (t) { return maskNames(t, st.cls); }), source: st.source };
+  }
+  function openPanel() {
+    var sub = $('#aiSub');
+    if (sub && sub.hidden) $('#btnAiOpen').click();
+    else if (sub && sub.scrollIntoView) sub.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }
+
+  window.Summary = { render: render, captionText: captionText, reload: load, source: source, openPanel: openPanel, maskNames: maskNames };
 
 })();

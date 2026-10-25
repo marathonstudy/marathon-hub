@@ -20,7 +20,8 @@
     'class_weeks', 'lesson_videos', 'class_files', 'lesson_summaries', 'review_tests', 'review_submissions',
     'report_skips', 'care_checks',     /* 건너뛰기 · 확인함 (migration-036) */
     'attend_checks',                   /* 출석 체크 완료 (migration-037) */
-    'hw_fixes'                         /* 과제 수정 (migration-038) */
+    'hw_fixes',                        /* 과제 수정 (migration-038) */
+    'review_notes'                     /* 복습 노트 (migration-039) */
   ];
   var POLL_MS = 30000;
   var THROTTLE_MS = 3000;

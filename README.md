@@ -541,6 +541,19 @@ delete from public.staff where email = '조교이메일@example.com';
 - 저장하면 그 학생만 화면 메모리(AppFetch.forget) · 10분 기억(mhub.appCache)을 지우고 바로 다시 불러온다
 - 만료(expired) · 이름이 다름 → 주황 「링크 확인 필요」 (「오늘」 · 레포트 발송 · 작성 화면 학생 카드 · 학생 명단)
 
+### 5-43. 20261031l — 복습 노트 (한 장 요약 + OX 퀴즈 · migration-039-review-note.sql · Edge Function lesson-summary 다시 배포)
+1. Supabase SQL Editor 에서 `supabase/migration-039-review-note.sql` 실행 (038 다음 · 여러 번 실행해도 안전).
+   - `review_notes` 반 + 수업 주마다 노트 한 장 (draft 초안 · confirmed 확정본 — 러닝노트는 확정본만). 쓰기는 함수만 (`review_note_draft` · `review_note_confirm` · `review_note_unconfirm` · `review_note_discard`)
+   - 과정(§) 칸에서 확정하면 `_course_member_dates` 로 그 회차의 반마다 같은 노트 (from_course · 반에서 따로 확정한 것은 그대로)
+   - `hub_review_notes(코드)` 러닝노트 · `staff_hub_review_notes` 미리보기 · `hub_review_note_open` 학생 링크로 연 것만 · `staff_review_note_opens` 반 전체 숫자만
+   - `review_note_opens` 는 아무도 직접 못 읽는다 (숫자만 함수로). OX 점수 · 풀었는지는 서버에 없다 (학생 기기 localStorage `mhub.rnox.주`)
+2. Edge Functions → `lesson-summary` → 코드 전체를 `supabase/functions/lesson-summary/index.ts` 로 바꿔 Deploy. 키는 그대로 (ANTHROPIC_API_KEY · Secrets).
+   - `kind: "review"` — op make(자막 → 노트 + OX → 두 번째 호출로 OX 문항마다 기준 검사 → 4개 미만이면 OX 없음) · field(칸 하나) · quiz · polish(자막 없이 말만)
+   - 같은 Sonnet · 같은 월 상한(summary_begin · `review_note_usage`). 자막 원문은 저장하지 않는다
+- 코치룸: 「수업 내용」 [📒 복습 노트 만들기] → 「복습 노트」 칸 (admin/reviewnote.js) · 자막은 「✨ 영상 자막으로 채우기」에 넣은 것 (Summary.source · 이 화면 메모리에만)
+- 러닝노트: assets/review-note.js — 레포트 수업 영상 아래 「이번 수업 복습 노트」 · 「복습 노트 모음」 · 휴대폰 한 장 · OX 한 문제씩(학생) · 접어서(학부모) · 인쇄 / PDF
+- 「오늘」 반 카드 「이번 복습 노트 연 학생 n/전체」
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.
