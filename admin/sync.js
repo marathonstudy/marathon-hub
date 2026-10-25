@@ -19,7 +19,8 @@
     'student_cards', 'student_grades', 'student_notes', 'note_photos', 'classes',
     'class_weeks', 'lesson_videos', 'class_files', 'lesson_summaries', 'review_tests', 'review_submissions',
     'report_skips', 'care_checks',     /* 건너뛰기 · 확인함 (migration-036) */
-    'attend_checks'                    /* 출석 체크 완료 (migration-037) */
+    'attend_checks',                   /* 출석 체크 완료 (migration-037) */
+    'hw_fixes'                         /* 과제 수정 (migration-038) */
   ];
   var POLL_MS = 30000;
   var THROTTLE_MS = 3000;

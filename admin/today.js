@@ -142,13 +142,17 @@
       : why === 'nolink' || why === 'expired' ? { ok: false, need: true, reason: why, data: null, at: Date.now() }
       : { ok: false, failed: true, reason: why, data: null, at: Date.now() };
   }
+  /* 과제 수정 (hwfix.js · migration-038 · 20261031j) — 앱 기록(raw)은 그대로 두고 고친 값을 덮은 것(data)으로 센다 */
+  function fixed(sid, raw) { return raw && window.HwFix ? HwFix.apply(sid, raw) : raw; }
   function sameEntry(a, b) { return !!a && !!b && a.ok === b.ok && !!a.need === !!b.need && !!a.failed === !!b.failed && JSON.stringify(a.data) === JSON.stringify(b.data); }
   function setEntry(s, e) {
     var old = app[s.id];
+    e.raw = e.data;
+    e.data = fixed(s.id, e.raw);
     app[s.id] = e;
     if (!e.failed) {
       var m = readCache();
-      m[s.code] = { at: e.at, ok: e.ok, need: !!e.need, reason: e.reason || '', data: e.data };
+      m[s.code] = { at: e.at, ok: e.ok, need: !!e.need, reason: e.reason || '', data: e.raw };
       writeCache(m);
     }
     if (!sameEntry(old, e)) paintApp(s.id);
@@ -161,7 +165,7 @@
     list.forEach(function (s) {
       var c = m[s.code];
       if (!c || now - c.at > CACHE_TTL || app[s.id]) return;
-      app[s.id] = { ok: c.ok, need: c.need, reason: c.reason, data: c.data, at: c.at, cached: true };
+      app[s.id] = { ok: c.ok, need: c.need, reason: c.reason, raw: c.data, data: fixed(s.id, c.data), at: c.at, cached: true };
       if (c.at < oldest) oldest = c.at;
     });
     if (oldest < now) appMeta.shown = oldest;            /* at 은 그대로 0 — 기억한 것을 보여 준 뒤 곧바로 뒤에서 새로 받는다 */
@@ -469,6 +473,107 @@
   function tipOf(w) { return mdw(w.from) + ' ~ ' + mdw(w.to) + ' · 평일 ' + w.hwDays + '일 중 ' + w.hwDone + '일 제출'; }
   var det = { sid: '', from: '', to: '', lesson: '', live: false, day: '' };
   function closedDet() { return { sid: '', from: '', to: '', lesson: '', live: false, day: '' }; }
+
+  /* ---------- 과제 수정 — 7칸 표에서 칸을 누르면 그날 과제 아래 [고치기] (hwfix.js · 20261031j) ----------
+     정시 제출 · 늦게 제출 · 미제출 · 면제(셈에서 뺌) 중 하나 + 사유(앱 오류 · 종이로 제출 · 결석으로 면제 · 기타 직접 입력)를 꼭 고른다
+     고친 칸에는 작은 「수정」 — 누르면 「원래 앱: 미제출 → 수정: 정시 제출 · 종이로 제출 · 김OO 10/25 10:12」 · [원래대로]
+     이미 공개한 레포트 기간이면 「다시 공개해야 학부모에게 반영됩니다」 · 수정 기록은 지우지 않는다 (원래대로도 한 줄) */
+  var fx = { edit: false, st: '', rs: '', other: '', err: '', busy: false };
+  function fxReset() { fx = { edit: false, st: '', rs: '', other: '', err: '', busy: false }; }
+  var FIX_NAME = { onTime: '정시 제출', late: '늦게 제출', none: '미제출', exempt: '면제', off: '과제 없음' };
+  var FIX_OPT = { onTime: '정시 제출', late: '늦게 제출', none: '미제출', exempt: '면제(셈에서 뺌)' };
+  var FIX_RS = [['앱 오류', '앱 오류'], ['종이로 제출', '종이로 제출'], ['결석으로 면제', '결석으로 면제'], ['기타', '기타 직접 입력']];
+  /* 앱이 준 그날 상태 (고치기 전 · onTime | late | none | off) */
+  function appStatusOf(sid, day) {
+    var a = app[sid], c = a && a.raw ? (a.raw.calendar || []).find(function (x) { return x && x.date === day; }) : null;
+    return !c ? 'off' : c.status === 'onTime' || c.status === 'late' ? c.status : 'none';
+  }
+  function fxReason() { return fx.rs === '기타' ? fx.other.trim() : fx.rs; }
+  function fxReady() { return !!fx.st && !!fxReason() && !fx.busy; }
+  function fixHtml(sid, d) {
+    if (!window.HwFix || d.weekend || d.hw === 'future' || d.hw === 'off') return '';
+    var x = HwFix.activeOf(sid, d.date), rows = HwFix.rowsOf(sid, d.date), was = appStatusOf(sid, d.date);
+    var cut = HwFix.cutKnown(sid);
+    if (cut === null) HwFix.cutOf(sid).then(function (v) { if (v && det.sid === sid && det.day === d.date) paintDetail(); });
+    var pub = !!cut && d.date <= cut;
+    var h = '<div class="hd-fix">';
+    if (x) h += '<p class="hd-fix__was"><i class="hd-fx">수정</i> 원래 앱: ' + esc(FIX_NAME[was]) + ' → 수정: ' + esc(FIX_NAME[x.status]) + ' · ' + esc(x.reason) + (HwFix.stamp(x) ? ' · ' + esc(HwFix.stamp(x)) : '') + '</p>';
+    if (!fx.edit) {
+      h += '<div class="hd-fix__act"><button type="button" class="btn btn--sm" data-hd-fix="open">' + (x ? '다시 고치기' : '고치기') + '</button>' +
+        (x ? '<button type="button" class="btn btn--sm btn--ghost" data-hd-fix="revert"' + (fx.busy ? ' disabled' : '') + '>원래대로</button>' : '') + '</div>';
+    } else {
+      h += '<div class="hd-fix__form" role="group" aria-label="' + esc(mdw(d.date) + ' 과제 고치기') + '">' +
+        '<p class="hd-fix__q">바꿀 상태</p><div class="hd-fix__opts">' + HwFix.STATUSES.map(function (k) {
+          return '<button type="button" class="hd-fix__o' + (fx.st === k ? ' is-on' : '') + '" data-hd-st="' + k + '" aria-pressed="' + (fx.st === k) + '">' + FIX_OPT[k] + '</button>';
+        }).join('') + '</div>' +
+        '<p class="hd-fix__q">사유 <small>(꼭 고르기)</small></p><div class="hd-fix__opts">' + FIX_RS.map(function (r) {
+          return '<button type="button" class="hd-fix__o' + (fx.rs === r[0] ? ' is-on' : '') + '" data-hd-rs="' + esc(r[0]) + '" aria-pressed="' + (fx.rs === r[0]) + '">' + esc(r[1]) + '</button>';
+        }).join('') + '</div>' +
+        (fx.rs === '기타' ? '<input class="input hd-fix__other" data-hd-other type="text" maxlength="100" placeholder="사유를 적어 주세요" aria-label="기타 사유" value="' + esc(fx.other) + '">' : '') +
+        '<div class="hd-fix__act"><button type="button" class="btn btn--sm btn--primary" data-hd-fix="save"' + (fxReady() ? '' : ' disabled') + '>' + (fx.busy ? '저장하는 중…' : '저장') + '</button>' +
+        '<button type="button" class="btn btn--sm" data-hd-fix="cancel">취소</button></div>' +
+        '<p class="hd-fix__hint">' + (fx.err ? '<b role="alert">' + esc(fx.err) + '</b>' : '앱 기록은 그대로 두고 코치룸에 「과제 수정」으로 따로 남깁니다 · 원래 앱: ' + esc(FIX_NAME[was])) + '</p>' +
+      '</div>';
+    }
+    if (pub && (x || fx.edit)) h += '<p class="hd-fix__pub">이미 공개한 레포트 기간입니다 — 고치면 다시 공개해야 학부모에게 반영됩니다</p>';
+    if (rows.length) h += '<details class="hd-fix__log"><summary>수정 기록 ' + rows.length + '건</summary><ol>' + rows.slice().reverse().map(function (r) {
+      return '<li>' + (r.status === 'app' ? '원래대로(앱 값)' : esc(FIX_NAME[r.status]) + ' · ' + esc(r.reason)) + (HwFix.stamp(r) ? ' · ' + esc(HwFix.stamp(r)) : '') + '</li>';
+    }).join('') + '</ol></details>';
+    return h + '</div>';
+  }
+  function fxDone(res, msg, sid, day) {
+    fx.busy = false;
+    if (!res || !res.ok) { fx.err = (res && res.message) || '저장하지 못했습니다'; paintDetail(); return; }
+    var cut = HwFix.cutKnown(sid);
+    fxReset();
+    paintDetail();
+    if (window.UI && UI.toast) UI.toast(msg + (cut && day <= cut ? ' · 이미 공개한 레포트 기간이라 다시 공개해야 학부모에게 반영됩니다' : ''), 'good');
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-hd-fix], [data-hd-st], [data-hd-rs]');
+    if (!b || !det.sid || !det.day || !window.HwFix) return;
+    e.preventDefault();
+    e.stopPropagation();
+    var sid = det.sid, day = det.day;
+    if (b.hasAttribute('data-hd-st')) { fx.st = b.dataset.hdSt; fx.err = ''; paintDetail(); return; }
+    if (b.hasAttribute('data-hd-rs')) {
+      fx.rs = b.dataset.hdRs; fx.err = '';
+      if (fx.rs === '결석으로 면제' && !fx.st) fx.st = 'exempt';
+      paintDetail();
+      if (fx.rs === '기타') { var inp = document.querySelector('[data-hd-other]'); if (inp) inp.focus(); }
+      return;
+    }
+    var act = b.dataset.hdFix;
+    if (act === 'open') { fxReset(); fx.edit = true; paintDetail(); return; }
+    if (act === 'cancel') { fxReset(); paintDetail(); return; }
+    if (act === 'save') {
+      if (!fxReady()) { fx.err = !fx.st ? '바꿀 상태를 골라 주세요' : '사유를 골라 주세요'; paintDetail(); return; }
+      var was = appStatusOf(sid, day);
+      if (fx.st === was && !HwFix.activeOf(sid, day)) { fx.err = '앱 기록과 같습니다 — 다른 상태를 골라 주세요'; paintDetail(); return; }
+      var to = fx.st;
+      fx.busy = true; paintDetail();
+      HwFix.save(sid, day, to, fxReason(), was).then(function (res) { fxDone(res, mdw(day) + ' 과제를 「' + FIX_NAME[to] + '」로 고쳤습니다', sid, day); });
+      return;
+    }
+    if (act === 'revert') {
+      fx.busy = true; paintDetail();
+      HwFix.revert(sid, day, appStatusOf(sid, day)).then(function (res) { fxDone(res, mdw(day) + ' 과제를 원래 앱 기록(' + FIX_NAME[appStatusOf(sid, day)] + ')으로 되돌렸습니다', sid, day); });
+    }
+  }, true);
+  document.addEventListener('input', function (e) {
+    var t = e.target;
+    if (!t || !t.hasAttribute || !t.hasAttribute('data-hd-other')) return;
+    fx.other = t.value;
+    Array.prototype.forEach.call(document.querySelectorAll('[data-hd-fix="save"]'), function (b) { b.disabled = !fxReady(); });
+  });
+  /* 수정값이 바뀌면 (이 화면 · 다른 직원) — 덮은 값을 다시 만들고 과제 칸 · 평균을 다시 */
+  window.addEventListener('jt:hwfix', function () {
+    Object.keys(app).forEach(function (sid) { var a = app[sid]; if (a && a.raw) a.data = fixed(sid, a.raw); });
+    if (!st.data) return;
+    Object.keys(app).forEach(paintApp);
+    paintAvg();
+    if (det.sid) paintDetail();
+  });
   /* 제출 시각 「23:40」 — 시간대가 붙은 값은 한국 시각으로, 없으면 적힌 그대로 */
   function hhmm(v) {
     var x = String(v || '');
@@ -499,8 +604,8 @@
     else if (d.weekend) tail = '제출 기록 없음';
     return mdw(date) + ' ' + title + (tail ? ' · ' + tail.replace(/^ /, '') : '');
   }
-  var HW_MARK = { onTime: '●', late: '◐', none: '○', off: '', future: '' };
-  var HW_NAME = { onTime: '정시 제출', late: '늦게 제출', none: '미제출', off: '과제 없음', future: '아직' };
+  var HW_MARK = { onTime: '●', late: '◐', none: '○', exempt: '면제', off: '', future: '' };
+  var HW_NAME = { onTime: '정시 제출', late: '늦게 제출', none: '미제출', exempt: '면제', off: '과제 없음', future: '아직' };
   var LEC_MARK = { done: '✓', todo: '–', off: '', future: '' };
   /* 진행 중 기간은 어제까지만 센다 (오늘 마감이 아직 안 지났으므로 오늘 칸은 흐리게) */
   function detailHtml(sid, from, to, lesson, live) {
@@ -519,16 +624,18 @@
         cells += '<button type="button" class="hd-c hd-c--wk' + (d.hw === 'wkDone' ? ' is-done' : '') + (on ? ' is-pick' : '') + '" style="' + col + 'grid-row:2 / span 2" data-hd-day="' + d.date + '" aria-label="' + esc(mdw(d.date) + ' 주중 복습' + (d.hw === 'wkDone' ? ' 제출' : '')) + '">주중<br>복습' + (d.hw === 'wkDone' ? '<b>✓</b>' : '') + '</button>';
         return;
       }
+      var fxr = window.HwFix ? HwFix.activeOf(sid, d.date) : null;
       cells += (d.hw === 'off'
         ? '<span class="hd-c hd-c--off" style="' + col + 'grid-row:2" aria-label="' + esc(mdw(d.date) + ' 과제 없음') + '"></span>'
-        : '<button type="button" class="hd-c hd-c--' + d.hw + (on ? ' is-pick' : '') + '" style="' + col + 'grid-row:2" data-hd-day="' + d.date + '" aria-label="' + esc(mdw(d.date) + ' ' + HW_NAME[d.hw]) + '">' + HW_MARK[d.hw] + '</button>') +
+        : '<button type="button" class="hd-c hd-c--' + d.hw + (fxr ? ' is-fixed' : '') + (on ? ' is-pick' : '') + '" style="' + col + 'grid-row:2" data-hd-day="' + d.date + '" aria-label="' + esc(mdw(d.date) + ' ' + HW_NAME[d.hw] + (fxr ? ' (수정)' : '')) + '">' + HW_MARK[d.hw] +
+            (fxr ? '<i class="hd-fx" aria-hidden="true">수정</i>' : '') + '</button>') +
         '<span class="hd-l hd-l--' + d.lec + '" style="' + col + 'grid-row:3">' + LEC_MARK[d.lec] + '</span>';
     });
     return '<div class="hd-box" data-hd-box="' + esc(sid) + '">' +
       '<div class="hd-head num">' + esc(mdw(w.from) + ' ~ ' + mdw(w.to) + (live ? ' · 진행 중' + (lesson ? ' (' + mdw(lesson) + ' 수업 레포트 기간)' : '') : lesson ? ' · ' + mdw(lesson) + ' 수업 레포트 기준' : '')) + '</div>' +
       '<div class="hd-grid" style="grid-template-columns:2.4em repeat(' + n + ', minmax(0, 1fr))">' + cells + '</div>' +
-      (pick ? '<p class="hd-pick">' + esc(dayInfo(a.data, pick)) + '</p>' : '') +
-      '<p class="hd-legend">● 정시 제출 ◐ 늦게 제출 ○ 미제출 · 빈칸 그날 과제 없음 / ✓ 강의 다 봄 – 안 봄 · 토 · 일은 주중 복습 · 칸을 누르면 그날 과제</p>' +
+      (pick ? '<p class="hd-pick">' + esc(dayInfo(a.data, pick)) + '</p>' + fixHtml(sid, pick) : '') +
+      '<p class="hd-legend">● 정시 제출 ◐ 늦게 제출 ○ 미제출 · 빈칸 그날 과제 없음 / ✓ 강의 다 봄 – 안 봄 · 토 · 일은 주중 복습 · 칸을 누르면 그날 과제 · 「수정」 = 조교가 고친 칸</p>' +
       '<div class="hd-foot"><button type="button" class="hd-more" data-pv="parent" data-pv-view="app" data-sid="' + esc(sid) + '">과제 상세 보기 →</button></div>' +
     '</div>';
   }
@@ -558,8 +665,9 @@
     if (!b) return;
     e.preventDefault();
     e.stopPropagation();
-    if (b.hasAttribute('data-hd-day')) { det.day = det.day === b.dataset.hdDay ? '' : b.dataset.hdDay; paintDetail(); return; }
+    if (b.hasAttribute('data-hd-day')) { det.day = det.day === b.dataset.hdDay ? '' : b.dataset.hdDay; fxReset(); paintDetail(); return; }
     var same = det.sid === b.dataset.appDetail && det.from === b.dataset.appFrom;
+    fxReset();
     det = same ? closedDet() : { sid: b.dataset.appDetail, from: b.dataset.appFrom, to: b.dataset.appTo, lesson: b.dataset.appLesson || '', live: b.dataset.appLive === '1', day: '' };
     paintDetail();
   }, true);

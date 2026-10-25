@@ -16,6 +16,9 @@
    토 · 일 = 「주중 복습」 (20261030d) — 앱 기록이 없어도 늘 「주중 복습」 칸(옅은 색 · 과제 · 강의 두 줄을 한 칸으로),
      그날 앱에 제출한 기록이 있으면 「주중 복습 ✓」. 미제출로 치지 않고 제출률 · 정시율 · 강의 시청률의 분자 · 분모에서 모두 뺀다
      (compute · cumulative · 이것을 쓰는 「오늘」 앱 과제 알림 · AI 초안 수치 · 누적 추이가 모두 같이)
+   과제 수정 (20261031j · migration-038) — 조교가 고친 값을 앱 기록 위에 덮는다 (withFix). 앱 기록은 바꾸지 않는다
+     fix = { 'YYYY-MM-DD': onTime | late | none | exempt } — exempt(면제)는 셈에서 뺀다 (제출 수 · 과제 있던 날 모두)
+     코치룸은 hwfix.js 가, 러닝노트는 hub_hw_fix 로 받은 값을 덮는다 (「수정」 표시 · 사유는 코치룸에만)
    ============================================================ */
 
 (function (global) {
@@ -39,6 +42,24 @@
   function subDaysOf(data) {
     var out = {};
     ((data && (data.history || data.recent)) || []).forEach(function (h) { var x = String((h && h.submittedAt) || '').slice(0, 10); if (valid(x)) out[x] = 1; });
+    return out;
+  }
+  /* 수정값 덮기 — data 는 그대로 두고 calendar 만 새로 (그날 앱 칸이 없으면 새 칸) */
+  var FIX_OK = { onTime: 1, late: 1, none: 1, exempt: 1 };
+  function withFix(data, fix) {
+    if (!data || !fix || typeof fix !== 'object') return data;
+    var keys = Object.keys(fix).filter(function (k) { return valid(k) && FIX_OK[fix[k]]; });
+    if (!keys.length) return data;
+    var out = {}, seen = {};
+    Object.keys(data).forEach(function (k) { out[k] = data[k]; });
+    out.calendar = (data.calendar || []).map(function (c) {
+      if (!c || !fix[c.date] || !FIX_OK[fix[c.date]]) return c;
+      seen[c.date] = 1;
+      var x = {}; Object.keys(c).forEach(function (k) { x[k] = c[k]; });
+      x.status = fix[c.date];
+      return x;
+    });
+    keys.forEach(function (k) { if (!seen[k]) out.calendar.push({ date: k, order: 0, status: fix[k] }); });
     return out;
   }
   function esc(v) {
@@ -68,10 +89,10 @@
         continue;
       }
       var future = !!today && d > today;
-      var hw = future ? 'future' : !c ? 'off' : (c.status === 'onTime' ? 'onTime' : c.status === 'late' ? 'late' : 'none');
+      var hw = future ? 'future' : !c ? 'off' : (c.status === 'onTime' ? 'onTime' : c.status === 'late' ? 'late' : c.status === 'exempt' ? 'exempt' : 'none');
       var L = c && c.order ? lec[c.order] : null;
       var lv = future ? 'future' : !c || !c.order || !L ? 'off' : (L.videosTotal > 0 && L.videosDone >= L.videosTotal ? 'done' : 'todo');
-      if (hw !== 'off' && hw !== 'future') { hwDays++; if (hw === 'onTime' || hw === 'late') hwDone++; if (hw === 'onTime') hwOnTime++; }
+      if (hw !== 'off' && hw !== 'future' && hw !== 'exempt') { hwDays++; if (hw === 'onTime' || hw === 'late') hwDone++; if (hw === 'onTime') hwOnTime++; }
       if (lv === 'done' || lv === 'todo') { lecDays++; if (lv === 'done') lecDone++; }
       days.push({ date: d, dow: DOW[new Date(d + 'T00:00:00Z').getUTCDay()], hw: hw, lec: lv });
     }
@@ -111,7 +132,7 @@
     (data.lectures || []).forEach(function (l) { if (l && l.order) lec[l.order] = l; });
     var days = 0, done = 0, onTime = 0, lDays = 0, lDone = 0;
     (data.calendar || []).forEach(function (c) {
-      if (!c || !valid(c.date) || c.date > to || (today && c.date > today) || isWeekend(c.date)) return;
+      if (!c || !valid(c.date) || c.date > to || (today && c.date > today) || isWeekend(c.date) || c.status === 'exempt') return;
       days++;
       if (c.status === 'onTime' || c.status === 'late') done++;
       if (c.status === 'onTime') onTime++;
@@ -139,8 +160,8 @@
   function tone(done, days) { var r = days ? done / days : 0; return r >= 1 ? 'ok' : r >= 0.5 ? 'mid' : r > 0 ? 'low' : 'zero'; }
   function hwRate(w) { return w && w.hwDays ? Math.round(w.hwDone / w.hwDays * 100) : null; }
 
-  var HW_MARK = { onTime: '●', late: '◐', none: '○', future: '·', off: '' };
-  var HW_TIP = { onTime: '정시 제출', late: '늦게 제출', none: '미제출', future: '아직', off: '과제 없음', wk: '주중 복습', wkDone: '주중 복습 · 제출함' };
+  var HW_MARK = { onTime: '●', late: '◐', none: '○', exempt: '면제', future: '·', off: '' };
+  var HW_TIP = { onTime: '정시 제출', late: '늦게 제출', none: '미제출', exempt: '면제(셈에서 뺌)', future: '아직', off: '과제 없음', wk: '주중 복습', wkDone: '주중 복습 · 제출함' };
   var LEC_MARK = { done: '✓', todo: '–', future: '·', off: '' };
   var LEC_TIP = { done: '강의 영상을 다 봄', todo: '아직 안 봄', future: '아직', off: '강의 없음' };
 
@@ -176,12 +197,12 @@
         (pending && !w.lecDays ? '<span class="aw-sum aw-sum--wait">아직 강의 전</span>'
           : '<span class="aw-sum num">' + w.lecDone + '/' + w.lecDays + '일 시청</span>') +
       '</div>' +
-      '<p class="aw-legend">' + esc(LEGEND) + '</p>' +
+      '<p class="aw-legend">' + esc(LEGEND + (w.days.some(function (d) { return d.hw === 'exempt'; }) ? ' 「면제」인 날은 제출 수에 넣지 않아요.' : '')) + '</p>' +
     '</div>';
   }
 
   global.AppWeek = { compute: compute, tableHtml: tableHtml, hwRate: hwRate, tone: tone, LEGEND: LEGEND,
                      lastWeek: lastWeek, startOf: startOf, cumulative: cumulative, forLesson: forLesson,
-                     isWeekend: isWeekend, subDaysOf: subDaysOf };
+                     isWeekend: isWeekend, subDaysOf: subDaysOf, withFix: withFix };
 
 })(window);

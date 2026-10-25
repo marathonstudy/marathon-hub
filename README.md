@@ -526,6 +526,14 @@ delete from public.staff where email = '조교이메일@example.com';
 - 「챙길 학생」 — 결석생 자료 미배부 · 보강 영상 미신청 (반 + 수업마다 · 누르면 출석 체크 그 학생 · 확인함 · ×). 학부모 · 학생 레포트에는 넣지 않는다.
 - 학생 → 출석부 (admin/attbook.js) — 반 · 월 · 학생 × 수업일 · 합계 · 반 전체 · CSV. 퇴원일 — 그 뒤 수업부터 출석 체크 · 레포트 · 「오늘」 · 문자에서 빠짐 (Store.isActiveOn).
 
+### 5-41. 20261031j — 과제 수정 (migration-038-hw-fix.sql)
+1. Supabase SQL Editor 에서 `supabase/migration-038-hw-fix.sql` 실행 (037 다음 · 여러 번 실행해도 안전). 함수 · Storage 배포는 없다 (app-report 는 그대로).
+   - `hw_fixes` 「과제 수정」 기록 — 학생 · 날짜 · 바꾼 상태(onTime · late · none · exempt · app=원래대로) · 사유 · 원래 앱 값 · 고친 사람 · 시각(서버가 채움). 직원만 읽고 넣기만 (고치기 · 지우기 없음)
+   - `hub_hw_fix(코드)` 러닝노트용 — 바꾼 상태만. 공개한 레포트 기간은 공개할 때 레포트에 담은 값(report_data.hwFix · hwFixTo)
+   - `staff_hub_hw_fix` 미리보기 · `staff_hw_fix_cut` 「다시 공개해야 학부모에게 반영됩니다」
+- 7칸 표 칸 → [고치기] → 정시 제출 · 늦게 제출 · 미제출 · 면제(셈에서 뺌) + 사유(앱 오류 · 종이로 제출 · 결석으로 면제 · 기타) → 작은 「수정」 · 「원래 앱: … → 수정: …」 · [원래대로] (admin/hwfix.js · today.js)
+- 앱 기록 위에 덮어서 센다 (AppWeek.withFix · 면제는 분모에서 뺌) — 과제 칩 · 평균 · 정렬 · 레포트 · 러닝노트 · AI 초안. 앱에서 다시 받아 와도 유지.
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

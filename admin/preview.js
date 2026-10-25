@@ -83,6 +83,11 @@
         if (args.p_week === '__draft' || (cur.mode === 'week' && dr2 && args.p_week === dr2.startDate)) return Promise.resolve(dr2);
         return sb().rpc('staff_hub_report', { p_student: cur.sid, p_week: args.p_week }).then(unwrap);
       }
+      /* 과제 수정 (migration-038 · 20261031j) — 「이 주차」(공개 전 작성 내용)는 지금 고친 값 그대로 · 그 밖에는 학부모가 지금 보는 값 */
+      if (name === 'hub_hw_fix') {
+        if (cur.mode === 'week' && window.HwFix) return Promise.resolve(HwFix.mapOf(cur.sid));
+        return sb().rpc('staff_hub_hw_fix', { p_student: cur.sid }).then(function (r) { return r.error ? {} : (r.data || {}); }, function () { return {}; });
+      }
       if (name === 'hub_textbook') return sb().rpc('staff_hub_textbook', { p_student: cur.sid }).then(unwrap);
       if (name === 'hub_trend') return sb().rpc('staff_hub_trend', { p_student: cur.sid }).then(unwrap);
       /* 레포트 복습테스트 칸의 낸 것(맞은 수 / 전체) · 미응시 — 직원 표(review_week)에서 그 학생 줄만 hub_review_week(030)와 같은 모양으로 (메모 없이) */

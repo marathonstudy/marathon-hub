@@ -72,6 +72,18 @@
     });
   }
 
+  /* 과제 수정 (hwfix.js · migration-038 · 20261031j) — 공개하는 순간 그 수업 전날까지 고친 값을 레포트에 담는다 (hwFix · hwFixTo)
+     러닝노트는 공개한 기간을 이 값으로 보여 준다 → 공개한 뒤에 고치면 다시 공개해야 학부모에게 반영된다 (바꾼 상태만 · 사유는 담지 않는다) */
+  function withHwFix(s, data) {
+    if (!window.HwFix || !HwFix.sql() || !data) return data;
+    var L = Store.lessonOf ? Store.lessonOf(s.className || '', state.week) : null;
+    var to = L && L.date && !L.canceled ? Lesson.addDays(L.date, -1) : state.weekEnd;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(to || ''))) return data;
+    data.hwFix = HwFix.mapOf(s.id, to);
+    data.hwFixTo = to;
+    return data;
+  }
+
   /* 「10/22(목) 수업」 — 주 시작일 대신 그 반 수업일 (반을 안 골랐거나 수업 요일이 없으면 「10/12~10/18」 · 20261030b) */
   function whenText() {
     if (isCourse()) { var co = Course.byKey(curClass()); return co.name + ' ' + Course.label(co, Course.roundOfWeek(co, state.week)) + ' 레포트'; }
@@ -315,7 +327,7 @@
       var rows = picked.map(function (r) {
         return {
           studentId: r.student.id, name: r.student.name,
-          data: Report.toReportData(r.student, r.common, r.entry, { start: state.week, end: state.weekEnd })
+          data: withHwFix(r.student, Report.toReportData(r.student, r.common, r.entry, { start: state.week, end: state.weekEnd }))
         };
       });
       var again = rows.filter(function (r) { return state.published[r.studentId]; }).map(function (r) { return r.studentId; });
@@ -339,6 +351,7 @@
         all[state.week] = all[state.week] || {};
         rows.forEach(function (r) { all[state.week][r.studentId] = { visible: true, publishedAt: new Date().toISOString() }; });
         Store.writeLocal(Store.KEYS.published, all);
+        if (window.HwFix) HwFix.clearCut();
         toast(rows.length + '명 공개했습니다. 레포트 발송 → 3 발송에서 링크를 보내세요', 'good');
         if (window.RTabs) RTabs.counts();           /* 단계 버튼 「2 공개 11/11 ✓」 바로 */
         return load().then(function () { return changed.length ? askNotify(changed) : null; });

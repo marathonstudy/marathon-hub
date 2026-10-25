@@ -3217,3 +3217,36 @@ thead .ab-name { background: #F6F7FB; z-index: 2; }
 .ab-c--tot { font-size: 11.5px; color: #4A34B8; }
 .ab-total { margin: 10px 0 2px; font-weight: 800; color: var(--ink-deep); font-size: 14px; }
 .ab-legend { margin-top: 4px; }
+
+/* ---------- 과제 수정 (today.js · hwfix.js · 20261031j) ----------
+   7칸 표 칸 — 고친 칸은 오른쪽 위 작은 「수정」 · 면제 칸은 회색 「면제」
+   그날 과제 아래 [고치기] → 상태 네 개 · 사유 네 개(꼭 고르기) · [저장] — 휴대폰에서는 두 줄로 접힌다 */
+.hd-c { position: relative; }
+.hd-c--exempt { background: #F2F2F7; border-color: #E0E1EA; color: #7D8199; font-size: 11px; font-weight: 800; letter-spacing: -.04em; }
+.hd-fx { font-style: normal; font-size: 9.5px; font-weight: 800; line-height: 1; color: #fff; background: #5A3FD0; border-radius: 4px; padding: 2px 3px; letter-spacing: -.04em; }
+.hd-c .hd-fx { position: absolute; top: -6px; right: -4px; pointer-events: none; }
+.hd-c.is-fixed { border-color: #5A3FD0; }
+.hd-fix { display: grid; gap: 6px; padding: 8px; border-radius: 8px; background: #FAFAFE; border: 1px dashed #D5D0F2; }
+.hd-fix__was { margin: 0; font-size: 12.5px; font-weight: 700; color: var(--ink-deep); line-height: 1.5; overflow-wrap: anywhere; }
+.hd-fix__was .hd-fx { margin-right: 4px; vertical-align: 1px; }
+.hd-fix__act { display: flex; flex-wrap: wrap; gap: 6px; }
+.hd-fix__form { display: grid; gap: 5px; }
+.hd-fix__q { margin: 2px 0 0; font-size: 12px; font-weight: 800; color: var(--ink-mid); }
+.hd-fix__q small { font-weight: 600; color: var(--ink-light); }
+.hd-fix__opts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+.hd-fix__o { appearance: none; font: inherit; min-height: 36px; padding: 4px 6px; border: 1px solid #DCDFEA; border-radius: 8px; background: #fff; color: var(--ink-deep);
+  font-size: 12.5px; font-weight: 700; line-height: 1.2; cursor: pointer; overflow-wrap: anywhere; }
+.hd-fix__o.is-on { background: #5A3FD0; border-color: #5A3FD0; color: #fff; }
+.hd-fix__other { width: 100%; min-width: 0; box-sizing: border-box; }
+.hd-fix__hint { margin: 0; font-size: 11.5px; color: var(--ink-light); }
+.hd-fix__hint b { color: #9E1F3B; }
+.hd-fix__pub { margin: 0; font-size: 12.5px; font-weight: 800; color: #874A0B; background: #FFF4E5; border-radius: 6px; padding: 5px 8px; }
+.hd-fix__log { font-size: 12px; color: var(--ink-mid); }
+.hd-fix__log summary { cursor: pointer; font-weight: 700; }
+.hd-fix__log ol { margin: 4px 0 0; padding-left: 18px; display: grid; gap: 2px; }
+@media (max-width: 520px) {
+  .hd-fix__opts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hd-fix__o { min-height: 40px; }
+  .hd-c .hd-fx { top: -5px; right: -3px; font-size: 8.5px; padding: 1px 2px; }
+  .hd-c--exempt { font-size: 10px; }
+}

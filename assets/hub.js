@@ -546,10 +546,20 @@
      앱 기록 — 한 번만 불러와 레포트 · 과제 상세 탭 · 누적 추이가 같이 쓴다 (app-week.js)
      ============================================================ */
   var APP = { code: '', p: null, info: null };
+  /* 과제 수정 (migration-038 · 20261031j) — 선생님이 고친 날은 고친 값으로 (바꾼 상태만 · 사유나 「수정」 표시는 없다)
+     공개한 레포트 기간은 공개할 때 담은 값 · SQL 이 아직 없으면 앱 기록 그대로 */
+  function hwFix(code) {
+    return Promise.resolve().then(function () { return rpc('hub_hw_fix', { p_code: code }); })
+      .then(function (m) { return m && typeof m === 'object' ? m : {}; }, function () { return {}; });
+  }
   function appData(code) {
     if (APP.code !== code || !APP.p) {
       APP.code = code;
-      APP.p = appReport(code).then(function (r) { return r && r.ok ? (r.data || {}) : null; }, function () { return null; });
+      APP.p = Promise.all([appReport(code), hwFix(code)]).then(function (x) {
+        var r = x[0];
+        if (!(r && r.ok)) return null;
+        return global.AppWeek && AppWeek.withFix ? AppWeek.withFix(r.data || {}, x[1]) : (r.data || {});
+      }, function () { return null; });
       /* 실패는 남기지 않는다 — [다시 시도]는 새로 부른다 */
       APP.p.then(function (d) { if (!d && APP.code === code) APP.p = null; });
     }
@@ -1068,6 +1078,7 @@
   }
 
   function bootMe() {
+    if (PV) APP.p = null;                  /* 코치룸 미리보기 — 열 때마다 과제 기록 · 고친 값을 새로 (20261031j) */
     fromQuery();
     var root = $('#hubRoot');
     var head = $('#hubHead');
@@ -1750,7 +1761,7 @@
            '</div>';
   }
 
-  var CAL_LABEL = { onTime: '정시 제출', late: '늦게 제출', none: '미제출' };
+  var CAL_LABEL = { onTime: '정시 제출', late: '늦게 제출', none: '미제출', exempt: '면제' };
 
   function categoriesHtml(list) {
     if (!list.length) return '';
@@ -1827,7 +1838,7 @@
   function apSumHtml(list) {
     var all = list, on = 0, late = 0, none = 0, lecN = 0, lecDone = 0, items = [];
     all.forEach(function (x) { items = items.concat(x.items); });
-    list = list.filter(function (x) { return !x.weekend; });      /* 토 · 일(주중 복습)은 제출 · 정시 · 강의 수에 넣지 않는다 */
+    list = list.filter(function (x) { return !x.weekend && x.status !== 'exempt'; });      /* 토 · 일(주중 복습) · 면제한 날은 제출 · 정시 · 강의 수에 넣지 않는다 */
     var n = list.length;
     list.forEach(function (x) {
       if (x.status === 'onTime') on++; else if (x.status === 'late') late++; else none++;
@@ -1856,6 +1867,7 @@
   }
 
   var AP_ST = { onTime: ['정시', 'app-tag'], late: ['늦게', 'app-tag app-tag--late'], none: ['미제출', 'app-tag app-tag--none'],
+                exempt: ['면제', 'app-tag app-tag--wk'],
                 wk: ['주중 복습', 'app-tag app-tag--wk'], wkDone: ['주중 복습 ✓', 'app-tag app-tag--wk app-tag--wkdone'] };
   /* 날짜별 과제 — 펼치면 그날 과제마다 제목 · 제출 시각 · 정답률, 그날 강의 영상 */
   function apDaysHtml(list) {
@@ -1881,7 +1893,7 @@
                 (h.late ? '<span class="app-tag app-tag--late">지각</span>' : '<span class="app-tag">정시</span>') +
                 (h.correctRate == null ? '' : '<span class="app-recent__rate num">' + h.correctRate + '%</span>') +
               '</li>';
-            }).join('') + '</ul>' : '<p class="ap-muted">' + (x.weekend ? '토 · 일은 주중 복습 날입니다 (제출 수에 넣지 않아요)' : x.status === 'none' ? '제출한 과제가 없습니다' : '과제 기록이 없습니다') + '</p>') +
+            }).join('') + '</ul>' : '<p class="ap-muted">' + (x.weekend ? '토 · 일은 주중 복습 날입니다 (제출 수에 넣지 않아요)' : x.status === 'exempt' ? '면제한 날입니다 (제출 수에 넣지 않아요)' : x.status === 'none' ? '제출한 과제가 없습니다' : '과제 기록이 없습니다') + '</p>') +
           '</div></details>';
       }).join('') + '</div>';
   }

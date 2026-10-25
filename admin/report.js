@@ -174,6 +174,9 @@
     if ((Number(old.focusScore) || 0) !== (Number(next.focusScore) || 0)) add('집중도 변경');
     if (String(old.comment || '').trim() !== String(next.comment || '').trim()) add('코멘트 수정');
     if (JSON.stringify(old.lessons || []) !== JSON.stringify(next.lessons || [])) add('수업 내용 수정');
+    /* 과제 수정 (20261031j) — 공개할 때 담은 고친 값이 달라졌으면 */
+    var fk = function (m) { m = m && typeof m === 'object' ? m : {}; return JSON.stringify(Object.keys(m).sort().map(function (k) { return [k, m[k]]; })); };
+    if (('hwFix' in next || 'hwFix' in old) && fk(old.hwFix) !== fk(next.hwFix)) add('과제 기록 수정');
     return out;
   }
 
