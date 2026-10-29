@@ -827,7 +827,7 @@
     }).join('');
   }
   function toggleBar(key, n, open, c) {
-    return '<div class="tdc-togglebar' + (open && c ? ' tdc-grid' : '') + '"><button type="button" class="tdc-toggle" data-toggle aria-expanded="' + open + '">학생 ' + n + '명 ' + (open ? '접기 ▴' : '보기 ▾') + '</button>' +
+    return '<div class="tdc-togglebar' + (open && c ? ' tdc-grid' : '') + '"><button type="button" class="tdc-toggle" data-toggle aria-expanded="' + open + '"><span class="tg-x">학생 </span>' + n + '명 <span class="tg-x">' + (open ? '접기 ' : '보기 ') + '</span>' + (open ? '▴' : '▾') + '</button>' +
       (open && c ? headHtml(c) + '<span class="tdc-grid__rest" aria-hidden="true"></span>' : '') + '</div>';
   }
   /* 반 카드 위 「+ 과제 링크 연결 필요 n명」 — 누르면 그 학생들 링크 칸이 차례로 펼쳐진다 (applink.js) */
@@ -891,16 +891,18 @@
       '<button type="button" class="btn btn--sm" data-sms-sid="' + id + '">문자</button>' +
       '<button type="button" class="btn btn--sm btn--ghost" data-pv="parent" data-sid="' + id + '">학부모 화면 미리보기</button>' +
       '<button type="button" class="btn btn--sm btn--ghost" data-pv="student" data-sid="' + id + '">학생 화면 미리보기</button>';
-    return '<div class="tdc-st__acts">' + btns +
+    /* [상담 +] — 휴대폰에서도 「⋯」 앞에 그대로 (quicknote.js · 20261031o) */
+    return '<div class="tdc-st__acts">' + btns + (window.QuickNote ? QuickNote.btnHtml(s.id, s.name) : '') +
       '<details class="tdc-more"><summary class="btn btn--sm tdc-more__b" aria-label="' + esc(s.name) + ' 더 보기">⋯</summary><div class="tdc-more__menu">' + btns +
         (window.AppLink && AppLink.openHtml ? AppLink.openHtml(s.id, { noAdd: true, cls: 'btn btn--sm' }) : '') + '</div></details></div>';
   }
   function studentRow(s, c) {
     return '<div class="tdc-st tdc-grid" data-id="' + esc(s.id) + '">' +
-      '<div class="tdc-st__main">' + (window.Profile ? Profile.avatar({ id: s.id, name: s.name }, 's') : '') + '<button type="button" class="roster__name roster__name-btn" data-card="' + esc(s.id) + '">' + esc(s.name) + '</button>' + (linkWarn(s) === 'other' ? warnHtml(s) : '') + '</div>' +
+      '<div class="tdc-st__main">' + (window.Profile ? Profile.avatar({ id: s.id, name: s.name }, 's') : '') + '<span class="qn-namebox"><button type="button" class="roster__name roster__name-btn" data-card="' + esc(s.id) + '">' + esc(s.name) + '</button>' + (window.QuickNote ? QuickNote.tagHtml(s.id) : '') + '</span>' + (linkWarn(s) === 'other' ? warnHtml(s) : '') + '</div>' +
       '<span class="tdc-app-slot tdc-tri">' + triHtml(s, c) + '</span>' +
       actsHtml(s) +
       (window.AppLink ? AppLink.boxHtml(s.id) : '') +
+      (window.QuickNote ? QuickNote.slotHtml(s.id) : '') +
     '</div>';
   }
 
@@ -1129,6 +1131,7 @@
       '<div class="tdc-list-wrap">' + cardsOf(classes).map(function (it) { return it.course ? courseCardHtml(it.course, it.cls) : classCardHtml(it.c); }).join('') + '</div>';
     paintDetail();
     paintStamp();
+    if (window.QuickNote) QuickNote.mount();
   }
 
 
@@ -1201,6 +1204,15 @@
     },
     sortBarHtml: sortBarHtml,
     paintDetail: paintDetail,
+    /* 그날그날 과제 — { 날짜: onTime | late | none | exempt | off | future | wk | wkDone } · 불러오는 중 null · 앱 기록 없음 false (quicknote.js 지난번 약속 · 20261031o) */
+    hwOn: function (sid, dates) {
+      var s = rowById(sid), a = app[sid];
+      if (!s || !s.app || !s.code || (a && !a.ok)) return false;            /* 링크 없음 · 만료 · 못 불러옴 */
+      if (!a || !a.data || !window.AppWeek) return null;                     /* 불러오는 중 */
+      var out = {};
+      (dates || []).forEach(function (d) { var w = AppWeek.compute(a.data, d, d, DDay.today()); out[d] = w && w.days[0] ? w.days[0].hw : 'off'; });
+      return out;
+    },
     /* 과제 칸이 모두 채워졌나 (불러오는 중인 학생이 없음) — 시험 · 로딩 시간 재기 */
     appReady: function () { return !!st.data && liveList().every(function (s) { return !!app[s.id]; }); },
     detailOpen: function () { return { sid: det.sid, from: det.from, day: det.day }; },

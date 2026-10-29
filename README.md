@@ -579,6 +579,14 @@ delete from public.staff where email = '조교이메일@example.com';
 - 러닝노트(hub.js appMoreHtml): 「과제 상세」 탭 맨 위 안내 한 줄 + [앱에서 자세히 보기 ↗] · 레포트 과제 요약 아래 작은 한 줄 · 링크 없으면 숨김 · 버튼 높이 44px · 반짝임 없음 (예전 맨 아래 「앱 리포트 열기 ›」는 없앴다). 학생 링크 · 학부모 링크 · /s/ 모두 같은 화면
 - 레포트 발송 → 3 발송 문구 복사 · 카톡용 · 내 폰 문자 — 링크가 있는 학생은 끝에 같은 한 줄 · 「단톡방 안내 문구」에도 한 줄. 알림톡 템플릿은 그대로
 
+### 5-46. 20261031o — 「오늘」 학생 줄에서 바로 상담 · 다음에 확인할 것 (migration-042-quick-note.sql · 함수 배포 없음)
+- 앞서 만든 과제 현황 이미지 · 운영진 사진 문자(3ea6700)는 되돌렸다 (push · SQL · 함수 배포 전 · 그 migration-042-ops-mms.sql 은 없다)
+1. Supabase SQL Editor 에서 `supabase/migration-042-quick-note.sql` 실행 (041 다음 · 여러 번 실행해도 안전 · 확인 세 줄 모두 true).
+   - `student_notes.next_check` 「다음에 확인할 것」(200자 · 비워도 됨) · 분류에 과제 독려 · 학습 상담 · 학부모 연락 (예전 분류 그대로)
+- 코치룸 quicknote.js — 「오늘」 · 레포트 발송 학생 줄 이름 아래 「마지막 상담 10/15」 · 「상담 없음」 · 「오늘 상담 ✓」, [상담 +] → 그 줄 아래 칸(지난 상담 · 지난번 약속 + 그 뒤 과제 기록 · 이전 상담 더 보기 · 분류 · 내용 · 다음에 확인할 것 · 확인 필요)
+  저장하면 student_notes 에 한 줄 (상담 카드와 같은 표) · 줄 정렬은 그대로. 상담 카드에 「다음에 확인할 것」 칸 · 맨 위 「지난번 약속: …」
+- 상담 내용 · 약속은 학생 · 학부모 화면(/me/ · /s/)이 읽지 않는다 (student_notes 는 직원만)
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

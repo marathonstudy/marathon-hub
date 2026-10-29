@@ -268,14 +268,17 @@
     return '<div class="snd-row snd-row--' + k + (open ? ' is-expanded' : '') + '" data-id="' + esc(s.id) + '">' +
         '<div class="snd-row__line">' +
           (window.Profile ? Profile.avatar(s, 's') : '') +
-          '<button class="snd-row__name" type="button" data-expand aria-expanded="' + open + '">' + esc(s.name || '') + '</button>' +
+          '<span class="qn-namebox"><button class="snd-row__name" type="button" data-expand aria-expanded="' + open + '">' + esc(s.name || '') + '</button>' +
+          (window.QuickNote ? QuickNote.tagHtml(s.id) : '') + '</span>' +
           '<span class="snd-tag snd-tag--' + t.cls + '"' + (t.title ? ' title="' + esc(t.title) + '"' : '') + '>' + esc(t.text) + '</span>' +
           notifyTag(s) +
           main +
+          (window.QuickNote ? QuickNote.btnHtml(s.id, s.name) : '') +          /* 상담 + (quicknote.js · 20261031o) */
           '<button class="btn btn--sm btn--ghost snd-more" type="button" data-more aria-label="' + esc(s.name || '') + ' 더 보기">⋯</button>' +
         '</div>' +
         (window.Today && Today.appCell ? '<div class="snd-row__app tdc-app-slot">' + Today.appCell(s.id, appDate(lesson)) + '</div>' : '') +
         (window.AppLink ? AppLink.boxHtml(s.id) : '') +
+        (window.QuickNote ? QuickNote.slotHtml(s.id) : '') +
         (open ? '<div class="snd-row__phones num">' + esc(phones.length ? phones.map(function (p) { return p.label + ' ' + Store.phoneMask(p.number); }).join(' · ') : '번호 없음 — 학생 → 명단에서 넣어 주세요') + '</div>' : '') +
       '</div>';
   }
@@ -340,6 +343,7 @@
     if (!gs.length) { host.innerHTML = '<div class="empty-state">다니는 학생이 없습니다.</div>'; return; }
     host.innerHTML = gs.map(cardHtml).join('');
     if (window.Today && Today.paintDetail) Today.paintDetail();       /* 펼친 과제 표 (today.js · 20261031f) */
+    if (window.QuickNote) QuickNote.mount();                            /* 펼친 상담 칸 (quicknote.js · 20261031o) */
   }
 
   /* ============================================================

@@ -25,7 +25,10 @@
   }
   function isMissing(e) { return /does not exist|Could not find the|schema cache/i.test((e && e.message) || ''); }
 
-  var CATS = ['상담', '집중', '정서·컨디션', '출결', '학습', '기타'];
+  /* 과제 독려 · 학습 상담 · 학부모 연락 — 「오늘」 학생 줄 [상담 +] 와 같은 분류 (migration-042-quick-note · 20261031o) */
+  var CATS = ['상담', '과제 독려', '학습 상담', '학부모 연락', '집중', '정서·컨디션', '출결', '학습', '기타'];
+  var CONSULT = ['상담', '과제 독려', '학습 상담', '학부모 연락'];
+  function isConsult(n) { return (n.categories || []).some(function (c) { return CONSULT.indexOf(c) !== -1; }); }
   var SUBJ = [['kor', '국어'], ['eng', '영어'], ['math', '수학'], ['inq', '탐구']];
   var COLS = ['kor_raw', 'kor_grade', 'eng_raw', 'eng_grade', 'math_raw', 'math_grade', 'inq_raw', 'inq_grade'];
   var LEVELS = ['N수', '고3', '고2', '고1', '중3', '중2', '중1'];
@@ -171,11 +174,16 @@
     return (list || C.notes).filter(function (n) { return n.follow_up && !n.followed_at && !n.deleted_at; });
   }
 
+  /* 맨 위 「지난번 약속: …」 — 가장 최근 「다음에 확인할 것」 한 줄 (20261031o) */
+  function promiseHtml() {
+    var p = C.notes.find(function (n) { return !n.deleted_at && (n.next_check || '').trim(); });
+    return p ? '<p class="cd-promise"><b>지난번 약속:</b> ' + esc(p.next_check) + ' <span class="muted-note num">(' + esc(fmtDate(p.note_date)) + ' · ' + esc(p.author_name || '') + ')</span></p>' : '';
+  }
   function renderPinned() {
     var host = $('#cdPinned');
     var list = openFollow();
-    if (!list.length) { host.innerHTML = ''; return; }
-    host.innerHTML = '<div class="cd-pinned"><div class="cd-pinned__title">📌 다음 상담 때 확인 ' + list.length + '건</div>' +
+    if (!list.length) { host.innerHTML = promiseHtml(); return; }
+    host.innerHTML = promiseHtml() + '<div class="cd-pinned"><div class="cd-pinned__title">📌 다음 상담 때 확인 ' + list.length + '건</div>' +
       list.map(function (n) {
         return '<div class="cd-pin" data-id="' + n.id + '">' +
           '<div class="cd-pin__top"><span class="num">' + esc(fmtDate(n.note_date)) + '</span> ' + catsHtml(n.categories) +
@@ -558,7 +566,7 @@
     var anyCat = Object.keys(f.cats).filter(function (k) { return f.cats[k]; });
     return C.notes.filter(function (n) {
       if (n.deleted_at && !(isTeacher() && C.showDeleted)) return false;
-      if (f.consult && (n.categories || []).indexOf('상담') === -1) return false;
+      if (f.consult && !isConsult(n)) return false;
       if (anyCat.length && !anyCat.some(function (c) { return (n.categories || []).indexOf(c) !== -1; })) return false;
       if (f.from && n.note_date < f.from) return false;
       if (f.to && n.note_date > f.to) return false;
@@ -579,6 +587,7 @@
           '<div class="chips tb-chips-sm" id="cnCats">' + catChips('ccat', {}) + '</div>' +
         '</div>' +
         '<textarea class="textarea" id="cnBody" rows="3" placeholder="오늘 상담·관찰한 내용을 적으세요"></textarea>' +
+        '<input class="input cn-next" id="cnNext" type="text" maxlength="200" placeholder="다음에 확인할 것 (한 줄 · 비워도 됨) 예) 화 · 목 과제 내기" aria-label="다음에 확인할 것">' +
         '<div class="toolbar">' +
           '<label class="chk-inline"><input type="checkbox" id="cnFollow"> 다음 상담 때 확인</label>' +
           '<span class="muted-note">쓴 사람: ' + esc(me.name || UI.whoami()) + '</span>' +
@@ -608,7 +617,7 @@
 
   function noteHtml(n) {
     var editing = C.editing === n.id;
-    var consult = (n.categories || []).indexOf('상담') !== -1;
+    var consult = isConsult(n);
     var meta = [];
     if (n.edited_at) meta.push('수정됨 · ' + esc(n.edited_by) + ' · ' + esc(fmtDT(n.edited_at)));
     if (n.follow_up && n.followed_at) meta.push('확인 완료 · ' + esc(n.followed_by) + ' · ' + esc(fmtDT(n.followed_at)));
@@ -623,11 +632,13 @@
         '<div class="toolbar"><input class="input" type="date" data-ef="date" value="' + esc(n.note_date) + '">' +
         '<div class="chips tb-chips-sm">' + catChips('ecat', picked) + '</div></div>' +
         '<textarea class="textarea" data-ef="body" rows="3">' + esc(n.body) + '</textarea>' +
+        '<input class="input cn-next" type="text" maxlength="200" data-ef="next" placeholder="다음에 확인할 것 (비워도 됨)" aria-label="다음에 확인할 것" value="' + esc(n.next_check || '') + '">' +
         '<div class="toolbar"><label class="chk-inline"><input type="checkbox" data-ef="follow"' + (n.follow_up ? ' checked' : '') + '> 다음 상담 때 확인</label>' +
         '<span class="spacer"></span><button class="btn btn--sm" type="button" data-nact="cancel">취소</button>' +
         '<button class="btn btn--sm btn--primary" type="button" data-nact="save">저장</button></div></div>';
     } else {
-      body = '<div class="cn-item__body">' + esc(n.body) + '</div>';
+      body = '<div class="cn-item__body">' + esc(n.body) + '</div>' +
+        ((n.next_check || '').trim() ? '<div class="cn-item__next">다음에 확인할 것: ' + esc(n.next_check) + '</div>' : '');
     }
     var acts = n.deleted_at
       ? (isTeacher() ? '<button class="btn btn--sm" type="button" data-nact="restore">되살리기</button>' : '')
@@ -654,15 +665,16 @@
     var sid = C.sid;
     var btn = $('#cnAdd');
     btn.disabled = true;
-    sb().from('student_notes').insert({
-      student_id: sid, note_date: $('#cnDate').value || todayKST(), categories: cats, body: body,
-      follow_up: $('#cnFollow').checked
-    }).select('*').single().then(check).then(function (r) {
+    var row = { student_id: sid, note_date: $('#cnDate').value || todayKST(), categories: cats, body: body, follow_up: $('#cnFollow').checked };
+    var nx = ($('#cnNext').value || '').trim();
+    if (nx) row.next_check = nx.slice(0, 200);
+    sb().from('student_notes').insert(row).select('*').single().then(check).then(function (r) {
       btn.disabled = false;
       if (!C || C.sid !== sid) return;
       C.notes.unshift(r.data);
       sortNotes();
       $('#cnBody').value = '';
+      $('#cnNext').value = '';
       $('#cnFollow').checked = false;
       $$('#cnCats .chip').forEach(function (b) { b.classList.remove('is-on'); });
       renderPinned();
@@ -702,6 +714,8 @@
         categories: $$('.chip.is-on', ed).map(function (b) { return b.dataset.ecat; }),
         follow_up: ed.querySelector('[data-ef="follow"]').checked
       };
+      var nxe = ed.querySelector('[data-ef="next"]').value.trim().slice(0, 200);
+      if ('next_check' in n || nxe) patch.next_check = nxe;
       if (!patch.body) { toast('내용을 비울 수 없습니다', 'bad'); return; }
       if (!patch.follow_up) patch.followed_at = null;
       UI.guardedSave('이 기록', function (chk) {
@@ -854,6 +868,7 @@
 
   /* 기록을 고치면 열려 있는 그 학생 [상담 기록] 칸도 새로 */
   function afterNotesChanged(sid) {
+    if (window.QuickNote) QuickNote.changed(sid);                 /* 「오늘」 학생 줄 「마지막 상담」 (quicknote.js) */
     Array.prototype.forEach.call(document.querySelectorAll('.entry__notes:not([hidden])'), function (h) { if (h.dataset.sid === sid) renderInline(h, sid); });
   }
 
@@ -895,7 +910,13 @@
   window.Card = {
     renderInline: renderInline,
     open: open,
-    followCount: function (sid) { return follow[sid] || 0; }
+    followCount: function (sid) { return follow[sid] || 0; },
+    /* 「오늘」 학생 줄에서 상담을 남기면 (quicknote.js · 20261031o) — 확인 필요 개수 · 열린 카드 · 작성 화면 기록 칸 */
+    notesChanged: function (sid) {
+      loadFollow();
+      if (C && C.sid === sid && modal.open) reloadNotes();
+      Array.prototype.forEach.call(document.querySelectorAll('.entry__notes:not([hidden])'), function (h) { if (h.dataset.sid === sid) renderInline(h, sid); });
+    }
   };
 
 })();
