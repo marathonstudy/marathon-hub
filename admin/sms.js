@@ -733,7 +733,7 @@
   /* ---------- 안쪽 작은 탭 ---------- */
   function showPane(name) {
     st.pane = name;
-    ['send', 'tpl', 'log', 'conn'].forEach(function (p) {
+    ['send', 'tpl', 'log', 'conn', 'ops'].forEach(function (p) {
       var el = $('#smsPane' + p.charAt(0).toUpperCase() + p.slice(1));
       if (el) el.hidden = p !== name;
     });
@@ -742,6 +742,7 @@
     if (name === 'tpl') { if (!st.templates.length) loadTemplates(); else renderTplList(); }
     if (name === 'log') openLog();
     if (name === 'conn') loadConn();
+    if (name === 'ops' && window.HwImage) HwImage.renderPane(false);          /* 운영진 (hwimage.js · 20261031o) */
   }
   function goTab() {
     var cur = (window.RTabs && RTabs.current) ? RTabs.current() : -1;
@@ -995,7 +996,7 @@
     }, function () {});
   }
 
-  var TO_LABEL = { parent1: '학부모', parent2: '학부모', parent: '학부모', student: '학생 본인', test: '시험' };
+  var TO_LABEL = { parent1: '학부모', parent2: '학부모', parent: '학부모', student: '학생 본인', test: '시험', staff: '운영진' };
 
   function showResult(res, isRetry) {
     var host = $('#smsResult');
@@ -1142,7 +1143,7 @@
           var stt = x.status === 'ok' ? '<span class="snd-tag snd-tag--sent">성공</span>' : x.status === 'fail' ? '<span class="snd-tag snd-tag--failed" title="' + esc(x.error) + '">실패</span>' : '<span class="snd-tag">보내는 중</span>';
           return '<div class="sms-log__row">' +
               '<div class="sms-log__top"><span class="num">' + esc(fmtAt(x.at)) + '</span> <b>' + esc(x.name || '') + '</b> <span class="muted-note">' + esc(x.class_name || '') + ' · ' + esc(TO_LABEL[x.target] || x.target) + ' ****' + esc(x.phone_last4 || '') + '</span> ' +
-                '<span class="sms-kind sms-kind--' + esc(x.kind) + '">' + (x.kind === 'LMS' ? '장문' : '단문') + '</span>' + (x.ad ? ' <span class="sms-kind">광고</span>' : '') + ' ' + stt + '</div>' +
+                '<span class="sms-kind sms-kind--' + esc(x.kind) + '">' + (x.kind === 'LMS' ? '장문' : x.kind === 'MMS' ? '사진' : '단문') + '</span>' + (x.ad ? ' <span class="sms-kind">광고</span>' : '') + ' ' + stt + '</div>' +
               '<div class="sms-log__body">' + esc(x.body_head || '') + '</div>' +
               '<div class="sms-log__by muted-note">' + esc(x.by_name || '') + (x.status === 'fail' && x.error ? ' · ' + esc(x.error) : '') + '</div>' +
             '</div>';
@@ -1174,7 +1175,7 @@
       rows.map(function (r) {
         var res = r.status === 'ok' ? '<span class="sms-st sms-st--ok">보냄 ' + esc(fmtAt(r.done_at || r.at)) + '</span>'
           : r.status === 'fail' ? '<span class="sms-st sms-st--bad">실패 · ' + esc(r.error || '이유 모름') + '</span>' : '<span class="sms-st sms-st--muted">보내는 중</span>';
-        return '<tr><td>' + esc(r.name || '') + ' <span class="muted-note">' + esc(r.class_name || '') + '</span></td><td>' + esc(TO_LABEL[r.target] || r.target) + (r.kind ? ' <span class="muted-note">' + esc(r.kind === 'LMS' ? '장문' : r.kind === 'SMS' ? '단문' : r.kind) + '</span>' : '') + '</td>' +
+        return '<tr><td>' + esc(r.name || '') + ' <span class="muted-note">' + esc(r.class_name || '') + '</span></td><td>' + esc(TO_LABEL[r.target] || r.target) + (r.kind ? ' <span class="muted-note">' + esc(r.kind === 'LMS' ? '장문' : r.kind === 'SMS' ? '단문' : r.kind === 'MMS' ? '사진' : r.kind) + '</span>' : '') + '</td>' +
           '<td class="num">****' + esc(r.last4 || '') + '</td><td>' + res + '</td></tr>';
       }).join('') + '</tbody></table></div>' +
       '<div class="toolbar">' + (canRetry ? '<button class="btn btn--primary btn--sm" type="button" id="smsLogRetry">실패만 다시 보내기 (' + fails.length + '건)</button>' : fails.length ? '<span class="muted-note">이 기록은 글이 남아 있지 않아 다시 보낼 수 없습니다</span>' : '') +

@@ -579,6 +579,18 @@ delete from public.staff where email = '조교이메일@example.com';
 - 러닝노트(hub.js appMoreHtml): 「과제 상세」 탭 맨 위 안내 한 줄 + [앱에서 자세히 보기 ↗] · 레포트 과제 요약 아래 작은 한 줄 · 링크 없으면 숨김 · 버튼 높이 44px · 반짝임 없음 (예전 맨 아래 「앱 리포트 열기 ›」는 없앴다). 학생 링크 · 학부모 링크 · /s/ 모두 같은 화면
 - 레포트 발송 → 3 발송 문구 복사 · 카톡용 · 내 폰 문자 — 링크가 있는 학생은 끝에 같은 한 줄 · 「단톡방 안내 문구」에도 한 줄. 알림톡 템플릿은 그대로
 
+### 5-46. 20261031o — 과제 현황 이미지 · 운영진에게 보내기 (migration-042-ops-mms.sql · sms-send 다시 배포)
+1. Supabase SQL Editor 에서 `supabase/migration-042-ops-mms.sql` 실행 (041 다음 · 여러 번 실행해도 안전 · 확인 세 줄 모두 true).
+   - `ops_contacts` 운영진(이름 · 번호 · 역할 강사/조교/행정) — 표는 직접 못 읽고 함수로만 · 화면에는 번호 뒤 4자리만
+     (`ops_contacts_list` · `ops_contacts_save` · `ops_contacts_delete` · `ops_contacts_import`)
+   - 처음 열면 설정(app_settings)의 opsPhones · staffPhones · managerPhones 와 연 직원의 「내 시험 번호」를 가져온다 (한 번만 · 지운 번호는 다시 안 생김 · [설정에서 가져오기]는 다시)
+   - `sms_log.kind` 에 MMS · `sms_ops_prepare` — 운영진 · 직접 넣은 번호로 보낼 줄 · 「운영진으로 저장」 · 하루 · 한 달 상한 · 보낸 기록 「과제 현황 이미지」 묶음
+2. Edge Functions → `sms-send` → `supabase/functions/sms-send/index.ts` 전체로 Deploy (Verify JWT 끈 채로)
+   - action `mms` — 화면이 200KB 안팎 JPG 로 줄인 이미지를 솔라피 저장소(storage/v1/files · type MMS)에 올린 뒤 사진 문자로. 이미지는 어디에도 남기지 않는다
+- 코치룸: [과제 현황 이미지] (hwimage.js) — 「오늘」 반 카드 · 과정 카드 반 줄 · 레포트 발송 학생 목록 위. 자료는 `Today.board(반)` (세 기간 · 같은 색 · 가장 최근 기간 7칸 · 퇴원생 · 번호 · 상담 · 점수 없음)
+  미리보기 → [이미지 저장](PNG) · [운영진에게 보내기](체크 · 번호 직접 넣기 · 운영진으로 저장) · 실패하면 「이미지 저장 후 직접 보내 주세요」
+- 「문자 발송」 안쪽 탭에 「운영진」 (연결 상태 옆)
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

@@ -296,6 +296,8 @@
         var need = window.Today && Today.appNeed ? g.rows.filter(function (s) { return Today.appNeed(s.id); }).map(function (s) { return s.id; }) : [];
         body = '<div class="snd-acts">' +
             (kakaoOn() ? '<button class="btn btn--sm btn--primary" type="button" data-kk-class' + (targets.length && !Kakao.busy() ? '' : ' disabled') + '>알림톡 ' + targets.length + '명 보내기</button>' : '') +
+            /* 과제 현황 이미지 — 학생 목록 위 (hwimage.js · 20261031o) */
+            (g.name === NOCLS || !window.HwImage ? '' : '<button class="btn btn--sm snd-hwimg" type="button" data-hwimg="' + esc(g.name) + '">과제 현황 이미지</button>') +
             (g.name === NOCLS ? '' : '<button class="btn btn--sm" type="button" data-sms-cls="' + esc(g.name) + '" data-sms-week="' + esc(state.week) + '" title="문자 창 — 보낼 표 · 이 수업 레포트를 누구에게 언제 보냈는지도 표에 나옵니다">반 전체 문자 · 보낸 표</button>') +
             (need.length ? '<button type="button" class="tdc-link-btn tdc-need num" data-app-need="' + esc(need.join(',')) + '" title="누르면 그 학생들 링크 칸이 차례로 펼쳐집니다">+ 과제 링크 연결 필요 ' + need.length + '명</button>' : '') +
             /* 학생 정렬 — 목록 머리줄 오른쪽 끝 (「오늘」과 같은 작은 글자 버튼 · 20261031e) */
