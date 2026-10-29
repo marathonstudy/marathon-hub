@@ -9,10 +9,6 @@
 //                      화면은 학생 id 와 보낼 곳만 보낸다. 번호 · 링크 코드는 부른 직원의 로그인으로 DB 함수 sms_prepare 가 찾는다
 //                      (같은 번호는 한 번만 · 한 번 · 하루 상한 · 광고 문구). 보낸 결과는 sms_record 로 기록(번호는 뒤 4자리만).
 //    action "test"   — 같은 내용을 첫 사람 것으로 바꿔, 설정에 넣은 내 시험 번호에 한 건만.
-//    action "mms"    — 과제 현황 이미지를 운영진에게 사진 문자로 (migration-042 · 20261031o)
-//                      { ops: [운영진 id], phones: ["010…"], save, body(한 줄), cls(반 이름), image(JPG base64 · 200KB 안팎) }
-//                      번호는 DB 함수 sms_ops_prepare 가 운영진 표에서 찾는다. 이미지는 솔라피 저장소에만 올리고(MMS 용) 어디에도 남기지 않는다.
-//                      이미지를 못 올리거나 MMS 가 실패하면 그 줄을 실패로 기록한다 — 화면은 「이미지 저장 후 직접 보내 주세요」.
 //  솔라피는 「접수」 결과만 바로 알려 준다 (실제 도착 여부는 솔라피 콘솔의 발송 내역에서 본다).
 //
 //  키 — Supabase 대시보드 → Edge Functions → Secrets 에만 넣는다 (알림톡과 같은 값). 이 파일 · 저장소 · 화면에는 어떤 키도 없다.
@@ -26,8 +22,6 @@
 const ALLOWED_ORIGINS = ["https://marathonstudy.github.io"];
 const SITE = "https://marathonstudy.github.io/marathon-hub";          // #{링크} 앞부분 (assets/config.js 의 siteUrl 과 같다)
 const SOLAPI = "https://api.solapi.com/messages/v4/send-many/detail";
-const SOLAPI_FILE = "https://api.solapi.com/storage/v1/files";
-const MMS_MAX = 300 * 1024;              // 솔라피 MMS 이미지 200KB 안팎 — 화면이 줄여서 보낸다 · 이보다 크면 받지 않는다
 const KEYS = ["SOLAPI_API_KEY", "SOLAPI_API_SECRET", "SOLAPI_SENDER"];
 
 function corsHeaders(origin: string | null): Record<string, string> {
@@ -104,7 +98,6 @@ async function handle(req: Request, cors: Record<string, string>) {
   KEYS.forEach((k) => { have[k] = !!env(k); });
   /* 발신번호는 숫자만 (받는 사람이 보는 번호라 비밀이 아니다 · 로그인한 직원에게만) */
   if (action === "status") return json({ ok: true, keys: have, cfg, sender: env("SOLAPI_SENDER").replace(/\D/g, "") }, cors);
-  if (action === "mms") return await sendMms(auth, apikey, body, have, cors);
   if (action !== "send" && action !== "test") return json({ ok: false, reason: "input", message: "알 수 없는 요청입니다." }, cors, 400);
 
   const items = (Array.isArray(body.items) ? body.items : [])
@@ -205,95 +198,6 @@ async function handle(req: Request, cors: Record<string, string>) {
     lms: rows.filter((r) => r.kind === "LMS").length,
     results: results.map((x) => ({ student_id: x.student_id, to: x.to, name: x.name, ok: x.ok, error: x.error })),
   }, cors);
-}
-
-/* ---------- 사진 문자 (과제 현황 이미지 → 운영진 · 20261031o) ---------- */
-async function sendMms(auth: string, apikey: string, body: Any, have: Record<string, boolean>, cors: Record<string, string>) {
-  const missing = KEYS.filter((k) => !have[k]);
-  if (missing.length) {
-    return json({ ok: false, reason: "nokeys", missing, message: "문자 키가 아직 다 들어가지 않았습니다 (" + missing.join(", ") + "). Supabase Secrets 에 넣어 주세요." }, cors, 200);
-  }
-  const image = String(body.image ?? "").replace(/^data:image\/jpe?g;base64,/i, "").replace(/\s+/g, "");
-  if (!image || !/^[A-Za-z0-9+/]+=*$/.test(image)) return json({ ok: false, reason: "image", message: "이미지가 없습니다." }, cors, 200);
-  const bytes = Math.floor(image.length * 3 / 4) - (image.endsWith("==") ? 2 : image.endsWith("=") ? 1 : 0);
-  if (bytes > MMS_MAX) return json({ ok: false, reason: "image", message: "이미지가 너무 큽니다 (" + Math.round(bytes / 1024) + "KB)." }, cors, 200);
-  const ops = (Array.isArray(body.ops) ? body.ops : []).map((x: Any) => String(x ?? "")).filter((x: string) => /^[0-9a-f-]{36}$/i.test(x)).slice(0, 50);
-  const phones = (Array.isArray(body.phones) ? body.phones : []).map((x: Any) => String(x ?? "").replace(/\D/g, "")).filter(Boolean).slice(0, 50);
-  const text = String(body.body ?? "").trim().slice(0, 300);
-  let prep: Any;
-  try {
-    prep = await rpcAs(auth, apikey, "sms_ops_prepare", { p_ops: ops, p_phones: phones, p_save: !!body.save, p_body: text, p_class: String(body.cls ?? "").slice(0, 60), p_label: "과제 현황 이미지" });
-  } catch (e) {
-    const m = String((e as Error).message || e);
-    if (/Could not find the function|schema cache|does not exist/i.test(m)) return json({ ok: false, reason: "nosql", message: "migration-042 SQL 을 먼저 실행해 주세요." }, cors, 200);
-    return json({ ok: false, reason: "prepare", message: m }, cors, 200);
-  }
-  if (!prep?.ok) return json({ ok: false, reason: prep?.reason || "prepare", message: prep?.message || "보낼 수 없습니다.", skipped: prep?.skipped || [] }, cors, 200);
-  const rows: Any[] = prep.rows || [];
-  const results: Any[] = rows.map((r) => ({ log_id: r.log_id, name: r.name, ok: false, error: "", message_id: "" }));
-  const done = async (reason: string, message: string) => {
-    await rpcAs(auth, apikey, "sms_record", { p_results: results.map(({ log_id, ok, error, message_id }) => ({ log_id, ok, error, message_id })) }).catch(() => {});
-    const sent = results.filter((x) => x.ok).length;
-    return json({
-      ok: sent > 0, reason: sent ? "" : reason, message: sent ? "" : message, sent, failed: results.length - sent,
-      skipped: prep.skipped || [], saved: prep.saved || 0, contacts: prep.contacts || null,
-      results: results.map((x) => ({ name: x.name, ok: x.ok, error: x.error })),
-    }, cors);
-  };
-
-  /* 1) 이미지 올리기 — 솔라피 저장소 (MMS 용) */
-  let imageId = "";
-  try {
-    const up = await fetch(SOLAPI_FILE, {
-      method: "POST",
-      headers: { Authorization: await solapiAuth(env("SOLAPI_API_KEY"), env("SOLAPI_API_SECRET")), "Content-Type": "application/json" },
-      body: JSON.stringify({ file: image, type: "MMS", name: "homework.jpg" }),
-    });
-    const uo: Any = await up.json().catch(() => null);
-    imageId = up.ok && uo && uo.fileId ? String(uo.fileId) : "";
-    if (!imageId) {
-      const why = String((uo && (uo.errorMessage || uo.message || uo.errorCode)) || `솔라피 오류 (${up.status})`);
-      results.forEach((x) => { x.error = ("이미지를 올리지 못했습니다 — " + why).slice(0, 200); });
-      return await done("upload", ("이미지를 올리지 못했습니다 — " + why).slice(0, 160));
-    }
-  } catch {
-    results.forEach((x) => { x.error = "이미지를 올리지 못했습니다 (솔라피 연결 실패)"; });
-    return await done("upload", "이미지를 올리지 못했습니다 (솔라피에 연결하지 못했습니다).");
-  }
-
-  /* 2) 사진 문자 */
-  const from = env("SOLAPI_SENDER").replace(/\D/g, "");
-  try {
-    const res = await fetch(SOLAPI, {
-      method: "POST",
-      headers: { Authorization: await solapiAuth(env("SOLAPI_API_KEY"), env("SOLAPI_API_SECRET")), "Content-Type": "application/json" },
-      body: JSON.stringify({
-        messages: rows.map((r) => ({ to: String(r.to), from, type: "MMS", subject: "과제 현황", text: String(r.text || ""), imageId, customFields: { log: String(r.log_id) } })),
-        allowDuplicates: true, showMessageList: true,
-      }),
-    });
-    const out: Any = await res.json().catch(() => null);
-    if (!res.ok) {
-      const why = (out && (out.errorMessage || out.message || out.errorCode)) || `솔라피 오류 (${res.status})`;
-      results.forEach((x) => { x.error = String(why).slice(0, 200); });
-    } else {
-      const failed = new Map<string, string>();
-      (out?.failedMessageList || []).forEach((f: Any) => {
-        const id = f?.customFields?.log;
-        if (id) failed.set(String(id), `${f.statusCode || ""} ${f.statusMessage || ""}`.trim() || "접수 실패");
-      });
-      const ids = new Map<string, string>();
-      (out?.messageList || []).forEach((m: Any) => { if (m?.customFields?.log) ids.set(String(m.customFields.log), String(m.messageId || "")); });
-      results.forEach((x) => {
-        if (failed.has(String(x.log_id))) { x.error = failed.get(String(x.log_id)); return; }
-        x.ok = true;
-        x.message_id = ids.get(String(x.log_id)) || "";
-      });
-    }
-  } catch {
-    results.forEach((x) => { x.error = "솔라피에 연결하지 못했습니다."; });
-  }
-  return await done("mms", "사진 문자를 보내지 못했습니다.");
 }
 
 Deno.serve(async (req: Request) => {

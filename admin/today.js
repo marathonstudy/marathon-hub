@@ -1020,8 +1020,6 @@
     var h = d ? Attend.buttonHtml(cls, d, label ? { label: label } : null) : '';
     return h ? '<div class="tdc-att">' + h + '</div>' : '';
   }
-  /* [과제 현황 이미지] — 반마다 (과정 카드는 반 줄마다 · hwimage.js · 20261031o) */
-  function hwImgBtn(cls) { return window.HwImage ? '<button type="button" class="btn btn--sm tdc-hwimg" data-hwimg="' + esc(cls) + '" aria-label="' + esc(cls) + ' 과제 현황 이미지">과제 현황 이미지</button>' : ''; }
   function courseCardHtml(co, cls) {
     var no = Course.roundNow(co), ms = Course.membersAt(co, no), t = DDay.today();
     var rs = Course.roundStart(co, no), ckey = '§' + co.name, open = !!st.open[ckey];
@@ -1048,7 +1046,7 @@
         '<div class="tdw" aria-label="이번 회차 일주일">' + days + '</div>' +
         cls.map(function (c) {
           return '<div class="tdc-crow' + (Course.mine(c.name) ? ' is-mine' : '') + '"><div class="tdc-crow__top"><b class="tdc-crow__n">' + esc(Course.shortName(c.name)) + '</b>' + classWhen(c) +
-            (c.rows.length ? '<button type="button" class="btn btn--sm tdc-sms" data-sms-cls="' + esc(c.name) + '" aria-label="' + esc(c.name) + ' 전체 문자 발송">전체 문자 발송</button>' + hwImgBtn(c.name) : '') + '</div>' +
+            (c.rows.length ? '<button type="button" class="btn btn--sm tdc-sms" data-sms-cls="' + esc(c.name) + '" aria-label="' + esc(c.name) + ' 전체 문자 발송">전체 문자 발송</button>' : '') + '</div>' +
             linesHtml(c, chipsOf(c)) + attHtml(c.name, Course.shortName(c.name)) + '</div>';
         }).join('') +
       '</div><div class="tdc-btns"><button type="button" class="btn btn--sm btn--primary tdc-write" data-write-course="' + esc(ckey) + '">레포트 작성</button></div></div>' +
@@ -1074,7 +1072,7 @@
           attHtml(c.name, '') +
         '</div>' +
         '<div class="tdc-btns">' +
-          (c.name === '(반 없음)' || !n ? '' : '<button type="button" class="btn btn--sm tdc-sms" data-sms-cls="' + esc(c.name) + '" aria-label="' + esc(c.name) + ' 전체 문자 발송">전체 문자 발송</button>' + hwImgBtn(c.name)) +
+          (c.name === '(반 없음)' || !n ? '' : '<button type="button" class="btn btn--sm tdc-sms" data-sms-cls="' + esc(c.name) + '" aria-label="' + esc(c.name) + ' 전체 문자 발송">전체 문자 발송</button>') +
           (c.name === '(반 없음)' ? '' : '<button type="button" class="btn btn--sm btn--primary tdc-write" data-write="' + esc(c.name) + '">레포트 작성</button>') +
         '</div>' +
       '</div>' +
@@ -1176,46 +1174,6 @@
     return out;
   }
   function rowById(sid) { return st.data ? st.data.students.find(function (x) { return x.id === sid; }) || null : null; }
-  /* ---------- 과제 현황 이미지 자료 (hwimage.js · 20261031o) ----------
-     한 반 — 세 기간 머리칸 · 학생마다 세 기간 숫자(같은 색 기준) · 가장 최근 기간 7칸(정시 / 늦게 / 미제출 / 주중 복습)
-     퇴원생은 이미 빠져 있다(activeOnly). 번호 · 상담 · 점수는 넣지 않는다. 가장 최근 기간 적게 한 순 (숫자 없는 학생은 아래) */
-  function boardOf(cls) {
-    if (!st.data) return null;
-    var c = (st.classes || []).find(function (x) { return x.name === cls; });
-    var rows = c ? c.rows : st.data.students.filter(function (s) { return (s.class_name || '') === cls; });
-    var cy = c ? c.cy : cycleOf(cls), per = c ? c.per : periodsOf(cls);
-    var heads = PKEYS.map(function (k) { var p = per && per[k]; return p ? { key: k, label: p.live ? '진행 중' : perLabel(p), sub: p.live ? md(p.from) + '~' : '', live: !!p.live, from: p.from, to: p.to } : null; });
-    var out = rows.map(function (s) {
-      var x = appState(s, cy), r = { id: s.id, name: s.name, state: x.k, why: x.why || '', vals: [null, null, null], days: [] };
-      if (x.k === 'need' || x.k === 'wait' || x.k === 'fail' || !per) return r;
-      r.vals = PKEYS.map(function (k) {
-        var v = per[k] ? perVal(s, per[k]) : null;
-        return !v ? null : v.k === 'ok' ? { k: 'ok', done: v.done, days: v.days, tone: hwTone(v.done, v.days) } : { k: v.k };
-      });
-      var a = app[s.id], p = per.recent;
-      var w = p && a && a.ok && a.data ? AppWeek.compute(a.data, p.from, p.to, DDay.today()) : null;
-      if (w) r.days = w.days.map(function (d) { return { date: d.date, dow: d.dow, weekend: !!d.weekend, hw: d.hw }; });
-      return r;
-    });
-    var key = function (r) { var v = r.vals[1]; return v && v.k === 'ok' ? { g: 0, r: v.done / v.days, n: v.done } : { g: r.state === 'need' ? 3 : r.state === 'ok' || r.state === 'none' ? 1 : 2 }; };
-    out.sort(function (a, b) {
-      var x = key(a), y = key(b);
-      if (x.g !== y.g) return x.g - y.g;
-      if (x.g === 0 && x.r !== y.r) return x.r - y.r;
-      if (x.g === 0 && x.n !== y.n) return x.n - y.n;
-      return String(a.name).localeCompare(String(b.name), 'ko');
-    });
-    var low = out.filter(function (r) { var v = r.vals[1]; return v && v.k === 'ok' && v.done <= 1; });
-    var span = heads.filter(Boolean);
-    return {
-      cls: cls, heads: heads, rows: out,
-      range: span.length ? md(span[0].from) + '~' + md(span[span.length - 1].live ? DDay.today() : span[span.length - 1].to) : '',
-      recent: per && per.recent ? perLabel(per.recent) : '',
-      low: low.map(function (r) { return r.name; }),
-      nolink: out.filter(function (r) { return r.state === 'need' && r.why !== 'expired'; }).length,
-      waiting: out.some(function (r) { return r.state === 'wait'; })
-    };
-  }
   window.Today = {
     studentFacts: function (sid, lessonDate) {
       var s = rowById(sid);
@@ -1243,7 +1201,6 @@
     },
     sortBarHtml: sortBarHtml,
     paintDetail: paintDetail,
-    board: boardOf,
     /* 과제 칸이 모두 채워졌나 (불러오는 중인 학생이 없음) — 시험 · 로딩 시간 재기 */
     appReady: function () { return !!st.data && liveList().every(function (s) { return !!app[s.id]; }); },
     detailOpen: function () { return { sid: det.sid, from: det.from, day: det.day }; },
