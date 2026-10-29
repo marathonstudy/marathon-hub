@@ -172,7 +172,54 @@
     return (r.status === 'confirmed' && r.confirmed ? r.confirmed : r.draft) || [];
   }
 
+  /* ---------- 키워드 (20261031t · migration-046) — 수업 내용 칸 아래 칩 · 지우기 × · 넣기 · [키워드 다시 만들기] ----------
+     요약을 확정하면 서버가 같이 만든다(복습 노트 「다룬 지문」 우선 → 「작품명」 → 요약 줄 말마디) · 러닝노트 수업 영상 카드 · 「키워드로 찾기」 */
+  function renderKw() {
+    var host = $('#kwHost');
+    if (!host) return;
+    var r = st.row;
+    if (!r || !r.confirmed) { host.innerHTML = ''; return; }
+    if (!Array.isArray(r.keywords)) { host.innerHTML = '<p class="kw-line muted-note">migration-046 SQL 을 실행하면 수업 영상 카드에 키워드가 붙습니다.</p>'; return; }
+    host.innerHTML = '<div class="kw-line"><span class="kw-line__t">키워드</span>' +
+      (r.keywords.length ? r.keywords.map(function (k, i) {
+        return '<span class="aip-mem__c">' + esc(k) + '<button type="button" class="aip-mem__x" data-kw-del="' + i + '" aria-label="' + esc('「' + k + '」 지우기') + '">×</button></span>';
+      }).join('') : '<span class="muted-note">아직 없음</span>') +
+      (r.keywords.length < 8 ? '<input class="input kw-line__in" id="kwNew" type="text" maxlength="20" placeholder="키워드 넣기" aria-label="키워드 넣기">' +
+        '<button type="button" class="btn btn--sm" data-kw-add>넣기</button>' : '') +
+      '<button type="button" class="btn btn--sm btn--ghost" data-kw-rebuild title="확정된 요약 · 복습 노트 「다룬 지문」에서 다시 뽑습니다">키워드 다시 만들기</button>' +
+      '<span class="muted-note kw-line__hint">러닝노트 수업 영상 카드에 보이고 「키워드로 찾기」에 쓰입니다</span></div>';
+  }
+  function kwSave(list) {
+    var cls = st.cls, week = st.week, key = st.key;
+    return sb().rpc('summary_keywords_set', { p_class: cls, p_week: week, p_keywords: list }).then(function (r) {
+      if (r.error) { toast(isMissing(r.error) ? 'migration-046 SQL 을 먼저 실행해 주세요.' : r.error.message, 'bad'); return; }
+      if (key === st.key && st.row) { st.row.keywords = r.data.keywords; renderKw(); }
+    });
+  }
+  function kwClick(e) {
+    var r = st.row;
+    if (!r) return;
+    var d = e.target.closest('[data-kw-del]');
+    if (d) { var l = r.keywords.slice(); l.splice(+d.dataset.kwDel, 1); kwSave(l); return; }
+    if (e.target.closest('[data-kw-add]')) { kwAdd(); return; }
+    if (e.target.closest('[data-kw-rebuild]')) {
+      var key = st.key;
+      sb().rpc('summary_keywords_rebuild', { p_class: st.cls, p_week: st.week }).then(function (x) {
+        if (x.error) { toast(isMissing(x.error) ? 'migration-046 SQL 을 먼저 실행해 주세요.' : x.error.message, 'bad'); return; }
+        if (key === st.key && st.row) { st.row.keywords = x.data.keywords; renderKw(); }
+        toast('키워드를 다시 만들었습니다 (' + (x.data.keywords || []).length + '개)', 'good');
+      });
+    }
+  }
+  function kwAdd() {
+    var el = $('#kwNew'), v = el ? el.value.replace(/\s+/g, ' ').trim() : '';
+    if (!v || !st.row) return;
+    if (st.row.keywords.indexOf(v) !== -1) { el.value = ''; return; }
+    kwSave(st.row.keywords.concat([v]));
+  }
+
   function renderResult() {
+    renderKw();
     var host = $('#aiResult');
     if (!host) return;
     if (st.missing) { host.innerHTML = '<p class="panel__hint">' + NEED_SQL + '</p>'; return; }
@@ -615,6 +662,11 @@
       if (e.target.id === 'btnAiClose') { $('#aiSub').hidden = true; $('#btnAiOpen').setAttribute('aria-expanded', 'false'); }
     });
 
+    var kh = $('#kwHost');
+    if (kh) {
+      kh.addEventListener('click', kwClick);
+      kh.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target.id === 'kwNew') { e.preventDefault(); kwAdd(); } });
+    }
     var result = $('#aiResult');
     result.addEventListener('input', function (e) {
       if (e.target.dataset.aiLine == null) return;

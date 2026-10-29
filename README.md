@@ -622,6 +622,13 @@ delete from public.staff where email = '조교이메일@example.com';
   `Store.loginBlock` — 명단 · 복습테스트 화면 「로그인 불가 · 반 없음 / 학생 번호 없음」(누르면 그 칸이 열린 수정 창)
 - 학생 입구(/s/ · entry.js) 실패 문구 — 「이 반에 그 이름이 없습니다」 · 「비밀번호는 학생 휴대폰 번호에서 010을 뺀 8자리입니다」
 
+### 5-51. 20261031t — 수업 영상 카드에 어떤 수업이었는지 · 키워드 (migration-046-video-keywords.sql · 함수 배포 없음)
+1. Supabase SQL Editor 에서 `supabase/migration-046-video-keywords.sql` 실행 (045 다음 · 여러 번 실행해도 안전 · 확인 세 줄 모두 true).
+   - `lesson_summaries.keywords` — 확정할 때 트리거로 (복습 노트 「다룬 지문」 → 「작품명」 → 요약 줄 말마디 · 5개까지 · AI 없음) · 지난 확정본은 한 번 채움
+   - `summary_keywords_rebuild` · `summary_keywords_set` (직원만) · `_weekly_of` 주마다 `keywords`
+- 러닝노트 hub.js — 수업 영상 탭 · 레포트 「이 수업 영상」 카드: 차시별 한 줄 · 키워드 칩 · 기본 제목이면 첫 차시 한 줄 크게 · 탭 맨 위 「키워드로 찾기」
+- 코치룸 summary.js — 수업 내용 칸 아래 키워드 칩(× · 넣기 · 키워드 다시 만들기)
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

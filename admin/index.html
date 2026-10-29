@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" as="style" crossorigin
       href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
-<link rel="stylesheet" href="style.css?v=20261031s">
+<link rel="stylesheet" href="style.css?v=20261031t">
 </head>
 <body class="is-locked">
 
@@ -434,6 +434,8 @@
             <div id="aiPanel"></div>
             <div id="aiResult"></div>
           </div>
+          <!-- 키워드 칩 (summary.js · migration-046 · 20261031t) — 확정된 요약이 있을 때만 · 러닝노트 수업 영상 카드 · 찾기 -->
+          <div class="kw-host" id="kwHost"></div>
         </div>
 
         <!-- 복습 노트 (reviewnote.js · migration-039 · 20261031l) — 한 장 요약 + OX · 만들기 → 고치기 → 확정 -->
@@ -2250,58 +2252,58 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
 <!-- config.js 와 brand.js 가 먼저 와야 한다. 나머지가 이 값을 읽는다. -->
-<script src="../assets/config.js?v=20261031s"></script>
-<script src="../assets/brand.js?v=20261031s"></script>
-<script src="../assets/lesson.js?v=20261031s"></script>
-<script src="supabase.js?v=20261031s"></script>
-<script src="db.js?v=20261031s"></script>
-<script src="store.js?v=20261031s"></script>
-<script src="report.js?v=20261031s"></script>
-<script src="aipolish.js?v=20261031s"></script>
-<script src="app.js?v=20261031s"></script>
-<script src="import.js?v=20261031s"></script>
-<script src="appfetch.js?v=20261031s"></script>
-<script src="profile.js?v=20261031s"></script>
-<script src="course.js?v=20261031s"></script>
-<script src="write.js?v=20261031s"></script>
-<script src="publish.js?v=20261031s"></script>
-<script src="send.js?v=20261031s"></script>
-<script src="kakao.js?v=20261031s"></script>
-<script src="sms.js?v=20261031s"></script>
-<script src="contacts.js?v=20261031s"></script>
-<script src="notice.js?v=20261031s"></script>
-<script src="tb.js?v=20261031s"></script>
-<script src="tb-dash.js?v=20261031s"></script>
-<script src="tb-issue.js?v=20261031s"></script>
-<script src="tb-stock.js?v=20261031s"></script>
-<script src="tb-bill.js?v=20261031s"></script>
-<script src="../assets/dday.js?v=20261031s"></script>
-<script src="../assets/app-week.js?v=20261031s"></script>
-<script src="card.js?v=20261031s"></script>
-<script src="exams.js?v=20261031s"></script>
-<script src="photo.js?v=20261031s"></script>
-<script src="applink.js?v=20261031s"></script>
-<script src="skips.js?v=20261031s"></script>
-<script src="reviewnote.js?v=20261031s"></script>
-<script src="hwfix.js?v=20261031s"></script>
-<script src="attend.js?v=20261031s"></script>
-<script src="attbook.js?v=20261031s"></script>
-<script src="quicknote.js?v=20261031s"></script>
-<script src="today.js?v=20261031s"></script>
-<script src="staff.js?v=20261031s"></script>
-<script src="classes.js?v=20261031s"></script>
-<script src="weekly.js?v=20261031s"></script>
-<script src="filethumb.js?v=20261031s"></script>
-<script src="ytbm.js?v=20261031s"></script>
-<script src="summary.js?v=20261031s"></script>
-<script src="weeks.js?v=20261031s"></script>
-<script src="../assets/photos.js?v=20261031s"></script>
-<script src="review.js?v=20261031s"></script>
-<script src="draftguard.js?v=20261031s"></script>
-<script src="preview.js?v=20261031s"></script>
-<script src="rtabs.js?v=20261031s"></script>
-<script src="nav.js?v=20261031s"></script>
-<script src="sync.js?v=20261031s"></script>
-<script src="auth.js?v=20261031s"></script>
+<script src="../assets/config.js?v=20261031t"></script>
+<script src="../assets/brand.js?v=20261031t"></script>
+<script src="../assets/lesson.js?v=20261031t"></script>
+<script src="supabase.js?v=20261031t"></script>
+<script src="db.js?v=20261031t"></script>
+<script src="store.js?v=20261031t"></script>
+<script src="report.js?v=20261031t"></script>
+<script src="aipolish.js?v=20261031t"></script>
+<script src="app.js?v=20261031t"></script>
+<script src="import.js?v=20261031t"></script>
+<script src="appfetch.js?v=20261031t"></script>
+<script src="profile.js?v=20261031t"></script>
+<script src="course.js?v=20261031t"></script>
+<script src="write.js?v=20261031t"></script>
+<script src="publish.js?v=20261031t"></script>
+<script src="send.js?v=20261031t"></script>
+<script src="kakao.js?v=20261031t"></script>
+<script src="sms.js?v=20261031t"></script>
+<script src="contacts.js?v=20261031t"></script>
+<script src="notice.js?v=20261031t"></script>
+<script src="tb.js?v=20261031t"></script>
+<script src="tb-dash.js?v=20261031t"></script>
+<script src="tb-issue.js?v=20261031t"></script>
+<script src="tb-stock.js?v=20261031t"></script>
+<script src="tb-bill.js?v=20261031t"></script>
+<script src="../assets/dday.js?v=20261031t"></script>
+<script src="../assets/app-week.js?v=20261031t"></script>
+<script src="card.js?v=20261031t"></script>
+<script src="exams.js?v=20261031t"></script>
+<script src="photo.js?v=20261031t"></script>
+<script src="applink.js?v=20261031t"></script>
+<script src="skips.js?v=20261031t"></script>
+<script src="reviewnote.js?v=20261031t"></script>
+<script src="hwfix.js?v=20261031t"></script>
+<script src="attend.js?v=20261031t"></script>
+<script src="attbook.js?v=20261031t"></script>
+<script src="quicknote.js?v=20261031t"></script>
+<script src="today.js?v=20261031t"></script>
+<script src="staff.js?v=20261031t"></script>
+<script src="classes.js?v=20261031t"></script>
+<script src="weekly.js?v=20261031t"></script>
+<script src="filethumb.js?v=20261031t"></script>
+<script src="ytbm.js?v=20261031t"></script>
+<script src="summary.js?v=20261031t"></script>
+<script src="weeks.js?v=20261031t"></script>
+<script src="../assets/photos.js?v=20261031t"></script>
+<script src="review.js?v=20261031t"></script>
+<script src="draftguard.js?v=20261031t"></script>
+<script src="preview.js?v=20261031t"></script>
+<script src="rtabs.js?v=20261031t"></script>
+<script src="nav.js?v=20261031t"></script>
+<script src="sync.js?v=20261031t"></script>
+<script src="auth.js?v=20261031t"></script>
 </body>
 </html>

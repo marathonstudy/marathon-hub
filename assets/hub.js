@@ -296,6 +296,23 @@
       esc(v.title || (v.part === 'full' ? '수업 영상' : part + ' 영상')));
   }
 
+  /* 「어떤 수업이었는지」 (20261031t · migration-046) — 차시별 한 줄(확정된 수업 내용 요약) · 키워드 칩 3~5개(복습 노트 「다룬 지문」 우선)
+     영상 제목이 「수업 영상」 「수업 전체」 같은 기본값이면 첫 차시 한 줄을 크게 */
+  var VD_DEFAULT = /^\s*(수업\s*영상|수업\s*전체|전체\s*영상|전체|영상|\d\s*차시(\s*영상)?|강의\s*영상)?\s*$/;
+  function lessonLines(w) { return ((w && w.lessons) || []).map(function (x) { return String(x || '').trim(); }).filter(Boolean); }
+  function bareLine(l) { return String(l).replace(/^\s*\d+\s*차시\s*[:：.]?\s*/, ''); }
+  function lessonInfoHtml(w, vids) {
+    var lines = lessonLines(w), kws = ((w && w.keywords) || []).filter(function (k) { return String(k || '').trim(); }).slice(0, 5);
+    if (!lines.length && !kws.length) return '';
+    var big = lines.length && (vids || []).every(function (v) { return VD_DEFAULT.test(v.title || ''); });
+    return '<div class="vd-info">' +
+      (big ? '<p class="vd-big">' + esc(bareLine(lines[0])) + '</p>' : '') +
+      (lines.length ? '<ul class="vd-lines">' + lines.map(function (l) { return '<li>' + esc(l) + '</li>'; }).join('') + '</ul>' : '') +
+      (kws.length ? '<div class="vd-kws" aria-label="키워드">' + kws.map(function (k) { return '<span class="vd-kw">#' + esc(k) + '</span>'; }).join('') + '</div>' : '') +
+    '</div>';
+  }
+  function vdText(x) { return [weekName(x.w.week_start)].concat(lessonLines(x.w), (x.w.keywords || []), x.vids.map(function (v) { return v.title || ''; })).join(' ').toLowerCase(); }
+
   function plusDays(iso, n) {
     var d = new Date(iso + 'T00:00:00Z');
     d.setUTCDate(d.getUTCDate() + n);
@@ -451,6 +468,7 @@
   function videoWeekCard(x) {
     return '<div class="card vd-week">' +
              '<h2 class="card-title">▶️ ' + esc(weekName(x.w.week_start)) + '<span class="card-note">' + x.vids.length + '개</span></h2>' +
+             lessonInfoHtml(x.w, x.vids) +
              '<div class="nt-videos">' + x.vids.map(weekVideoHtml).join('') + '</div>' +
            '</div>';
   }
@@ -458,14 +476,24 @@
     var list = videoWeeks();
     var head = '<h2 class="vd-title">강의 다시 보기</h2>';
     if (!list.length) { host.innerHTML = head + '<div class="empty">아직 올라온 수업 영상이 없습니다.</div>'; return; }
-    host.innerHTML = head + list.slice(0, 4).map(videoWeekCard).join('') +
-      (list.length > 4
-        ? '<div id="vdMore"><button type="button" class="hub-more" data-vd-more>이전 주 더 보기 <span class="num">(' + (list.length - 4) + '주)</span></button></div>'
-        : '');
+    /* 맨 위 키워드로 찾기 — 키워드 · 차시 한 줄 · 영상 제목 · 수업일에서 (찾는 중에는 모든 주에서) */
+    host.innerHTML = head +
+      '<label class="vd-find"><span class="sr-only">키워드로 찾기</span><input type="search" class="vd-find__in" data-vd-find placeholder="키워드로 찾기 (예: 진달래꽃 · 비문학)" autocomplete="off"></label>' +
+      '<div class="vd-list" data-vd-list></div>';
+    var box = host.querySelector('[data-vd-list]'), all = false;
+    function draw(q) {
+      q = String(q || '').trim().toLowerCase();
+      var hit = q ? list.filter(function (x) { return vdText(x).indexOf(q) !== -1; }) : list;
+      if (q) { box.innerHTML = hit.length ? hit.map(videoWeekCard).join('') : '<div class="empty">「' + esc(q) + '」이(가) 들어간 수업 영상이 없습니다.</div>'; return; }
+      box.innerHTML = (all ? list : list.slice(0, 4)).map(videoWeekCard).join('') +
+        (!all && list.length > 4 ? '<div id="vdMore"><button type="button" class="hub-more" data-vd-more>이전 주 더 보기 <span class="num">(' + (list.length - 4) + '주)</span></button></div>' : '');
+    }
+    draw('');
+    host.oninput = function (e) { if (e.target.hasAttribute && e.target.hasAttribute('data-vd-find')) draw(e.target.value); };
     host.onclick = function (e) {
       if (!e.target.closest('[data-vd-more]')) return;
-      var box = host.querySelector('#vdMore');
-      if (box) box.outerHTML = list.slice(4).map(videoWeekCard).join('');
+      all = true;
+      draw(host.querySelector('[data-vd-find]').value);
     };
   }
 
@@ -937,7 +965,7 @@
   function weekVideosHtml(w) {
     var vids = w ? sortVideos((w.videos || []).filter(function (v) { return v && safeUrl(v.url); })) : [];
     if (!vids.length) return '';
-    return '<div class="card tw-videos rw-videos"><h2 class="card-title">▶️ 이 수업 영상</h2><div class="nt-videos">' + vids.map(weekVideoHtml).join('') + '</div></div>';
+    return '<div class="card tw-videos rw-videos"><h2 class="card-title">▶️ 이 수업 영상</h2>' + lessonInfoHtml(w, vids) + '<div class="nt-videos">' + vids.map(weekVideoHtml).join('') + '</div></div>';
   }
 
   /* 선생님 공지 — 수업일 · 영상 · 자료는 위 칸과 겹치므로 빼고, 공지 글만 */

@@ -27,11 +27,17 @@ $$;
 
 create or replace function public._summary_keywords(p_class text, p_week date, p_lines jsonb)
 returns jsonb
-language sql
+language plpgsql
 stable
 security definer
 set search_path = public
 as $$
+declare
+  picked text[] := '{}';
+  c record;
+begin
+  /* 앞에서 고른 말을 품거나 그 안에 든 말은 건너뛴다 (「진달래꽃」 뒤의 「현대시 진달래꽃」 같은 것) */
+  for c in
   with cand as (
     select public._kw_clean(e #>> '{}') as k, 1 as pri, l.o * 100 + e2.o as o
       from public.review_notes r,
@@ -52,7 +58,14 @@ as $$
      where char_length(k) between 2 and 20 and k !~ '^[0-9\s.~-]+$'
      group by k
   )
-  select coalesce(jsonb_agg(k order by rk), '[]'::jsonb) from (select k, rk from ok order by rk limit 5) x;
+  select k from ok order by rk
+  loop
+    if exists (select 1 from unnest(picked) p where position(p in c.k) > 0 or position(c.k in p) > 0) then continue; end if;
+    picked := picked || c.k;
+    exit when array_length(picked, 1) >= 5;
+  end loop;
+  return to_jsonb(picked);
+end;
 $$;
 revoke all on function public._kw_clean(text) from public, anon, authenticated;
 revoke all on function public._summary_keywords(text, date, jsonb) from public, anon, authenticated;
