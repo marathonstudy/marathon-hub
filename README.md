@@ -609,6 +609,12 @@ delete from public.staff where email = '조교이메일@example.com';
   「오늘 할 일」 — 안 보낸 학생 이름(3명까지 · 넘으면 「홍민기 외 4명」 펼치기) · 짐작한 이유(신입 · 10/29 등록 · 번호 없음 · 보내기 실패 · 결석 · 퇴원 예정) · 이름 옆 ×
   학생 등록 창 · 엑셀 넣기 — 수강 시작일 칸 (기본값 그 반 다음 수업일)
 
+### 5-49. 20261031r — 여러 명에게 보낼 때 「내 번호로도 한 통 받기(맨 위 학생 기준)」 (SQL · 함수 배포 없음)
+- 코치룸 sms.js — 문자 발송 → 보내기 · 레포트 발송 반 카드 [알림톡 n명 보내기](kakao.js) 에 체크(기본 켜짐 · 이 기기에 기억 `mhub.copyMe`)
+  보낸 뒤 맨 위 학생 내용 그대로 「나에게 시험 발송」과 같은 길로 내 시험 번호에 한 통 (sms-send `test` · 알림톡이면 kakao-send `test`)
+  확인 창 「+ 내 번호 1통」 · 보냄 표시(sent)에 세지 않음 · 보낸 기록의 시험 묶음은 「내 번호 확인용」 · 내 시험 번호가 비면 체크를 끄고 안내
+- 실패만 다시 보내기 · 학생 한 명에게 보내기에는 붙이지 않는다
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

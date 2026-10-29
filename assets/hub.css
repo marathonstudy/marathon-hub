@@ -1209,3 +1209,13 @@ html.rn-lock, html.rn-lock body { overflow: hidden; }
 .aw-sum--new { color: #7A7F98; background: #EEF0F5; }
 .cal-cell--new { display: flex; flex-direction: column; align-items: center; justify-content: center; background: #EEF0F5; color: #8A8FA6; overflow: hidden; padding: 0 1px; }
 .cal-cell--new small { font-size: 9px; font-weight: 700; letter-spacing: -.06em; }
+
+/* 수업 영상 카드 — 어떤 수업이었는지 · 키워드 · 찾기 (20261031t) */
+.vd-info { margin: 2px 0 10px; display: grid; gap: 6px; }
+.vd-big { margin: 0; font-size: 17px; font-weight: 800; color: var(--ink-deep, #2C3566); line-height: 1.45; overflow-wrap: anywhere; }
+.vd-lines { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; font-size: 14px; line-height: 1.5; color: #4E5691; }
+.vd-lines li { overflow-wrap: anywhere; }
+.vd-kws { display: flex; flex-wrap: wrap; gap: 5px; }
+.vd-kw { padding: 2px 9px; border-radius: 999px; background: #EFEBFF; color: #3A2799; font-size: 12.5px; font-weight: 700; max-width: 100%; overflow-wrap: anywhere; }
+.vd-find { display: block; margin: 0 0 12px; }
+.vd-find__in { width: 100%; box-sizing: border-box; min-height: 44px; padding: 8px 12px; border: 1px solid #D9D4F5; border-radius: 12px; font: inherit; font-size: 16px; background: #fff; }

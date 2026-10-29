@@ -111,7 +111,10 @@
     var n = list.length;
     var msgs = list.reduce(function (a, s) { return a + Math.max(1, (s.phones || []).length); }, 0);
     var won = msgs * (cfg.unitWon != null ? cfg.unitWon : 13);
-    var desc = n + '명에게 알림톡을 보냅니다. 예상 비용 약 ' + won.toLocaleString() + '원' +
+    /* 「내 번호로도 한 통 받기(맨 위 학생 기준)」 — 맨 위 학생 알림톡 그대로 내 시험 번호로 (보낸 기록 「내 번호 확인용」 · sms.js · 20261031r) */
+    var copy = n > 1 && !!(window.Sms && Sms.copyOn && Sms.copyOn());
+    var nm0 = (Store.getStudents().find(function (x) { return x.id === list[0].id; }) || {}).name || '첫';
+    var desc = n + '명에게 알림톡을 보냅니다' + (copy ? ' + 내 번호 1통 (맨 위 ' + nm0 + ' 학생 내용 그대로 · ' + Sms.myPhone() + ' · 보냄 표시에는 세지 않음)' : '') + '. 예상 비용 약 ' + won.toLocaleString() + '원' +
       (msgs !== n ? ' (번호 ' + msgs + '개)' : '') + '.' +
       (cfg.smsFallback ? ' 알림톡이 실패하면 문자로 대신 보내며, 그때는 건당 약 ' + LMS_WON + '원까지 더 들 수 있습니다.' : '') +
       (resend ? ' 이미 보낸 학생에게 한 번 더 보냅니다.' : '');
@@ -131,7 +134,15 @@
             total.skipped = total.skipped.concat(r.skipped || []); total.results = total.results.concat(r.results || []);
           });
         });
-      }, Promise.resolve()).then(function () { summarize(total, false); after(); });
+      }, Promise.resolve()).then(function () {
+        summarize(total, false);
+        if (!copy || !total.ok) { after(); return; }
+        return invoke({ action: 'test', week: st.week, students: [list[0].id] }).then(function (r) {
+          var ok = r && r.ok && r.sent;
+          toast(ok ? '내 번호로도 한 통 보냈습니다 (' + nm0 + ' 학생 알림톡)' : '내 번호 확인용 한 통은 보내지 못했습니다' + (r && r.message ? ' — ' + r.message : ''), ok ? 'good' : 'bad');
+          after();
+        });
+      });
     });
   }
 

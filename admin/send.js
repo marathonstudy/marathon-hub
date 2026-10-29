@@ -299,6 +299,8 @@
         var need = window.Today && Today.appNeed ? g.rows.filter(function (s) { return Today.appNeed(s.id); }).map(function (s) { return s.id; }) : [];
         body = '<div class="snd-acts">' +
             (kakaoOn() ? '<button class="btn btn--sm btn--primary" type="button" data-kk-class' + (targets.length && !Kakao.busy() ? '' : ' disabled') + '>알림톡 ' + targets.length + '명 보내기</button>' : '') +
+            /* 여러 명에게 알림톡 — 「내 번호로도 한 통 받기(맨 위 학생 기준)」 (sms.js · 20261031r) */
+            (kakaoOn() && targets.length > 1 && window.Sms && Sms.copyHtml ? Sms.copyHtml() : '') +
             (g.name === NOCLS ? '' : '<button class="btn btn--sm" type="button" data-sms-cls="' + esc(g.name) + '" data-sms-week="' + esc(state.week) + '" title="문자 창 — 보낼 표 · 이 수업 레포트를 누구에게 언제 보냈는지도 표에 나옵니다">반 전체 문자 · 보낸 표</button>') +
             (need.length ? '<button type="button" class="tdc-link-btn tdc-need num" data-app-need="' + esc(need.join(',')) + '" title="누르면 그 학생들 링크 칸이 차례로 펼쳐집니다">+ 과제 링크 연결 필요 ' + need.length + '명</button>' : '') +
             /* 학생 정렬 — 목록 머리줄 오른쪽 끝 (「오늘」과 같은 작은 글자 버튼 · 20261031e) */
@@ -739,6 +741,7 @@
   });
 
   window.addEventListener('jt:kakao', function () { if (state.loaded) render(); });
+  window.addEventListener('jt:copyme', function () { if (state.loaded) render(); });       /* 내 시험 번호를 알게 되면 (sms.js) */
   window.addEventListener('jt:profiles', function () { if (state.loaded) render(); });
   /* 과제 기록을 받거나 · 정렬을 바꾸거나 · 과제 링크를 넣으면 (today.js · applink.js) — 보고 있을 때만, 받는 동안은 0.4초에 한 번 */
   var appTimer = null;

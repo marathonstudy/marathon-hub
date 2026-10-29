@@ -91,6 +91,54 @@
     });
   }
 
+  /* ---------- 「내 번호로도 한 통 받기(맨 위 학생 기준)」 (20261031r) ----------
+     여러 명에게 보낼 때(문자 발송 → 보내기 · 레포트 발송 반 카드 알림톡) 맨 위 학생에게 실제로 가는 내용 그대로 내 시험 번호로 한 통 더.
+     알림톡이면 알림톡(kakao-send test), 문자면 문자(sms-send test) — 학생 발송 현황(보냄 표시)에 세지 않고 보낸 기록에 「내 번호 확인용」.
+     기본 켜짐 · 이 기기에 기억 (mhub.copyMe). 내 시험 번호가 비어 있으면 안내하고 체크를 끈다 */
+  var COPY_KEY = 'mhub.copyMe';
+  var me = { phone: null, p: null };
+  function loadMyPhone(force) {
+    if (me.p && !force) return me.p;
+    me.p = Promise.resolve(sb().rpc('sms_settings_get')).then(function (r) {
+      if (r && !r.error && r.data) return r.data.testPhone || '';
+      return Promise.resolve(sb().rpc('kakao_settings_get')).then(function (k) { return k && !k.error && k.data ? k.data.testPhone || '' : ''; });
+    }).then(function (p) { setMyPhone(p); return p; }, function () { setMyPhone(''); return ''; });
+    return me.p;
+  }
+  function setMyPhone(p) {
+    var was = me.phone;
+    me.phone = p || '';
+    if (was !== me.phone) window.dispatchEvent(new CustomEvent('jt:copyme'));
+  }
+  function copyPref() { try { return localStorage.getItem(COPY_KEY) !== '0'; } catch (e) { return true; } }
+  function copyOn() { return copyPref() && !!me.phone; }
+  function copyHtml(id) {
+    if (me.phone === null) loadMyPhone();
+    var has = !!me.phone;
+    return '<label class="copyme' + (has ? '' : ' is-off') + '"><input type="checkbox" data-copyme' + (id ? ' id="' + id + '"' : '') + (copyOn() ? ' checked' : '') + (has ? '' : ' disabled') + '>' +
+      ' <span>내 번호로도 한 통 받기 <small>(맨 위 학생 기준' + (has ? ' · ' + esc(me.phone) : '') + ')</small></span>' +
+      (has || me.phone === null ? '' : '<small class="copyme__why">내 시험 번호가 없어 꺼 두었습니다 — 「문자 발송 → 연결 상태」에서 넣으면 켤 수 있습니다</small>') + '</label>';
+  }
+  document.addEventListener('change', function (e) {
+    var t = e.target;
+    if (!t || !t.hasAttribute || !t.hasAttribute('data-copyme')) return;
+    try { localStorage.setItem(COPY_KEY, t.checked ? '1' : '0'); } catch (er) {}
+    Array.prototype.forEach.call(document.querySelectorAll('[data-copyme]'), function (x) { if (x !== t && !x.disabled) x.checked = t.checked; });
+  });
+  /* 맨 위 학생 내용 그대로 내 번호로 — 알림톡(학부모 · 카톡으로 보냈을 때)이면 알림톡, 아니면 문자 */
+  function sendCopy(pl, first, kk) {
+    if (!first) return Promise.resolve();
+    var useKk = !!kk && first.t !== 'student';
+    var body = st.notify ? String(pl.body).split('#{바뀐 내용}').join(String(st.notify[first.s.id] || '내용')) : pl.body;
+    var q = useKk
+      ? invoke({ action: 'test', week: st.week, students: [first.s.id] }, KFN)
+      : invoke(Object.assign({}, pl, { action: 'test', body: body, items: [{ student_id: first.s.id, to: first.t }], markWeek: '', label: ((pl.label || '문자') + ' · 내 번호 확인용').slice(0, 60) }));
+    return q.then(function (r) {
+      var ok = r && r.ok && r.sent;
+      toast(ok ? '내 번호로도 한 통 보냈습니다 (' + first.s.name + ' 학생 내용 · ' + (useKk ? '알림톡' : '문자') + ')' : '내 번호 확인용 한 통은 보내지 못했습니다' + (r && r.message ? ' — ' + r.message : ''), ok ? 'good' : 'bad');
+    });
+  }
+
   /* ---------- 학생 · 반 ---------- */
 
   function active() { return UI.activeStudents(); }
@@ -498,6 +546,12 @@
     $('#smsTest').disabled = st.busy || !(plan && plan.items.length && $('#smsBody').value.trim());
     $('#smsSend').textContent = st.busy ? '보내는 중…' : st.done ? '보냄 완료' : plan && plan.items.length ? plan.items.length + '건 보내기' : '보내기';
     $('#smsResend').hidden = !st.done;
+    /* 여러 명에게 보낼 때만 「내 번호로도 한 통 받기」 */
+    var ch = $('#smsCopyHost');
+    if (ch) {
+      var h = plan && plan.people > 1 && !st.done ? copyHtml('smsCopyMe') : '';
+      if (ch.dataset.h !== h) { ch.innerHTML = h; ch.dataset.h = h; }
+    }
   }
 
   /* ---------- 자주 쓰는 문구 (직원 공용 · sms_templates) ---------- */
@@ -695,6 +749,7 @@
       if (r.error) { st.cfg = null; st.missing = isMissing(r.error); if (!st.missing) toast('문자 설정을 불러오지 못했습니다 — ' + r.error.message, 'bad'); return; }
       st.cfg = Object.assign({}, DEF, r.data || {});
       st.missing = false;
+      setMyPhone(st.cfg.testPhone || '');
     }, function () { st.cfg = null; });
   }
   /* 반 「앱 입장코드」 (classes.app_code · migration-040) — 아직 없으면 빈 칸 */
@@ -884,7 +939,9 @@
     var kk = !retryList && viaKakao();
     var prevN = p.items.filter(function (x) { return st.prev[x.s.id]; }).map(function (x) { return x.s.id; }).filter(function (v, i, a) { return a.indexOf(v) === i; }).length;
     var kkN = kk ? p.items.filter(function (x) { return x.t !== 'student'; }).map(function (x) { return x.s.id; }).filter(function (v, i, a) { return a.indexOf(v) === i; }).length : 0;
-    var desc = p.people + '명 · 문자 ' + p.items.length + '건 (단문 ' + p.sms + ' · 장문 ' + p.lms + ') · 예상 약 ' + p.won.toLocaleString() + '원을 보냅니다.' +
+    var copy = !retryList && p.people > 1 && copyOn();
+    var desc = p.people + '명 · 문자 ' + p.items.length + '건' + (copy ? ' + 내 번호 1통' : '') + ' (단문 ' + p.sms + ' · 장문 ' + p.lms + ') · 예상 약 ' + p.won.toLocaleString() + '원을 보냅니다.' +
+      (copy ? ' 맨 위 ' + p.items[0].s.name + ' 학생에게 가는 내용 그대로 내 번호(' + me.phone + ')로도 한 통 갑니다 (보냄 표시에는 세지 않음).' : '') +
       (kk ? ' 학부모 ' + kkN + '명은 카톡 알림톡(「' + KK_TEMPLATE + '」 템플릿)으로 — 카톡을 안 받으면 문자로 대신 갑니다.' : '') +
       (again ? ' 방금 보낸 사람에게 한 번 더 보냅니다.' : '') +
       (prevN ? ' 이 레포트를 이미 보낸 학생 ' + prevN + '명에게도 다시 보냅니다.' : '') +
@@ -904,6 +961,7 @@
       go.then(function (res) {
         st.busy = false;
         showResult(res, !!retryList);
+        if (copy && res && res.ok) sendCopy(pl, p.items[0], kk);
         if (st.notify) recordNotify(res);
         if (st.purpose === 'app') recordInvite(res);
         loadCfg().then(renderPreview);
@@ -995,7 +1053,7 @@
     }, function () {});
   }
 
-  var TO_LABEL = { parent1: '학부모', parent2: '학부모', parent: '학부모', student: '학생 본인', test: '시험' };
+  var TO_LABEL = { parent1: '학부모', parent2: '학부모', parent: '학부모', student: '학생 본인', test: '내 번호 확인용' };
 
   function showResult(res, isRetry) {
     var host = $('#smsResult');
@@ -1121,7 +1179,7 @@
           var cls = (x.classes || []).slice(0, 3).join(', ') + ((x.classes || []).length > 3 ? ' 외 ' + ((x.classes || []).length - 3) : '');
           return '<li><button type="button" class="sms-batch' + (x.fail ? ' has-fail' : '') + '" data-batch="' + i + '">' +
               '<span class="sms-batch__main"><span class="num">' + esc(fmtAt(x.at)) + '</span> · ' + (cls ? esc(cls) + ' ' : '') + esc(name) + ' · <span class="num">' + x.n + '</span>건 · 성공 <span class="num">' + x.ok + '</span>' + (x.fail ? ' · <b class="sms-batch__bad">실패 ' + x.fail + '</b>' : '') + '</span>' +
-              '<span class="sms-batch__sub muted-note">' + (x.via === 'kakao' ? '알림톡' : '문자') + (x.test ? ' · 시험 발송' : '') + ' · ' + esc(x.by_name || '') + '</span>' +
+              '<span class="sms-batch__sub muted-note">' + (x.via === 'kakao' ? '알림톡' : '문자') + (x.test ? ' · 내 번호 확인용' : '') + ' · ' + esc(x.by_name || '') + '</span>' +
             '</button></li>';
         }).join('') + '</ul>';
     });
@@ -1610,6 +1668,8 @@
     open: open, openLog: function (o) { goTab(); openLog(o); }, openSettings: openSettings, showPane: function (p) { goTab(); showPane(p); },
     appInvite: appInvite, inviteOpts: inviteOpts, resetInvite: resetInvite,
     build: build, bytes: bytes, kdate: kdate, state: function () { return st; },
-    isOpen: function () { return !!$('#panel-sms') && !$('#panel-sms').hidden && st.pane === 'send'; }
+    isOpen: function () { return !!$('#panel-sms') && !$('#panel-sms').hidden && st.pane === 'send'; },
+    /* 「내 번호로도 한 통 받기」 — kakao.js · send.js 도 같이 (20261031r) */
+    copyHtml: copyHtml, copyOn: copyOn, myPhone: function () { return me.phone; }, loadMyPhone: loadMyPhone
   };
 })();

@@ -3521,3 +3521,19 @@ textarea.aip-text--new:focus { outline: 2px solid #B9AEF0; outline-offset: 1px; 
 .td-todo__x:hover { background: #F1EFFC; color: #4A34B8; }
 .td-todo__more { appearance: none; border: 0; background: none; font: inherit; font-size: 12.5px; font-weight: 800; color: #5A3FD0; cursor: pointer; padding: 2px 0; min-height: 28px; }
 .td-care2__nm .td-guess { margin-left: 3px; }
+
+/* ============================================================
+   내 번호로도 한 통 · 로그인 불가 · 키워드 (sms.js · kakao.js · app.js · review.js · summary.js · 20261031r~t)
+   ============================================================ */
+.copyme { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; font-size: 13px; color: var(--ink-deep); min-height: 36px; }
+.copyme input { width: 18px; height: 18px; }
+.copyme small { color: var(--ink-light); }
+.copyme.is-off { color: var(--ink-light); }
+.copyme__why { flex: 1 1 100%; font-size: 11.5px; color: #874A0B !important; }
+.snd-acts .copyme { flex: 1 1 100%; }
+.login-no { appearance: none; margin-left: 4px; padding: 1px 7px; border: 1px solid #F0B9C6; border-radius: 999px; background: #FCE4E9; color: #9E1F3B; font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; min-height: 22px; }
+.login-no:hover { background: #F9D3DC; }
+.kw-line { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0 2px; font-size: 12.5px; }
+.kw-line__t { font-weight: 800; color: var(--ink-mid); }
+.kw-line__in { width: 9em; min-height: 32px; font-size: 13px; }
+.kw-line__hint { flex: 1 1 100%; }
