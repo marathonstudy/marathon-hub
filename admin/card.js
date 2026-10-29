@@ -98,6 +98,9 @@
     $('#cardLogin').textContent = '';
     $('#btnCardSms').setAttribute('data-sms-sid', sid);
     $('#btnCardSms').hidden = !!s.archived;
+    /* [앱 안내 문자] — 「문자 발송」 → 보내기 (앱 안내(기본) · 그 반 입장코드 · 20261031m) */
+    $('#btnCardApp').setAttribute('data-app-invite', sid);
+    $('#btnCardApp').hidden = !!s.archived;
     $('#cardDesc').textContent = [s.className, s.school, s.grade].filter(Boolean).join(' · ') +
       ' — 선생님·조교만 봅니다. 학부모 화면에는 나가지 않습니다';
     $('#cardBody').innerHTML = '<p class="panel__hint">불러오는 중…</p>';

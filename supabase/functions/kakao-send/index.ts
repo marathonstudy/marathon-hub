@@ -2,10 +2,12 @@
 //  kakao-send — 레포트 알림톡 발송 (솔라피)
 //
 //  코치룸 ④ 발송 → [알림톡 보내기] · [나에게 시험 발송] · [설정]의 알림톡 칸이 부른다. 로그인한 직원만 (조교 · 선생님 같다).
-//    action "status" — 키 다섯 개가 들어갔는지(있음/없음)와 템플릿 ID 만 돌려준다. 키 값은 절대 돌려주지 않는다.
+//    action "health" — 「문자 발송 → 연결 상태」 (20261031m) · 필요한 Secrets 가 들어갔는지 true/false 만 돌려준다. 값은 절대 돌려주지 않는다.
+//    action "status" — health 와 같고 알림톡 설정(cfg)을 더한다. 템플릿 ID 도 값이 아니라 있음/없음(templateSet)만.
 //    action "send"   — { week, students: [학생 id], resend } 화면은 학생 id 만 보낸다. 번호 · 링크 코드 · 이름 · 수업일은
 //                      부른 직원의 로그인으로 DB 함수 kakao_prepare 가 찾는다 (공개 전 · 이미 보냄 · 번호 없음은 건너뛴다,
 //                      한 번에 100명 · 하루 최대 건수). 보낸 결과는 kakao_record 로 기록(번호는 뒤 4자리만).
+//                      fallback: true — 「카톡으로 보내기(안 받는 사람은 문자로)」 · 설정의 「문자로 대신 보내기」가 꺼져 있어도 이번만 문자로 대신
 //    action "test"   — { week, students } 그 주 레포트가 공개된 첫 학생 내용으로, 설정에 넣은 내 번호에 한 건만.
 //  솔라피는 「접수」 결과만 바로 알려 준다 (실제 도착 여부는 솔라피 콘솔의 발송 내역에서 본다).
 //
@@ -92,8 +94,9 @@ async function handle(req: Request, cors: Record<string, string>) {
 
   const have: Record<string, boolean> = {};
   KEYS.forEach((k) => { have[k] = !!env(k); });
+  if (action === "health") return json({ ok: true, keys: have, ready: KEYS.every((k) => have[k]) }, cors);
   if (action === "status") {
-    return json({ ok: true, keys: have, templateId: env("SOLAPI_TEMPLATE_ID"), cfg }, cors);
+    return json({ ok: true, keys: have, templateSet: have.SOLAPI_TEMPLATE_ID, cfg }, cors);
   }
   if (action !== "send" && action !== "test") return json({ ok: false, reason: "input", message: "알 수 없는 요청입니다." }, cors, 400);
 
@@ -127,7 +130,7 @@ async function handle(req: Request, cors: Record<string, string>) {
       pfId: env("SOLAPI_PFID"),
       templateId: env("SOLAPI_TEMPLATE_ID"),
       variables: { "#{이름}": String(r.name || ""), "#{수업일}": String(r.lesson || ""), "#{코드}": String(r.code || "") },
-      disableSms: !prep.smsFallback,
+      disableSms: !(prep.smsFallback || body.fallback === true),
     },
     customFields: { log: String(r.log_id) },
   }));

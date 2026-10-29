@@ -4,6 +4,7 @@
    · 이름 바꾸기 — 그 반의 모든 기록이 새 이름을 따라간다 (서버 함수 class_rename 이 한 번에)
    · 보관 / 되살리기 — 보관한 반은 모든 반 목록에서 숨긴다. 기록 · 학생은 그대로
    · 삭제 — 학생(퇴원생 포함) 0명 · 기록 0건인 반만 버튼이 보인다
+   · 앱 입장코드 — 그 반 학생을 등록할 때 「마라톤 앱 안내 문자」의 입장코드 칸에 저절로 (classes.app_code · migration-040 · 20261031m)
    전부 서버 함수(class_*)가 teacher 인지 다시 확인한다. 바뀐 내용은 class_log 에 남는다.
    ============================================================ */
 
@@ -48,7 +49,12 @@
       }
       data = r.data;
       if (editing && !data.classes.some(function (c) { return c.name === editing; })) editing = '';
-      render();
+      /* 앱 입장코드 — classes 표에서 (040 전이면 칸 없이 「—」) */
+      return sb().from('classes').select('name,app_code').then(function (q) {
+        var by = {};
+        if (!q.error) (q.data || []).forEach(function (x) { by[x.name] = x.app_code || ''; });
+        data.classes.forEach(function (c) { c.app_code = q.error ? null : (by[c.name] || ''); });
+      }, function () {}).then(render);
     });
   }
 
@@ -91,13 +97,15 @@
       '<td>' + records(c) + '</td>' +
       '<td>' + (c.review_names == null ? '<span class="muted-note">—</span>'
         : '<input class="input ca-names" type="text" maxlength="110" data-ca-names value="' + esc((c.review_names || []).join(', ')) + '" aria-label="복습테스트 기본 시험 목록 (쉼표로 나눠 순서대로)">') + '</td>' +
+      '<td>' + (c.app_code == null ? '<span class="muted-note">—</span>'
+        : '<input class="input ca-code" type="text" maxlength="30" autocomplete="off" spellcheck="false" data-ca-code value="' + esc(c.app_code) + '" placeholder="예: MARA2026" aria-label="' + esc(c.name) + ' 앱 입장코드">') + '</td>' +
       '<td class="roster__actions tb-acts">' + acts + '</td></tr>';
   }
 
   function table(list, empty) {
     if (!list.length) return '<p class="panel__hint">' + empty + '</p>';
     return '<div class="roster-scroll"><table class="roster tb-table ca-table"><thead><tr>' +
-      '<th>반</th><th>재원</th><th>퇴원</th><th>기록</th><th title="반 수업일마다 저절로 생기는 복습테스트 — 쉼표로 나눠 순서대로 (예: 복습 TEST, 화작문 TEST). 그 주만 끄기 · 더 넣기는 레포트 발송 → 1 작성 반 공통에서">복습 시험 (순서대로)</th><th></th></tr></thead><tbody>' +
+      '<th>반</th><th>재원</th><th>퇴원</th><th>기록</th><th title="반 수업일마다 저절로 생기는 복습테스트 — 쉼표로 나눠 순서대로 (예: 복습 TEST, 화작문 TEST). 그 주만 끄기 · 더 넣기는 레포트 발송 → 1 작성 반 공통에서">복습 시험 (순서대로)</th><th title="그 반 학생을 등록할 때 마라톤 앱 안내 문자의 입장코드 칸에 저절로 들어갑니다 (바꿀 수 있음)">앱 입장코드</th><th></th></tr></thead><tbody>' +
       list.map(row).join('') + '</tbody></table></div>';
   }
 
@@ -239,6 +247,22 @@
       c.review_names = (r.data && r.data.review_names) || names;
       e.target.value = c.review_names.join(', ');
       UI.toast('‘' + c.name + '’ 복습테스트 — ' + c.review_names.join(' · ') + ' (앞으로 생기는 수업일부터)', 'good');
+    });
+  });
+
+  /* 앱 입장코드 (migration-040) — 칸에서 나오면 저장 · 비우면 지움 */
+  $('#caBody').addEventListener('change', function (e) {
+    if (e.target.dataset.caCode == null) return;
+    var c = find(e.target.closest('tr').dataset.name);
+    if (!c) return;
+    var code = e.target.value.trim();
+    if (code && !/^[A-Za-z0-9가-힣_-]{2,30}$/.test(code)) {
+      UI.toast('입장코드는 영문 · 숫자 · 한글 2 ~ 30자로 적어 주세요 (띄어쓰기 없이)', 'bad'); e.target.value = c.app_code || ''; return;
+    }
+    sb().rpc('class_app_code_set', { p_name: c.name, p_code: code }).then(function (r) {
+      if (r.error) { UI.toast(/Could not find the function|schema cache/i.test(r.error.message) ? 'migration-040 SQL 을 먼저 실행해 주세요' : r.error.message, 'bad'); e.target.value = c.app_code || ''; return; }
+      c.app_code = code;
+      UI.toast('‘' + c.name + '’ 앱 입장코드 — ' + (code || '지움'), 'good');
     });
   });
 

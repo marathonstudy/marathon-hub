@@ -328,6 +328,8 @@
 
   function apply() {
     if (!plan) return;
+    /* 새로 들어오는 학생에게 앱 안내 문자 (sms.js · 20261031m) — 반영한 뒤 「문자 발송」 → 보내기 */
+    var invite = window.Sms && Sms.inviteOpts ? Sms.inviteOpts('i') : null;
     var btn = $('#btnImportApply');
     btn.disabled = true;
     btn.textContent = '반영하는 중…';
@@ -378,6 +380,11 @@
         toast('새 학생 ' + p.adds.length + '명 · 고친 학생 ' + p.updates.length + '명 반영' +
               (issued ? ' · 개인 링크 ' + issued + '명 발급' : ''), 'good');
         plan = null;
+        var newIds = p.adds.map(function (a) { return a.student.id; }).filter(function (id) {
+          var s = Store.getStudents().find(function (x) { return x.id === id; });
+          return s && !s.archived;
+        });
+        if (invite && newIds.length) Sms.appInvite(newIds, { code: invite.code, to: invite.to, from: 'roster', confirm: true });
       })
       .catch(function (e) {
         btn.disabled = false;
@@ -416,6 +423,7 @@
     renderPlan();
     showError('');
     $('#importPreview').textContent = '';
+    if (window.Sms && Sms.resetInvite) Sms.resetInvite('i', true);
     $('#importModal').showModal();
   });
   $('#btnImportCancel').addEventListener('click', function () { $('#importModal').close(); });

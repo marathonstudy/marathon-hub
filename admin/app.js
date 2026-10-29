@@ -149,7 +149,8 @@
     { tab: '#tab-book',    panel: '#panel-book'    },
     { tab: '#tab-photo',   panel: '#panel-photo'   },
     { tab: '#tab-today',   panel: '#panel-today'   },    /* 7 — 화면 맨 앞 · 로그인 첫 화면 */
-    { tab: '#tab-attbook', panel: '#panel-attbook' }     /* 8 — 학생 → 출석부 (attbook.js · 20261031i) */
+    { tab: '#tab-attbook', panel: '#panel-attbook' },    /* 8 — 학생 → 출석부 (attbook.js · 20261031i) */
+    { tab: '#tab-sms',     panel: '#panel-sms'     }     /* 9 — 문자 발송 (sms.js · 20261031m) */
   ];
 
   function selectTab(idx) {
@@ -323,7 +324,8 @@
         '<button class="btn btn--sm btn--ghost" data-pv="parent" title="학부모 링크로 열었을 때 모습 (작성 화면에서 고른 주 · 공개 전 내용 포함)">학부모 화면 미리보기</button>' +
         '<button class="btn btn--sm btn--ghost" data-pv="student" title="학생 링크로 열었을 때 모습 (작성 화면에서 고른 주 · 공개 전 내용 포함)">학생 화면 미리보기</button>' +
         '<button class="btn btn--sm btn--ghost" data-pv="parent" data-pv-view="app" title="러닝노트 「과제 상세」 탭 — 과제 세부 기록 (학부모 화면과 같은 화면)">과제 상세 보기</button>' +
-        '<button class="btn btn--sm btn--ghost" data-sms-sid="" title="사이트에서 문자 보내기 (sms.js)">문자</button>' +
+        '<button class="btn btn--sm btn--ghost" data-sms-sid="" title="「문자 발송」 → 보내기 (이 학생만 골라진 채로)">문자</button>' +
+        '<button class="btn btn--sm btn--ghost" data-app-invite="" title="마라톤 앱 설치 · 입장코드 안내 문자 (「문자 발송」 → 보내기)">앱 안내 문자</button>' +
         '<button class="btn btn--sm" data-act="edit">수정</button>' +
       '</td>';
   }
@@ -998,6 +1000,8 @@
 
     renderLinkBox();
     renderExtraFields(s);
+    /* 새 학생만 — 「등록하면 마라톤 앱 안내 문자 보내기」 (sms.js · 20261031m) */
+    if (window.Sms && Sms.resetInvite) Sms.resetInvite('f', !s);
     showStudentError('');
     studentModal.showModal();
     setTimeout(function () { $('#fName').focus(); }, 30);
@@ -1150,12 +1154,21 @@
     var link = Store.linkOf(rec.id);
     var needIssue = !rec.archived && !link.hubCode;
     var appChanged = (appCode || '') !== (link.appCode || '');
+    /* 앱 안내 문자 — 새 학생 · 체크했을 때만. 서버에 학생 줄이 생긴 뒤 「문자 발송」 → 보내기에서 확인을 띄운다 */
+    var invite = !prev && !rec.archived && window.Sms && Sms.inviteOpts ? Sms.inviteOpts('f') : null;
+    function afterInvite() {
+      if (!invite) return;
+      Store.flushNow(Store.KEYS.students, Store.getStudents()).then(function () {
+        Sms.appInvite([rec.id], { code: invite.code, to: invite.to, from: 'roster', confirm: true });
+      }, function (e) { toast('학생은 저장했지만 앱 안내 문자를 준비하지 못했습니다 — ' + e.message, 'bad'); });
+    }
 
     studentModal.close();
     render();
 
     if (!needIssue && !appChanged) {
       toast(prev ? rec.name + ' 학생을 수정했습니다' : rec.name + ' 학생을 추가했습니다', 'good');
+      afterInvite();
       return;
     }
 
@@ -1178,6 +1191,7 @@
         render();
         toast(rec.name + ' 학생을 저장했습니다' + (needIssue ? ' · 개인 링크 발급' : '') +
               (appChanged ? ' · 앱 코드 ' + (appCode ? '저장' : '지움') : ''), 'good');
+        afterInvite();
       })
       .catch(function (err) {
         btn.disabled = false;

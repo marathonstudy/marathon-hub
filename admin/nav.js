@@ -17,7 +17,7 @@
 (function () {
   'use strict';
 
-  var TABS = ['roster', 'write', 'publish', 'send', 'notice', 'book', 'photo', 'today', 'attbook'];
+  var TABS = ['roster', 'write', 'publish', 'send', 'notice', 'book', 'photo', 'today', 'attbook', 'sms'];
   var OVERLAYS = ['pvOverlay', 'rvLive'];           /* dialog 가 아닌 전체 화면 창 */
   var ready = false, restoring = 0, ignorePop = 0;
   var stack = [];                                     /* 지금 열린 창 (위가 마지막) */

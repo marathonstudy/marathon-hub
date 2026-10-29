@@ -4,7 +4,8 @@
 //  코치룸 「문자 보내기」 창 · [설정]의 문자 칸이 부른다. 로그인한 직원만 (조교 · 선생님 같다).
 //    action "status" — 키 세 개가 들어갔는지(있음/없음)와 발신번호(숫자만 · 문자 창 「보내는 번호: 02-…」 · 20261031e)를 돌려준다.
 //                      API 키 · 시크릿 값은 절대 돌려주지 않는다.
-//    action "send"   — { items: [{ student_id, to: "parent1" | "parent2" | "student" }], body, ad, lessons, siblings, markWeek }
+//    action "send"   — { items: [{ student_id, to: "parent1" | "parent2" | "student" }], body, ad, lessons, siblings, markWeek,
+//                        label(묶음 이름 · 보낸 기록), purpose(app 앱 안내 …), vars({ 학생 id: { code: 입장코드 } }) }   (label · purpose · vars 는 migration-040)
 //                      화면은 학생 id 와 보낼 곳만 보낸다. 번호 · 링크 코드는 부른 직원의 로그인으로 DB 함수 sms_prepare 가 찾는다
 //                      (같은 번호는 한 번만 · 한 번 · 하루 상한 · 광고 문구). 보낸 결과는 sms_record 로 기록(번호는 뒤 4자리만).
 //    action "test"   — 같은 내용을 첫 사람 것으로 바꿔, 설정에 넣은 내 시험 번호에 한 건만.
@@ -71,6 +72,7 @@ async function solapiAuth(key: string, secret: string): Promise<string> {
 const REASON: Record<string, string> = {
   nophone: "번호 없음",
   nolink: "링크 없음",
+  nocode: "입장코드 없음",
   sibling: "같은 번호(형제) — 한 번만",
   toolong: "너무 김",
 };
@@ -110,6 +112,16 @@ async function handle(req: Request, cors: Record<string, string>) {
     Object.keys(body.lessons).slice(0, 200).forEach((k) => { lessons[String(k).slice(0, 60)] = String(body.lessons[k] ?? "").slice(0, 30); });
   }
   const markWeek = /^\d{4}-\d{2}-\d{2}$/.test(String(body.markWeek ?? "")) ? String(body.markWeek) : null;
+  /* 묶음 이름 · 목적 · 학생마다 입장코드 (migration-040) */
+  const label = String(body.label ?? "").slice(0, 60);
+  const purpose = String(body.purpose ?? "").replace(/[^a-z]/g, "").slice(0, 20);
+  const vars: Record<string, { code: string }> = {};
+  if (body.vars && typeof body.vars === "object") {
+    Object.keys(body.vars).slice(0, 3000).forEach((k) => {
+      const c = String(body.vars[k]?.code ?? "").trim();
+      if (/^[0-9a-f-]{36}$/i.test(k) && /^[A-Za-z0-9가-힣_-]{2,30}$/.test(c)) vars[k] = { code: c };
+    });
+  }
   const missing = KEYS.filter((k) => !have[k]);
   if (missing.length) {
     return json({ ok: false, reason: "nokeys", missing, message: "문자 키가 아직 다 들어가지 않았습니다 (" + missing.join(", ") + "). Supabase Secrets 에 넣어 주세요." }, cors, 200);
@@ -117,13 +129,25 @@ async function handle(req: Request, cors: Record<string, string>) {
 
   /* 1) 보낼 줄 — 기록 줄을 먼저 만든다 */
   let prep: Any;
+  const args: Record<string, unknown> = {
+    p_items: items, p_body: text, p_ad: !!body.ad, p_lessons: lessons, p_siblings: !!body.siblings,
+    p_test: action === "test", p_mark_week: action === "test" ? null : markWeek, p_site: SITE,
+  };
   try {
-    prep = await rpcAs(auth, apikey, "sms_prepare", {
-      p_items: items, p_body: text, p_ad: !!body.ad, p_lessons: lessons, p_siblings: !!body.siblings,
-      p_test: action === "test", p_mark_week: action === "test" ? null : markWeek, p_site: SITE,
-    });
+    prep = await rpcAs(auth, apikey, "sms_prepare", { ...args, p_label: label, p_purpose: purpose, p_vars: vars });
   } catch (e) {
-    return json({ ok: false, reason: "prepare", message: String((e as Error).message || e) }, cors, 200);
+    const m = String((e as Error).message || e);
+    const old = /Could not find the function|schema cache|function (public\.)?sms_prepare\(.*\) does not exist/i.test(m);
+    /* migration-040 전 — 새 칸 없이 예전처럼 (입장코드 · 앱 설치 링크를 쓴 글은 보낼 수 없다) */
+    if (old && /#\{입장코드\}|#\{앱 설치 링크\}/.test(text)) {
+      return json({ ok: false, reason: "nosql", message: "입장코드 · 앱 설치 링크를 쓰려면 migration-040 SQL 을 먼저 실행해 주세요." }, cors, 200);
+    }
+    if (!old) return json({ ok: false, reason: "prepare", message: m }, cors, 200);
+    try {
+      prep = await rpcAs(auth, apikey, "sms_prepare", args);
+    } catch (e2) {
+      return json({ ok: false, reason: "prepare", message: String((e2 as Error).message || e2) }, cors, 200);
+    }
   }
   const skipped = (prep?.skipped || []).map((s: Any) => ({ student_id: s.student_id, name: s.name, to: s.to, reason: s.reason, label: REASON[s.reason] || s.reason }));
   if (!prep?.ok) return json({ ok: false, reason: prep?.reason || "prepare", message: prep?.message || "보낼 수 없습니다.", skipped }, cors, 200);

@@ -48,10 +48,10 @@ admin/        코치룸 (명단 · 작성 · 공개 · 발송 · 반 공지 · �
   draftguard.js 레포트 발송 → 1 작성 글 지키기 — 다른 사람이 고친 칸 알림 · 저장 안 된 내용 복구 · 이전 내용 보기
   preview.js    학부모 화면 · 학생 화면 미리보기 (조교 화면 · 링크 코드 없이 · 아무것도 안 바뀜)
   aipolish.js   글 칸 「AI로 다듬기」 · 「AI로 초안 쓰기」 공통 부품 — 학생 · 학부모가 읽는 모든 여러 줄 글 칸 (20261029g)
-  rtabs.js      위쪽 탭 5개(오늘 · 레포트 발송 · 학생 · 교재 · 더보기) · 레포트 발송 세 단계(작성 ── 공개 ── 발송 n/전체) · 학생 두 화면 · 더보기 메뉴 (20261029a)
+  rtabs.js      위쪽 탭 6개(오늘 · 레포트 발송 · 문자 발송 · 학생 · 교재 · 더보기) · 레포트 발송 세 단계(작성 ── 공개 ── 발송 n/전체) · 학생 두 화면 · 더보기 메뉴 (20261029a)
   nav.js        뒤로가기 · 새로고침 (탭 · 반 · 주차 · 창마다 기록) · 저장 안 된 글이 있으면 떠나기 전 확인
   send.js       레포트 발송 → 3 발송 — 주차 띠 · 반마다 카드 · 학생 줄 한 줄 · ⋯ 메뉴 (알림톡은 kakao.js)
-  sms.js        사이트에서 문자 보내기 (SMS · LMS) · 자주 쓰는 문구 · 문자 보낸 기록 · [설정] 문자 칸
+  sms.js        「문자 발송」 탭 — 보내기(SMS · LMS · 카톡 알림톡 고르기) · 자주 쓰는 문구 · 보낸 기록 · 연결 상태 · 새 학생 앱 안내 문자 (20261031m)
 me/           학생·학부모 개인 페이지
 s/            학생 공용 입구 (반 · 이름 · 휴대폰 번호 8자리 → /me/#학생링크) — assets/entry.js
 notice/       반 공용 공지 페이지
@@ -553,6 +553,22 @@ delete from public.staff where email = '조교이메일@example.com';
 - 코치룸: 「수업 내용」 [📒 복습 노트 만들기] → 「복습 노트」 칸 (admin/reviewnote.js) · 자막은 「✨ 영상 자막으로 채우기」에 넣은 것 (Summary.source · 이 화면 메모리에만)
 - 러닝노트: assets/review-note.js — 레포트 수업 영상 아래 「이번 수업 복습 노트」 · 「복습 노트 모음」 · 휴대폰 한 장 · OX 한 문제씩(학생) · 접어서(학부모) · 인쇄 / PDF
 - 「오늘」 반 카드 「이번 복습 노트 연 학생 n/전체」
+
+### 5-44. 20261031m — 「문자 발송」 탭 · 새 학생 앱 안내 문자 (migration-040-sms-tab.sql · Edge Function sms-send · kakao-send 다시 배포)
+1. Supabase SQL Editor 에서 `supabase/migration-040-sms-tab.sql` 실행 (039 다음 · 여러 번 실행해도 안전).
+   - `sms_batches` 한 번 보낸 묶음 (문구 이름 · 쓴 글 · 수업일 · 입장코드 — 보낸 기록 · 실패만 다시 보내기) · `sms_batch_list` · `sms_batch_get` (알림톡 kakao_log 도 직원 · 주 · 분마다 한 묶음)
+   - `classes.app_code` 반 「앱 입장코드」 · `class_app_code_set`
+   - 문자 설정에 한 달 최대(monthMax · 기본 3000) · 앱 설치 링크(androidUrl · iosUrl · `sms_app_links_set`) · `sms_settings_get` 에 이번 달 건수(month)
+   - `sms_prepare` 새 칸 — #{입장코드}(p_vars · 학생마다) · #{앱 설치 링크} · p_label · p_purpose · 한 달 최대 · 묶음 줄. 예전 모양(8칸)은 지운다
+   - 자주 쓰는 문구 순서(`sms_templates_reorder`) · 「앱 안내(기본)」 문구 (처음 한 번만 · 지우면 다시 안 생김)
+2. Edge Functions → `sms-send` → `supabase/functions/sms-send/index.ts` 전체로 Deploy (label · purpose · vars 를 넘김 · 040 전이면 예전처럼)
+3. Edge Functions → `kakao-send` → `supabase/functions/kakao-send/index.ts` 전체로 Deploy
+   - action `health` — 필요한 Secrets 다섯 개가 들어갔는지 true/false 만 (값은 절대 안 돌려줌). `status` 도 템플릿 ID 값 대신 `templateSet`
+   - `fallback: true` — 「카톡으로 보내기(안 받는 사람은 문자로)」 · 이번만 문자로 대신 (설정의 문자 대체는 그대로)
+   - 둘 다 Verify JWT 는 끈 채로 (예전과 같음)
+- 코치룸: 위쪽 탭 「문자 발송」(app.js TABS 9 · `#tab=sms`) — 보내기 · 자주 쓰는 문구 · 보낸 기록 · 연결 상태. 예전 문자 창(smsModal) · 기록 창 · 「오늘」 → [설정]의 알림톡 · 문자 칸은 이 탭으로 옮겼다
+- 다른 화면의 [문자] · [전체 문자 발송] · [반 전체 문자] · [앱 안내 문자]는 모두 이 탭의 「보내기」를 골라진 채로 연다 (Sms.open · data-sms-cls · data-sms-sid · data-app-invite)
+- 학생 등록(한 명 · 엑셀 · CSV) 「등록하면 마라톤 앱 안내 문자 보내기」 → 저장 뒤 확인(받는 사람 · 번호 뒤 4자리 · 실제 문구) → [보내기] → 상담 카드 「10/29 앱 안내 문자 보냄」
 
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.

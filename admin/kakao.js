@@ -7,8 +7,9 @@
        → 함수가 DB 에서 번호를 찾아 보낸다 (화면은 학생 id 만 넘긴다). 이미 보낸 학생은 건너뛰고,
        ⋯ [알림톡 다시 보내기]로 한 번 더 확인받고 다시.
      · 띠 ⋯ [알림톡 나에게 시험 발송] — 설정에 넣은 내 번호로 한 건만
-   「오늘」 → [설정] 알림톡 칸 — 키가 들어갔는지(✓/✗) · 템플릿 ID · 문자로 대신 보내기 · 하루 최대 · 1건 예상 비용 · 내 시험 번호
-   키 값은 어디에도 보이지 않는다 (함수가 있음/없음만 알려 준다).
+   「문자 발송」 → 연결 상태의 알림톡 칸 (20261031m · 예전 「오늘」 → [설정]) — 키가 들어갔는지(✓/✗) · 문자로 대신 보내기 · 하루 최대 · 1건 예상 비용
+     (내 시험 번호 · 나에게 시험 발송은 연결 상태 위쪽 — sms.js)
+   키 값 · 템플릿 ID 값은 어디에도 보이지 않는다 (함수가 있음/없음만 알려 준다).
    ============================================================ */
 
 (function () {
@@ -142,7 +143,7 @@
       .then(function (r) { summarize(r, true); after(); });
   }
 
-  /* ---------- [설정] 알림톡 칸 ---------- */
+  /* ---------- 「문자 발송」 → 연결 상태 — 알림톡 칸 ---------- */
 
   function settingsHtml(fnRes, cfg) {
     var keys = (fnRes && fnRes.keys) || null;
@@ -152,7 +153,7 @@
         ? '<ul class="kk-keys">' + Object.keys(KEY_NAME).map(function (k) {
             return '<li class="' + (keys[k] ? 'is-ok' : 'is-no') + '">' + (keys[k] ? '✓' : '✗') + ' ' + KEY_NAME[k] + ' <code>' + k + '</code></li>';
           }).join('') + '</ul>' +
-          '<p class="field__hint">템플릿 ID: ' + (fnRes.templateId ? '<code>' + esc(fnRes.templateId) + '</code>' : '아직 없음') + ' · 키 값은 화면에 보이지 않습니다 (Supabase Secrets 에만).</p>'
+          '<p class="field__hint">템플릿 ID: ' + (fnRes.templateSet || fnRes.templateId ? '들어감 (템플릿 「주간레포트안내」)' : '아직 없음') + ' · 키 값은 화면에 보이지 않습니다 (Supabase Secrets 에만).</p>'
         : '<p class="panel__hint">' + esc((fnRes && fnRes.message) || '알림톡 함수(kakao-send)가 아직 배포되지 않았습니다.') + '</p>') +
       (cfg
         ? '<label class="check-line"><input type="checkbox" id="kkSms"' + (cfg.smsFallback ? ' checked' : '') + '> <span>알림톡이 실패하면 문자로 대신 보내기 <span class="field__opt">기본 끔 · 켜면 건당 약 ' + LMS_WON + '원까지 더 듭니다</span></span></label>' +
@@ -161,12 +162,7 @@
             '<label class="field"><span class="field__label">1건 예상 비용(원)</span><input class="input input--num" id="kkUnit" type="number" min="0" max="1000" value="' + esc(cfg.unitWon) + '"></label>' +
             '<button class="btn btn--sm" type="button" id="kkSaveCfg">알림톡 설정 저장</button>' +
           '</div>' +
-          '<div class="toolbar">' +
-            '<label class="field"><span class="field__label">내 시험 번호 <span class="field__opt">나만 보입니다 · 알림톡 · 문자 [나에게 시험 발송]에 씀</span></span>' +
-              '<input class="input" id="kkTestPhone" type="tel" inputmode="numeric" autocomplete="off" placeholder="' + esc(cfg.testPhone || '010-1234-5678') + '"></label>' +
-            '<button class="btn btn--sm" type="button" id="kkSaveTest">내 번호 저장</button>' +
-          '</div>' +
-          (cfg.testPhone ? '<p class="field__hint">지금 내 시험 번호: <span class="num">' + esc(cfg.testPhone) + '</span> (빈 칸으로 저장하면 지웁니다)</p>' : '')
+          '<p class="field__hint">오늘 알림톡 ' + esc(cfg.today || 0) + '건' + (cfg.testPhone ? ' · 내 시험 번호 <span class="num">' + esc(cfg.testPhone) + '</span> (위에서 바꿉니다)' : '') + '</p>'
         : '<p class="panel__hint">migration-020 SQL 을 실행하면 알림톡 설정을 바꿀 수 있습니다.</p>');
   }
 
@@ -191,23 +187,14 @@
       loadSettings(); load();
     });
   }
-  function saveTest() {
-    sb().rpc('kakao_test_phone_set', { p_phone: $('#kkTestPhone').value }).then(function (r) {
-      if (r.error) { toast(r.error.message, 'bad'); return; }
-      toast(r.data && r.data.testPhone ? '내 시험 번호를 저장했습니다 (' + r.data.testPhone + ')' : '내 시험 번호를 지웠습니다', 'good');
-      loadSettings();
-    });
-  }
 
   /* ---------- 시작 ---------- */
 
   function init() {
     var set = $('#kakaoSettings');
     if (set) {
-      $('#tdSettingsBtn').addEventListener('click', loadSettings);
       set.addEventListener('click', function (e) {
         if (e.target.id === 'kkSaveCfg') saveCfg();
-        if (e.target.id === 'kkSaveTest') saveTest();
       });
     }
   }
@@ -215,6 +202,7 @@
 
   window.Kakao = {
     reload: load,
+    loadSettings: loadSettings,
     stateOf: stateOf,
     state: function () { return st; },
     ready: ready,

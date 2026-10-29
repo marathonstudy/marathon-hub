@@ -1,9 +1,10 @@
 /* ============================================================
-   rtabs.js — 위쪽 탭 5개 (20261029a · 「레포트 발송」 단계 버튼 20261030e)
+   rtabs.js — 위쪽 탭 6개 (20261029a · 「레포트 발송」 단계 버튼 20261030e · 「문자 발송」 20261031m)
 
-   오늘 · 레포트 발송 · 학생 · 교재 · 더보기 (번호 없음)
-     · 화면(panel)은 예전 그대로 8개다. app.js 의 UI.selectTab(번호)도 그대로 쓴다
-       (0 명단 · 1 작성 · 2 공개 · 3 발송 · 4 반 공지 · 5 교재 · 6 필기 노트 · 7 오늘).
+   오늘 · 레포트 발송 · 문자 발송 · 학생 · 교재 · 더보기 (번호 없음)
+     · app.js 의 UI.selectTab(번호)를 그대로 쓴다
+       (0 명단 · 1 작성 · 2 공개 · 3 발송 · 4 반 공지 · 5 교재 · 6 필기 노트 · 7 오늘 · 8 출석부 · 9 문자 발송).
+     · 문자 발송 = 보내기 · 자주 쓰는 문구 · 보낸 기록 · 연결 상태 (안쪽 작은 탭은 sms.js)
        예전 탭 단추(#tab-write …)는 같은 id 로 안쪽 단계 · 화면 단추가 되었다 — 주소(#tab=write …)와 뒤로가기도 그대로 맞는다.
      · 레포트 발송 = 작성 · 공개 · 발송 세 단계. 맨 위 주차 띠(write.js)를 세 단계가 함께 쓰고, 그 아래 「작성 ── 공개 ── 발송」.
        지금 단계만 강조하고, 단계마다 그 반 그 주 진행(작성 n/전체 · 공개 n/전체 · 발송 n/전체)을 작게.
@@ -23,7 +24,7 @@
   var counts = { week: '', pub: null, run: 0 };
 
   function active() {
-    var ids = ['tab-roster', 'tab-write', 'tab-publish', 'tab-send', 'tab-notice', 'tab-book', 'tab-photo', 'tab-today', 'tab-attbook'];
+    var ids = ['tab-roster', 'tab-write', 'tab-publish', 'tab-send', 'tab-notice', 'tab-book', 'tab-photo', 'tab-today', 'tab-attbook', 'tab-sms'];
     for (var i = 0; i < ids.length; i++) {
       var t = document.getElementById(ids[i]);
       if (t && t.getAttribute('aria-selected') === 'true') return i;
@@ -159,5 +160,5 @@
     clearTimeout(t0); t0 = setTimeout(updateCounts, 1000);
   });
 
-  window.RTabs = { sync: sync, counts: updateCounts, week: weekNow };
+  window.RTabs = { sync: sync, counts: updateCounts, week: weekNow, current: function () { return cur >= 0 ? cur : active(); } };
 })();
