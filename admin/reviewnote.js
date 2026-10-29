@@ -176,7 +176,7 @@
     var A = window.AiPolish, max = A ? A.MAX_REQ : 300, ms = memList();
     return '<div class="aip-ask rn-ask" role="group" aria-label="AI에게 고쳐 달라고 하기"><div class="aip-ask__t">AI에게 고쳐 달라고 하기</div>' +
       '<div class="aip-quick">' + (A ? A.QUICK : []).filter(function (q) { return !q[2]; }).map(function (q) {
-        return '<button type="button" class="aip-q" data-rn-q="' + esc(q[1]) + '"' + (st.busy ? ' disabled' : '') + '>' + esc(q[0]) + '</button>';
+        return '<button type="button" class="aip-q" data-rn-quick="' + esc(q[1]) + '"' + (st.busy ? ' disabled' : '') + '>' + esc(q[0]) + '</button>';
       }).join('') + '</div>' +
       '<textarea class="textarea aip-req" id="rnReq" rows="2" maxlength="' + max + '" placeholder="예: 행동 강령은 세 줄로 줄이고, 자주 하는 실수는 더 쉽게 써 줘" aria-label="어떻게 고칠지">' + esc(st.req) + '</textarea>' +
       (ms.length ? '<div class="aip-mem"><span class="aip-mem__t">이 ' + scopeLabel() + ' 기본 요청</span>' + ms.map(function (x) {
@@ -422,9 +422,9 @@
     body.addEventListener('click', function (e) {
       var rg = e.target.closest('[data-rn-regen]');
       if (rg) { var p = rg.dataset.rnRegen.split('|'); regen(+p[0], p[1]); return; }
-      var rq = e.target.closest('[data-rn-q]');
+      var rq = e.target.closest('[data-rn-quick]');
       if (rq) {
-        var cur = st.req.replace(/\s+$/, ''), add = rq.dataset.rnQ;
+        var cur = st.req.replace(/\s+$/, ''), add = rq.dataset.rnQuick;
         if (cur.indexOf(add) === -1) st.req = ((cur ? cur.replace(/[,.]$/, '') + ', ' : '') + add).slice(0, window.AiPolish ? AiPolish.MAX_REQ : 300);
         st.edit = readDom(); draw();
         var ta = body.querySelector('#rnReq'); if (ta) ta.focus();

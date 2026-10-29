@@ -211,6 +211,9 @@
       if (c.at < oldest) oldest = c.at;
     });
     if (oldest < now) appMeta.shown = oldest;            /* at 은 그대로 0 — 기억한 것을 보여 준 뒤 곧바로 뒤에서 새로 받는다 */
+    /* 기억한 기록을 바로 칸에 — 이미 그려진 줄이면 그 줄만 다시 (20261031q) */
+    list.forEach(function (s) { if (app[s.id] && app[s.id].cached) setTimeout(function () { paintApp(s.id); }, 0); });
+    setTimeout(paintAvg, 0);
   }
   function liveList() { return st.data ? st.data.students.filter(function (s) { return s.app && s.code; }) : []; }
   function loadApp(only, force) {
@@ -971,8 +974,8 @@
     var ids = u.x.ids || [], key = u.cls + '|' + u.x.date, open = !!st.todoOpen[key] || ids.length <= 3;
     var one = function (id) {
       var s = rowById(id) || stu(id) || {}, why = whyOf(id, u.x.date, u.x.week);
-      return '<span class="td-todo__nm">' + esc(s.name || '') + (why ? '<small class="td-why">' + esc(why) + '</small>' : '') +
-        (open ? '<button type="button" class="td-todo__x" data-skip-sid="' + esc(id) + '" data-skip-cls="' + esc(u.cls) + '" data-skip-date="' + esc(u.x.date) + '" aria-label="' + esc((s.name || '') + ' 이 레포트 건너뛰기') + '" title="이 학생만 이 레포트를 보내지 않고 넘깁니다">×</button>' : '') + '</span>';
+      return '<span class="td-todo__nm">' + esc(s.name || '') + (why ? '<small class="td-guess">' + esc(why) + '</small>' : '') +
+        (open ? '<button type="button" class="td-todo__x" data-skip1-sid="' + esc(id) + '" data-skip1-cls="' + esc(u.cls) + '" data-skip1-date="' + esc(u.x.date) + '" aria-label="' + esc((s.name || '') + ' 이 레포트 건너뛰기') + '" title="이 학생만 이 레포트를 보내지 않고 넘깁니다">×</button>' : '') + '</span>';
     };
     if (!ids.length) return '';
     if (open) return '<span class="td-todo__names">' + ids.map(one).join('') + (ids.length > 3 ? '<button type="button" class="td-todo__more" data-todo-open="' + esc(key) + '" aria-expanded="true">접기</button>' : '') + '</span>';
@@ -1060,7 +1063,7 @@
           '<span class="td-care2__go">' + (it.kind === 'review' ? '대신 입력 · 미응시 ›' : it.kind === 'material' || it.kind === 'makeup' ? '출석 체크에서 바꾸기 ›' : '상담 카드 ›') + '</span></button>' +
           '<div class="td-care2__foot"><span class="td-care2__names">' + it.ids.map(function (id, i) {
             var why = it.kind === 'review' ? whyOf(id, it.date, it.week || weekOfDate(it.date || DDay.today())) : '';
-            return '<span class="td-care2__nm">' + esc(it.names[i]) + (why ? '<small class="td-why">' + esc(why) + '</small>' : '') + '<button type="button" class="td-care2__x" data-care-x' + attrs(it, id) + ' aria-label="' + esc(it.names[i]) + ' 목록에서 빼기" title="이 학생만 목록에서 빼기 (대신 입력 · 미응시를 안 해도 다시 뜨지 않음)">×</button></span>';
+            return '<span class="td-care2__nm">' + esc(it.names[i]) + (why ? '<small class="td-guess">' + esc(why) + '</small>' : '') + '<button type="button" class="td-care2__x" data-care-x' + attrs(it, id) + ' aria-label="' + esc(it.names[i]) + ' 목록에서 빼기" title="이 학생만 목록에서 빼기 (대신 입력 · 미응시를 안 해도 다시 뜨지 않음)">×</button></span>';
           }).join('') + '</span>' +
           '<button type="button" class="btn btn--sm btn--ghost td-care2__ok" data-care-ok' + attrs(it, it.kind === 'absent' ? it.sid : '') + ' title="이 묶음을 확인했습니다 — 다시 뜨지 않음">확인함</button></div></li>';
       }).join('') + '</ul>' : '') +
@@ -1314,8 +1317,8 @@
     if (rt) { loadApp(rt.dataset.appRetry); return; }
     var to = e.target.closest('[data-todo-open]');
     if (to) { var k0 = to.dataset.todoOpen; if (st.todoOpen[k0]) delete st.todoOpen[k0]; else st.todoOpen[k0] = true; render(); return; }
-    var ss = e.target.closest('[data-skip-sid]');
-    if (ss) { if (window.Skips) Skips.check('report', ss.dataset.skipCls, ss.dataset.skipDate, ss.dataset.skipSid); return; }
+    var ss = e.target.closest('[data-skip1-sid]');
+    if (ss) { if (window.Skips) Skips.check('report', ss.dataset.skip1Cls, ss.dataset.skip1Date, ss.dataset.skip1Sid); return; }
     var sk = e.target.closest('[data-skip-cls]');
     if (sk) { if (window.Skips) Skips.skip(sk.dataset.skipCls, sk.dataset.skipDate); return; }
     var us = e.target.closest('[data-unskip-cls]');
