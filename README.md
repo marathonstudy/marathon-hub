@@ -615,6 +615,13 @@ delete from public.staff where email = '조교이메일@example.com';
   확인 창 「+ 내 번호 1통」 · 보냄 표시(sent)에 세지 않음 · 보낸 기록의 시험 묶음은 「내 번호 확인용」 · 내 시험 번호가 비면 체크를 끄고 안내
 - 실패만 다시 보내기 · 학생 한 명에게 보내기에는 붙이지 않는다
 
+### 5-50. 20261031s — 새 학생 링크 바로 만들기 · 로그인 불가 표시 (migration-045-links.sql · 함수 배포 없음)
+1. Supabase SQL Editor 에서 `supabase/migration-045-links.sql` 실행 (044 다음 · 여러 번 실행해도 안전).
+   - 링크 없는 학생(퇴원 제외) 모두 학부모 · 학생 링크 · 맨 아래 「링크 만든 학생 n명」 · 새 학생은 트리거로 바로 · student_login 은 학생 링크가 없으면 그 자리에서 만들어 들어감
+- 코치룸: 등록(한 명 · 엑셀 · CSV · 번호 한꺼번에 넣기) 직후 `UI.issueMissing` 이 학부모 · 학생 링크 둘 다 · 못 만들면 명단 [링크 만들기]
+  `Store.loginBlock` — 명단 · 복습테스트 화면 「로그인 불가 · 반 없음 / 학생 번호 없음」(누르면 그 칸이 열린 수정 창)
+- 학생 입구(/s/ · entry.js) 실패 문구 — 「이 반에 그 이름이 없습니다」 · 「비밀번호는 학생 휴대폰 번호에서 010을 뺀 8자리입니다」
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

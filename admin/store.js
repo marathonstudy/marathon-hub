@@ -841,6 +841,13 @@
     if (!st) return false;
     return st > t || (Date.parse(t) - Date.parse(st)) / 86400000 < 14;
   }
+  /* 학생 입구(/s/) 로그인을 못 하는 이유 (20261031s) — 'class' 반 없음 · 'phone' 학생 번호 없음 · '' 됨 */
+  function loginBlock(s) {
+    if (!s || s.archived) return '';
+    if (!String(s.className || '').trim()) return 'class';
+    if (phoneDigits(s.studentPhone || '').length < 8) return 'phone';
+    return '';
+  }
   /* 그 반 다음 수업일 — 오늘이 수업일이면 오늘 (등록할 때 수강 시작일 기본값) · 수업 요일이 없으면 오늘 */
   function nextLessonDate(cls, from) {
     from = from || todayISO();
@@ -1638,7 +1645,7 @@
     getStudents: getStudents,
     activeStudents: activeStudents,
     isActiveOn: isActiveOn,
-    startOf: startOf, joinedOf: joinedOf, kstDay: kstDay, inLesson: inLesson, isNew: isNew, nextLessonDate: nextLessonDate,
+    loginBlock: loginBlock, startOf: startOf, joinedOf: joinedOf, kstDay: kstDay, inLesson: inLesson, isNew: isNew, nextLessonDate: nextLessonDate,
     isGone: isGone,
     lessonDayOf: lessonDayOf,
     saveStudents: saveStudents,

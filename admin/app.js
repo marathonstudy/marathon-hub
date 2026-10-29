@@ -259,18 +259,42 @@
   }
 
   /* 링크가 없는 학생 여럿에게 한 번에 */
+  /* 학부모 링크 · 학생 링크 — 없는 것만 (등록하자마자 · 엑셀 · 번호 한꺼번에 넣기 · 20261031s) */
   function issueMissing(ids) {
-    var list = ids.map(function (id) { return { studentId: id, hubCode: Store.randomCode(24) }; });
+    var list = ids.map(function (id) {
+      var l = Store.linkOf(id), p = { studentId: id };
+      if (!l.hubCode) p.hubCode = Store.randomCode(24);
+      if (!l.studentCode) p.studentCode = Store.randomCode(24);
+      return p;
+    }).filter(function (p) { return p.hubCode || p.studentCode; });
+    if (!list.length) return Promise.resolve(0);
     return DB.saveLinks(list).then(function () {
+      var now = new Date().toISOString();
       list.forEach(function (p) {
         var cur = Store.linkOf(p.studentId);
-        cur.hubCode = p.hubCode;
-        cur.hubIssuedAt = new Date().toISOString();
+        if (p.hubCode) { cur.hubCode = p.hubCode; cur.hubIssuedAt = now; }
+        if (p.studentCode) { cur.studentCode = p.studentCode; cur.studentIssuedAt = now; }
         Store.setLinkLocal(p.studentId, cur);
       });
       return list.length;
     });
   }
+  /* 로그인 불가 · 반 없음 / 학생 번호 없음 — 명단 · 복습테스트 화면 (누르면 그 칸이 열린 학생 수정 창) */
+  function loginTagHtml(s) {
+    var k = Store.loginBlock(s);
+    if (!k) return '';
+    return '<button type="button" class="login-no" data-login-fix="' + k + '" data-login-sid="' + escAttr(s.id) + '" title="학생 입구(/s/)로 로그인할 수 없습니다 — 누르면 고치는 칸이 열립니다">로그인 불가 · ' + (k === 'class' ? '반 없음' : '학생 번호 없음') + '</button>';
+  }
+  function escAttr(v) { return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-login-fix]');
+    if (!b) return;
+    e.preventDefault(); e.stopPropagation();
+    var s = Store.getStudents().find(function (x) { return x.id === b.dataset.loginSid; });
+    if (!s) return;
+    openStudentModal(s);
+    setTimeout(function () { var f = $(b.dataset.loginFix === 'class' ? '#fClass' : '#fPhone2'); if (f) { f.focus(); if (f.select) try { f.select(); } catch (er) {} } }, 60);
+  }, true);
 
   /* ============================================================
      명단 — 상태
@@ -345,6 +369,8 @@
     nb.hidden = !nf;
     nb.textContent = '확인 ' + nf;
     nb.title = '다음 상담 때 확인할 기록 ' + nf + '개';
+    var lt = loginTagHtml(s);
+    if (lt) nb.insertAdjacentHTML('afterend', lt);
     tds[1].textContent = s.school || '-';
     tds[2].textContent = s.grade || '-';
 
@@ -391,7 +417,7 @@
     } else {
       linkTd.innerHTML = (link.hubCode
           ? '<button class="btn btn--sm btn--parent" data-act="copylink" title="학부모 링크 복사 — 레포트 · 안내용 (보기 전용)">학부모 링크</button>'
-          : '<button class="btn btn--sm btn--primary" data-act="issue">학부모 링크 발급</button>') +
+          : '<button class="btn btn--sm btn--primary" data-act="issue" title="학부모 링크 · 학생 링크를 만듭니다">링크 만들기</button>') +
         '<button class="btn btn--sm btn--student" data-act="copystudent" title="학생 링크 복사 — 복습테스트 · 필기 사진 입력용">학생 링크</button>';
     }
     appTd.innerHTML = rosterAppCell(s, link);
@@ -585,7 +611,8 @@
 
   function missingLinkIds() {
     return students.filter(function (s) {
-      return !Store.isGone(s) && !Store.linkOf(s.id).hubCode;
+      var l = Store.linkOf(s.id);
+      return !Store.isGone(s) && (!l.hubCode || !l.studentCode);
     }).map(function (s) { return s.id; });
   }
 
@@ -1167,7 +1194,7 @@
     Store.writeLocal(Store.KEYS.settings, settings);
 
     var link = Store.linkOf(rec.id);
-    var needIssue = !rec.archived && !link.hubCode;
+    var needIssue = !rec.archived && (!link.hubCode || !link.studentCode);          /* 학부모 · 학생 링크 둘 다 바로 (20261031s) */
     var appChanged = (appCode || '') !== (link.appCode || '');
     /* 앱 안내 문자 — 새 학생 · 체크했을 때만. 서버에 학생 줄이 생긴 뒤 「문자 발송」 → 보내기에서 확인을 띄운다 */
     var invite = !prev && !rec.archived && window.Sms && Sms.inviteOpts ? Sms.inviteOpts('f') : null;
@@ -1191,7 +1218,7 @@
     var btn = $('#btnStudentSave');
     btn.disabled = true;
     Store.flushNow(Store.KEYS.students, students)
-      .then(function () { return needIssue ? issueLink(rec.id) : null; })
+      .then(function () { return needIssue ? issueMissing([rec.id]) : null; })
       .then(function () {
         if (!appChanged) return null;
         return DB.saveLink(rec.id, { appCode: appCode || '' }).then(function (l) {
@@ -1204,14 +1231,14 @@
       .then(function () {
         btn.disabled = false;
         render();
-        toast(rec.name + ' 학생을 저장했습니다' + (needIssue ? ' · 개인 링크 발급' : '') +
+        toast(rec.name + ' 학생을 저장했습니다' + (needIssue ? ' · 학부모 · 학생 링크를 만들었습니다' : '') +
               (appChanged ? ' · 앱 코드 ' + (appCode ? '저장' : '지움') : ''), 'good');
         afterInvite();
       })
       .catch(function (err) {
         btn.disabled = false;
         render();
-        toast('학생은 저장했지만 링크를 저장하지 못했습니다 — ' + err.message, 'bad');
+        toast('학생은 저장했지만 링크를 만들지 못했습니다 — 명단의 [링크 만들기]를 눌러 주세요 (' + err.message + ')', 'bad');
       });
   }
 
@@ -1691,6 +1718,7 @@
     selectTab: selectTab,
     whoami: whoami,
     issueMissing: issueMissing,
+    loginTagHtml: loginTagHtml,
     entryUrl: entryUrl,
     entryNotice: function () { return ENTRY_NOTICE.split('{주소}').join(entryUrl()); },
     getStudents: function () { return students; },

@@ -122,6 +122,9 @@
       n++;
     });
     window.dispatchEvent(new CustomEvent('jt:roster-changed'));
+    /* 링크가 없는 학생은 바로 만든다 (학부모 · 학생 링크 · 20261031s) */
+    var ids = plan.ok.map(function (r) { return r.student.id; }).filter(function (id, i, a) { return a.indexOf(id) === i; });
+    if (window.UI && UI.issueMissing) Store.flushNow(Store.KEYS.students).then(function () { return UI.issueMissing(ids); }).then(function (k) { if (k) toast('링크 ' + k + '명을 만들었습니다', 'good'); }, function () {});
     $('#phonePasteModal').close();
     toast((to === 'student' ? '학생 본인 번호 ' : '학부모 번호 ') + n + '개를 넣었습니다', 'good');
   }
