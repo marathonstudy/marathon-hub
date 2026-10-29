@@ -1188,3 +1188,18 @@ html.rn-lock, html.rn-lock body { overflow: hidden; }
   html.rn-printing .rn-print-ans { margin-top: 3mm; font-size: 7.5pt; color: #555; }
   html.rn-printing .rn-print-box { white-space: nowrap; color: #555; }
 }
+
+/* 「앱에서 자세히 보기 ↗」 (hub.js appMoreHtml · 20261031n) — 과제 상세 탭 맨 위 · 레포트 과제 요약 아래. 차분하게 (움직임 없음) */
+.ap-more { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin: 0 0 14px; padding: 12px 14px;
+  border: 1px solid #E2DDF7; border-radius: 14px; background: #FAF9FE; }
+.ap-more__t { margin: 0; flex: 1 1 220px; font-size: 14px; line-height: 1.55; color: var(--ink-mid); }
+.ap-more .hub-btn.ap-more__btn { flex: 0 0 auto; min-height: 44px; padding: 11px 18px; font-size: 14.5px; box-shadow: none; display: inline-flex; align-items: center; justify-content: center; }
+.ap-more--sm { display: block; margin: -4px 2px 14px; padding: 0; border: 0; background: none; font-size: 12.5px; color: var(--ink-light); line-height: 1.7; }
+.ap-more--sm .ap-more__btn { display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px; color: #5B45C9; font-weight: 800; text-decoration: underline; text-underline-offset: 3px; white-space: nowrap; }
+@media (max-width: 480px) {
+  .ap-more .hub-btn.ap-more__btn { width: 100%; }
+}
+.ap-more--warn { border-color: #F2C98A; background: #FFF8EC; }
+.ap-more--warn .ap-more__t { color: #8A5A12; }
+.ap-more__dot { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: #E8891C; vertical-align: middle; }
+@media print { .ap-more { display: none !important; } }

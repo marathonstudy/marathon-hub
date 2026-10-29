@@ -665,7 +665,8 @@
       (pick ? '<p class="hd-pick">' + esc(dayInfo(a.data, pick)) + '</p>' + fixHtml(sid, pick) : '') +
       '<p class="hd-legend">● 정시 제출 ◐ 늦게 제출 ○ 미제출 · 빈칸 그날 과제 없음 / ✓ 강의 다 봄 – 안 봄 · 토 · 일은 주중 복습 · 칸을 누르면 그날 과제 · 「수정」 = 조교가 고친 칸</p>' +
       '<div class="hd-foot"><button type="button" class="hd-relink" data-app-relink="' + esc(sid) + '" aria-expanded="' + !!(window.AppLink && AppLink.current() === sid && AppLink.editing()) + '">링크 바꾸기</button>' +
-        '<button type="button" class="hd-more" data-pv="parent" data-pv-view="app" data-sid="' + esc(sid) + '">과제 상세 보기 →</button></div>' +
+        '<button type="button" class="hd-more" data-pv="parent" data-pv-view="app" data-sid="' + esc(sid) + '">과제 상세 보기 →</button>' +
+        (window.AppLink && AppLink.openHtml ? AppLink.openHtml(sid, { noAdd: true, cls: 'hd-open' }) : '') + '</div>' +
     '</div>';
   }
   /* 펼친 표를 그 칩이 있는 줄 아래에 다시 붙인다 (칩의 기준 수업일이 같은 곳만) */
@@ -891,7 +892,8 @@
       '<button type="button" class="btn btn--sm btn--ghost" data-pv="parent" data-sid="' + id + '">학부모 화면 미리보기</button>' +
       '<button type="button" class="btn btn--sm btn--ghost" data-pv="student" data-sid="' + id + '">학생 화면 미리보기</button>';
     return '<div class="tdc-st__acts">' + btns +
-      '<details class="tdc-more"><summary class="btn btn--sm tdc-more__b" aria-label="' + esc(s.name) + ' 더 보기">⋯</summary><div class="tdc-more__menu">' + btns + '</div></details></div>';
+      '<details class="tdc-more"><summary class="btn btn--sm tdc-more__b" aria-label="' + esc(s.name) + ' 더 보기">⋯</summary><div class="tdc-more__menu">' + btns +
+        (window.AppLink && AppLink.openHtml ? AppLink.openHtml(s.id, { noAdd: true, cls: 'btn btn--sm' }) : '') + '</div></details></div>';
   }
   function studentRow(s, c) {
     return '<div class="tdc-st tdc-grid" data-id="' + esc(s.id) + '">' +

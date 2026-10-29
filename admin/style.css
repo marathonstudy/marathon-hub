@@ -3372,3 +3372,23 @@ thead .ab-name { background: #F6F7FB; z-index: 2; }
   .sms-log-table th, .sms-log-table td { white-space: normal; word-break: keep-all; }
   .sms-entry { max-width: none; }
 }
+
+/* 「앱에서 보기 ↗」 (applink.js openHtml · 20261031n) — 마라톤 앱 공유 링크를 새 탭으로 · 링크 확인 필요면 주황 점 */
+.al-open { display: inline-flex; align-items: center; gap: 5px; min-height: 30px; padding: 3px 10px; border: 1px solid #CFC6F5; border-radius: 999px;
+  background: #fff; color: #4A34B8; font-size: 12.5px; font-weight: 800; text-decoration: none; white-space: nowrap; margin-left: 6px; vertical-align: middle; }
+.al-open:hover { background: #F4F2FE; }
+.al-open.btn { border-radius: 10px; margin-left: 0; }
+.al-dot { width: 8px; height: 8px; border-radius: 50%; background: #E8891C; box-shadow: 0 0 0 2px #FFF1E0; display: inline-block; }
+.al-pop { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 4px 0 0 6px; padding: 5px 10px; border-radius: 10px;
+  background: #FFF4E2; border: 1px solid #F2C98A; color: #8A5A12; font-size: 12.5px; font-weight: 700; }
+.al-pop__b { border: 0; background: #fff; color: #8A5A12; border: 1px solid #F2C98A; border-radius: 8px; padding: 3px 9px; font: inherit; font-weight: 800; cursor: pointer; }
+.al-pop__a { color: #8A5A12; font-weight: 800; }
+.hd-foot .al-open { margin-left: auto; }
+.cd-appopen { display: inline-flex; align-items: center; }
+.cd-appopen:empty { display: none; }
+.cd-albox:empty { display: none; }
+.cd-albox { padding: 0 18px; }
+@media (max-width: 480px) {
+  .al-open { min-height: 40px; padding: 6px 12px; font-size: 13px; }
+  .al-pop { margin-left: 0; }
+}

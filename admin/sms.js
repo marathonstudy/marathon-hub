@@ -179,9 +179,16 @@
     var c = typed || st.codes[clsOf(s)] || '';
     return CODE_RE.test(c) ? c : '';
   }
+  /* #{앱 안내} — 앱 공유 링크가 있는 학생만 한 줄 · 없으면 그 줄을 뺀다 (서버 sms_prepare · migration-041 과 같다 · 20261031n) */
+  var APP_NOTE = "과제를 더 자세히 보시려면 레포트의 '앱에서 자세히 보기'를 눌러 주세요";
+  function appNote(body, s) {
+    if (body.indexOf('#{앱 안내}') === -1) return body;
+    var has = !!(Store.linkOf(s.id) || {}).appCode;
+    return has ? body.split('#{앱 안내}').join(APP_NOTE) : body.split('\n#{앱 안내}').join('').split('#{앱 안내}').join('');
+  }
   function render(body, s, t, lessons, opt) {
     opt = opt || {};
-    var txt = body.split('#{이름}').join(s.name || '')
+    var txt = appNote(body, s).split('#{이름}').join(s.name || '')
       .split('#{반}').join((s.className || '').trim())
       .split('#{수업일}').join(String(lessons[(s.className || '').trim()] || '').slice(0, 30))
       .split('#{바뀐 내용}').join(st.notify ? String(st.notify[s.id] || '내용') : '')

@@ -251,7 +251,8 @@
     '반과 이름을 고르고, 비밀번호는 내 휴대폰 번호에서 010을 뺀 8자리예요.\n' +
     '로그인하면 「내 정보」에서 내 정보와 얼굴 사진도 채워 주세요.\n' +
     '「이 휴대폰에서 로그인 유지」를 켜 두면 다음부터 바로 열려요.\n' +
-    '휴대폰 번호가 등록돼 있지 않으면 조교 선생님께 말해 주세요.';
+    '휴대폰 번호가 등록돼 있지 않으면 조교 선생님께 말해 주세요.\n' +
+    "과제를 더 자세히 보시려면 레포트의 '앱에서 자세히 보기'를 눌러 주세요.";
   if ($('#btnEntryCopy')) {
     $('#btnEntryCopy').addEventListener('click', function () { entryCopy(entryUrl(), '학생 입구 주소'); });
     $('#btnEntryNotice').addEventListener('click', function () { entryCopy(ENTRY_NOTICE.split('{주소}').join(entryUrl()), '단톡방 안내 문구'); });

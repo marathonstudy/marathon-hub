@@ -570,6 +570,15 @@ delete from public.staff where email = '조교이메일@example.com';
 - 다른 화면의 [문자] · [전체 문자 발송] · [반 전체 문자] · [앱 안내 문자]는 모두 이 탭의 「보내기」를 골라진 채로 연다 (Sms.open · data-sms-cls · data-sms-sid · data-app-invite)
 - 학생 등록(한 명 · 엑셀 · CSV) 「등록하면 마라톤 앱 안내 문자 보내기」 → 저장 뒤 확인(받는 사람 · 번호 뒤 4자리 · 실제 문구) → [보내기] → 상담 카드 「10/29 앱 안내 문자 보냄」
 
+### 5-45. 20261031n — 「앱에서 보기 ↗」 · 「앱에서 자세히 보기 ↗」 (migration-041-app-more.sql · 함수 배포 없음)
+1. Supabase SQL Editor 에서 `supabase/migration-041-app-more.sql` 실행 (040 다음 · 여러 번 실행해도 안전).
+   - 문자 칸 `#{앱 안내}` — 앱 공유 링크(student_links.app_share_code)가 있는 학생만 「과제를 더 자세히 보시려면 레포트의 '앱에서 자세히 보기'를 눌러 주세요」 · 없으면 그 줄을 뺀다 (`sms_prepare` 는 040 과 같고 이 칸만 더함 · `_sms_app_note`)
+   - 「자주 쓰는 문구」의 「레포트 안내」 끝에 `#{앱 안내}` 한 줄 (이미 있으면 그대로)
+- 코치룸: `AppLink.openHtml(학생 id)` (applink.js) — 공유 링크를 새 탭으로 · 없으면 [+ 과제 링크 연결] · 「링크 확인 필요」(today.js linkWarn)면 주황 점 + 먼저 「링크가 만료됐을 수 있습니다 · 링크 바꾸기」
+  7칸 표 아래 · 작성 화면 학생 카드 과제 줄 · 레포트 발송 학생 ⋯ · 「오늘」 학생 ⋯ · 상담 카드 머리
+- 러닝노트(hub.js appMoreHtml): 「과제 상세」 탭 맨 위 안내 한 줄 + [앱에서 자세히 보기 ↗] · 레포트 과제 요약 아래 작은 한 줄 · 링크 없으면 숨김 · 버튼 높이 44px · 반짝임 없음 (예전 맨 아래 「앱 리포트 열기 ›」는 없앴다). 학생 링크 · 학부모 링크 · /s/ 모두 같은 화면
+- 레포트 발송 → 3 발송 문구 복사 · 카톡용 · 내 폰 문자 — 링크가 있는 학생은 끝에 같은 한 줄 · 「단톡방 안내 문구」에도 한 줄. 알림톡 템플릿은 그대로
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

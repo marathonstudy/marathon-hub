@@ -953,7 +953,9 @@
     if (!window.Today || !Today.ready || !Today.ready()) return '<span class="tdc-app tdc-app--wait"><i class="spin" aria-hidden="true"></i>과제 불러오는 중</span>';
     if (!Today.appKnown(s.id)) return '<span class="tdc-app tdc-app--none">과제 —</span>';
     var cell = Today.appCell(s.id, lessonDateOf(s));
-    return Today.appNeed(s.id) ? '<span class="tdc-app tdc-app--pre">과제 연동 전</span>' + cell : cell;
+    if (Today.appNeed(s.id)) return '<span class="tdc-app tdc-app--pre">과제 연동 전</span>' + cell;
+    /* 「앱에서 보기 ↗」 — 링크가 있는 학생만 (applink.js · 20261031n) */
+    return cell + (window.AppLink && AppLink.openHtml ? AppLink.openHtml(s.id, { noAdd: true }) : '');
   }
   function fillApp(el, s) {
     var h = el.querySelector('[data-role="app"]'), box = el.querySelector('[data-role="albox"]');

@@ -78,11 +78,15 @@
      문구 만들기
      ============================================================ */
 
+  /* 마라톤 앱 공유 링크가 있는 학생에게는 끝에 한 줄 (레포트의 「앱에서 자세히 보기 ↗」 · 20261031n) */
+  var APP_NOTE = "과제를 더 자세히 보시려면 레포트의 '앱에서 자세히 보기'를 눌러 주세요";
   function messageFor(student, url) {
-    return String(state.greeting || DEFAULT_GREETING)
+    var t = String(state.greeting || DEFAULT_GREETING)
       .split('{호칭}').join(Store.parentTitleOf(student))
       .split('{이름}').join(student.name || '')
       .split('{링크}').join(url || '');
+    var has = !!(Store.linkOf(student.id) || {}).appCode;
+    return has && t.indexOf('앱에서 자세히 보기') === -1 ? t + '\n' + APP_NOTE : t;
   }
 
   /* ============================================================
@@ -383,6 +387,10 @@
     if (k === 'sent' && kakaoOn()) items.push({ act: 'kkresend', label: '알림톡 다시 보내기' });
     if (k === 'sent') items.push({ act: 'undo', label: '보냄 되돌리기', danger: true });
     items.push({ act: 'pvparent', label: '학부모 화면 미리보기' }, { act: 'pvstudent', label: '학생 화면 미리보기' });
+    /* 마라톤 앱 공유 링크 — 있으면 「앱에서 보기 ↗」(만료 · 확인 필요면 먼저 안내), 없으면 「+ 과제 링크 연결」 (20261031n) */
+    var aw = window.Today && Today.linkWarn ? Today.linkWarn(s.id) : '';
+    if (window.AppLink && AppLink.url(s.id)) items.push({ act: 'appopen', label: '앱에서 보기 ↗', hint: aw ? '링크 확인 필요' : '' });
+    else items.push({ act: 'applink', label: '+ 과제 링크 연결' });
     var desc = phones.length ? phones.map(function (p) { return p.label + ' ' + Store.phoneMask(p.number); }).join(' · ') : '번호 없음';
     menu((s.name || '') + ' · ' + clsOf(s), desc, items, function (act) { doAct(s, act); });
   }
@@ -397,6 +405,19 @@
     if (act === 'kakao') { if (kakaoOn()) Kakao.send([sid], false); return; }
     if (act === 'kkresend') { if (kakaoOn()) Kakao.send([sid], true); return; }
     if (act === 'undo') { unmarkSent(sid); toast('되돌렸습니다'); return; }
+    if (act === 'applink') { if (window.AppLink) AppLink.open([sid]); return; }
+    if (act === 'appopen') {
+      var au = window.AppLink ? AppLink.url(sid) : '';
+      if (!au) return;
+      if (window.Today && Today.linkWarn && Today.linkWarn(sid)) {
+        UI.confirmAsk('앱에서 보기', '링크가 만료됐을 수 있습니다. 링크를 먼저 바꾸시겠어요? (그 학생 줄 아래에 링크 칸이 펼쳐집니다)', '링크 바꾸기').then(function (y) {
+          if (y) { if (window.AppLink) AppLink.open([sid], { edit: true }); } else window.open(au, '_blank', 'noopener');
+        });
+        return;
+      }
+      window.open(au, '_blank', 'noopener');
+      return;
+    }
 
     if (act === 'copyphone') {
       pickPhone(s, Store.phonesOf(s), function (num) {

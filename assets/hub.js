@@ -557,6 +557,7 @@
       APP.code = code;
       APP.p = Promise.all([appReport(code), hwFix(code)]).then(function (x) {
         var r = x[0];
+        APP.why = r && !r.ok ? String(r.reason || '') : '';      /* 'expired' — 링크 만료 (과제 상세 탭 안내 · 20261031n) */
         if (!(r && r.ok)) return null;
         return global.AppWeek && AppWeek.withFix ? AppWeek.withFix(r.data || {}, x[1]) : (r.data || {});
       }, function () { return null; });
@@ -994,6 +995,8 @@
         var aw = from && to ? AppWeek.compute(dd, from, to, todayISO()) : null;
         box.innerHTML = aw && aw.any ? appBlockHtml(dd, aw, { title: periodTitle('과제 기간', from, to), month: to.slice(0, 7) }) : '';
       }
+      /* 과제 요약 칸 아래 작은 한 줄 — 「앱에서 자세히 보기 ↗」 */
+      if (box.innerHTML) box.innerHTML += appMoreHtml(APP.info, true);
       animateRings(box);
     });
   }
@@ -1998,10 +2001,20 @@
       Object.keys(sh).map(function (k) { return '<li><b>' + esc(k) + '</b> ' + esc([].concat(sh[k] || []).join(', ')) + '</li>'; }).join('') + '</ul></details>';
   }
 
-  function appOpenButton(app) {
-    return app && app.share_url
-      ? '<a class="hub-btn" href="' + esc(safeUrl(app.share_url)) + '" target="_blank" rel="noopener">앱 리포트 열기 ›</a>'
-      : '';
+  /* 「앱에서 자세히 보기 ↗」 (20261031n) — 과제 상세 탭 맨 위(차분한 안내 한 줄 + 버튼) · 레포트 과제 요약 아래(작은 글씨 한 줄)
+     공유 링크가 없는 학생은 아무것도 그리지 않는다. 반짝임 같은 효과는 넣지 않는다 */
+  var APP_MORE = '마라톤 앱에서는 학생이 실제로 푼 흔적까지 더 자세히 볼 수 있습니다';
+  function appMoreHtml(app, small, warn) {
+    if (!(app && app.linked && app.share_url)) return '';
+    var url = esc(safeUrl(app.share_url));
+    /* 링크가 만료됐을 때 — 코치룸 미리보기에서만 주황 점 · 「링크가 만료됐을 수 있습니다 · 링크 바꾸기」(코치룸 과제 칩 아래에서) */
+    if (warn && PV) {
+      return '<div class="ap-more ap-more--warn"><p class="ap-more__t"><i class="ap-more__dot" aria-hidden="true"></i>링크가 만료됐을 수 있습니다 · 코치룸 과제 칩의 [링크 바꾸기]에서 새 링크를 넣어 주세요</p>' +
+        '<a class="hub-btn hub-btn--ghost ap-more__btn" href="' + url + '" target="_blank" rel="noopener">그래도 앱에서 열기 ↗</a></div>';
+    }
+    return small
+      ? '<p class="ap-more ap-more--sm"><span>' + APP_MORE + '</span> <a class="ap-more__btn" href="' + url + '" target="_blank" rel="noopener">앱에서 자세히 보기 ↗</a></p>'
+      : '<div class="ap-more"><p class="ap-more__t">' + APP_MORE + '</p><a class="hub-btn ap-more__btn" href="' + url + '" target="_blank" rel="noopener">앱에서 자세히 보기 ↗</a></div>';
   }
 
   function renderApp(code, app, reports) {
@@ -2012,20 +2025,19 @@
       return;
     }
 
-    host.innerHTML = appWaitHtml() + '<div class="hub-actions">' + appOpenButton(app) + '</div>';
+    host.innerHTML = appMoreHtml(app) + appWaitHtml();
     appWaitSlow(host);
     APP_RETRY.detail = function () { renderApp(code, app, reports); };
 
     appData(code).then(function (dd) {
-      var res = dd ? { ok: true, data: dd } : { ok: false };
+      var res = dd ? { ok: true, data: dd } : { ok: false, reason: APP.why || '' };
       if (!res || !res.ok) {
         /* Edge Function 이 아직 없거나 앱 서버가 응답하지 않을 때.
-           '앱 리포트 열기' 로 원래 화면을 볼 수 있게 남겨 둔다. */
+           맨 위 「앱에서 자세히 보기 ↗」로 원래 화면을 볼 수 있게 남겨 둔다. */
         var why = res && res.reason === 'expired'
           ? '앱 공유 링크가 바뀐 것 같습니다. 선생님께 새 링크를 요청해 주세요.'
           : '';
-        host.innerHTML = (why ? '<div class="empty">' + why + '</div>' : appFailHtml('detail')) +
-                         '<div class="hub-actions">' + appOpenButton(app) + '</div>';
+        host.innerHTML = appMoreHtml(app, false, !!why) + (why ? '<div class="empty">' + why + '</div>' : appFailHtml('detail'));
         return;
       }
 
@@ -2034,13 +2046,12 @@
       var rep = (reports || []).filter(function (r) { return r && r.week_start && !r.draft; })[0] || null;
       var p = currentPeriod(rep, '');
       var aw = p && p.from && global.AppWeek ? AppWeek.compute(d, p.from, p.to, todayISO()) : null;
-      host.innerHTML =
+      host.innerHTML = appMoreHtml(app) +
         appBlockHtml(d, aw, { title: p && p.from ? periodTitle('이번 주', p.from, p.to) : '과제 요약', month: todayISO().slice(0, 7), pending: true }) +
         '<div id="apDetail">' + apDetailHtml(d) + '</div>' +
         apCatsHtml(d.categories || []) +
         apLecturesHtml(d.lectures) +
-        apShapeHtml(d) +
-        '<div class="hub-actions">' + appOpenButton(app) + '</div>';
+        apShapeHtml(d);
       /* 기간 고르기 — 요약 칸 · 날짜별 과제만 다시 그린다 */
       host.onclick = function (e) {
         var b = e.target.closest && e.target.closest('[data-ap-period]');
@@ -2060,8 +2071,7 @@
         });
       });
     }).catch(function () {
-      host.innerHTML = appFailHtml('detail') +
-                       '<div class="hub-actions">' + appOpenButton(app) + '</div>';
+      host.innerHTML = appMoreHtml(app) + appFailHtml('detail');
     });
   }
 

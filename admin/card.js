@@ -101,6 +101,8 @@
     /* [앱 안내 문자] — 「문자 발송」 → 보내기 (앱 안내(기본) · 그 반 입장코드 · 20261031m) */
     $('#btnCardApp').setAttribute('data-app-invite', sid);
     $('#btnCardApp').hidden = !!s.archived;
+    /* 「앱에서 보기 ↗」 · 링크가 없으면 「+ 과제 링크 연결」 (applink.js · 20261031n) */
+    paintAppOpen();
     $('#cardDesc').textContent = [s.className, s.school, s.grade].filter(Boolean).join(' · ') +
       ' — 선생님·조교만 봅니다. 학부모 화면에는 나가지 않습니다';
     $('#cardBody').innerHTML = '<p class="panel__hint">불러오는 중…</p>';
@@ -112,6 +114,16 @@
       }
     });
   }
+
+  function paintAppOpen() {
+    var h = $('#cardAppOpen'), box = $('#cardAlBox');
+    if (!h) return;
+    var s = C && Store.getStudents().find(function (x) { return x.id === C.sid; });
+    h.innerHTML = s && !s.archived && window.AppLink && AppLink.openHtml ? AppLink.openHtml(s.id) : '';
+    box.innerHTML = s && window.AppLink ? AppLink.boxHtml(s.id) : '';
+  }
+  window.addEventListener('jt:applink-ui', function () { if (modal.open) paintAppOpen(); });
+  window.addEventListener('jt:applink', function () { if (modal.open) setTimeout(paintAppOpen, 0); });
 
   function loadAll() {
     if (!C) return Promise.resolve();

@@ -13,6 +13,9 @@
    펼친 칸은 화면을 다시 그려도 남는다 — 학생 줄을 그리는 쪽이 AppLink.boxHtml(학생 id)를 줄 끝에 붙인다.
    「링크 바꾸기」 (20261031k) — 7칸 표 맨 아래 · 「링크 확인 필요」를 누르면 같은 칸이 지금 링크가 들어 있는 채로 펼쳐진다 (open(ids, { edit: true }))
      [저장] 새 링크로 그 학생 과제 기록만 바로 다시 불러온다 (10분 기억도 그 학생만 지운다) · [링크 지우기] 앱 공유 링크를 비운다
+   「앱에서 보기 ↗」 (20261031n) — 그 학생의 마라톤 앱 공유 링크를 새 탭으로. AppLink.openHtml(학생 id)
+     링크가 없으면 지금처럼 [+ 과제 링크 연결] · 만료됐거나 「링크 확인 필요」면 주황 점 — 누르면 먼저 「링크가 만료됐을 수 있습니다 · 링크 바꾸기」
+     (7칸 표 아래 · 작성 화면 학생 카드 과제 줄 · 레포트 발송 학생 ⋯ · 상담 카드 · 학생 미리보기 과제 상세는 hub.js)
    ============================================================ */
 
 (function () {
@@ -34,6 +37,28 @@
 
   var SHARE = 'https://marathonstudy.com/share/report/';
   function linkUrl(sid) { var c = window.Store && Store.linkOf ? Store.linkOf(sid).appCode : ''; return c ? SHARE + c : ''; }
+  /* 링크 확인 필요 — 「오늘」 과제 기록에서 (today.js · 'expired' | 'other' | '') */
+  function warnOf(sid) { return window.Today && Today.linkWarn ? Today.linkWarn(sid) : ''; }
+  function openHtml(sid, opt) {
+    opt = opt || {};
+    var url = linkUrl(sid);
+    if (!url) return opt.noAdd ? '' : '<button type="button" class="tdc-link-btn" data-app-link="' + esc(sid) + '" aria-expanded="' + (cur() === sid) + '" title="앱 공유 링크가 아직 없습니다 · 누르면 바로 아래에 링크 칸">+ 과제 링크 연결</button>';
+    var w = warnOf(sid);
+    return '<a class="al-open' + (w ? ' is-warn' : '') + (opt.cls ? ' ' + opt.cls : '') + '" href="' + esc(url) + '" target="_blank" rel="noopener" data-al-open="' + esc(sid) + '"' +
+      (w ? ' data-al-warn="' + w + '" title="링크가 만료됐을 수 있습니다 — 누르면 먼저 확인"' : ' title="마라톤 앱 공유 링크를 새 탭으로"') + '>앱에서 보기 ↗' + (w ? '<i class="al-dot" aria-label="링크 확인 필요"></i>' : '') + '</a>';
+  }
+  /* 주황 점이 있으면 바로 열지 않고 그 자리에 한 줄 — [링크 바꾸기] · [그래도 열기 ↗] */
+  function warnPop(a) {
+    var old = document.querySelector('.al-pop');
+    if (old) { var same = old.previousElementSibling === a; old.parentNode.removeChild(old); if (same) return; }
+    var sid = a.dataset.alOpen;
+    var p = document.createElement('span');
+    p.className = 'al-pop';
+    p.setAttribute('role', 'alert');
+    p.innerHTML = '링크가 만료됐을 수 있습니다 · <button type="button" class="al-pop__b" data-app-relink="' + esc(sid) + '">링크 바꾸기</button> ' +
+      '<a class="al-pop__a" href="' + esc(a.getAttribute('href')) + '" target="_blank" rel="noopener" data-al-go>그래도 열기 ↗</a>';
+    a.parentNode.insertBefore(p, a.nextSibling);
+  }
   function open(ids, opt) {
     ids = (ids || []).filter(Boolean);
     if (!ids.length) return;
@@ -169,6 +194,14 @@
   }
 
   document.addEventListener('click', function (e) {
+    var ao = e.target.closest('[data-al-open]');
+    if (ao) {
+      e.stopPropagation();
+      if (ao.hasAttribute('data-al-warn')) { e.preventDefault(); warnPop(ao); }
+      return;                                     /* 링크가 맞으면 그대로 새 탭 */
+    }
+    var go = e.target.closest('[data-al-go], .al-pop [data-app-relink]');
+    if (go) { var pp = go.closest('.al-pop'); setTimeout(function () { if (pp && pp.parentNode) pp.parentNode.removeChild(pp); }, 0); }
     var t = e.target.closest('[data-al-save], [data-al-skip], [data-al-cancel], [data-al-clear], [data-al-copy], [data-al-setup], [data-app-link], [data-app-need], [data-app-relink]');
     if (!t) return;
     if (t.hasAttribute('data-app-relink')) { e.preventDefault(); e.stopPropagation(); if (cur() === t.dataset.appRelink && q.edit) close(); else open([t.dataset.appRelink], { edit: true }); return; }
@@ -220,5 +253,5 @@
     });
   });
 
-  window.AppLink = { open: open, close: close, boxHtml: boxHtml, current: cur, editing: function () { return q.edit; }, loadLogin: loadLogin, login: function () { return { loaded: login.loaded, has: login.has }; } };
+  window.AppLink = { open: open, close: close, boxHtml: boxHtml, openHtml: openHtml, url: linkUrl, current: cur, editing: function () { return q.edit; }, loadLogin: loadLogin, login: function () { return { loaded: login.loaded, has: login.has }; } };
 })();
