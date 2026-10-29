@@ -3537,3 +3537,6 @@ textarea.aip-text--new:focus { outline: 2px solid #B9AEF0; outline-offset: 1px; 
 .kw-line__t { font-weight: 800; color: var(--ink-mid); }
 .kw-line__in { width: 9em; min-height: 32px; font-size: 13px; }
 .kw-line__hint { flex: 1 1 100%; }
+/* 레포트 발송 학생 줄 — 이름 아래 「마지막 상담」과 그 아래 과제 칸이 붙지 않게 (20261031t 점검) */
+.snd-row__line .qn-namebox { padding: 2px 0; }
+.snd-row__line + .snd-row__app { margin-top: 4px; }
