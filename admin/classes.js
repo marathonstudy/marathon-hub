@@ -54,10 +54,21 @@
         var by = {};
         if (!q.error) (q.data || []).forEach(function (x) { by[x.name] = x.app_code || ''; });
         data.classes.forEach(function (c) { c.app_code = q.error ? null : (by[c.name] || ''); });
-      }, function () {}).then(render);
+      }, function () {}).then(function () {
+        /* AI 기본 요청 — 「이 요청을 이 반 기본으로 기억하기」 (aipolish.js · migration-043 · 20261031p) · 043 전이면 「—」 */
+        return window.AiPolish ? AiPolish.memAll().then(function (m) { aiReq = m; }) : null;
+      }).then(render);
     });
   }
 
+  var aiReq = null;
+  function aiCell(c) {
+    if (!aiReq) return '<span class="muted-note">—</span>';
+    var l = aiReq[c.name] || [];
+    return l.length ? '<span class="ca-ai">' + l.map(function (x) {
+      return '<span class="aip-mem__c">' + esc(x.request) + '<button type="button" class="aip-mem__x" data-ca-aidel="' + esc(x.id) + '" aria-label="' + esc('「' + x.request + '」 지우기') + '">×</button></span>';
+    }).join('') + '</span>' : '<span class="muted-note">없음</span>';
+  }
   function records(c) {
     var p = [];
     if (+c.reports)  p.push('레포트 ' + c.reports);
@@ -99,13 +110,14 @@
         : '<input class="input ca-names" type="text" maxlength="110" data-ca-names value="' + esc((c.review_names || []).join(', ')) + '" aria-label="복습테스트 기본 시험 목록 (쉼표로 나눠 순서대로)">') + '</td>' +
       '<td>' + (c.app_code == null ? '<span class="muted-note">—</span>'
         : '<input class="input ca-code" type="text" maxlength="30" autocomplete="off" spellcheck="false" data-ca-code value="' + esc(c.app_code) + '" placeholder="예: MARA2026" aria-label="' + esc(c.name) + ' 앱 입장코드">') + '</td>' +
+      '<td>' + aiCell(c) + '</td>' +
       '<td class="roster__actions tb-acts">' + acts + '</td></tr>';
   }
 
   function table(list, empty) {
     if (!list.length) return '<p class="panel__hint">' + empty + '</p>';
     return '<div class="roster-scroll"><table class="roster tb-table ca-table"><thead><tr>' +
-      '<th>반</th><th>재원</th><th>퇴원</th><th>기록</th><th title="반 수업일마다 저절로 생기는 복습테스트 — 쉼표로 나눠 순서대로 (예: 복습 TEST, 화작문 TEST). 그 주만 끄기 · 더 넣기는 레포트 발송 → 1 작성 반 공통에서">복습 시험 (순서대로)</th><th title="그 반 학생을 등록할 때 마라톤 앱 안내 문자의 입장코드 칸에 저절로 들어갑니다 (바꿀 수 있음)">앱 입장코드</th><th></th></tr></thead><tbody>' +
+      '<th>반</th><th>재원</th><th>퇴원</th><th>기록</th><th title="반 수업일마다 저절로 생기는 복습테스트 — 쉼표로 나눠 순서대로 (예: 복습 TEST, 화작문 TEST). 그 주만 끄기 · 더 넣기는 레포트 발송 → 1 작성 반 공통에서">복습 시험 (순서대로)</th><th title="그 반 학생을 등록할 때 마라톤 앱 안내 문자의 입장코드 칸에 저절로 들어갑니다 (바꿀 수 있음)">앱 입장코드</th><th title="AI 결과 창 「이 요청을 이 반 기본으로 기억하기」로 남긴 요청 — 다음 AI 초안부터 처음부터 따릅니다 · ×로 지웁니다">AI 기본 요청</th><th></th></tr></thead><tbody>' +
       list.map(row).join('') + '</tbody></table></div>';
   }
 
@@ -220,6 +232,8 @@
   }
 
   $('#caBody').addEventListener('click', function (e) {
+    var ad = e.target.closest('[data-ca-aidel]');
+    if (ad) { AiPolish.memDel(ad.dataset.caAidel).then(function (ok) { if (ok) { UI.toast('기억한 요청을 지웠습니다', 'good'); render(); } }); return; }
     var b = e.target.closest('[data-ca]');
     if (!b || busy) return;
     var c = find(b.closest('tr').dataset.name);

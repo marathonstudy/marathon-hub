@@ -903,6 +903,12 @@
   function fillEntryCard(el, s, tests) {
     var e = entryOf(s.id);
     el.querySelector('.entry__name').textContent = s.name || '';
+    /* 「신입」 — 수강 시작한 지 2주가 안 된 학생 (20261031q) */
+    var nb = el.querySelector('.entry__new');
+    if (Store.isNew && Store.isNew(s)) {
+      if (!nb) { nb = document.createElement('span'); nb.className = 'new-badge entry__new'; nb.textContent = '신입'; el.querySelector('.entry__name').insertAdjacentElement('afterend', nb); }
+      nb.title = '수강 시작 ' + Lesson.md(Store.startOf(s), false);
+    } else if (nb) nb.parentNode.removeChild(nb);
     var sv = el.querySelector('[data-save]');
     if (sv && uiState.entry[s.id]) { sv.textContent = SAVE_TEXT[uiState.entry[s.id]] || ''; sv.className = 'entry__save save-state save-state--' + uiState.entry[s.id]; }
 
@@ -1916,13 +1922,16 @@
     return { target: 'student', facts: f, note: ls.length ? '' : NEED_LESSONS };
   }
 
+  /* 「이 요청을 이 반 기본으로 기억하기」 — 반 이름 · 과정은 「§과정」 단위 (aipolish.js · migration-043 · 20261031p) */
+  function aiScope() { return currentClass && currentClass !== '_' ? { key: currentClass, label: isCourse(currentClass) ? '과정' : '반' } : null; }
   if (window.AiPolish) {
     /* 반 공통 코멘트 */
     AiPolish.attach($('#commonComment'), {
       kind: 'comment', id: 'commonAi', host: $('#commonAiHost'),
       get: function () { return $('#commonComment').value; },
       set: function (v) { var el = $('#commonComment'); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); },
-      draft: function () { return Promise.resolve(classDraftFacts()); }
+      draft: function () { return Promise.resolve(classDraftFacts()); },
+      scope: aiScope
     });
     /* 코멘트 창 — 반 공통(크게 쓰기) 또는 학생 한 명. 학생 창에서 반 공통을 쓰는 중이면 빈 칸으로 보고 초안을 바로 넣는다 */
     AiPolish.attach($('#commentText'), {
@@ -1930,11 +1939,12 @@
       get: function () { return $('#commentText').value; },
       set: function (v) { var el = $('#commentText'); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); },
       isEmpty: function () { return !$('#commentText').value.trim() || (!commentIsClass && !commentOwnMode); },
-      draft: function () { return Promise.resolve(commentIsClass ? classDraftFacts() : studentDraftFacts(commentTargetId)); }
+      draft: function () { return Promise.resolve(commentIsClass ? classDraftFacts() : studentDraftFacts(commentTargetId)); },
+      scope: aiScope
     });
     /* 수업 내용 — 차시 줄을 한 번에 (줄 수 그대로) */
     AiPolish.attach($('#lessonList'), {
-      kind: 'lessons', id: 'lessonAi', host: $('#lessonAiHost'),
+      kind: 'lessons', id: 'lessonAi', host: $('#lessonAiHost'), scope: aiScope,
       get: function () { return lessonsOfClass().join('\n'); },
       set: function (v) {
         var c = commonOf(currentClass || '_');

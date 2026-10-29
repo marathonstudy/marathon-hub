@@ -685,7 +685,16 @@
     if (on) { $('#fClassNewName').value = ''; setTimeout(function () { $('#fClassNewName').focus(); }, 0); }
   }
 
+  /* 새 학생 — 반을 바꾸면 그 반 다음 수업일로 (직접 고친 뒤에는 그대로) */
+  function paintStartHint(isNew) {
+    var h = $('#fStartHint'), v = $('#fStart') && $('#fStart').value;
+    if (!h) return;
+    h.textContent = isNew ? (v ? Store.dateWithDow(v) + ' 수업부터 레포트에 들어갑니다 (그 앞 수업 레포트에는 넣지 않음)' : '비워 두면 등록한 날부터') : (v ? '이날 수업부터 레포트 · 과제를 셉니다' : '');
+  }
+  if ($('#fStart')) $('#fStart').addEventListener('input', function (e) { e.target.dataset.typed = '1'; paintStartHint(!editingId); });
   $('#fClass').addEventListener('change', function () {
+    var sf = $('#fStart');
+    if (sf && !editingId && !sf.dataset.typed && $('#fClass').value !== NEW_CLASS) { sf.value = Store.nextLessonDate($('#fClass').value); paintStartHint(true); }
     var sel = $('#fClass');
     if (sel.value === NEW_CLASS) { showNewClass(true); return; }
     sel.dataset.prev = sel.value;
@@ -985,6 +994,9 @@
     $('#fSchool').value = s ? (s.school || '') : (settings.lastSchool || '');
     $('#fGrade').value  = s ? (s.grade || '') : (settings.lastGrade || '');
     fillStudentClass(s ? (s.className || '') : (settings.lastClass || ''), !!s);
+    /* 수강 시작일 — 있는 학생은 그 값, 새 학생은 그 반 다음 수업일 (20261031q) */
+    var fs0 = $('#fStart');
+    if (fs0) { fs0.dataset.typed = ''; fs0.value = s ? (Store.startOf(s) || '') : Store.nextLessonDate($('#fClass').value); paintStartHint(!s); }
     $('#fParentTitle').value = s ? (s.parentTitle || '') : (settings.lastParentTitle || '');
     /* 번호는 가려서 보여 준다 — 그대로 두면 원래 번호가 남고, 지우고 새로 적으면 바뀐다 */
     $('#fPhone').value  = s && s.parentPhone ? Store.phoneMask(s.parentPhone) : '';
@@ -1140,8 +1152,10 @@
       archived: $('#fArchived').checked,
       extra: collectExtra(prev),
       sortOrder: prev ? prev.sortOrder || 0 : 0,
-      createdAt: prev ? prev.createdAt : new Date().toISOString()
+      createdAt: prev ? prev.createdAt : new Date().toISOString(),
+      startOn: ($('#fStart') && $('#fStart').value) || (prev ? prev.startOn || '' : Store.nextLessonDate($('#fClass').value.trim()))
     };
+    if (prev && prev.leftOn) rec.leftOn = prev.leftOn;
 
     Store.upsertStudent(rec);
     students = Store.getStudents();

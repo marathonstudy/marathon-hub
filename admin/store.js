@@ -818,8 +818,42 @@
   }
   function isActiveOn(s, week) {
     if (!s || s.archived) return false;
+    var day = week ? lessonDayOf(s, week) : todayISO();
+    if (week && day < startOf(s)) return false;          /* 수강 시작일 앞 수업 — 그 레포트에 넣지 않는다 (20261031q) */
     if (!s.leftOn) return true;
-    return (week ? lessonDayOf(s, week) : todayISO()) <= s.leftOn;
+    return day <= s.leftOn;
+  }
+  /* 신입생 (20261031q · migration-044) — 수강 시작일(students.start_on) · 비어 있으면 등록일(한국 날짜)
+       inLesson(s, 수업일) — 그 수업 레포트에 들어가나 (시작일 당일 수업부터 · 퇴원일 당일 수업까지)
+       isNew(s) — 시작한 지 2주(14일)가 안 됨 · 「신입」 표시
+     비어 있던 학생은 migration-044 가 한 번 채운다(상담 카드 수강 시작일 → 등록일 · 이미 보낸 레포트는 남게). 044 전에는 예전처럼 거르지 않는다 */
+  function kstDay(iso) { var t = Date.parse(iso || ''); return isNaN(t) ? '' : new Date(t + 9 * 3600000).toISOString().slice(0, 10); }
+  function startOf(s) { return (s && s.startOn) || ''; }
+  function joinedOf(s) { return (s && (s.startOn || kstDay(s.createdAt))) || ''; }
+  function inLesson(s, date) {
+    if (!s || s.archived || !date) return !!s && !s.archived;
+    var st = startOf(s);
+    if (st && date < st) return false;
+    return !s.leftOn || date <= s.leftOn;
+  }
+  function isNew(s) {
+    var st = startOf(s), t = todayISO();
+    if (!st) return false;
+    return st > t || (Date.parse(t) - Date.parse(st)) / 86400000 < 14;
+  }
+  /* 그 반 다음 수업일 — 오늘이 수업일이면 오늘 (등록할 때 수강 시작일 기본값) · 수업 요일이 없으면 오늘 */
+  function nextLessonDate(cls, from) {
+    from = from || todayISO();
+    var d = parseISO(from);
+    if (!d || !global.Lesson) return from;
+    var mon = toISO(mondayOf(d));
+    for (var i = 0; i < 6; i++) {
+      var L = lessonOf(String(cls || '').trim(), global.Lesson.addDays(mon, 7 * i));
+      if (!L || L.canceled) continue;
+      var ds = (L.days && L.days.length ? L.days : [L.date]).filter(function (x) { return x && x >= from; }).sort();
+      if (ds.length) return ds[0];
+    }
+    return from;
   }
   function isGone(s) { return !!s && (!!s.archived || (!!s.leftOn && todayISO() > s.leftOn)); }
   function activeStudents(week) {
@@ -1604,6 +1638,7 @@
     getStudents: getStudents,
     activeStudents: activeStudents,
     isActiveOn: isActiveOn,
+    startOf: startOf, joinedOf: joinedOf, kstDay: kstDay, inLesson: inLesson, isNew: isNew, nextLessonDate: nextLessonDate,
     isGone: isGone,
     lessonDayOf: lessonDayOf,
     saveStudents: saveStudents,

@@ -55,7 +55,9 @@
       homeworkItems: [],
       requiredRate: -1,
       optionalRate: -1,
-      comment: commentFor(common, entry)
+      comment: commentFor(common, entry),
+      /* 수강 시작일 (migration-044 · 20261031q) — 러닝노트가 그 앞 날을 「신입생」으로 · 첫 레포트는 「첫 수업입니다」 */
+      startOn: global.Store && global.Store.startOf ? global.Store.startOf(student) : ''
     }, lesson);
   }
 

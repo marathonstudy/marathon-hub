@@ -8,6 +8,8 @@
      확실하지 않은 칸은 비워 두고 「자막에서 확인 안 됨」
    맨 아래 OX 4~6문항 — 문항마다 [지우기] · [OX 다시 만들기] · [OX 빼기] · 좋은 문항이 4개 미만이면 「이번 수업은 OX 없음」
    [AI로 다듬기] · [다시 만들기] · [임시 저장] · [확정] — 확정해야 학생 · 학부모 화면(러닝노트)에 나온다
+   「AI에게 고쳐 달라고 하기」(20261031p) — 칸은 그대로 손으로 고치고, 요청(빠른 버튼 · 300자)대로 지금 노트를 고친다 (lesson-summary polish + request)
+     [한 단계 전으로] · 「이 요청을 이 반 기본으로 기억하기」(aipolish.js memAdd · migration-043) — 다음 [복습 노트 만들기]부터 처음부터 따른다
      확정 뒤 고치면 「다시 공개해야 반영됩니다」 → [고친 내용으로 다시 확정]
    과정(고3) 회차 — 「§과정」 칸에서 한 번 만들고 확정하면 그 회차의 모든 반 레포트에 들어간다
    「오늘」 반 카드 — 「이번 복습 노트 연 학생 8/11」(반 전체 숫자만 · 누가 열었는지 · OX 점수는 없다)
@@ -35,7 +37,7 @@
   ];
   var UNSURE = '자막에서 확인 안 됨';
 
-  var st = { cls: '', week: '', key: '', row: null, edit: null, busy: '', missing: false };
+  var st = { cls: '', week: '', key: '', row: null, edit: null, busy: '', missing: false, req: '', remember: false, hist: [] };
 
   function fmtDT(iso) {
     if (!iso) return '';
@@ -69,7 +71,7 @@
     var key = (cls || '') + '|' + (week || '');
     st.cls = cls || ''; st.week = week || '';
     if (key === st.key) return;
-    st.key = key; st.row = null; st.edit = null;
+    st.key = key; st.row = null; st.edit = null; st.hist = []; st.req = '';
     draw();
     load();
   }
@@ -158,8 +160,52 @@
           : '<button class="btn btn--sm btn--ghost" type="button" data-rn-act="discard">초안 지우기</button>') +
         '<button class="btn btn--sm btn--primary" type="button" data-rn-act="confirm"' + (st.busy ? ' disabled' : '') + '>' + (r && r.confirmed ? (confirmed ? '다시 확정' : '고친 내용으로 다시 확정') : '확정') + '</button>' +
       '</div>' +
+      askHtml() +
       '<p class="panel__hint">[확정]하면 러닝노트 레포트(수업 영상 아래) · 「복습 노트 모음」에 나옵니다' + (isCourse() ? ' — 과정이라 이 회차의 모든 반 레포트에 들어갑니다' : '') + '. 학부모에게 풀었는지는 알리지 않습니다.</p>' +
     '</div>';
+  }
+
+  /* 「AI에게 고쳐 달라고 하기」 — 다른 AI 칸과 같은 모양 (aipolish.js 의 빠른 버튼 · 반 기본 요청) */
+  function scopeLabel() { return isCourse() ? '과정' : '반'; }
+  function memList() { return window.AiPolish && st.cls ? AiPolish.memOf(st.cls) : []; }
+  function withMem(b) {
+    if (!window.AiPolish || !st.cls) return Promise.resolve(b);
+    return AiPolish.memLoad(st.cls).then(function (l) { if (l.length) b.requests = l.map(function (x) { return x.request; }); return b; });
+  }
+  function askHtml() {
+    var A = window.AiPolish, max = A ? A.MAX_REQ : 300, ms = memList();
+    return '<div class="aip-ask rn-ask" role="group" aria-label="AI에게 고쳐 달라고 하기"><div class="aip-ask__t">AI에게 고쳐 달라고 하기</div>' +
+      '<div class="aip-quick">' + (A ? A.QUICK : []).filter(function (q) { return !q[2]; }).map(function (q) {
+        return '<button type="button" class="aip-q" data-rn-q="' + esc(q[1]) + '"' + (st.busy ? ' disabled' : '') + '>' + esc(q[0]) + '</button>';
+      }).join('') + '</div>' +
+      '<textarea class="textarea aip-req" id="rnReq" rows="2" maxlength="' + max + '" placeholder="예: 행동 강령은 세 줄로 줄이고, 자주 하는 실수는 더 쉽게 써 줘" aria-label="어떻게 고칠지">' + esc(st.req) + '</textarea>' +
+      (ms.length ? '<div class="aip-mem"><span class="aip-mem__t">이 ' + scopeLabel() + ' 기본 요청</span>' + ms.map(function (x) {
+        return '<span class="aip-mem__c">' + esc(x.request) + '<button type="button" class="aip-mem__x" data-rn-memdel="' + esc(x.id) + '" aria-label="' + esc('「' + x.request + '」 지우기') + '">×</button></span>';
+      }).join('') + '</div>' : '') +
+      '<label class="aip-remember"><input type="checkbox" id="rnRemember"' + (st.remember ? ' checked' : '') + '> 이 요청을 이 ' + scopeLabel() + ' 기본으로 기억하기</label>' +
+      '<div class="aip-ask__acts"><button type="button" class="btn btn--sm btn--primary" data-rn-act="revise" id="rnRevise"' + (st.busy || st.req.trim().length < 2 ? ' disabled' : '') + '>' + (st.busy === 'revise' ? '고치는 중…' : '이대로 고치기') + '</button>' +
+        (st.hist.length ? '<button type="button" class="btn btn--sm btn--ghost" data-rn-act="back" id="rnBack"' + (st.busy ? ' disabled' : '') + '>한 단계 전으로</button>' : '') +
+        '<span class="muted-note aip-req-n num" id="rnReqN">' + st.req.length + '/' + max + '</span></div></div>';
+  }
+  function reviseNote() {
+    if (st.busy) return;
+    var req = st.req.replace(/\s+/g, ' ').trim();
+    if (req.length < 2) { toast('어떻게 고칠지 적어 주세요', 'bad'); return; }
+    var n = readDom(), key = st.key, cls = st.cls, remember = st.remember;
+    st.hist.push(clone(n));
+    st.edit = n; st.busy = 'revise'; draw();
+    var b = base('polish', null); b.lessons = Math.min(4, Math.max(1, n.lessons.length)); b.note = { lessons: n.lessons, quiz: n.quizOff ? [] : n.quiz || [] }; b.request = req;
+    withMem(b).then(invoke).then(function (res) {
+      st.busy = '';
+      if (key !== st.key) return;
+      if (!res || !res.ok) { st.hist.pop(); toast((res && res.message) || '고치지 못했습니다', 'bad'); draw(); return; }
+      if (Array.isArray(res.lessons) && res.lessons.length) st.edit.lessons = res.lessons;
+      if (!n.quizOff && Array.isArray(res.quiz) && res.quiz.length) st.edit.quiz = res.quiz;
+      st.req = '';
+      var fin = function () { draw(); saveDraft(true); toast('요청대로 고쳤습니다 — 읽어 보고 [확정]해 주세요 · [한 단계 전으로]로 되돌릴 수 있습니다', 'good'); };
+      if (remember && window.AiPolish) AiPolish.memAdd(cls, req).then(function (ok) { if (ok) st.remember = false; fin(); });
+      else fin();
+    });
   }
 
   /* 화면 → 노트 (고치는 중) */
@@ -210,7 +256,7 @@
     var go = function () {
       var key = st.key;
       st.busy = 'make'; st.edit = null; draw();
-      invoke(base('make', src)).then(function (res) {
+      withMem(base('make', src)).then(invoke).then(function (res) {
         st.busy = '';
         if (!res || !res.ok) { toast((res && res.message) || '복습 노트를 만들지 못했습니다', 'bad'); draw(); return; }
         if (key === st.key) { st.row = res.note || st.row; st.edit = null; draw(); }
@@ -265,7 +311,7 @@
     var n = readDom(), key = st.key;
     st.edit = n; st.busy = 'polish'; draw();
     var b = base('polish', null); b.lessons = Math.min(4, Math.max(1, n.lessons.length)); b.note = { lessons: n.lessons, quiz: n.quizOff ? [] : n.quiz || [] };
-    invoke(b).then(function (res) {
+    withMem(b).then(invoke).then(function (res) {
       st.busy = '';
       if (key !== st.key) return;
       if (!res || !res.ok) { toast((res && res.message) || '다듬지 못했습니다', 'bad'); draw(); return; }
@@ -362,10 +408,30 @@
         if (confirmedEdited() && !body.querySelector('.rn-ed__warn')) head.insertAdjacentHTML('afterend', '<p class="rn-ed__warn">확정한 뒤 고쳤습니다 — 다시 공개해야 반영됩니다. [고친 내용으로 다시 확정]을 눌러 주세요.</p>');
       }
     });
-    body.addEventListener('change', function (e) { if (e.target.closest('[data-rn-qf]')) st.edit = readDom(); });
+    body.addEventListener('change', function (e) {
+      if (e.target.id === 'rnRemember') { st.remember = e.target.checked; return; }
+      if (e.target.closest('[data-rn-qf]')) st.edit = readDom();
+    });
+    /* 요청 칸 — 다시 그려도 남게 */
+    body.addEventListener('input', function (e) {
+      if (e.target.id !== 'rnReq') return;
+      st.req = e.target.value;
+      var n = body.querySelector('#rnReqN'); if (n) n.textContent = st.req.length + '/' + (window.AiPolish ? AiPolish.MAX_REQ : 300);
+      var rv = body.querySelector('#rnRevise'); if (rv) rv.disabled = !!st.busy || st.req.trim().length < 2;
+    });
     body.addEventListener('click', function (e) {
       var rg = e.target.closest('[data-rn-regen]');
       if (rg) { var p = rg.dataset.rnRegen.split('|'); regen(+p[0], p[1]); return; }
+      var rq = e.target.closest('[data-rn-q]');
+      if (rq) {
+        var cur = st.req.replace(/\s+$/, ''), add = rq.dataset.rnQ;
+        if (cur.indexOf(add) === -1) st.req = ((cur ? cur.replace(/[,.]$/, '') + ', ' : '') + add).slice(0, window.AiPolish ? AiPolish.MAX_REQ : 300);
+        st.edit = readDom(); draw();
+        var ta = body.querySelector('#rnReq'); if (ta) ta.focus();
+        return;
+      }
+      var mdl = e.target.closest('[data-rn-memdel]');
+      if (mdl && window.AiPolish) { AiPolish.memDel(mdl.dataset.rnMemdel).then(function () { st.edit = readDomSafe(); draw(); }); return; }
       var qd = e.target.closest('[data-rn-qdel]');
       if (qd) { var n = readDom(); n.quiz.splice(+qd.dataset.rnQdel, 1); st.edit = n; draw(); return; }
       var a = e.target.closest('[data-rn-act]');
@@ -374,6 +440,8 @@
       if (act === 'quizoff' || act === 'quizon') { var n2 = readDom(); n2.quizOff = act === 'quizoff'; st.edit = n2; draw(); return; }
       if (act === 'quiz') regenQuiz();
       else if (act === 'polish') polish();
+      else if (act === 'revise') reviseNote();
+      else if (act === 'back') { var pv = st.hist.pop(); if (pv) { st.edit = pv; draw(); saveDraft(true); toast('한 단계 전으로 돌아갔습니다'); } }
       else if (act === 'remake') make();
       else if (act === 'save') saveDraft(false);
       else if (act === 'confirm') confirmNote();

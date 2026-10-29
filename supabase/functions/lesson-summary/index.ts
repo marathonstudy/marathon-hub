@@ -216,6 +216,8 @@ async function summarize(req: Request, cors: Record<string, string>) {
      op "field"  자막 → 그 차시 그 칸만 다시 (저장은 코치룸이 고친 초안과 함께)
      op "quiz"   자막 → OX 만 다시 (검사 포함)
      op "polish" 지금 노트(자막 없이) → 말만 다듬는다 (내용을 더하지 않는다)
+                 request(2~300자)가 있으면 「AI에게 고쳐 달라고 하기」 — 지금 노트(손으로 고친 것 포함)를 그 요청대로만 고친다 (20261031p)
+     requests    그 반 기본 요청(migration-043) — make · polish 가 처음부터 따른다
    수업 요약과 같은 모델 · 같은 월 상한(summary_begin) · 자막 원문은 저장하지 않는다
    ============================================================ */
 
@@ -410,6 +412,11 @@ async function reviewNote(body: Any, auth: string, apikey: string, cors: Record<
   } else if (!cur || !Array.isArray(cur.lessons) || !cur.lessons.length) {
     return json({ ok: false, reason: "input", message: "다듬을 복습 노트가 없습니다." }, cors, 400);
   }
+  /* 「AI에게 고쳐 달라고 하기」(polish + request · 2~300자) · 그 반 기본 요청(requests · migration-043) — 20261031p */
+  const request = String(body.request ?? "").replace(/\s+/g, " ").trim();
+  if (request && (request.length < 2 || request.length > 300)) return json({ ok: false, reason: "input", message: "요청은 2 ~ 300자로 적어 주세요." }, cors, 400);
+  const always: string[] = (Array.isArray(body.requests) ? body.requests : []).map((x: unknown) => String(x ?? "").replace(/\s+/g, " ").trim().slice(0, 300)).filter((x: string) => x.length >= 2).slice(0, 8);
+  const alwaysText = always.length ? "\n\n선생님이 이 반에 늘 바라는 점 (처음부터 따른다):\n" + always.map((x) => "- " + x).join("\n") : "";
   const lessonNo = Math.round(Number(body.lesson) || 1);
   const field = String(body.field ?? "");
   if (op === "field" && !FIELDS.includes(field)) return json({ ok: false, reason: "input", message: "다시 만들 칸을 골라 주세요." }, cors, 400);
@@ -438,7 +445,7 @@ async function reviewNote(body: Any, auth: string, apikey: string, cors: Record<
     const tb = op === "polish" ? "" : transcriptBlock(mode, n, texts);
 
     if (op === "make") {
-      const { res, parsed } = await callJson(client, REVIEW_SYSTEM, tb + `\n\n위 수업으로 복습 노트를 만들어라. lessons 에 ${n}개(no 는 1부터), quiz 에 4~6문항, 확인이 필요한 점은 note 에 짧게 (없으면 빈 문자열).`, NOTE_SCHEMA);
+      const { res, parsed } = await callJson(client, REVIEW_SYSTEM + alwaysText, tb + `\n\n위 수업으로 복습 노트를 만들어라. lessons 에 ${n}개(no 는 1부터), quiz 에 4~6문항, 확인이 필요한 점은 note 에 짧게 (없으면 빈 문자열).`, NOTE_SCHEMA);
       add(res);
       const stop = stopped(res);
       if (stop) { await finish(false, String(res?.stop_reason)); return json({ ok: false, reason: "claude", message: stop }, cors, 200); }
@@ -469,8 +476,11 @@ async function reviewNote(body: Any, auth: string, apikey: string, cors: Record<
     }
     /* polish — 자막 없이 지금 노트의 말만 다듬는다 */
     const base = cur.lessons.slice(0, 6).map(cleanLesson);
-    const { res, parsed } = await callJson(client, REVIEW_SYSTEM + "\n\n지금은 다듬기만 한다: 맞춤법 · 띄어쓰기 · 어색한 말만 고친다. 내용 · 항목을 더하거나 빼지 않는다. 빈 칸은 빈 채로 둔다. 선생님 표현은 살린다. OX 문항 수와 정답은 바꾸지 않는다.",
-      `<note>\n${JSON.stringify({ lessons: base, quiz: Array.isArray(cur.quiz) ? cur.quiz.map((q: Any) => ({ q: q.q, a: q.a, why: q.why, from: "actions" })) : [] })}\n</note>\n\n이 노트를 다듬어 같은 모양으로 돌려줘라. note 는 빈 문자열.`, NOTE_SCHEMA);
+    const howTo = request
+      ? "\n\n지금은 선생님 요청대로 고친다 (처음부터 새로 쓰지 않는다): 요청에 없는 칸 · 문장은 그대로 둔다. 손으로 고친 표현은 살린다. 자막에 없는 새 사실을 더하지 않는다. 빈 칸은 빈 채로 둔다. OX 정답은 바꾸지 않는다." + alwaysText + "\n\n<request>\n" + request + "\n</request>"
+      : "\n\n지금은 다듬기만 한다: 맞춤법 · 띄어쓰기 · 어색한 말만 고친다. 내용 · 항목을 더하거나 빼지 않는다. 빈 칸은 빈 채로 둔다. 선생님 표현은 살린다. OX 문항 수와 정답은 바꾸지 않는다." + alwaysText;
+    const { res, parsed } = await callJson(client, REVIEW_SYSTEM + howTo,
+      `<note>\n${JSON.stringify({ lessons: base, quiz: Array.isArray(cur.quiz) ? cur.quiz.map((q: Any) => ({ q: q.q, a: q.a, why: q.why, from: "actions" })) : [] })}\n</note>\n\n이 노트를 ${request ? "요청대로 고쳐" : "다듬어"} 같은 모양으로 돌려줘라. note 는 빈 문자열.`, NOTE_SCHEMA);
     add(res);
     const stop = stopped(res);
     if (stop) { await finish(false, String(res?.stop_reason)); return json({ ok: false, reason: "claude", message: stop }, cors, 200); }

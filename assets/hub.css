@@ -1203,3 +1203,9 @@ html.rn-lock, html.rn-lock body { overflow: hidden; }
 .ap-more--warn .ap-more__t { color: #8A5A12; }
 .ap-more__dot { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: #E8891C; vertical-align: middle; }
 @media print { .ap-more { display: none !important; } }
+
+/* 신입생 — 수강 시작 전 날은 회색 「신입생」 (세지 않음 · app-week.js · 20261031q) */
+.aw-new { background: #EEF0F5 !important; color: #7A7F98 !important; font-size: 10px; font-weight: 700; letter-spacing: -.04em; line-height: 1.15; display: flex; align-items: center; justify-content: center; text-align: center; }
+.aw-sum--new { color: #7A7F98; background: #EEF0F5; }
+.cal-cell--new { display: flex; flex-direction: column; align-items: center; justify-content: center; background: #EEF0F5; color: #8A8FA6; overflow: hidden; padding: 0 1px; }
+.cal-cell--new small { font-size: 9px; font-weight: 700; letter-spacing: -.06em; }

@@ -552,6 +552,9 @@
     return Promise.resolve().then(function () { return rpc('hub_hw_fix', { p_code: code }); })
       .then(function (m) { return m && typeof m === 'object' ? m : {}; }, function () { return {}; });
   }
+  /* 수강 시작일 — 레포트(report_data.startOn · 코치룸이 공개할 때 담는다)에서 · 그 앞 날은 「신입생」 (20261031q) */
+  var HUBSTART = '';
+  function withStart(d) { return d && HUBSTART && !d.startOn ? Object.assign({}, d, { startOn: HUBSTART }) : d; }
   function appData(code) {
     if (APP.code !== code || !APP.p) {
       APP.code = code;
@@ -564,7 +567,7 @@
       /* 실패는 남기지 않는다 — [다시 시도]는 새로 부른다 */
       APP.p.then(function (d) { if (!d && APP.code === code) APP.p = null; });
     }
-    return APP.p;
+    return APP.p.then(withStart);
   }
   /* 불러오는 동안 — 빙글빙글 「과제 불러오는 중」 (10초가 넘으면 「조금 오래 걸리고 있습니다」) · 실패 — 「과제 기록 못 불러옴 · 다시 시도」 */
   function appWaitHtml() {
@@ -626,6 +629,10 @@
     for (var dd = 1; dd <= last; dd++) {
       var key = ym + '-' + String(dd).padStart(2, '0'), info = byDay[key];
       var inR = b.range && key >= b.range.from && key <= b.range.to;
+      if (b.data && b.data.startOn && key < b.data.startOn) {
+        cells += '<span class="cal-cell cal-cell--new' + (inR ? ' cal-cell--range' : '') + '" title="' + esc(dd + '일 · 신입생 (수강 시작 전 · 세지 않음)') + '"><b>' + dd + '</b><small>신입생</small></span>';
+        continue;
+      }
       if (AppWeek.isWeekend(key)) {
         /* 토 · 일 = 늘 「주중 복습」(옅은 색 · 미제출로 치지 않음) · 앱에 제출한 기록이 있으면 ✓ (20261030d) */
         var wkd = key <= t && ((info && (info.status === 'onTime' || info.status === 'late')) || !!subs[key]);
@@ -656,11 +663,11 @@
     var s = (data && data.stats) || {};
     if (opt.first) {
       var fin = '<h2 class="card-title">📱 ' + esc(opt.title || '과제 요약') + '</h2>' +
-        (opt.sub ? '<p class="awb-sub">' + opt.sub + '</p>' : '') + '<p class="awb-wait">첫 주라 지난 기록이 없습니다</p>';
+        (opt.sub ? '<p class="awb-sub">' + opt.sub + '</p>' : '') + '<p class="awb-wait">' + (opt.newStudent ? '첫 수업입니다 · 다음 레포트부터 과제 기록이 보입니다' : '첫 주라 지난 기록이 없습니다') + '</p>';
       return opt.card === false ? '<div class="awb" id="' + id + '">' + fin + '</div>' : '<div class="card awb aw-card" id="' + id + '">' + fin + '</div>';
     }
     var body = !w || !w.hwDays
-      ? '<p class="awb-wait">' + (opt.range ? '이 기간에는 과제가 없었습니다' : '아직 과제 시작 전') + '</p>'
+      ? '<p class="awb-wait">' + (w && w.allNew ? '신입생 — 수강 시작 전 기간입니다' : opt.range ? '이 기간에는 과제가 없었습니다' : '아직 과제 시작 전') + '</p>'
       : '<div class="rate-grid rate-grid--three">' +
           ring(pctOf(w.hwDone, w.hwDays), '과제 제출') + ring(pctOf(w.hwOnTime, w.hwDays), '정시 제출') +
           (w.lecDays ? ring(pctOf(w.lecDone, w.lecDays), '강의 시청') : dashRing('강의 시청')) +
@@ -686,7 +693,7 @@
     var p = data && global.AppWeek ? AppWeek.forLesson(data, lessonDate, todayISO()) : null;
     if (!p || (!p.first && !(p.w && p.w.any))) return '';      /* 그 일주일에 과제 · 강의가 하나도 없던 주는 그리지 않는다 (예전 그대로) */
     return appBlockHtml(data, p.w, { title: periodTitle('지난 일주일', p.from, p.to), sub: esc(Lesson.md(p.lesson, false)) + ' 수업 전까지 한 것',
-                                     month: p.to.slice(0, 7), total: p.total, range: { from: p.from, to: p.to }, first: p.first, card: card });
+                                     month: p.to.slice(0, 7), total: p.total, range: { from: p.from, to: p.to }, first: p.first, newStudent: !!p.newStudent, card: card });
   }
   function animateRings(root) {
     requestAnimationFrame(function () {
@@ -979,6 +986,7 @@
     if (!box) return;
     if (!(APP.info && APP.info.linked)) { box.innerHTML = ''; return; }
     var ld = lessonDateOf(r, data);
+    if (data && data.startOn) HUBSTART = String(data.startOn).slice(0, 10);
     box.innerHTML = appWaitHtml();
     appWaitSlow(box);
     APP_RETRY.report = function () { drawReportApp(box, code, r, data, idx); };

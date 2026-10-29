@@ -587,6 +587,28 @@ delete from public.staff where email = '조교이메일@example.com';
   저장하면 student_notes 에 한 줄 (상담 카드와 같은 표) · 줄 정렬은 그대로. 상담 카드에 「다음에 확인할 것」 칸 · 맨 위 「지난번 약속: …」
 - 상담 내용 · 약속은 학생 · 학부모 화면(/me/ · /s/)이 읽지 않는다 (student_notes 는 직원만)
 
+### 5-47. 20261031p — AI 초안 직접 고치기 · AI에게 고쳐 달라고 하기 (migration-043-ai-requests.sql · text-polish · lesson-summary 다시 배포)
+1. Supabase SQL Editor 에서 `supabase/migration-043-ai-requests.sql` 실행 (042 다음 · 여러 번 실행해도 안전 · 확인 두 줄 모두 true).
+   - `ai_requests` — 「이 요청을 이 반 기본으로 기억하기」(scope = 반 이름 · 과정은 「§과정 이름」 · 요청 2~300자 · 같은 글은 한 번) · 직원만
+2. Edge Functions → `text-polish` → `supabase/functions/text-polish/index.ts` 전체로 Deploy
+   - action `revise` — 지금 글(손으로 고친 것 포함)을 요청대로 (처음부터 새로 쓰지 않음 · 자리표시 · 링크는 그대로 · 숫자 · 날짜는 지금 글 · 자료 · 원래 글 안의 것만)
+   - draft 에 `requests`(반 기본 요청) · `keep`(칸에 있던 글 — 화면이 초안 끝에 그대로 붙임) · 「확인할 것」은 일반 당부를 거르고 2개까지 (`cleanChecks`)
+3. Edge Functions → `lesson-summary` → `supabase/functions/lesson-summary/index.ts` 전체로 Deploy (복습 노트 polish + `request` · make · polish 에 `requests`)
+- 코치룸 aipolish.js — 모든 AI 칸(반 공통 · 학생 코멘트 · 수업 내용 · 반 공지 · 문자 · 문구 · 교재 안내 · 인사말 · 상용구): 초안 칸이 입력 칸(「직접 고친 내용 있음」 · AI 초안으로 되돌리기) ·
+  「AI에게 고쳐 달라고 하기」(빠른 버튼 · 300자 · 이대로 고치기 · 한 단계 전으로 · 반 기본으로 기억하기) · 「빼 줘」 항목은 자료에서 뺌(`AiPolish.exclude`) · 「다시 쓰기」 → 「처음부터 다시 쓰기」
+  초안은 늘 결과 창에 먼저 (칸이 비었으면 [칸에 넣기]). 복습 노트(reviewnote.js)도 같은 요청 칸 · 반 관리 「AI 기본 요청」 열 · 과정 관리 카드에서 보고 지운다
+
+### 5-48. 20261031q — 신입생은 수강 시작일부터 · 「오늘 할 일」 이름과 짐작한 이유 (migration-044-start-on.sql · 함수 배포 없음)
+1. Supabase SQL Editor 에서 `supabase/migration-044-start-on.sql` 실행 (043 다음 · 여러 번 실행해도 안전 · 확인 세 줄 모두 true).
+   - `students.start_on` 수강 시작일 — 비어 있던 학생은 상담 카드 수강 시작일 → 등록일로 한 번 채움 (이미 공개 · 발송한 레포트가 있으면 그 주 첫날까지 당겨서 사라지지 않게)
+   - 새로 등록할 때 비면 등록한 날 (코치룸은 그 반 다음 수업일을 기본값으로) · 상담 카드 수강 시작일과 서로 같은 값 (트리거)
+   - `care_checks.kind` 에 report — 「오늘 할 일」 학생 이름 옆 × (그 학생만 그 수업 레포트 건너뛰기)
+- 코치룸: `Store.isActiveOn(학생, 주)` 가 수강 시작일 앞 수업을 뺀다 → 작성 · 공개 · 발송 목록 · 공개 n/전체 · 보냄 n/전체 · 탭 배지. 「오늘」 칩 · 오늘 할 일 · 과정 카드는 `Store.inLesson`
+  앱 기록에 `startOn` 을 붙여 AppWeek 가 그 앞 날을 「신입생」(hw 'new' · 셈에서 뺌 · allNew) · 첫 레포트 forLesson `newStudent` → 「첫 수업입니다 · 다음 레포트부터 과제 기록이 보입니다」
+  레포트 데이터에 `startOn` (러닝노트가 날짜별 달력 · 과제 상세에서 같은 회색). 복습테스트 챙길 학생도 시작일 앞 시험은 뺀다. 시작 2주 안 된 학생은 「신입」
+  「오늘 할 일」 — 안 보낸 학생 이름(3명까지 · 넘으면 「홍민기 외 4명」 펼치기) · 짐작한 이유(신입 · 10/29 등록 · 번호 없음 · 보내기 실패 · 결석 · 퇴원 예정) · 이름 옆 ×
+  학생 등록 창 · 엑셀 넣기 — 수강 시작일 칸 (기본값 그 반 다음 수업일)
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

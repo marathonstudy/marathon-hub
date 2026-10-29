@@ -228,7 +228,9 @@
           id: Store.newId(), name: name, school: vals.school, grade: vals.grade,
           className: vals.className, parentTitle: vals.parentTitle,
           parentPhone: parentPhone, studentPhone: studentPhone,
-          archived: false, extra: {}, sortOrder: 0, createdAt: new Date().toISOString()
+          archived: false, extra: {}, sortOrder: 0, createdAt: new Date().toISOString(),
+          /* 수강 시작일 — 칸에 없으면 그 반 다음 수업일 (오늘이 수업일이면 오늘 · migration-044 · 20261031q) */
+          startOn: startDate || Store.nextLessonDate(vals.className)
         };
         if (appCode) out.appCodes[rec.id] = appCode;
         if (startDate) out.startDates[rec.id] = startDate;

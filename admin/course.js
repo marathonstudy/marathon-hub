@@ -263,6 +263,7 @@
         }).join('') + '</div>' +
         '<div class="cm-mem">' + (act.length ? membersAt(c, no).map(function (m) { return esc(shortName(m.cls)) + ' ' + (m.date ? esc(Store.dateWithDow(m.date)) : m.nosched ? '(수업 요일 없음)' : '(휴강)'); }).join(' · ') : '<span class="muted-note">아직 들어간 반이 없습니다</span>') + '</div>' +
         '<label class="check-line"><input type="checkbox" data-cm-wl="' + esc(c.id) + '"' + (c.weekLabel ? ' checked' : '') + '> <span>회차 이름에 「10월 4주」도 함께 쓰기</span></label>' +
+        aiLine(c) +
       '</div>';
     }).join('') : '<p class="panel__hint">아직 과정이 없습니다. 아래에서 만듭니다.</p>') +
     '<div class="cm-assist"><div class="cm-sub">반마다 담당 조교 <span class="muted-note">(선택) 지정된 조교에게는 그 반이 「오늘」 · 레포트 발송 맨 위에 오고, 과정 작성 화면에서 그 반 학생 카드가 펼쳐져 있습니다. 권한은 모두 같습니다.</span></div>' +
@@ -270,6 +271,14 @@
         return '<label class="cm-arow"><span>' + esc(n) + '</span><select class="select" data-cm-asst="' + esc(n) + '"><option value="">없음</option>' +
           st.staff.map(function (s) { var em = String(s.email || '').toLowerCase(); return '<option value="' + esc(em) + '"' + (assistantOf(n) === em ? ' selected' : '') + '>' + esc(s.name || em) + '</option>'; }).join('') + '</select></label>';
       }).join('') + '</div>';
+  }
+  /* AI 기본 요청 — 과정은 과정 단위(「§과정 이름」)로 기억한다 (aipolish.js · migration-043 · 20261031p) */
+  function aiLine(c) {
+    if (!window.AiPolish) return '';
+    var l = AiPolish.memOf('§' + c.name);
+    return '<div class="cm-ai"><span class="cm-sub">AI 기본 요청</span> ' + (l.length ? l.map(function (x) {
+      return '<span class="aip-mem__c">' + esc(x.request) + '<button type="button" class="aip-mem__x" data-cm-aidel="' + esc(x.id) + '" aria-label="' + esc('「' + x.request + '」 지우기') + '">×</button></span>';
+    }).join('') : '<span class="muted-note">없음 — AI 결과 창 「이 요청을 이 과정 기본으로 기억하기」로 남깁니다</span>') + '</div>';
   }
   function openForm(c) {
     edit.id = c ? c.id : '';
@@ -283,7 +292,7 @@
     $('#courseModal').showModal();
     openForm(null);
     renderManage();
-    Promise.all([load(), loadStaff()]).then(renderManage);
+    Promise.all([load(), loadStaff(), window.AiPolish ? AiPolish.memAll() : null]).then(renderManage);
   }
   function save() {
     var name = $('#cmName').value.trim(), start = $('#cmStart').value, no = parseInt($('#cmStartNo').value, 10) || 1;
@@ -303,6 +312,8 @@
     $('#cmNew').addEventListener('click', function () { openForm(null); $('#cmName').focus(); });
     $('#courseClose').addEventListener('click', function () { $('#courseModal').close(); });
     $('#courseList').addEventListener('click', function (e) {
+      var ad = e.target.closest('[data-cm-aidel]');
+      if (ad) { AiPolish.memDel(ad.dataset.cmAidel).then(function (ok) { if (ok) { toast('기억한 요청을 지웠습니다', 'good'); renderManage(); } }); return; }
       var b = e.target.closest('[data-cm-edit]');
       if (b) { openForm(byId(b.dataset.cmEdit)); $('#cmName').focus(); }
     });

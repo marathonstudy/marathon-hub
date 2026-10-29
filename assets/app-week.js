@@ -19,6 +19,9 @@
    과제 수정 (20261031j · migration-038) — 조교가 고친 값을 앱 기록 위에 덮는다 (withFix). 앱 기록은 바꾸지 않는다
      fix = { 'YYYY-MM-DD': onTime | late | none | exempt } — exempt(면제)는 셈에서 뺀다 (제출 수 · 과제 있던 날 모두)
      코치룸은 hwfix.js 가, 러닝노트는 hub_hw_fix 로 받은 값을 덮는다 (「수정」 표시 · 사유는 코치룸에만)
+   신입생 (20261031q · migration-044) — data.startOn(수강 시작일)이 있으면 그 앞 날은 회색 「신입생」(hw · lec 'new')
+     제출 수 · 과제 있던 날 · 누적 어디에도 세지 않는다. 기간 중간에 시작했으면 시작일부터만 (예: 2/2일) · 시작일 뒤 평일이 없으면 allNew
+     그 수업 레포트 기간(D-7 ~ D-1)이 모두 시작 전이면 forLesson 의 newStudent — 「첫 수업입니다 · 다음 레포트부터 과제 기록이 보입니다」
    ============================================================ */
 
 (function (global) {
@@ -79,8 +82,14 @@
     (data.lectures || []).forEach(function (l) { if (l && l.order) lec[l.order] = l; });
 
     var days = [], hwDone = 0, hwOnTime = 0, hwDays = 0, lecDone = 0, lecDays = 0, wkDays = 0, wkDone = 0, subs = subDaysOf(data);
+    var start = valid(data.startOn) ? data.startOn : '', newDays = 0;
     for (var d = from, k = 0; d <= to && k < 31; d = addDays(d, 1), k++) {
       var c = cal[d] || null;
+      if (start && d < start) {
+        newDays++;
+        days.push({ date: d, dow: DOW[new Date(d + 'T00:00:00Z').getUTCDay()], hw: 'new', lec: 'new', weekend: isWeekend(d) });
+        continue;
+      }
       if (isWeekend(d)) {
         /* 토 · 일 = 주중 복습 — 세지 않는다 (제출 기록이 있으면 ✓ 만) */
         var wd = !(today && d > today) && submittedOn(c, subs, d);
@@ -107,7 +116,8 @@
     var rate = rates.length ? Math.round(rates.reduce(function (a, b) { return a + b; }, 0) / rates.length) : null;
 
     return { from: from, to: to, days: days, hwDone: hwDone, hwOnTime: hwOnTime, hwDays: hwDays, lecDone: lecDone, lecDays: lecDays, rate: rate,
-             wkDays: wkDays, wkDone: wkDone,
+             wkDays: wkDays, wkDone: wkDone, newDays: newDays,
+             allNew: newDays > 0 && !days.some(function (x) { return x.hw !== 'new' && !x.weekend; }),
              any: hwDays > 0 || lecDays > 0 };
   }
 
@@ -130,9 +140,9 @@
     if (!data || !valid(to)) return null;
     var lec = {};
     (data.lectures || []).forEach(function (l) { if (l && l.order) lec[l.order] = l; });
-    var days = 0, done = 0, onTime = 0, lDays = 0, lDone = 0;
+    var days = 0, done = 0, onTime = 0, lDays = 0, lDone = 0, start = valid(data.startOn) ? data.startOn : '';
     (data.calendar || []).forEach(function (c) {
-      if (!c || !valid(c.date) || c.date > to || (today && c.date > today) || isWeekend(c.date) || c.status === 'exempt') return;
+      if (!c || !valid(c.date) || c.date > to || (today && c.date > today) || isWeekend(c.date) || c.status === 'exempt' || (start && c.date < start)) return;
       days++;
       if (c.status === 'onTime' || c.status === 'late') done++;
       if (c.status === 'onTime') onTime++;
@@ -148,7 +158,8 @@
     var p = lastWeek(lessonDate);
     if (!p || !data) return null;
     var start = startOf(data);
-    p.first = !start || start > p.to;
+    p.newStudent = valid(data.startOn) && data.startOn > p.to;          /* 수강 시작일 뒤 첫 레포트 (20261031q) */
+    p.first = p.newStudent || !start || start > p.to;
     p.w = p.first ? null : compute(data, p.from, p.to, today);
     p.total = p.first ? null : cumulative(data, p.to, today);
     return p;
@@ -175,6 +186,11 @@
     function cells(kind) {
       return w.days.map(function (d) {
         /* 토 · 일 — 과제 · 강의 두 줄을 한 칸으로 「주중 복습」(제출 기록이 있으면 ✓) · 옅은 색 */
+        if (d.hw === 'new') {
+          if (kind !== 'hw' && d.weekend) return '';
+          return kind === 'hw' ? '<span class="aw-cell aw-new' + (d.weekend ? ' aw-wk' : '') + '" title="' + esc(md(d.date) + ' 신입생 — 수강 시작 전 (세지 않음)') + '">신입생</span>'
+            : '<span class="aw-cell aw-lec aw-lec--new"><span class="aw-blank" aria-hidden="true"></span><span class="sr-only">신입생</span></span>';
+        }
         if (d.weekend) {
           if (kind !== 'hw') return '';
           return '<span class="aw-cell aw-wk' + (d.hw === 'wkDone' ? ' aw-wk--done' : '') + '" title="' + esc(md(d.date) + ' ' + HW_TIP[d.hw]) + '">' +
@@ -191,10 +207,12 @@
         w.days.map(function (d) { return '<span class="aw-head aw-day"><b class="num">' + md(d.date).split('/')[1] + '</b>' + d.dow + '</span>'; }).join('') +
         '<span class="aw-head"></span>' +
         '<span class="aw-label">과제</span>' + cells('hw') +
-        (pending && !w.hwDays ? '<span class="aw-sum aw-sum--wait">아직 과제 시작 전</span>'
+        (w.allNew ? '<span class="aw-sum aw-sum--new">신입생</span>'
+          : pending && !w.hwDays ? '<span class="aw-sum aw-sum--wait">아직 과제 시작 전</span>'
           : '<span class="aw-sum aw-sum--' + tone(w.hwDone, w.hwDays) + ' num">' + w.hwDone + '/' + w.hwDays + '일 제출' + (w.rate != null ? '<small>정답률 ' + w.rate + '%</small>' : '') + '</span>') +
         '<span class="aw-label">강의</span>' + cells('lec') +
-        (pending && !w.lecDays ? '<span class="aw-sum aw-sum--wait">아직 강의 전</span>'
+        (w.allNew ? '<span class="aw-sum aw-sum--new">신입생</span>'
+          : pending && !w.lecDays ? '<span class="aw-sum aw-sum--wait">아직 강의 전</span>'
           : '<span class="aw-sum num">' + w.lecDone + '/' + w.lecDays + '일 시청</span>') +
       '</div>' +
       '<p class="aw-legend">' + esc(LEGEND + (w.days.some(function (d) { return d.hw === 'exempt'; }) ? ' 「면제」인 날은 제출 수에 넣지 않아요.' : '')) + '</p>' +

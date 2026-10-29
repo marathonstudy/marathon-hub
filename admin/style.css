@@ -3469,3 +3469,55 @@ thead .ab-name { background: #F6F7FB; z-index: 2; }
   .snd-row__line { gap: 4px; }
   .snd-row__line .qn-btn { padding-left: 6px; padding-right: 6px; }
 }
+
+/* ============================================================
+   AI 초안 직접 고치기 · AI에게 고쳐 달라고 하기 (aipolish.js · reviewnote.js · 20261031p)
+   ============================================================ */
+.aip-cols:has(.aip-col--orig[hidden]) { grid-template-columns: minmax(0, 1fr); }
+.aip-col__t--new { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.aip-col__right { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
+.aip-edited { font-size: 11.5px; font-weight: 700; color: #874A0B; background: #FFF6E5; border: 1px solid #F3D9A6; border-radius: 999px; padding: 1px 8px; }
+.aip-revert { appearance: none; border: 0; background: none; padding: 2px 0; font: inherit; font-size: 12px; font-weight: 800; color: #5A3FD0; cursor: pointer; text-decoration: underline; }
+textarea.aip-text--new { width: 100%; box-sizing: border-box; min-height: 120px; resize: vertical; font: inherit; font-size: 14px; line-height: 1.6; color: var(--ink-deep); white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere; cursor: text; }
+textarea.aip-text--new:focus { outline: 2px solid #B9AEF0; outline-offset: 1px; border-color: #7858E8; }
+.aip-kept { margin: 0 0 6px; padding: 6px 10px; border-radius: 8px; background: #E8F6EE; border: 1px solid #B5E0CB; color: #135C3B; font-size: 12.5px; font-weight: 700; }
+.aip-ask { margin-top: 10px; padding: 10px; border: 1px dashed #CFC6F3; border-radius: 12px; background: #FBFAFF; display: grid; gap: 8px; min-width: 0; }
+.aip-ask__t { font-size: 13px; font-weight: 800; color: #4A34B8; }
+.aip-quick { display: flex; flex-wrap: wrap; gap: 6px; }
+.aip-q { appearance: none; min-height: 34px; padding: 4px 11px; border: 1px solid #D9D4F5; border-radius: 999px; background: #fff; font: inherit; font-size: 12.5px; font-weight: 700; color: #4A34B8; cursor: pointer; }
+.aip-q:hover { background: #F1EFFC; }
+.aip-q:disabled { opacity: .55; cursor: default; }
+.aip-req { width: 100%; box-sizing: border-box; min-height: 52px; font-size: 14px; }
+.aip-mem { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; font-size: 12px; }
+.aip-mem__t { font-weight: 800; color: var(--ink-mid); }
+.aip-mem__c { display: inline-flex; align-items: center; gap: 2px; padding: 2px 4px 2px 9px; border-radius: 999px; background: #EFEBFF; color: #3A2799; font-size: 12px; font-weight: 600; max-width: 100%; overflow-wrap: anywhere; }
+.aip-mem__x { appearance: none; border: 0; background: none; font: inherit; font-size: 14px; font-weight: 800; color: #6A5BC0; cursor: pointer; min-width: 24px; min-height: 24px; line-height: 1; }
+.aip-remember { display: flex; gap: 6px; align-items: center; font-size: 13px; }
+.aip-ask__acts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.aip-req-n { margin-left: auto; font-size: 11.5px; }
+.ca-ai { display: flex; flex-wrap: wrap; gap: 4px; max-width: 260px; }
+.cm-ai { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; margin-top: 6px; }
+.rn-ask { margin: 10px 0; }
+@media (max-width: 560px) {
+  .aip-ask { padding: 8px; }
+  .aip-q { min-height: 40px; }
+  .aip-ask__acts .btn { min-height: 40px; }
+}
+
+/* ============================================================
+   신입생 · 「오늘 할 일」 이름과 짐작한 이유 (today.js · write.js · 20261031q)
+   ============================================================ */
+.new-badge { display: inline-flex; align-items: center; margin-left: 4px; padding: 0 6px; border-radius: 999px; background: #E8F6EE; color: #135C3B; border: 1px solid #B5E0CB; font-size: 10.5px; font-weight: 800; line-height: 1.6; white-space: nowrap; flex: none; }
+.qn-nameline { display: inline-flex; align-items: center; min-width: 0; max-width: 100%; }
+.qn-nameline .roster__name-btn { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tdc-tc--new, .tdc-app--new { background: #EEF0F5; color: #7A7F98; }
+.hd-c--new { display: flex; align-items: center; justify-content: center; background: #EEF0F5; color: #7A7F98; border-radius: 8px; font-size: 10.5px; font-weight: 700; letter-spacing: -.05em; text-align: center; line-height: 1.15; }
+.aw-new { background: #EEF0F5 !important; color: #7A7F98 !important; font-size: 10px; font-weight: 700; letter-spacing: -.04em; line-height: 1.15; display: flex; align-items: center; justify-content: center; text-align: center; }
+.aw-sum--new { color: #7A7F98; background: #EEF0F5; }
+.td-todo__names { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; font-size: 13px; color: var(--ink-deep); }
+.td-todo__nm { display: inline-flex; align-items: center; gap: 4px; }
+.td-why { font-size: 11.5px; color: #8A90AC; font-weight: 500; }
+.td-todo__x { appearance: none; border: 0; background: none; font: inherit; font-size: 15px; font-weight: 800; color: #8A90AC; cursor: pointer; min-width: 28px; min-height: 28px; line-height: 1; border-radius: 6px; }
+.td-todo__x:hover { background: #F1EFFC; color: #4A34B8; }
+.td-todo__more { appearance: none; border: 0; background: none; font: inherit; font-size: 12.5px; font-weight: 800; color: #5A3FD0; cursor: pointer; padding: 2px 0; min-height: 28px; }
+.td-care2__nm .td-why { margin-left: 3px; }
