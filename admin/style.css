@@ -3636,3 +3636,22 @@ textarea.aip-text--new:focus { outline: 2px solid #B9AEF0; outline-offset: 1px; 
 .td-pending { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; margin-bottom: 6px; padding: 9px 12px; border: 1px solid #F1CC99; border-radius: 12px; background: #FFF8EE; }
 .td-pending__t { flex: 1 1 200px; font-size: 13.5px; color: #874A0B; }
 .td-pending .btn { min-height: 38px; }
+
+/* 챙길 학생 — 학생 한 명당 한 줄 · 반별 (today.js · 20261031z2) */
+.td-care3__grp { margin-top: 10px; }
+.td-care3__head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; padding: 4px 0 6px; border-bottom: 1px solid var(--line-soft, #EEF0F5); }
+.td-care3__head b { font-size: 14px; color: var(--ink-deep); }
+.td-care3__all { margin-left: auto; min-height: 34px; }
+.td-care3__list { list-style: none; margin: 0; padding: 0; }
+.td-care3__row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px dashed #EEF0F5; }
+.td-care3__main { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+.td-care3__name { appearance: none; border: 0; background: none; padding: 2px 0; font: inherit; font-size: 14.5px; font-weight: 800; color: var(--indigo, #4A34B8);
+  text-decoration: underline; text-underline-offset: 3px; cursor: pointer; white-space: nowrap; }
+.td-care3__cls { font-size: 12.5px; color: var(--ink-light); white-space: nowrap; }
+.td-care3__whys { flex: 1 1 100%; min-width: 0; font-size: 13px; line-height: 1.55; color: var(--ink-mid); overflow-wrap: anywhere; }
+.td-care3__why { appearance: none; border: 0; background: none; padding: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.td-care3__why:hover { text-decoration: underline; }
+.td-care3__ok { flex: 0 0 auto; min-height: 36px; white-space: nowrap; }
+.td-care3__old { margin-top: 10px; }
+.td-care3__old > summary { cursor: pointer; font-size: 12.5px; font-weight: 700; color: var(--ink-light); padding: 6px 0; }
+.td-care3__hist { display: block; margin-top: 10px; font-size: 12px; color: var(--ink-light); }

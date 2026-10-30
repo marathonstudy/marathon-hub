@@ -82,6 +82,19 @@
     var row = { ckey: checkKey(kind, cls, date, sid), kind: kind, class_name: cls || '', basis_date: String(date || '').slice(0, 10) || null, student_id: sid || null, undone_at: null };
     return sb().from('care_checks').upsert(row, { onConflict: 'ckey' }).then(function (r) { return done(r, sid ? '목록에서 뺐습니다' : '확인함으로 넘겼습니다'); });
   }
+  /* 여러 건 한 번에 — 학생 한 줄 [확인함] · 반 [모두 확인함] (today.js · 20261031z2) · list = [{ kind, cls, date, sid }] */
+  function checkMany(list, msg) {
+    if (st.missing) { toast(MISSING, 'bad'); return Promise.resolve(false); }
+    var seen = {}, rows = [];
+    (list || []).forEach(function (x) {
+      var k = checkKey(x.kind, x.cls, x.date, x.sid);
+      if (seen[k]) return;
+      seen[k] = 1;
+      rows.push({ ckey: k, kind: x.kind, class_name: x.cls || '', basis_date: String(x.date || '').slice(0, 10) || null, student_id: x.sid || null, undone_at: null });
+    });
+    if (!rows.length) return Promise.resolve(false);
+    return sb().from('care_checks').upsert(rows, { onConflict: 'ckey' }).then(function (r) { return done(r, msg || '확인함으로 넘겼습니다'); });
+  }
   function uncheck(ckey) {
     return sb().from('care_checks').update({ undone_at: new Date().toISOString() }).eq('ckey', ckey).then(function (r) { return done(r, '되돌렸습니다'); });
   }
@@ -119,6 +132,6 @@
   window.addEventListener('jt:loaded', function () { load(); });
   window.addEventListener('jt:remote', function (e) { var t = e.detail && e.detail.table; if (t === 'report_skips' || t === 'care_checks' || t === '*') load(); });
 
-  window.Skips = { load: load, skipped: skipped, skipRow: skipRow, skip: skip, unskip: unskip, checked: checked, check: check, uncheck: uncheck,
+  window.Skips = { load: load, skipped: skipped, skipRow: skipRow, skip: skip, unskip: unskip, checked: checked, check: check, checkMany: checkMany, uncheck: uncheck,
     history: history, checkKey: checkKey, paintNote: paintNote, missing: function () { return st.missing; }, loaded: function () { return st.loaded; } };
 })();

@@ -107,6 +107,7 @@
       var week = k.slice(0, 10), sid = k.slice(11), s = byId[sid];
       if (!s || !Store.isActiveOn(s)) return;
       var cls = (s.className || '').trim(), date = Store.lessonDayOf(s, week);
+      if (Store.isEnded && Store.isEnded(cls)) return;                 /* 종강한 반은 빼기 (20261031w) */
       [['material', !x.m, '자료 미배부'], ['makeup', !x.k, '보강 영상 미신청']].forEach(function (t) {
         if (!t[1]) return;
         if (window.Skips && (Skips.checked(t[0], cls, date, '') || Skips.checked(t[0], cls, date, sid))) return;

@@ -677,6 +677,10 @@ delete from public.staff where email = '조교이메일@example.com';
 2. Edge Function `staff-login` 배포 (문자는 보내지 않는다 · 새로 넣을 키 없음)
 - 화면: 「승인을 기다리는 중입니다…」 · 「승인되지 않은 번호입니다」 · 「오늘」 맨 위 「새 조교 승인 대기: 이름(뒤 4자리) [승인] [거절]」(운영진 모두) · 운영진 맨 위 승인 대기
 
+### 5-58. 20261101a — 챙길 학생을 학생 한 명당 한 줄로 (SQL · 함수 배포 없음)
+- today.js — 「김민규 · 고2 선수능반 · 10/29 결석 → 보강 영상 안 봄, 자료 안 받음 [확인함]」 · 같은 학생 이유는 한 줄 · 반별 「n명」 · [모두 확인함] · 이름 = 상담 카드 · 최근 수업일이 위 · 2주 지난 것은 「지난 항목 n개」 · 종강 반 제외 · 「확인함 기록 보기」는 맨 아래 작게
+- skips.js `checkMany` (여러 건 한 번에 확인함)
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

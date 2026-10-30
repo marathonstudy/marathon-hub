@@ -1054,29 +1054,91 @@
     return out;
   }
   function checked(kind, cls, date, sid) { return !!(window.Skips && Skips.checked(kind, cls, date, sid)); }
-  /* 묶음마다 [확인함] · 학생 이름마다 [×] (그 학생만 빼기) · 아래 「확인함 기록 보기」에서 되돌리기 (skips.js · migration-036 · 20261031e)
-     결석은 한 줄이 학생 한 명이라 [확인함] · [×] 모두 그 학생 그 결석 건 */
+  /* ---------- 챙길 학생 — 학생 한 명당 한 줄 (20261031z2) ----------
+     예전: 반 + 수업일 + 이유마다 한 묶음(이름은 작은 칩 · 「묶음 전체」 확인함)
+     지금: 「김민규 · 고2 선수능반 · 10/29 결석 → 보강 영상 안 봄, 자료 안 받음  [확인함]」 — 같은 학생의 이유는 한 줄에 (날짜마다 묶음)
+       반별로 묶고 반 이름 옆 「n명」 · [모두 확인함] · 이름을 누르면 상담 카드(전화 · 문자) · 이유를 누르면 그 일을 하는 화면(대신 입력 · 출석 체크)
+       가장 최근 수업일이 위 · 2주가 지난 이유는 맨 아래 「지난 항목 n개」에 접어 둔다 · 종강한 반은 빠진다 · 「확인함 기록 보기 (n)」는 맨 아래 작게 */
+  var CARE_LABEL = { review: '복습테스트 안 냄', material: '자료 안 받음', makeup: '보강 영상 안 봄' };
+  function careStudents(items) {
+    var by = {}, cut = Lesson.addDays(DDay.today(), -14);
+    items.forEach(function (it) {
+      if (Store.isEnded && Store.isEnded(it.cls)) return;
+      it.ids.forEach(function (id, i) {
+        var s = rowById(id) || stu(id) || {};
+        var k = id + '|' + it.cls;
+        var p = by[k] || (by[k] = { sid: id, name: it.names[i] || s.name || '학생', cls: it.cls, reasons: [] });
+        p.reasons.push({ kind: it.kind, date: it.date || '', week: it.week || '', text: it.kind === 'absent' ? it.text.replace(/^[^·]*·s*/, '') : '' });
+      });
+    });
+    var rows = [];
+    Object.keys(by).forEach(function (k) {
+      var p = by[k];
+      var recent = p.reasons.filter(function (r) { return !r.date || r.date >= cut; }), old = p.reasons.filter(function (r) { return r.date && r.date < cut; });
+      if (recent.length) rows.push({ sid: p.sid, name: p.name, cls: p.cls, reasons: recent, old: false });
+      if (old.length) rows.push({ sid: p.sid, name: p.name, cls: p.cls, reasons: old, old: true });
+    });
+    rows.forEach(function (r) { r.last = r.reasons.reduce(function (m, x) { return x.date > m ? x.date : m; }, ''); });
+    return rows;
+  }
+  /* 날짜마다 — 「10/29 결석 → 보강 영상 안 봄, 자료 안 받음」 · 「10/25 복습테스트 안 냄」 · 「최근 4번 중 결석 2번」 */
+  function reasonsHtml(r) {
+    var days = {}, order = [];
+    r.reasons.forEach(function (x) {
+      var k = x.kind === 'absent' ? 'absent' : x.date;
+      if (!days[k]) { days[k] = []; order.push(k); }
+      days[k].push(x);
+    });
+    order.sort(function (a, b) { return a === 'absent' ? 1 : b === 'absent' ? -1 : a < b ? 1 : -1; });
+    return order.map(function (k) {
+      var xs = days[k], first = xs[0];
+      var go = ' data-care="' + first.kind + '" data-care-cls="' + esc(r.cls) + '" data-care-sid="' + esc(r.sid) + '"' + (first.week ? ' data-care-week="' + esc(first.week) + '"' : '');
+      if (k === 'absent') return '<button type="button" class="td-care3__why"' + go + '>' + esc(first.text) + '</button>';
+      var abs = xs.filter(function (x) { return x.kind === 'material' || x.kind === 'makeup'; }).sort(function (a, b) { return a.kind === 'makeup' ? -1 : 1; });
+      var rv = xs.some(function (x) { return x.kind === 'review'; });
+      var t = Lesson.md(k, false) + ' ' + [abs.length ? '결석 → ' + abs.map(function (x) { return CARE_LABEL[x.kind]; }).join(', ') : '', rv ? CARE_LABEL.review : ''].filter(Boolean).join(' · ');
+      if (abs.length && first.kind === 'review') go = go.replace('data-care="review"', 'data-care="' + abs[0].kind + '"');
+      return '<button type="button" class="td-care3__why"' + go + '>' + esc(t) + '</button>';
+    }).join('<span class="td-care3__sep" aria-hidden="true"> · </span>');
+  }
+  /* 이름 옆 짐작한 이유 (신입 · 보내기 실패 · 결석 · 번호 없음 · 퇴원 예정 — 복습테스트 이유가 있을 때 · 20261031q) */
+  function guessOf(r) {
+    var rv = r.reasons.filter(function (x) { return x.kind === 'review'; })[0];
+    var why = rv ? whyOf(r.sid, rv.date, rv.week || weekOfDate(rv.date || DDay.today())) : '';
+    return why ? '<small class="td-guess">' + esc(why) + '</small>' : '';
+  }
+  function careChecks(r) { return r.reasons.map(function (x) { return { kind: x.kind, cls: r.cls, date: x.date, sid: r.sid }; }); }
+  function careRowHtml(r) {
+    return '<li class="td-care3__row" data-care-row="' + esc(r.sid) + '">' +
+      '<div class="td-care3__main"><button type="button" class="td-care3__name" data-card="' + esc(r.sid) + '" title="상담 카드 (전화 · 문자)">' + esc(r.name) + '</button>' + guessOf(r) +
+        '<span class="td-care3__cls">' + esc(r.cls || '(반 없음)') + '</span>' +
+        '<span class="td-care3__whys">' + reasonsHtml(r) + '</span></div>' +
+      '<button type="button" class="btn btn--sm btn--ghost td-care3__ok" data-care-ok1="' + esc(r.sid) + '" data-care-old="' + (r.old ? 1 : 0) + '" data-care-cls1="' + esc(r.cls) + '">확인함</button></li>';
+  }
   function careHtml(items) {
     var hist = window.Skips ? Skips.history() : [];
-    if (!items.length && !hist.length) return '';
-    var attrs = function (it, sid) { return ' data-k="' + it.kind + '" data-cls="' + esc(it.cls) + '" data-date="' + esc(it.date || '') + '" data-sid="' + esc(sid || '') + '"'; };
-    return '<div class="td-care2"><div class="td-todo__title">챙길 학생</div>' +
-      (items.length ? '<ul class="td-todo__list">' + items.map(function (it) {
-        return '<li class="td-care2__item td-care2__item--' + it.kind + '"><button type="button" class="td-care2__btn" data-care="' + it.kind + '" data-care-cls="' + esc(it.cls) + '" data-care-sid="' + esc(it.sid) + '"' +
-          (it.week ? ' data-care-week="' + esc(it.week) + '"' : '') + '>' +
-          '<span class="td-care2__t">' + esc(it.text) + '</span>' +
-          '<span class="td-care2__go">' + (it.kind === 'review' ? '대신 입력 · 미응시 ›' : it.kind === 'material' || it.kind === 'makeup' ? '출석 체크에서 바꾸기 ›' : '상담 카드 ›') + '</span></button>' +
-          '<div class="td-care2__foot"><span class="td-care2__names">' + it.ids.map(function (id, i) {
-            var why = it.kind === 'review' ? whyOf(id, it.date, it.week || weekOfDate(it.date || DDay.today())) : '';
-            return '<span class="td-care2__nm">' + esc(it.names[i]) + (why ? '<small class="td-guess">' + esc(why) + '</small>' : '') + '<button type="button" class="td-care2__x" data-care-x' + attrs(it, id) + ' aria-label="' + esc(it.names[i]) + ' 목록에서 빼기" title="이 학생만 목록에서 빼기 (대신 입력 · 미응시를 안 해도 다시 뜨지 않음)">×</button></span>';
-          }).join('') + '</span>' +
-          '<button type="button" class="btn btn--sm btn--ghost td-care2__ok" data-care-ok' + attrs(it, it.kind === 'absent' ? it.sid : '') + ' title="이 묶음을 확인했습니다 — 다시 뜨지 않음">확인함</button></div></li>';
-      }).join('') + '</ul>' : '') +
-      (hist.length ? '<button type="button" class="td-care2__hist" data-care-hist aria-expanded="' + !!st.careHist + '">확인함 기록 보기 (' + hist.length + ')</button>' +
+    var rows = careStudents(items);
+    st.careRows = rows;
+    if (!rows.length && !hist.length) return '';
+    var recent = rows.filter(function (r) { return !r.old; }), old = rows.filter(function (r) { return r.old; });
+    var groups = {}, order = [];
+    recent.forEach(function (r) { if (!groups[r.cls]) { groups[r.cls] = []; order.push(r.cls); } groups[r.cls].push(r); });
+    var lastOf = function (c) { return groups[c].reduce(function (m, r) { return r.last > m ? r.last : m; }, ''); };
+    order.sort(function (a, b) { var x = lastOf(a), y = lastOf(b); return x !== y ? (x < y ? 1 : -1) : a.localeCompare(b, 'ko'); });
+    var sortRows = function (list) { return list.slice().sort(function (a, b) { return a.last !== b.last ? (a.last < b.last ? 1 : -1) : byName(a, b); }); };
+    return '<div class="td-care2 td-care3"><div class="td-todo__title">챙길 학생</div>' +
+      order.map(function (c) {
+        var list = sortRows(groups[c]);
+        return '<div class="td-care3__grp"><div class="td-care3__head"><b>' + esc(c || '(반 없음)') + '</b><span class="muted-note num">' + list.length + '명</span>' +
+          '<button type="button" class="btn btn--sm btn--ghost td-care3__all" data-care-all="' + esc(c) + '">모두 확인함</button></div>' +
+          '<ul class="td-care3__list">' + list.map(careRowHtml).join('') + '</ul></div>';
+      }).join('') +
+      (old.length ? '<details class="td-care3__old"' + (st.careOld ? ' open' : '') + '><summary data-care-oldtoggle>지난 항목 ' + old.length + '개</summary><ul class="td-care3__list">' + sortRows(old).map(careRowHtml).join('') + '</ul></details>' : '') +
+      (hist.length ? '<button type="button" class="td-care2__hist td-care3__hist" data-care-hist aria-expanded="' + !!st.careHist + '">확인함 기록 보기 (' + hist.length + ')</button>' +
         (st.careHist ? '<ul class="td-care2__hlist">' + hist.map(function (x) {
-          var nm = x.student_id ? ((rowById(x.student_id) || {}).name || '학생') : '묶음 전체';
-          var what = x.kind === 'review' ? (x.class_name || '') + ' · ' + (x.basis_date ? Lesson.md(String(x.basis_date).slice(0, 10), false) + ' ' : '') + '복습테스트 안 낸 학생 · ' + nm
-            : x.kind === 'material' || x.kind === 'makeup' ? (x.class_name || '') + ' · ' + (x.basis_date ? Lesson.md(String(x.basis_date).slice(0, 10), false) + ' ' : '') + '결석 · ' + (x.kind === 'material' ? '자료 미배부' : '보강 영상 미신청') + ' · ' + nm
+          var nm = x.student_id ? ((rowById(x.student_id) || {}).name || '학생') : '반 전체';
+          var what = x.kind === 'review' ? (x.class_name || '') + ' · ' + (x.basis_date ? Lesson.md(String(x.basis_date).slice(0, 10), false) + ' ' : '') + '복습테스트 안 냄 · ' + nm
+            : x.kind === 'material' || x.kind === 'makeup' ? (x.class_name || '') + ' · ' + (x.basis_date ? Lesson.md(String(x.basis_date).slice(0, 10), false) + ' ' : '') + '결석 · ' + CARE_LABEL[x.kind] + ' · ' + nm
             : (x.class_name || '(반 없음)') + ' · 결석 잦은 학생 · ' + nm;
           var at = x.checked_at ? new Date(x.checked_at) : null;
           return '<li><span>' + esc(what) + '</span><span class="muted-note">' + esc((x.checked_name || '') + (at ? ' ' + (at.getMonth() + 1) + '/' + at.getDate() : '')) + '</span>' +
@@ -1384,6 +1446,20 @@
     if (us) { if (window.Skips) Skips.unskip(us.dataset.unskipCls, us.dataset.unskipDate, true); return; }
     var ck = e.target.closest('[data-care-ok], [data-care-x]');
     if (ck) { if (window.Skips) Skips.check(ck.dataset.k, ck.dataset.cls, ck.dataset.date, ck.dataset.sid || ''); return; }
+    /* 챙길 학생 — 학생 한 줄 [확인함] · 반 [모두 확인함] (20261031z2) */
+    var c1 = e.target.closest('[data-care-ok1]');
+    if (c1) {
+      var r1 = (st.careRows || []).filter(function (r) { return r.sid === c1.dataset.careOk1 && r.cls === c1.dataset.careCls1 && !!r.old === (c1.dataset.careOld === '1'); })[0];
+      if (r1 && window.Skips) Skips.checkMany(careChecks(r1), r1.name + ' — 확인함으로 넘겼습니다');
+      return;
+    }
+    var ca2 = e.target.closest('[data-care-all]');
+    if (ca2) {
+      var all = (st.careRows || []).filter(function (r) { return !r.old && r.cls === ca2.dataset.careAll; });
+      if (all.length && window.Skips) Skips.checkMany([].concat.apply([], all.map(careChecks)), (ca2.dataset.careAll || '반') + ' ' + all.length + '명 — 모두 확인함');
+      return;
+    }
+    if (e.target.closest('[data-care-oldtoggle]')) { st.careOld = !st.careOld; return; }
     if (e.target.closest('[data-care-hist]')) { st.careHist = !st.careHist; render(); return; }
     var uc = e.target.closest('[data-care-undo]');
     if (uc) { if (window.Skips) Skips.uncheck(uc.dataset.careUndo); return; }
