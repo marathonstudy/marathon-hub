@@ -278,9 +278,13 @@
       var mineC = function (co) { return co.members.some(function (m) { return m.to == null && Course.mine(m.cls); }); };
       courses = courses.filter(mineC).concat(courses.filter(function (co) { return !mineC(co); }));
     }
+    /* 종강한 반 (migration-049 · 20261031w) — 맨 뒤 「종강 n」 안에 접어 둔다 (고르면 지난 레포트 그대로 열림) */
+    var ended = classes.filter(function (c) { return Store.isEnded(c.name); });
+    var live = classes.filter(function (c) { return !Store.isEnded(c.name); });
     if (!classes.some(function (c) { return c.name === currentClass; }) && !(isCourse(currentClass) && Course.byKey(currentClass))) {
-      currentClass = classes[0].name;
+      currentClass = (live[0] || classes[0]).name;
     }
+    classes = live;
 
     var frag = document.createDocumentFragment();
     /* 과정 — 반 고르기 맨 앞 (「📚 고3 수능국어 · 2반」) · 고르면 회차 고르기(달력) → 1 작성 · 2 공개 · 3 발송 (20261031a) */
@@ -307,6 +311,22 @@
       b.querySelector('.chip__name').textContent = c.name;
       frag.appendChild(b);
     });
+    if (ended.length) {
+      var dt = document.createElement('details');
+      dt.className = 'chip-ended';
+      if (ended.some(function (c) { return c.name === currentClass; })) dt.open = true;
+      dt.innerHTML = '<summary>종강 ' + ended.length + '</summary>';
+      ended.forEach(function (c) {
+        var b2 = document.createElement('button');
+        b2.type = 'button';
+        b2.className = 'chip chip--ended' + (c.name === currentClass ? ' is-on' : '');
+        b2.dataset.cls = c.name;
+        b2.innerHTML = '<span class="chip__name"></span><span class="chip__count">종강</span>';
+        b2.querySelector('.chip__name').textContent = c.name;
+        dt.appendChild(b2);
+      });
+      frag.appendChild(dt);
+    }
     host.appendChild(frag);
 
     $('#classPickerHint').textContent = '전체 ' + students().length + '명';

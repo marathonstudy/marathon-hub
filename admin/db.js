@@ -269,6 +269,16 @@
     return out;
   }
 
+  /* 반 수업 시각 · 종강일 · 담당 운영진 · 필기 알림 (migration-049) — { 반: { start, end, endOn, staff, remind, min } } */
+  function metaOf(rows) {
+    var out = {}, hm = function (t) { return t ? String(t).slice(0, 5) : ''; };
+    rows.forEach(function (r) {
+      if (!('end_time' in r)) return;
+      out[r.name] = { start: hm(r.start_time), end: hm(r.end_time), endOn: r.end_on || '', staff: r.staff_emails || [], remind: !!r.note_remind, min: r.remind_min || 5 };
+    });
+    return out;
+  }
+
   /* ============================================================
      전체 읽기 — 로그인 직후 한 번
      ============================================================ */
@@ -336,6 +346,7 @@
         classesOff: res[9].data ? res[9].data.filter(function (r) { return r.archived; }).map(function (r) { return r.name; }) : [],
         /* 수업 요일 · 첫 수업일 (migration-011) — { 반: {dow, extra, first} } */
         classSched: schedOf(res[9].data || []),
+        classMeta: metaOf(res[9].data || []),
         classWeeks: res[10].data || []
       };
     });

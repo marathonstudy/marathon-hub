@@ -4,6 +4,8 @@
    · 이름 바꾸기 — 그 반의 모든 기록이 새 이름을 따라간다 (서버 함수 class_rename 이 한 번에)
    · 보관 / 되살리기 — 보관한 반은 모든 반 목록에서 숨긴다. 기록 · 학생은 그대로
    · 삭제 — 학생(퇴원생 포함) 0명 · 기록 0건인 반만 버튼이 보인다
+   · 수업 설정 (20261031w · migration-049) — 수업 시작 · 끝 시각 · 종강일 · 담당 운영진(여러 명) · 필기 알림 켜기/끄기 · 끝나기 몇 분 전(기본 5)
+     종강일이 지난 반은 「오늘」 · 필기 알림 · 레포트 발송 대상 · 챙길 학생에서 빠지고 반 고르기에서 「종강」으로 접힌다 · 언제든 바꿀 수 있다
    · 앱 입장코드 — 그 반 학생을 등록할 때 「마라톤 앱 안내 문자」의 입장코드 칸에 저절로 (classes.app_code · migration-040 · 20261031m)
    전부 서버 함수(class_*)가 teacher 인지 다시 확인한다. 바뀐 내용은 class_log 에 남는다.
    ============================================================ */
@@ -50,10 +52,14 @@
       data = r.data;
       if (editing && !data.classes.some(function (c) { return c.name === editing; })) editing = '';
       /* 앱 입장코드 — classes 표에서 (040 전이면 칸 없이 「—」) */
-      return sb().from('classes').select('name,app_code').then(function (q) {
+      return sb().from('classes').select('*').then(function (q) {
         var by = {};
-        if (!q.error) (q.data || []).forEach(function (x) { by[x.name] = x.app_code || ''; });
-        data.classes.forEach(function (c) { c.app_code = q.error ? null : (by[c.name] || ''); });
+        if (!q.error) (q.data || []).forEach(function (x) { by[x.name] = x; });
+        data.classes.forEach(function (c) {
+          var x = by[c.name] || {};
+          c.app_code = q.error || !('app_code' in x) ? (q.error ? null : '') : (x.app_code || '');
+          c.meta = 'end_time' in x ? { start: String(x.start_time || '').slice(0, 5), end: String(x.end_time || '').slice(0, 5), endOn: x.end_on || '', staff: x.staff_emails || [], remind: !!x.note_remind, min: x.remind_min || 5 } : null;
+        });
       }, function () {}).then(function () {
         /* AI 기본 요청 — 「이 요청을 이 반 기본으로 기억하기」 (aipolish.js · migration-043 · 20261031p) · 043 전이면 「—」 */
         return window.AiPolish ? AiPolish.memAll().then(function (m) { aiReq = m; }) : null;
@@ -62,6 +68,56 @@
   }
 
   var aiReq = null;
+  /* 「수업 · 종강」 칸 — 18:30~22:00 · 종강 11/5 · 담당 2명 · 필기 알림 5분 전 [수업 설정] (049 전이면 「—」) */
+  function mdOf(iso) { return iso ? (+iso.slice(5, 7)) + '/' + (+iso.slice(8, 10)) : ''; }
+  function metaCell(c) {
+    if (!c.meta) return '<span class="muted-note">—</span>';
+    var m = c.meta, ended = m.endOn && m.endOn < DDay.today();
+    return '<span class="ca-meta__t num">' + (m.start || m.end ? esc((m.start || '?') + '~' + (m.end || '?')) : '<span class="muted-note">시각 없음</span>') +
+      (m.endOn ? ' · ' + (ended ? '<b class="ca-ended">종강</b> ' : '종강 ') + esc(mdOf(m.endOn)) : '') + '</span>' +
+      '<span class="muted-note ca-meta__s">' + (m.staff.length ? '담당 ' + m.staff.length + '명' : '담당 전체') + ' · ' + (m.remind ? '필기 알림 ' + m.min + '분 전' : '필기 알림 끔') + '</span>' +
+      '<button class="btn btn--sm" type="button" data-ca="meta">수업 설정</button>';
+  }
+
+  /* ---------- 수업 설정 창 ---------- */
+  var metaFor = '';
+  var staffList = null;
+  function openMeta(c) {
+    metaFor = c.name;
+    var m = c.meta || { start: '', end: '', endOn: '', staff: [], remind: false, min: 5 };
+    $('#cmTitle').textContent = c.name + ' · 수업 설정';
+    $('#cmtStart').value = m.start || ''; $('#cmtEnd').value = m.end || ''; $('#cmtEndOn').value = m.endOn || '';
+    $('#cmtRemind').checked = !!m.remind; $('#cmtMin').value = m.min || 5;
+    $('#cmtStaff').innerHTML = '<p class="muted-note">운영진 불러오는 중…</p>';
+    $('#cmtError').textContent = '';
+    $('#classMetaModal').showModal();
+    sb().rpc('staff_list').then(function (r) {
+      staffList = r.error ? [] : ((r.data && r.data.staff) || []).filter(function (s) { return s.active; });
+      $('#cmtStaff').innerHTML = staffList.length ? staffList.map(function (s) {
+        return '<label class="chk-inline cm-staff"><input type="checkbox" value="' + esc(s.email) + '"' + (m.staff.indexOf(s.email) !== -1 ? ' checked' : '') + '> ' + esc(s.name || s.email) + '</label>';
+      }).join('') : '<p class="muted-note">운영진 목록을 불러오지 못했습니다 (migration-047)</p>';
+    });
+  }
+  function saveMeta() {
+    var c = find(metaFor);
+    if (!c) return;
+    var staff = Array.prototype.map.call(document.querySelectorAll('#cmtStaff input:checked'), function (x) { return x.value; });
+    var args = { p_class: c.name, p_start: $('#cmtStart').value || '', p_end: $('#cmtEnd').value || '', p_end_on: $('#cmtEndOn').value || null,
+                 p_staff: staff, p_remind: $('#cmtRemind').checked, p_min: parseInt($('#cmtMin').value, 10) || 5 };
+    if (args.p_remind && !args.p_end) { $('#cmtError').textContent = '필기 알림을 켜려면 수업 끝 시각을 넣어 주세요.'; return; }
+    sb().rpc('class_meta_set', args).then(function (r) {
+      if (r.error) { $('#cmtError').textContent = isMissing(r.error.message) ? 'migration-049 SQL 을 먼저 실행해 주세요.' : r.error.message; return; }
+      var m = { start: args.p_start, end: args.p_end, endOn: args.p_end_on || '', staff: (r.data && r.data.staff) || staff, remind: args.p_remind, min: args.p_min };
+      c.meta = m;
+      Store.setMetaLocal(c.name, m);
+      $('#classMetaModal').close();
+      toast(c.name + ' 수업 설정을 저장했습니다', 'good');
+      render();
+      window.dispatchEvent(new CustomEvent('jt:roster-changed'));
+    });
+  }
+  $('#cmtSave').addEventListener('click', saveMeta);
+  $('#cmtCancel').addEventListener('click', function () { $('#classMetaModal').close(); });
   function aiCell(c) {
     if (!aiReq) return '<span class="muted-note">—</span>';
     var l = aiReq[c.name] || [];
@@ -111,13 +167,14 @@
       '<td>' + (c.app_code == null ? '<span class="muted-note">—</span>'
         : '<input class="input ca-code" type="text" maxlength="30" autocomplete="off" spellcheck="false" data-ca-code value="' + esc(c.app_code) + '" placeholder="예: MARA2026" aria-label="' + esc(c.name) + ' 앱 입장코드">') + '</td>' +
       '<td>' + aiCell(c) + '</td>' +
+      '<td class="ca-meta">' + metaCell(c) + '</td>' +
       '<td class="roster__actions tb-acts">' + acts + '</td></tr>';
   }
 
   function table(list, empty) {
     if (!list.length) return '<p class="panel__hint">' + empty + '</p>';
     return '<div class="roster-scroll"><table class="roster tb-table ca-table"><thead><tr>' +
-      '<th>반</th><th>재원</th><th>퇴원</th><th>기록</th><th title="반 수업일마다 저절로 생기는 복습테스트 — 쉼표로 나눠 순서대로 (예: 복습 TEST, 화작문 TEST). 그 주만 끄기 · 더 넣기는 레포트 발송 → 1 작성 반 공통에서">복습 시험 (순서대로)</th><th title="그 반 학생을 등록할 때 마라톤 앱 안내 문자의 입장코드 칸에 저절로 들어갑니다 (바꿀 수 있음)">앱 입장코드</th><th title="AI 결과 창 「이 요청을 이 반 기본으로 기억하기」로 남긴 요청 — 다음 AI 초안부터 처음부터 따릅니다 · ×로 지웁니다">AI 기본 요청</th><th></th></tr></thead><tbody>' +
+      '<th>반</th><th>재원</th><th>퇴원</th><th>기록</th><th title="반 수업일마다 저절로 생기는 복습테스트 — 쉼표로 나눠 순서대로 (예: 복습 TEST, 화작문 TEST). 그 주만 끄기 · 더 넣기는 레포트 발송 → 1 작성 반 공통에서">복습 시험 (순서대로)</th><th title="그 반 학생을 등록할 때 마라톤 앱 안내 문자의 입장코드 칸에 저절로 들어갑니다 (바꿀 수 있음)">앱 입장코드</th><th title="AI 결과 창 「이 요청을 이 반 기본으로 기억하기」로 남긴 요청 — 다음 AI 초안부터 처음부터 따릅니다 · ×로 지웁니다">AI 기본 요청</th><th title="수업 시작 · 끝 시각 · 종강일 · 담당 운영진 · 필기 알림">수업 · 종강</th><th></th></tr></thead><tbody>' +
       list.map(row).join('') + '</tbody></table></div>';
   }
 
@@ -239,6 +296,7 @@
     var c = find(b.closest('tr').dataset.name);
     if (!c) return;
     var act = b.dataset.ca;
+    if (act === 'meta') { openMeta(c); return; }
     if (act === 'rename') { editing = c.name; render(); return; }
     if (act === 'rename-cancel') { editing = ''; render(); return; }
     if (act === 'rename-ok') { doRename(c); return; }

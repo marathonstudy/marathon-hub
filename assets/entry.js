@@ -47,7 +47,10 @@
       return r.json();
     });
   }
-  function go(code) { global.location.replace('../me/#' + code); }
+  /* 필기 QR (/s/?note=반 · 20261031w) — 로그인돼 있으면 바로, 아니면 로그인한 뒤 러닝노트 「내 필기」 오늘 칸 (사진 여러 장 · 카메라) */
+  var NOTE = (function () { var m = /[?&]note=([^&]+)/.exec(global.location.search || ''); try { return m ? decodeURIComponent(m[1].replace(/\+/g, ' ')) : ''; } catch (e) { return ''; } })();
+  function kstToday() { return new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10); }
+  function go(code) { global.location.replace('../me/#' + code + (NOTE ? '/photo/' + kstToday() : '')); }
   function msg(t, kind) {
     var el = $('#enMsg');
     el.hidden = !t;
@@ -82,6 +85,8 @@
       sel.appendChild(option('', (list || []).length ? '반을 골라 주세요' : '열린 반이 없어요'));
       (list || []).forEach(function (c) { sel.appendChild(option(c, c)); });
       sel.disabled = !(list || []).length;
+      /* 필기 QR — 그 반을 미리 골라 둔다 */
+      if (NOTE && (list || []).indexOf(NOTE) !== -1) { sel.value = NOTE; loadNames(NOTE); }
     }).catch(function () {
       sel.textContent = '';
       sel.appendChild(option('', '불러오지 못했어요'));

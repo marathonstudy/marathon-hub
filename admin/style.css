@@ -3589,3 +3589,37 @@ textarea.aip-text--new:focus { outline: 2px solid #B9AEF0; outline-offset: 1px; 
 .ar-bar__t { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: var(--ink-mid); }
 .ar-bar__msg { color: var(--ink-mid); line-height: 1.6; }
 @media (max-width: 420px) { .rvst-b { min-width: 0; flex: 1 1 auto; padding: 0 12px; } .rvst-seg { flex: 1 1 100%; } .ar-bar__btn { width: 100%; } }
+
+/* ============================================================
+   필기 QR · 필기 미제출 · 종강 · 수업 설정 (notes.js · classes.js · 20261031w)
+   ============================================================ */
+.tdc-note { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin-top: 8px; }
+.tdc-note__qr { min-height: 38px; }
+.tdc-note__miss { appearance: none; border: 1px solid #F0B9C6; background: #FDECEF; color: #9E1F3B; font: inherit; font-size: 13px; font-weight: 800;
+  border-radius: 999px; padding: 6px 12px; min-height: 36px; cursor: pointer; }
+.tdc-note__ok { font-size: 13px; font-weight: 700; color: #135C3B; }
+.tdc-note__rm { font-size: 12px; }
+.tdc-note__list { margin: 6px 0 2px; padding: 10px 12px; border-radius: 12px; background: #FFF6F8; border: 1px solid #F3D3DB; }
+.tdc-note__names { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
+.tdc-note__nm { font-size: 13px; font-weight: 700; padding: 3px 9px; border-radius: 8px; background: #fff; border: 1px solid #EED5DC; }
+.tdc-note__nm small { font-weight: 600; color: var(--ink-light); }
+.tdc-note-hint { margin: 6px 0 0; font-size: 12px; color: var(--ink-light); }
+.tdc-ended { margin-top: 12px; padding: 10px 12px; border: 1px dashed #D9DCE8; border-radius: 12px; background: #FAFAFD; }
+.tdc-ended > summary { cursor: pointer; font-size: 13px; font-weight: 800; color: var(--ink-mid); }
+.chip-ended { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.chip-ended > summary { cursor: pointer; font-size: 12.5px; font-weight: 800; color: var(--ink-light); padding: 6px 10px; border-radius: 999px; border: 1px dashed #D3D6E2; }
+.chip--ended { opacity: .75; }
+.ca-meta { min-width: 12em; }
+.ca-meta__t, .ca-meta__s { display: block; }
+.ca-ended { color: #9E1F3B; }
+.cm-staff-list { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.cm-staff { min-height: 36px; }
+.note-qr { position: fixed; inset: 0; width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; box-sizing: border-box; border: 0; border-radius: 0; padding: 0; background: #fff; }
+.note-qr__in { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 20px 16px; text-align: center; }
+.note-qr__title { font-size: clamp(22px, 4vw, 40px); font-weight: 900; color: var(--ink-deep); margin: 0; }
+.note-qr__sub { font-size: clamp(14px, 2vw, 20px); color: var(--ink-mid); margin: 0; }
+.note-qr__box { width: min(78vh, 86vw); aspect-ratio: 1; display: grid; place-items: center; }
+.note-qr__box svg { width: 100%; height: 100%; }
+.note-qr__count { font-size: clamp(22px, 4vw, 44px); font-weight: 900; color: #4A34B8; margin: 0; }
+.note-qr__url { font-size: 12px; color: var(--ink-light); word-break: break-all; margin: 0; }
+.note-qr__close { min-height: 44px; min-width: 120px; }

@@ -705,8 +705,47 @@
     h.classList.toggle('tb-warn', !!bad);
   }
 
+  /* 12월 새 반 — 미리 적어 둔 값(app_settings 'class_presets' · migration-049)에서 고르면 이름 · 수업 요일 · 첫 수업일(개강일) · 시각이 같이 (20261031w) */
+  var presets = null, pickedPreset = null;
+  function loadPresets() {
+    if (presets) return Promise.resolve(presets);
+    return Promise.resolve(SB.client.from('app_settings').select('value').eq('key', 'class_presets')).then(function (r) {
+      presets = (!r.error && r.data && r.data[0] && r.data[0].value && r.data[0].value.list) || [];
+      return presets;
+    }, function () { presets = []; return presets; });
+  }
+  function fillPresets() {
+    var sel = $('#fClassPreset');
+    if (!sel) return;
+    loadPresets().then(function (list) {
+      var have = Store.getClasses().map(function (c) { return c.name; });
+      list = list.filter(function (p) { return have.indexOf(p.name) === -1; });
+      sel.hidden = !list.length;
+      sel.innerHTML = '<option value="">미리 적어 둔 반에서 고르기 (' + list.length + ')</option>' + list.map(function (p, i) {
+        var D = ['일', '월', '화', '수', '목', '금', '토'][p.dow] || '';
+        return '<option value="' + presets.indexOf(p) + '">' + escAttr(p.name + ' (' + D + ') ' + p.start + '~' + p.end + ' · 개강 ' + (+p.first.slice(5, 7)) + '/' + (+p.first.slice(8, 10))) + '</option>';
+      }).join('');
+    });
+  }
+  if ($('#fClassPreset')) $('#fClassPreset').addEventListener('change', function (e) {
+    pickedPreset = e.target.value === '' ? null : presets[+e.target.value];
+    if (pickedPreset) $('#fClassNewName').value = pickedPreset.name;
+  });
+  /* 만든 뒤 — 수업 요일 · 첫 수업일 · 시각 */
+  function applyPreset(name) {
+    var p = pickedPreset && pickedPreset.name === name ? pickedPreset : null;
+    pickedPreset = null;
+    if (!p) return Promise.resolve();
+    return Store.setSchedule(name, p.dow, [], p.first).catch(function () {}).then(function () {
+      return SB.client.rpc('class_meta_set', { p_class: name, p_start: p.start, p_end: p.end, p_end_on: null, p_staff: [], p_remind: false, p_min: 5 });
+    }).then(function (r) {
+      if (r && !r.error) Store.setMetaLocal(name, { start: p.start, end: p.end, endOn: '', staff: [], remind: false, min: 5 });
+    }, function () {});
+  }
+
   function showNewClass(on) {
     $('#fClassNew').hidden = !on;
+    if (on) fillPresets();
     classConfirm = '';
     classHint(on ? '만들면 이 학생의 반으로 바로 골라지고, 모든 탭의 반 목록에 나옵니다.' : '');
     if (on) { $('#fClassNewName').value = ''; setTimeout(function () { $('#fClassNewName').focus(); }, 0); }
@@ -757,7 +796,7 @@
     }
     var btn = $('#btnClassNewOk');
     btn.disabled = true;
-    Store.addClass(name).then(function () {
+    Store.addClass(name).then(function () { return applyPreset(name); }).then(function () {
       btn.disabled = false;
       fillStudentClass(name, true);
       toast('새 반 ‘' + name + '’을 만들었습니다', 'good');

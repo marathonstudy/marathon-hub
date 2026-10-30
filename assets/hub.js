@@ -1169,7 +1169,24 @@
       (files ? '<div class="card tw-files rw-files"><h2 class="card-title">✏️ 이 수업 과제 · 자료</h2>' + files + '</div>' : '') +
       (latest ? otherFilesHtml(mon) : '') +
       (latest ? teacherNoticeHtml(noticeItems()) : weekNoticeHtml(mon)) +
-      ReportView.partsHtml(d2, ['student']);
+      ReportView.partsHtml(d2, ['student']) +
+      contactHtml();
+  }
+
+  /* 문의 안내 (20261031w · migration-049) — 레포트 맨 아래 · 학생 · 학부모 · 미리보기 같다
+     [문의하기] = 코치룸 설정의 「문의 연락처(카카오채널 링크)」 · 비어 있으면 버튼 없이 문구만 · 전화번호는 쓰지 않는다 */
+  var CONTACT_TEXT = '수정하실 내용이나 궁금한 점은 카카오톡 채널 \'jh국어연구소\'로 언제든 편하게 문의해 주세요.';
+  var CONTACT = { url: null, p: null };
+  function contactHtml() {
+    if (CONTACT.url === null && !CONTACT.p) {
+      CONTACT.p = Promise.resolve().then(function () { return rpc('hub_contact', {}); }).then(function (u) {
+        CONTACT.url = /^https:\/\/[^\s<>"]{4,300}$/.test(String(u || '')) ? String(u) : '';
+      }, function () { CONTACT.url = ''; }).then(function () {
+        Array.prototype.forEach.call(document.querySelectorAll('.rw-contact'), function (el) { el.outerHTML = contactHtml(); });
+      });
+    }
+    return '<div class="card rw-contact"><p class="rw-contact__t">' + esc(CONTACT_TEXT) + '</p>' +
+      (CONTACT.url ? '<a class="hub-btn rw-contact__btn" href="' + esc(CONTACT.url) + '" target="_blank" rel="noopener">문의하기</a>' : '') + '</div>';
   }
 
   /* ============================================================

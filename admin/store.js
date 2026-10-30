@@ -33,6 +33,7 @@
     classes:   P + 'classes',    /* 반 목록 (classes 표 · migration-009). 표가 없으면 null */
     classesOff: P + 'classesoff', /* 보관한 반 (migration-010) */
     classSched: P + 'classsched', /* 수업 요일 · 첫 수업일 (migration-011) */
+    classMeta:  P + 'classmeta',  /* 수업 시각 · 종강일 · 담당 운영진 · 필기 알림 (migration-049) */
     classWeeks: P + 'classweeks', /* 그 주만 바꾼 수업일 · 휴강 (migration-011) */
     weekEnds:  P + 'weekends'
   };
@@ -1223,6 +1224,21 @@
     writeLocal(KEYS.weekEnds, m);
   }
 
+  /* ---------- 수업 시각 · 종강 (migration-049 · 20261031w) ----------
+     metaOf(반) = { start, end, endOn, staff, remind, min } (없으면 null) · isEnded(반, 날) = 종강일이 그날보다 앞
+     종강한 반은 「오늘」 · 필기 알림 · 레포트 발송 대상 · 챙길 학생에서 빠지고, 반 고르기에서는 「종강」으로 접힌다.
+     지난 레포트 · 기록 · 학생 · 학부모 러닝노트는 그대로 */
+  function metaOf(cls) { return (read(KEYS.classMeta, {}) || {})[String(cls || '').trim()] || null; }
+  function isEnded(cls, day) {
+    var m = metaOf(cls), d = day || (global.DDay ? DDay.today() : new Date().toISOString().slice(0, 10));
+    return !!(m && m.endOn && m.endOn < d);
+  }
+  function setMetaLocal(cls, m) {
+    var all = Object.assign({}, read(KEYS.classMeta, {}) || {});
+    all[cls] = m;
+    writeLocal(KEYS.classMeta, all);
+  }
+
   /* ---------- 수업일 (migration-011 · 계산은 assets/lesson.js) ---------- */
 
   /* 그 반의 일정 { dow, extra, first, weeks:{주차: {lesson_date, canceled, note}} } — 요일을 안 정했으면 null */
@@ -1441,6 +1457,7 @@
       writeLocal(KEYS.classes, d.classes);
       writeLocal(KEYS.classesOff, d.classesOff);
       writeLocal(KEYS.classSched, d.classSched || {});
+      writeLocal(KEYS.classMeta, d.classMeta || {});
       writeLocal(KEYS.classWeeks, d.classWeeks || []);
       writeLocal(KEYS.sent, d.sent);
       writeLocal(KEYS.published, d.published);
@@ -1550,6 +1567,7 @@
       writeLocal(KEYS.classes, d.classes);
       writeLocal(KEYS.classesOff, d.classesOff);
       writeLocal(KEYS.classSched, d.classSched || {});
+      writeLocal(KEYS.classMeta, d.classMeta || {});
       writeLocal(KEYS.classWeeks, d.classWeeks || []);
       writeLocal(KEYS.sent, d.sent);
       writeLocal(KEYS.published, d.published);
@@ -1653,6 +1671,9 @@
     deleteStudent: deleteStudent,
     getClasses: getClasses,
     schedOf: schedOf,
+    metaOf: metaOf,
+    isEnded: isEnded,
+    setMetaLocal: setMetaLocal,
     acceptRemote: acceptRemote,
     KEY_LABEL: KEY_LABEL,
     keepMine: keepMine,

@@ -102,10 +102,11 @@
     if (d && d.students) { st.allStudents = d.students; d.students = activeOnly(d.students); }
     return d;
   }
+  /* 종강한 반(종강일이 지남 · migration-049) 학생은 「오늘」 · 챙길 학생 · 발송 차례에서 뺀다 (기록 · 러닝노트는 그대로) */
   function activeOnly(list) {
     var by = {};
     Store.getStudents().forEach(function (s) { by[s.id] = s; });
-    return (list || []).filter(function (s) { var x = by[s.id]; return !x || Store.isActiveOn(x); });
+    return (list || []).filter(function (s) { var x = by[s.id]; return (!x || Store.isActiveOn(x)) && !Store.isEnded(s.class_name); });
   }
 
   /* ---------- 과제 기록 불러오기 (20261031g) ----------
@@ -411,7 +412,7 @@
     d.students.forEach(function (s) { var k = s.class_name || '(반 없음)'; (by[k] = by[k] || { name: k, academy: s.academy || '', rows: [] }).rows.push(s); });
     Store.getClasses().forEach(function (c) { if (!by[c.name]) by[c.name] = { name: c.name, academy: '', rows: [] }; });
     return Object.keys(by).map(function (k) { return by[k]; })
-      .filter(function (c) { return !Store.isArchivedClass(c.name); })
+      .filter(function (c) { return !Store.isArchivedClass(c.name) && !Store.isEnded(c.name); })
       .map(function (c) { var no = c.name === '(반 없음)'; c.next = no ? null : nextLesson(c.name); c.cy = no ? null : cycleOf(c.name); c.per = no ? null : periodsOf(c.name); return c; })
       .sort(function (x, y) {
         if (!!x.next !== !!y.next) return x.next ? -1 : 1;               /* 수업일 미정은 맨 아래 */
@@ -1151,6 +1152,7 @@
           linesHtml(c, chips) +
           classWhen(c) +
           attHtml(c.name, '') +
+          (window.Notes ? Notes.cardHtml(c) : '') +          /* 필기 QR · 필기 미제출 · 끝 시각 안내 (notes.js · 20261031w) */
         '</div>' +
         '<div class="tdc-btns">' +
           (c.name === '(반 없음)' || !n ? '' : '<button type="button" class="btn btn--sm tdc-sms" data-sms-cls="' + esc(c.name) + '" aria-label="' + esc(c.name) + ' 전체 문자 발송">전체 문자 발송</button>') +
@@ -1175,6 +1177,15 @@
     classes.forEach(function (c, i) { if (!used[c.name]) items.push({ c: c, at: i, mine: !!(window.Course && Course.mine(c.name)) }); });
     items.sort(function (a, b) { return (b.mine - a.mine) || (a.at - b.at); });
     return items;
+  }
+
+  /* 종강한 반 — 맨 아래 접힌 한 줄 (이름만 · 지난 레포트 · 기록은 그대로) */
+  function endedHtml() {
+    var ended = Store.getClasses().filter(function (c) { return Store.isEnded(c.name); });
+    if (!ended.length) return '';
+    return '<details class="tdc-ended"><summary>종강 ' + ended.length + '개 반</summary><p class="muted-note">' +
+      ended.map(function (c) { var m = Store.metaOf(c.name); return esc(c.name) + (m && m.endOn ? ' (' + md(m.endOn) + ' 종강)' : ''); }).join(' · ') +
+      ' — 「오늘」 · 필기 알림 · 레포트 발송 대상 · 챙길 학생에서 빠집니다. 지난 레포트와 러닝노트는 그대로입니다.</p></details>';
   }
 
   function render() {
@@ -1207,8 +1218,10 @@
       todoHtml(unsent) +
       careHtml(careItems(d)) +
       '<div class="td-appbar" id="tdAppBar" hidden role="status" aria-live="polite"></div>' + stampHtml() +
-      '<div class="tdc-list-wrap">' + cardsOf(classes).map(function (it) { return it.course ? courseCardHtml(it.course, it.cls) : classCardHtml(it.c); }).join('') + '</div>';
+      '<div class="tdc-list-wrap">' + cardsOf(classes).map(function (it) { return it.course ? courseCardHtml(it.course, it.cls) : classCardHtml(it.c); }).join('') + '</div>' +
+      endedHtml();
     paintDetail();
+    if (window.Notes) setTimeout(Notes.paint, 0);
     paintStamp();
     if (window.QuickNote) QuickNote.mount();
   }

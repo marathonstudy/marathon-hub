@@ -647,6 +647,16 @@ delete from public.staff where email = '조교이메일@example.com';
 - app-week.js — 오늘(밤 12시 마감 전)은 아직이면 안 셈 · 냈으면 셈 · 칸 「오늘」 (today.js 진행 중 기간도 어제 대신 오늘 기준)
 - 러닝노트 hub.js — 과제 상세 「이 수업 과제 (L-7~L-1)」 · 「진행 중 · 다음 수업까지 (L~다음 수업 전날)」 · 맨 아래 전체 누적 · 달력 (L = 연 레포트 수업일 · 바로 열면 가장 최근 수업일)
 
+### 5-54. 20261031w — 반 수업 시각 · 종강일 · 담당 운영진 · 필기 QR · 필기 알림 · 문의 안내 (migration-049 · 050 · 새 함수 note-remind)
+1. Supabase SQL Editor 에서 `supabase/migration-049-class-time-notes.sql` 실행 (047 · 048 다음 · 여러 번 실행해도 안전 · 확인 다섯 줄 true + 마지막 줄 「시각 넣은 반」에 지금 반 세 개).
+   - `staff_phones`(운영진 문자용 번호 · 운영진만 읽음 · 로그인할 때마다 맞춤) · `staff_phone_login` 다시 정의(047 과 같고 번호 저장만 더함)
+   - `classes` start_time · end_time · end_on · staff_emails · note_remind(처음 끔) · remind_min(5) · 지금 반 세 개 값 · 12월 반 값(`app_settings.class_presets` · 만들지는 않음)
+   - 필기 알림: `note_remind_log`(같은 날 한 번) · `note_remind_prepare`/`note_remind_record`(service_role) · `note_manual_prepare`(운영진) · `note_status` · 문구 두 개(문자 문구 관리)
+   - 문의 안내: `app_settings.contact` · `contact_set` · `hub_contact()` · 「레포트 안내」 문구 끝에 카카오톡 채널 한 줄
+2. Edge Functions → Deploy a new function → 이름 `note-remind` → `supabase/functions/note-remind/index.ts` → Deploy → **Verify JWT 끄기**. 솔라피 Secrets 는 sms-send 와 같은 것(새로 넣을 키 없음).
+3. SQL Editor 에서 `supabase/migration-050-note-cron.sql` 실행 (매분 note-remind 호출 · pg_cron · pg_net). 「pg_cron is not available」이면 대시보드 → Integrations → Cron 을 켠 뒤 다시.
+4. 코치룸 반 관리 → 수업 설정에서 반마다 「필기 알림 켜기」 (처음엔 모두 꺼짐 · 켜기 전에는 아무 문자도 안 감) · 설정 → 문의 연락처에 카카오채널 링크.
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

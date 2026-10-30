@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" as="style" crossorigin
       href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
-<link rel="stylesheet" href="style.css?v=20261031v">
+<link rel="stylesheet" href="style.css?v=20261031w">
 </head>
 <body class="is-locked">
 
@@ -1248,6 +1248,7 @@
           <!-- 반 목록은 Store.getClasses() 하나에서 (학생 0명인 반 포함). 맨 아래 [+ 새 반 만들기] -->
           <select class="input" id="fClass"></select>
           <div class="cls-new" id="fClassNew" hidden>
+            <select class="input" id="fClassPreset" hidden aria-label="미리 적어 둔 반에서 고르기"></select>
             <input class="input" id="fClassNewName" type="text" maxlength="30" autocomplete="off" placeholder="새 반 이름 (예: 목동반)">
             <button class="btn btn--sm btn--primary" type="button" id="btnClassNewOk">만들기</button>
             <button class="btn btn--sm btn--ghost" type="button" id="btnClassNewCancel">취소</button>
@@ -1669,6 +1670,18 @@
   <div class="modal__foot"><button class="btn" type="button" id="courseClose">닫기</button></div>
 </dialog>
 
+<!-- 필기 QR — 화면 가득 · 「지금 제출 n/전체」만 (notes.js · 20261031w) -->
+<dialog class="modal note-qr" id="noteQrModal" aria-labelledby="noteQrTitle">
+  <div class="note-qr__in">
+    <h2 class="note-qr__title" id="noteQrTitle">오늘 수업 필기</h2>
+    <p class="note-qr__sub">휴대폰 카메라로 찍으면 「오늘 수업 필기 올리기」가 열려요</p>
+    <div class="note-qr__box" id="noteQrBox"></div>
+    <p class="note-qr__count num" id="noteQrCount" aria-live="polite">지금 제출 —</p>
+    <p class="note-qr__url" id="noteQrUrl"></p>
+    <button class="btn note-qr__close" type="button" id="noteQrClose">닫기</button>
+  </div>
+</dialog>
+
 <!-- 더보기 → 운영진 (staff.js · migration-047) — 사용 중지 · 다시 사용은 원장 계정 화면에만 -->
 <dialog class="modal modal--wide" id="staffModal">
   <div class="modal__head">
@@ -1982,6 +1995,24 @@
 </dialog>
 
 <!-- 반 관리 (classes.js) -->
+<!-- 반 관리 → 수업 설정 (classes.js · migration-049 · 20261031w) -->
+<dialog class="modal" id="classMetaModal">
+  <div class="modal__head"><h2 class="modal__title" id="cmTitle">수업 설정</h2>
+    <p class="modal__desc">종강일이 지나면 「오늘」 · 필기 알림 · 레포트 발송 대상 · 챙길 학생에서 빠지고 반 고르기에서 「종강」으로 접힙니다. 지난 레포트 · 러닝노트는 그대로입니다.</p></div>
+  <div class="modal__body">
+    <div class="cm-row">
+      <label class="field"><span class="field__label">수업 시작</span><input class="input" id="cmtStart" type="time"></label>
+      <label class="field"><span class="field__label">수업 끝</span><input class="input" id="cmtEnd" type="time"></label>
+    </div>
+    <label class="field"><span class="field__label">종강일 <span class="field__opt">비우면 계속</span></span><input class="input" id="cmtEndOn" type="date"></label>
+    <div class="field"><span class="field__label">담당 운영진 <span class="field__opt">강사 · 조교 여러 명 · 비우면 필기 알림은 사용 중인 운영진 전체에게</span></span><div class="cm-staff-list" id="cmtStaff"></div></div>
+    <label class="check-line"><input type="checkbox" id="cmtRemind"><span>필기 알림 켜기 <span class="field__opt">수업 끝나기 몇 분 전 — 필기를 안 낸 학생 본인 · 담당 운영진에게 문자 (처음엔 꺼짐)</span></span></label>
+    <label class="field"><span class="field__label">끝나기 몇 분 전</span><input class="input input--num" id="cmtMin" type="number" min="1" max="60" value="5"></label>
+    <p class="modal__error is-on" id="cmtError"></p>
+  </div>
+  <div class="modal__foot"><div class="spacer"></div><button class="btn btn--ghost" type="button" id="cmtCancel">닫기</button><button class="btn btn--primary" type="button" id="cmtSave">저장</button></div>
+</dialog>
+
 <dialog class="modal modal--wide" id="classAdminModal">
   <div class="modal__head">
     <h2 class="modal__title">반 관리</h2>
@@ -2162,6 +2193,13 @@
       <!-- 카카오 알림톡 · 문자 설정은 「문자 발송」 → 연결 상태로 옮겼다 (20261031m) -->
       <p class="field__hint td-set-sms">카카오 알림톡 · 문자 설정(키 · 단가 · 내 시험 번호)은 「문자 발송」 → 연결 상태에 있습니다.
         <button class="btn btn--sm" type="button" id="tdSetSmsGo">연결 상태 열기</button></p>
+      <!-- 문의 연락처 — 러닝노트 레포트 맨 아래 [문의하기] (notes.js · migration-049 · 20261031w) -->
+      <div class="extra-head" style="margin-top:14px"><span class="extra-head__title">문의 연락처 (카카오채널 링크)</span></div>
+      <p class="field__hint">러닝노트 레포트 맨 아래 「수정하실 내용이나 궁금한 점은 카카오톡 채널 'jh국어연구소'로…」 옆 [문의하기] 버튼이 이 링크로 열립니다. 비우면 버튼 없이 문구만 보입니다. 전화번호는 넣지 않습니다.</p>
+      <div class="toolbar">
+        <input class="input" id="tdSetContact" type="url" inputmode="url" autocomplete="off" spellcheck="false" maxlength="300" placeholder="https://pf.kakao.com/_xxxx/chat">
+        <button class="btn btn--sm" type="button" id="tdSetContactSave">저장</button>
+      </div>
     </div>
     <div class="modal__foot">
       <div class="spacer"></div>
@@ -2247,58 +2285,59 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
 <!-- config.js 와 brand.js 가 먼저 와야 한다. 나머지가 이 값을 읽는다. -->
-<script src="../assets/config.js?v=20261031v"></script>
-<script src="../assets/brand.js?v=20261031v"></script>
-<script src="../assets/lesson.js?v=20261031v"></script>
-<script src="supabase.js?v=20261031v"></script>
-<script src="db.js?v=20261031v"></script>
-<script src="store.js?v=20261031v"></script>
-<script src="report.js?v=20261031v"></script>
-<script src="aipolish.js?v=20261031v"></script>
-<script src="app.js?v=20261031v"></script>
-<script src="import.js?v=20261031v"></script>
-<script src="appfetch.js?v=20261031v"></script>
-<script src="profile.js?v=20261031v"></script>
-<script src="course.js?v=20261031v"></script>
-<script src="write.js?v=20261031v"></script>
-<script src="publish.js?v=20261031v"></script>
-<script src="send.js?v=20261031v"></script>
-<script src="kakao.js?v=20261031v"></script>
-<script src="sms.js?v=20261031v"></script>
-<script src="contacts.js?v=20261031v"></script>
-<script src="notice.js?v=20261031v"></script>
-<script src="tb.js?v=20261031v"></script>
-<script src="tb-dash.js?v=20261031v"></script>
-<script src="tb-issue.js?v=20261031v"></script>
-<script src="tb-stock.js?v=20261031v"></script>
-<script src="tb-bill.js?v=20261031v"></script>
-<script src="../assets/dday.js?v=20261031v"></script>
-<script src="../assets/app-week.js?v=20261031v"></script>
-<script src="card.js?v=20261031v"></script>
-<script src="exams.js?v=20261031v"></script>
-<script src="photo.js?v=20261031v"></script>
-<script src="applink.js?v=20261031v"></script>
-<script src="skips.js?v=20261031v"></script>
-<script src="reviewnote.js?v=20261031v"></script>
-<script src="hwfix.js?v=20261031v"></script>
-<script src="attend.js?v=20261031v"></script>
-<script src="attbook.js?v=20261031v"></script>
-<script src="quicknote.js?v=20261031v"></script>
-<script src="today.js?v=20261031v"></script>
-<script src="staff.js?v=20261031v"></script>
-<script src="classes.js?v=20261031v"></script>
-<script src="weekly.js?v=20261031v"></script>
-<script src="filethumb.js?v=20261031v"></script>
-<script src="ytbm.js?v=20261031v"></script>
-<script src="summary.js?v=20261031v"></script>
-<script src="weeks.js?v=20261031v"></script>
-<script src="../assets/photos.js?v=20261031v"></script>
-<script src="review.js?v=20261031v"></script>
-<script src="draftguard.js?v=20261031v"></script>
-<script src="preview.js?v=20261031v"></script>
-<script src="rtabs.js?v=20261031v"></script>
-<script src="nav.js?v=20261031v"></script>
-<script src="sync.js?v=20261031v"></script>
-<script src="auth.js?v=20261031v"></script>
+<script src="../assets/config.js?v=20261031w"></script>
+<script src="../assets/brand.js?v=20261031w"></script>
+<script src="../assets/lesson.js?v=20261031w"></script>
+<script src="supabase.js?v=20261031w"></script>
+<script src="db.js?v=20261031w"></script>
+<script src="store.js?v=20261031w"></script>
+<script src="report.js?v=20261031w"></script>
+<script src="aipolish.js?v=20261031w"></script>
+<script src="app.js?v=20261031w"></script>
+<script src="import.js?v=20261031w"></script>
+<script src="appfetch.js?v=20261031w"></script>
+<script src="profile.js?v=20261031w"></script>
+<script src="course.js?v=20261031w"></script>
+<script src="write.js?v=20261031w"></script>
+<script src="publish.js?v=20261031w"></script>
+<script src="send.js?v=20261031w"></script>
+<script src="kakao.js?v=20261031w"></script>
+<script src="sms.js?v=20261031w"></script>
+<script src="contacts.js?v=20261031w"></script>
+<script src="notice.js?v=20261031w"></script>
+<script src="tb.js?v=20261031w"></script>
+<script src="tb-dash.js?v=20261031w"></script>
+<script src="tb-issue.js?v=20261031w"></script>
+<script src="tb-stock.js?v=20261031w"></script>
+<script src="tb-bill.js?v=20261031w"></script>
+<script src="../assets/dday.js?v=20261031w"></script>
+<script src="../assets/app-week.js?v=20261031w"></script>
+<script src="card.js?v=20261031w"></script>
+<script src="exams.js?v=20261031w"></script>
+<script src="photo.js?v=20261031w"></script>
+<script src="applink.js?v=20261031w"></script>
+<script src="skips.js?v=20261031w"></script>
+<script src="reviewnote.js?v=20261031w"></script>
+<script src="hwfix.js?v=20261031w"></script>
+<script src="attend.js?v=20261031w"></script>
+<script src="attbook.js?v=20261031w"></script>
+<script src="quicknote.js?v=20261031w"></script>
+<script src="today.js?v=20261031w"></script>
+<script src="staff.js?v=20261031w"></script>
+<script src="notes.js?v=20261031w"></script>
+<script src="classes.js?v=20261031w"></script>
+<script src="weekly.js?v=20261031w"></script>
+<script src="filethumb.js?v=20261031w"></script>
+<script src="ytbm.js?v=20261031w"></script>
+<script src="summary.js?v=20261031w"></script>
+<script src="weeks.js?v=20261031w"></script>
+<script src="../assets/photos.js?v=20261031w"></script>
+<script src="review.js?v=20261031w"></script>
+<script src="draftguard.js?v=20261031w"></script>
+<script src="preview.js?v=20261031w"></script>
+<script src="rtabs.js?v=20261031w"></script>
+<script src="nav.js?v=20261031w"></script>
+<script src="sync.js?v=20261031w"></script>
+<script src="auth.js?v=20261031w"></script>
 </body>
 </html>

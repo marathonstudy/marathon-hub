@@ -1238,3 +1238,8 @@ html.rn-lock, html.rn-lock body { overflow: hidden; }
 .apg-c--wk { background: #F5F3FC; } .apg-c--wkDone i { color: #7B6CC4; font-weight: 900; }
 .apg-sum { margin-top: 8px; font-size: 12.5px; color: var(--ink-light); }
 @media (max-width: 380px) { .apg-c { min-height: 46px; } .apg-c i { font-size: 13px; } }
+
+/* 레포트 맨 아래 문의 안내 (hub.js · 20261031w) */
+.rw-contact { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; background: #FBFBFE; }
+.rw-contact__t { margin: 0; font-size: 14px; line-height: 1.65; color: var(--ink-mid); }
+.rw-contact__btn { min-height: 44px; padding: 0 20px; }
