@@ -2304,6 +2304,22 @@ dialog.modal.modal--card {
   font-size: 13px; font-weight: 700; color: var(--indigo); text-decoration: underline; text-underline-offset: 3px;
 }
 .gate__link:hover { color: #4A34B8; }
+/* 「다른 방법으로 로그인」 — 원장 이메일 로그인 (접어 둠 · 20261031u) */
+.gate__other { margin-top: 12px; }
+.gate__other > summary { cursor: pointer; text-align: center; font-size: 12.5px; font-weight: 700; color: var(--ink-light); padding: 6px 0; list-style: none; }
+.gate__other > summary::-webkit-details-marker { display: none; }
+.gate__other > summary::after { content: ' ▾'; }
+.gate__other[open] > summary::after { content: ' ▴'; }
+.gate__otherbody { padding-top: 6px; }
+/* 더보기 → 운영진 (staff.js · 20261031u) */
+.op-list { display: flex; flex-direction: column; gap: 8px; }
+.op-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: #fff; }
+.op-row.is-off { background: var(--surface-2); color: var(--ink-light); }
+.op-row__main { flex: 1 1 180px; min-width: 0; }
+.op-row__name { font-size: 14.5px; font-weight: 800; color: var(--ink-deep); }
+.op-row.is-off .op-row__name { color: var(--ink-light); text-decoration: line-through; }
+.op-row__meta { margin-top: 3px; font-size: 12px; line-height: 1.6; color: var(--ink-light); }
+.op-row__acts { display: flex; gap: 6px; flex-wrap: wrap; }
 .gate__ok { margin-top: 10px; font-size: 13px; line-height: 1.6; color: #35806A; background: #E6F5EE; border-radius: 10px; padding: 9px 11px; }
 .sa-code { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--surface-2); }
 .sa-code__now { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13.5px; font-weight: 700; color: var(--ink-deep); }

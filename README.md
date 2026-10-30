@@ -36,8 +36,8 @@ admin/        코치룸 (명단 · 작성 · 공개 · 발송 · 반 공지 · �
   sync.js       여러 기기 — 다시 불러오기 · 실시간 반영
   photo.js      학생 → 필기 노트 — 반·날짜별 올림 현황 · 숨기기 · 완전 삭제 · 저장 공간
   today.js      「오늘」 총괄 (로그인 첫 화면) — 요약 · 챙겨야 할 학생 · 반별 카드
-  staff.js      직원 관리 (「오늘」 [설정] · teacher 만) — 팀 가입 코드 · 사용 중지 · 역할
-  auth.js       로그인 · 조교 가입 · 비밀번호 찾기
+  staff.js      더보기 → 운영진 — 들어온 사람 목록 · [사용 중지]/[다시 사용](원장 계정만)
+  auth.js       로그인 (조교: 이름 · 번호 8자리 / 원장: 다른 방법으로 로그인 → 이메일) · 비밀번호 찾기
   weekly.js     레포트 발송 → 1 작성 반 공통 — 수업일 · 수업 영상 · 배부 자료/과제 파일 · 지난 파일 정리 · [미리보기 그림 만들기]
   filethumb.js  파일 「첫 페이지 그림」 만들기 — PDF 첫 페이지(pdf.js · cdnjs 3.11.174) · JPG/PNG 를 가로 400px JPG 로 (20261029i)
   summary.js    레포트 발송 → 1 작성 반 공통 — 자막으로 AI 수업 요약 (초안 → 확정)
@@ -116,6 +116,8 @@ supabase/
   kakao/template.txt · kakao/HOW-TO.md  알림톡 템플릿 초안 · 솔라피 등록 방법
   check-classes.sql               반 이름 점검 (읽기 전용 — 어느 표에 어떤 반이 있는지 · 비슷한 이름)
   functions/app-report/index.ts  앱 과제 기록을 대신 받아 오는 Edge Function
+  migration-047-phone-login.sql   조교 이름 + 번호 8자리 로그인 (번호는 해시 · 뒤 4자리만) · 운영진 목록 · 사용 중지는 원장만 · 팀 가입 코드 닫기
+  functions/staff-login/index.ts  조교 로그인 Edge Function (Supabase 기본 환경값만 함수 안에서 · 새 키 없음 · Verify JWT 끔)
 ```
 
 ## 고칠 때 규칙
@@ -629,6 +631,14 @@ delete from public.staff where email = '조교이메일@example.com';
 - 러닝노트 hub.js — 수업 영상 탭 · 레포트 「이 수업 영상」 카드: 차시별 한 줄 · 키워드 칩 · 기본 제목이면 첫 차시 한 줄 크게 · 탭 맨 위 「키워드로 찾기」
 - 코치룸 summary.js — 수업 내용 칸 아래 키워드 칩(× · 넣기 · 키워드 다시 만들기)
 
+### 5-52. 20261031u — 조교는 이름 + 휴대폰 번호 8자리로 (migration-047-phone-login.sql · 새 함수 staff-login)
+1. Supabase SQL Editor 에서 `supabase/migration-047-phone-login.sql` 실행 (046 다음 · 여러 번 실행해도 안전 · 확인 세 줄 모두 true).
+   - `staff.phone_hash` · `phone_last4` · 비밀 값 표 `staff_phone_secret`(정책 없음) · 시도 기록 `staff_phone_attempts`
+   - `staff_phone_login`(service_role 만) · `staff_list`(직원) · `staff_set_active` 는 원장만 · 팀 가입 코드 지움
+2. Edge Functions → Deploy a new function → 이름 `staff-login` → `supabase/functions/staff-login/index.ts` 전체 → Deploy → **Verify JWT 끄기**. 새로 넣을 키는 없다.
+3. (권장) Authentication → Sign In / Providers → Email → **Allow new users to sign up 끄기** — 이메일 가입은 더 이상 쓰지 않는다. 번호 로그인은 함수가 계정을 만들므로 꺼도 된다.
+- 코치룸 로그인 화면: 이름 · 휴대폰 번호(010 뺀 8자리) · [들어가기] / 아래 「다른 방법으로 로그인」(이메일) · 더보기 → 운영진
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.
@@ -695,14 +705,17 @@ delete from public.staff where email = '조교이메일@example.com';
 - 한국 시간 자정마다 하루씩 줄어든다. 당일은 "○○ 당일입니다. 모두 화이팅!". 고정한 시험이 지나면 다음 시험으로 넘어가고,
   다가오는 시험이 하나도 없으면 D-day 줄을 숨긴다.
 
-## 조교 가입 · 직원 관리
+## 조교 로그인 · 운영진 (20261031u · migration-047)
 
-- 조교는 로그인 화면 **[처음이신가요? 가입하기]** → 이름 · 이메일 · 비밀번호 · **팀 가입 코드** → 바로 코치룸.
-  코드가 틀리면 계정을 만들지 않는다. 같은 이메일 15분에 5번 · 전체 10분에 30번 틀리면 잠깐 막힌다.
-- 팀 가입 코드는 DB 에만 있다. teacher 가 「오늘」 → **[설정]** → 직원 관리에서 정하고 바꾼다(처음엔 가입이 닫혀 있다).
-- 직원 관리: 이름 · 이메일 · 역할 · 가입일 · 마지막 접속 · [사용 중지]/[다시 사용] · 역할 바꾸기.
-  사용 중지하면 바로 아무것도 못 보고(열려 있던 화면도 곧 로그아웃), 남긴 기록은 그대로다.
-- 비밀번호를 잊으면 로그인 화면 **[비밀번호를 잊으셨나요?]** → 메일의 링크 → 코치룸에서 새 비밀번호.
+- 조교: 코치룸 주소 → **이름 · 번호 8자리(010 뺀)** → **[들어가기]**. 가입 버튼 · 승인 · 가입 코드 · 미리 등록은 없다.
+  처음 보는 번호면 그 이름으로 바로 조교 등록 · 이미 있는 번호면 이름이 맞을 때만(띄어쓰기 · 대소문자 무시) · 다르면 「이름이나 번호가 맞지 않습니다」.
+  같은 번호 15분에 5번 · 전체 10분에 50번 틀리면 잠깐 막힌다. 새 등록은 전체 한 시간에 20명까지.
+- 번호는 DB 에 그대로 남지 않는다 — DB 에만 있는 비밀 값과 섞은 해시 + 뒤 4자리만. 로그인은 Edge Function staff-login 이 한다
+  (Supabase 가 함수에 기본으로 주는 SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY 를 그 함수 안에서만 · 화면 · 저장소에는 없음).
+- 원장(내 계정): 로그인 화면 아래 **[다른 방법으로 로그인]** → 이메일 · 비밀번호. 비밀번호 찾기도 그 안.
+- 더보기 → **운영진**: 이름 · 번호 뒤 4자리 · 처음 들어온 날 · 마지막 접속. **[사용 중지]/[다시 사용]** 은 원장(teacher) 계정 화면에만 · 서버도 원장만 받는다.
+  사용 중지하면 바로 아무것도 못 보고(열려 있던 화면도 곧 로그아웃), 쓴 기록은 그대로다.
+- 예전 이메일 가입(팀 가입 코드)은 닫았다 — 047 이 남아 있던 코드를 지운다. 이미 이메일로 등록된 사람은 그대로 「다른 방법으로 로그인」으로 들어온다.
 
 ## 오늘 (코치룸 첫 화면 「오늘」)
 

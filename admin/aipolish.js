@@ -69,11 +69,14 @@
   /* 이번 달 남은 횟수 (모든 칸이 같이 쓴다 · AI 요약과 따로) */
   function loadLeft() {
     if (!sb() || !sb().rpc) return Promise.resolve();
+    /* 로그인 전(관문)에는 부르지 않는다 — 들어온 뒤 jt:loaded 에 다시 */
+    if (document.body.classList.contains('is-locked')) return Promise.resolve();
     return Promise.resolve(sb().rpc('polish_status')).then(function (r) {
       left = r && !r.error && r.data ? Math.max(0, (r.data.cap || 0) - (r.data.used || 0)) : null;
       all.forEach(draw);
     }, function () { left = null; });
   }
+  window.addEventListener('jt:loaded', function () { if (left == null) loadLeft(); });
 
   /* ---------- 「빼 줘」 — 그 자료를 AI 에 아예 보내지 않는다 ---------- */
   var DROP = [

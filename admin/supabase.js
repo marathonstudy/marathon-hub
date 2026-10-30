@@ -1,5 +1,5 @@
 /* ============================================================
-   supabase.js — 로그인 (이메일 + 비밀번호)
+   supabase.js — 로그인 (조교: 이름 + 번호 8자리 · 원장: 이메일 + 비밀번호)
 
    접속 주소·키는 assets/config.js 에 있다.
    publishable key 는 공개돼도 되는 키다. 모든 표에 RLS 가 켜져 있고,
@@ -74,6 +74,49 @@
       });
   }
 
+  /* 조교 — 이름 + 휴대폰 번호 8자리 (Edge Function staff-login · migration-047).
+     처음 보는 번호면 그 이름으로 바로 가입된다. 받은 세션은 이 기기에 계속 남는다 (persistSession) */
+  var PHONE_REASON = {
+    name: '이름을 적어 주세요.',
+    phone: '휴대폰 번호는 010 을 뺀 8자리 숫자로 넣어 주세요.',
+    mismatch: '이름이나 번호가 맞지 않습니다',
+    disabled: '사용이 중지된 계정입니다. 원장님께 문의해 주세요.',
+    locked: '여러 번 맞지 않아 잠깐 막혔습니다. 15분쯤 뒤에 다시 해 주세요.',
+    busy: '지금 들어오는 사람이 많습니다. 잠시 뒤에 다시 해 주세요.',
+    nosql: '번호로 들어가기가 아직 설치되지 않았습니다. 원장님께 문의해 주세요.'
+  };
+  function phoneDigits(v) {
+    var d = String(v || '').replace(/\D/g, '');
+    return d.length === 11 && d.indexOf('010') === 0 ? d.slice(3) : d;
+  }
+  function phoneLogin(name, phone) {
+    name = String(name || '').trim();
+    phone = phoneDigits(phone);
+    if (!name) return Promise.reject(new Error(PHONE_REASON.name));
+    if (!/^\d{8}$/.test(phone)) return Promise.reject(new Error(PHONE_REASON.phone));
+    var call;
+    try {
+      init();
+      call = global.fetch(global.CONFIG.supabase.url + '/functions/v1/staff-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: global.CONFIG.supabase.key },
+        body: JSON.stringify({ name: name, phone: phone })
+      }).then(function (r) { return r.json(); });
+    } catch (e) {
+      return Promise.reject(translate(e));
+    }
+    return withTimeout(call, 25000, '서버 응답이 없습니다. 인터넷 연결을 확인하고 다시 시도해 주세요.')
+      .then(function (j) {
+        if (!j || !j.ok || !j.session) throw new Error(PHONE_REASON[j && j.reason] || (j && j.message) || '들어가지 못했습니다. 잠시 뒤에 다시 해 주세요.');
+        return init().auth.setSession({ access_token: j.session.access_token, refresh_token: j.session.refresh_token });
+      }, function (e) { throw translate(e); })
+      .then(function (r) {
+        if (r.error) throw translate(r.error);
+        if (!r.data || !r.data.session) throw new Error('로그인은 됐지만 세션을 받지 못했습니다. 새로고침 후 다시 시도해 주세요.');
+        return r.data.session;
+      });
+  }
+
   /* staff 표에 이 계정이 있는가. 없으면 생성기를 열지 않는다.
      (RLS 가 어차피 막지만, 빈 화면 대신 이유를 알려 주려고 먼저 본다) */
   function checkStaff() {
@@ -91,35 +134,9 @@
 
   function signOut() { return init().auth.signOut(); }
 
-  /* ---------- 조교 직접 가입 · 비밀번호 찾기 (migration-008) ---------- */
+  /* ---------- 상태 · 마지막 접속 · 비밀번호 찾기 (migration-008) ---------- */
 
   function missingFn(err) { return /Could not find the function|does not exist|schema cache/i.test((err && err.message) || ''); }
-
-  /* 가입 전에 팀 가입 코드만 확인 (틀리면 계정을 만들지 않는다) */
-  function joinCheck(email, code) {
-    return withTimeout(init().rpc('staff_join_check', { p_email: email, p_code: code }), 15000, '서버 응답이 없습니다.')
-      .then(function (r) {
-        if (r.error) throw missingFn(r.error) ? new Error('가입 기능이 아직 설치되지 않았습니다. 선생님께 문의해 주세요.') : translate(r.error);
-        return r.data || { ok: false };
-      });
-  }
-
-  function signUp(email, password) {
-    email = String(email || '').trim().toLowerCase();
-    return withTimeout(init().auth.signUp({ email: email, password: password }), 20000, '서버 응답이 없습니다.')
-      .then(function (res) {
-        if (res.error) throw translate(res.error);
-        return res.data || {};
-      });
-  }
-
-  /* 방금 가입(로그인)한 본인을 조교로 등록 — 서버가 코드를 다시 확인하고 역할은 항상 조교 */
-  function join(name, code) {
-    return init().rpc('staff_join', { p_name: name, p_code: code }).then(function (r) {
-      if (r.error) throw missingFn(r.error) ? new Error('가입 기능이 아직 설치되지 않았습니다.') : new Error(r.error.message);
-      return r.data || { ok: false };
-    });
-  }
 
   /* 로그인한 사람의 상태 — 'active' · 'disabled' · 'none'. 008 을 아직 안 돌렸으면 is_staff 로 */
   function staffStatus() {
@@ -212,11 +229,10 @@
     get client() { return init(); },
     withTimeout: withTimeout,
     signIn: signIn,
+    phoneLogin: phoneLogin,
+    phoneDigits: phoneDigits,
     signOut: signOut,
     checkStaff: checkStaff,
-    joinCheck: joinCheck,
-    signUp: signUp,
-    join: join,
     staffStatus: staffStatus,
     touch: touch,
     sendReset: sendReset,

@@ -1,14 +1,14 @@
 /* ============================================================
-   auth.js — 로그인 관문 · 조교 가입 · 비밀번호 찾기
+   auth.js — 로그인 관문 · 비밀번호 찾기
 
    로그인하기 전에는 아무 화면도 보이지 않는다.
    로그인해도 staff 표에 '사용 중' 으로 등록돼 있어야 들어간다.
 
-   가입: 이름 · 이메일 · 비밀번호 · 팀 가입 코드
-     1) staff_join_check 로 코드만 먼저 확인 — 틀리면 계정을 만들지 않는다
-     2) Supabase 가입(이메일 인증 끔 → 바로 로그인)
-     3) staff_join 이 코드를 다시 확인하고 조교로 등록 → 코치룸
-   로그인했는데 아직 등록 안 된 계정은 '팀 가입 코드 입력' 칸이 나온다.
+   조교: 이름 · 휴대폰 번호(010 뺀 8자리) → [들어가기] (Edge Function staff-login · migration-047)
+     처음 보는 번호면 그 이름으로 바로 조교 등록 · 이미 있는 번호면 이름이 맞을 때만
+     가입 버튼 · 승인 · 가입 코드 · 미리 등록은 없다. 로그인 상태는 이 기기에 계속 남는다.
+   원장(내 계정): 아래 「다른 방법으로 로그인」 안의 이메일 · 비밀번호 (비밀번호 찾기도 그 안)
+   staff 에 없는 이메일 계정은 들어가지 못한다.
    사용 중지된 계정은 들어가지 못하고, 열려 있던 화면도 곧 로그아웃된다.
    ============================================================ */
 
@@ -25,16 +25,15 @@
   var errBox  = $('#loginError');
   var btn     = $('#btnLogin');
 
-  var PANES = ['loginForm', 'signupForm', 'resetForm', 'newPwForm', 'joinForm'];
+  var phName  = $('#phName');
+  var phNum   = $('#phNum');
+  var phBtn   = $('#btnPhone');
+
+  var PANES = ['phoneForm', 'resetForm', 'newPwForm'];
   var REASON = {
-    code:     '팀 가입 코드가 맞지 않습니다.',
-    locked:   '잘못된 코드를 여러 번 넣어 잠깐 막혔습니다. 15분쯤 뒤에 다시 해 주세요.',
-    closed:   '지금은 가입을 받지 않습니다. 선생님께 팀 가입 코드를 물어봐 주세요.',
-    exists:   '이미 가입된 이메일입니다. 로그인해 주세요.',
-    disabled: '사용이 중지된 계정입니다. 선생님께 문의해 주세요.',
-    email:    '이메일 주소를 확인해 주세요.',
-    name:     '이름을 적어 주세요.',
-    login:    '로그인이 필요합니다.'
+    disabled: '사용이 중지된 계정입니다. 원장님께 문의해 주세요.',
+    none:     '코치룸에 등록되지 않은 이메일 계정입니다. 조교는 위에서 이름과 번호로 들어오세요.',
+    email:    '이메일 주소를 확인해 주세요.'
   };
 
   function showPane(id) {
@@ -47,13 +46,19 @@
     b.textContent = msg || '';
     b.classList.toggle('is-on', !!msg);
   }
-  function showError(msg) { err('#loginError', msg); }
+  /* 오류는 고른 방법의 칸 아래에 (이메일로 로그인하던 중이면 그 아래) */
+  var via = 'phone';
+  function showError(msg) {
+    err(via === 'email' ? '#loginError' : '#phError', msg);
+    err(via === 'email' ? '#phError' : '#loginError', '');
+  }
 
   function setBusy(on, label) {
-    btn.disabled = on;
-    btn.textContent = on ? (label || '확인 중…') : '로그인';
-    idInput.disabled = on;
-    pwInput.disabled = on;
+    btn.disabled = on; phBtn.disabled = on;
+    btn.textContent = on && via === 'email' ? (label || '확인 중…') : '이메일로 로그인';
+    phBtn.textContent = on && via === 'phone' ? (label || '확인 중…') : '들어가기';
+    idInput.disabled = on; pwInput.disabled = on;
+    phName.disabled = on; phNum.disabled = on;
   }
 
   function busyBtn(b, on, label, normal) {
@@ -75,18 +80,21 @@
         throw d;
       }
       if (st !== 'active') {
-        setBusy(false);
-        showJoin(email);
-        return 'join';
+        var n = new Error(REASON.none);
+        n.notStaff = true;
+        throw n;
       }
       setBusy(true, '불러오는 중…');
-      return Store.loadAll().then(function () {
+      /* 위쪽 이름 — 번호로 들어온 조교는 이메일 칸이 ph-… 라서 staff 표의 이름으로 (쓴 사람 · 고친 사람에도 쓰인다) */
+      var me = DB.myStaff().catch(function () { return null; });
+      return Promise.all([Store.loadAll(), me]).then(function (res) {
+        var nm = (res[1] && res[1].name) || email.split('@')[0];
         Store.enableSync(true);
         gate.hidden = true;
         appRoot.hidden = false;
         topbar.hidden = false;
-        $('#whoami').textContent = email.split('@')[0];
-        $('#whoami').title = email;
+        $('#whoami').textContent = nm;
+        $('#whoami').title = /^ph-/.test(email) ? nm : email;
         $('#whoamiWrap').hidden = !email;
         document.body.classList.remove('is-locked');
         setBusy(false);
@@ -98,11 +106,11 @@
       setBusy(false);
       if (e && e.notStaff) {
         SB.signOut();
-        showPane('loginForm');
+        showPane('phoneForm');
         showError(e.message);
       } else {
         console.error(e);
-        showPane('loginForm');
+        showPane('phoneForm');
         showError((e && e.message) || '데이터를 불러오지 못했습니다. 인터넷 연결을 확인하고 다시 로그인해 주세요.');
       }
     });
@@ -110,19 +118,19 @@
 
   function showLogin() {
     Store.enableSync(false);
-    showPane('loginForm');
+    showPane('phoneForm');
     appRoot.hidden = true;
     topbar.hidden = true;
     document.body.classList.add('is-locked');
     setBusy(false);
     pwInput.value = '';
-    setTimeout(function () { idInput.focus(); }, 60);
+    setTimeout(function () { ($('#otherLogin').open ? idInput : phName).focus(); }, 60);
   }
 
   /* ---------- 로그인 ---------- */
 
-  $('#loginForm').addEventListener('submit', function (e) {
-    e.preventDefault();
+  function emailLogin() {
+    via = 'email';
     showError('');
     setBusy(true);
     SB.signIn(idInput.value, pwInput.value)
@@ -136,6 +144,27 @@
         pwInput.value = '';
         pwInput.focus();
       });
+  }
+  btn.addEventListener('click', emailLogin);
+
+  /* 조교 — 이름 + 번호 8자리. 이메일 칸에서 Enter 를 누르면 이메일 로그인 */
+  $('#phoneForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    if ($('#loginForm').contains(document.activeElement)) { emailLogin(); return; }
+    via = 'phone';
+    showError('');
+    setBusy(true);
+    SB.phoneLogin(phName.value, phNum.value)
+      .then(function (session) {
+        try { localStorage.setItem(CONFIG.storagePrefix + 'lastName', phName.value.trim()); } catch (x) {}
+        phNum.value = '';
+        showApp(session);
+      })
+      .catch(function (x) {
+        setBusy(false);
+        showError(x && x.message ? x.message : '들어가지 못했습니다.');
+        phNum.focus();
+      });
   });
 
   $('#btnLogout').addEventListener('click', function () {
@@ -148,12 +177,6 @@
     }).then(function () { showLogin(); showError(''); });
   });
 
-  $('#goSignup').addEventListener('click', function () {
-    err('#suError', '');
-    $('#suEmail').value = idInput.value.trim();
-    showPane('signupForm');
-    setTimeout(function () { $('#suName').focus(); }, 30);
-  });
   $('#goReset').addEventListener('click', function () {
     err('#rsError', '');
     $('#rsOk').hidden = true;
@@ -162,85 +185,7 @@
     setTimeout(function () { $('#rsEmail').focus(); }, 30);
   });
   Array.prototype.forEach.call(document.querySelectorAll('#authGate [data-back]'), function (b) {
-    b.addEventListener('click', function () { showPane('loginForm'); showError(''); });
-  });
-
-  /* ---------- 가입 ---------- */
-
-  $('#signupForm').addEventListener('submit', function (e) {
-    e.preventDefault();
-    var name = $('#suName').value.trim();
-    var email = $('#suEmail').value.trim().toLowerCase();
-    var pw = $('#suPw').value, pw2 = $('#suPw2').value;
-    var code = $('#suCode').value.trim();
-    if (!name) { err('#suError', REASON.name); return; }
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { err('#suError', REASON.email); return; }
-    if (pw.length < 8) { err('#suError', '비밀번호는 8자 이상으로 정해 주세요.'); return; }
-    if (pw !== pw2) { err('#suError', '두 비밀번호가 서로 다릅니다.'); return; }
-    if (!code) { err('#suError', '팀 가입 코드를 넣어 주세요.'); return; }
-    err('#suError', '');
-    var b = $('#btnSignup');
-    busyBtn(b, true, '코드 확인 중…', '가입하기');
-
-    SB.joinCheck(email, code).then(function (r) {
-      if (!r.ok) throw new Error(REASON[r.reason] || REASON.code);
-      busyBtn(b, true, '가입하는 중…', '가입하기');
-      return SB.signUp(email, pw);
-    }).then(function (data) {
-      if (!data.session) {
-        /* 대시보드에서 이메일 인증이 켜져 있는 경우 */
-        busyBtn(b, false, '', '가입하기');
-        showPane('loginForm');
-        showError('가입 확인 메일을 보냈습니다. 메일의 링크를 누른 뒤 로그인하면 팀 가입 코드 칸이 나옵니다.');
-        return;
-      }
-      return SB.join(name, code).then(function (r) {
-        busyBtn(b, false, '', '가입하기');
-        try { localStorage.setItem(CONFIG.storagePrefix + 'lastEmail', email); } catch (x) {}
-        if (!r.ok) {
-          showJoin(email);
-          err('#joError', REASON[r.reason] || REASON.code);
-          return;
-        }
-        idInput.value = email;
-        $('#suPw').value = ''; $('#suPw2').value = ''; $('#suCode').value = '';
-        return showApp(data.session);
-      });
-    }).catch(function (x) {
-      busyBtn(b, false, '', '가입하기');
-      err('#suError', (x && x.message) || '가입하지 못했습니다.');
-    });
-  });
-
-  /* ---------- 로그인은 됐지만 아직 팀에 등록 안 됨 ---------- */
-
-  function showJoin(email) {
-    $('#joWho').textContent = (email || '이 계정') + ' 은(는) 아직 팀에 등록되지 않았습니다. 선생님께 받은 팀 가입 코드를 넣어 주세요.';
-    err('#joError', '');
-    showPane('joinForm');
-    setTimeout(function () { $('#joName').focus(); }, 30);
-  }
-
-  $('#joinForm').addEventListener('submit', function (e) {
-    e.preventDefault();
-    var name = $('#joName').value.trim(), code = $('#joCode').value.trim();
-    if (!name) { err('#joError', REASON.name); return; }
-    if (!code) { err('#joError', '팀 가입 코드를 넣어 주세요.'); return; }
-    var b = $('#btnJoin');
-    busyBtn(b, true, '확인 중…', '등록하고 들어가기');
-    SB.join(name, code).then(function (r) {
-      busyBtn(b, false, '', '등록하고 들어가기');
-      if (!r.ok) { err('#joError', REASON[r.reason] || REASON.code); return; }
-      $('#joCode').value = '';
-      return SB.getSession().then(showApp);
-    }).catch(function (x) {
-      busyBtn(b, false, '', '등록하고 들어가기');
-      err('#joError', (x && x.message) || '등록하지 못했습니다.');
-    });
-  });
-
-  $('#joLogout').addEventListener('click', function () {
-    SB.signOut().then(function () { showLogin(); showError(''); });
+    b.addEventListener('click', function () { showPane('phoneForm'); showError(''); });
   });
 
   /* ---------- 비밀번호 찾기 ---------- */
@@ -293,7 +238,7 @@
       Store.enableSync(false);
       SB.signOut().then(function () {
         showLogin();
-        showError(st === 'disabled' ? REASON.disabled : '팀 등록이 해제된 계정입니다. 선생님께 문의해 주세요.');
+        showError(st === 'disabled' ? REASON.disabled : '코치룸 등록이 해제된 계정입니다. 원장님께 문의해 주세요.');
       });
     }, function () {});
   });
@@ -304,7 +249,10 @@
     var verEl = $('#appVersion');
     if (verEl) verEl.textContent = 'v' + (window.SB ? SB.VERSION : '?');
 
-    try { idInput.value = localStorage.getItem(CONFIG.storagePrefix + 'lastEmail') || ''; } catch (x) {}
+    try {
+      idInput.value = localStorage.getItem(CONFIG.storagePrefix + 'lastEmail') || '';
+      phName.value = localStorage.getItem(CONFIG.storagePrefix + 'lastName') || '';
+    } catch (x) {}
 
     var dot = $('#syncDot');
     Store.onSyncChange(function (s) {

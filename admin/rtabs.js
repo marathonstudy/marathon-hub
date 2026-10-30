@@ -10,7 +10,7 @@
        지금 단계만 강조하고, 단계마다 그 반 그 주 진행(작성 n/전체 · 공개 n/전체 · 발송 n/전체)을 작게.
        주를 바꾸면(띠 ◀ ▶ · 날짜 직접 고르기 · 이번 주로) 세 단계가 같은 주를 본다 (jt:report-week).
      · 학생 = 명단 / 필기 노트 두 화면.
-     · 더보기 = 반 공지 · 시험 관리 · 설정 · 사용 설명서.
+     · 더보기 = 반 공지 · 시험 관리 · 과정 관리 · 운영진 · 설정 · 사용 설명서.
      · 배지 — 「오늘」 급함 학생 수(today.js) · 레포트 발송 = 수업일 +n일(설정)이 지나도 안 보낸 학생 수(today.js · 「오늘」 급함과 같은 기준 · 20261029f)
    ============================================================ */
 
@@ -75,6 +75,7 @@
     if (k === 'guide') { closeMore(); return; }                         /* 새 창으로 링크가 열린다 */
     if (k === 'exams') closeMore(function () { $('#btnExams').click(); });
     if (k === 'settings') closeMore(function () { $('#tdSettingsBtn').click(); });
+    if (k === 'staff') closeMore(function () { if (window.Staff) Staff.open(); });
     if (k === 'course') closeMore(function () { if (window.Course) Course.openManage(); });
   });
   $('#moreMenuClose').addEventListener('click', function () { $('#moreMenu').close(); });

@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" as="style" crossorigin
       href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
-<link rel="stylesheet" href="style.css?v=20261031t">
+<link rel="stylesheet" href="style.css?v=20261031u">
 </head>
 <body class="is-locked">
 
@@ -21,7 +21,8 @@
      로그인 관문 — 로그인 전에는 아무것도 보이지 않는다
      ============================================================ -->
 <div class="gate" id="authGate">
-  <form class="gate__card" id="loginForm">
+  <!-- 조교: 이름 + 휴대폰 번호 8자리 (staff-login · migration-047) — 처음 보는 번호면 그 이름으로 바로 가입 -->
+  <form class="gate__card" id="phoneForm" novalidate>
     <div class="gate__brand">
       <span class="brand__dot" aria-hidden="true"></span>
       <span data-brand="adminTitle">마라톤 코치룸</span>
@@ -29,49 +30,44 @@
     <p class="gate__desc">선생님과 조교만 사용합니다</p>
 
     <label class="field">
-      <span class="field__label">이메일</span>
-      <input class="input" id="loginId" type="email" autocomplete="username"
-             autocapitalize="off" autocorrect="off" spellcheck="false" required>
+      <span class="field__label">이름</span>
+      <input class="input" id="phName" type="text" maxlength="20" autocomplete="name" required>
     </label>
 
     <label class="field" style="margin-top:12px">
-      <span class="field__label">비밀번호</span>
-      <input class="input" id="loginPw" type="password" autocomplete="current-password" required>
+      <span class="field__label">휴대폰 번호(010 뺀 8자리)</span>
+      <input class="input num" id="phNum" type="tel" inputmode="numeric" maxlength="13" autocomplete="tel-local" placeholder="12345678" required>
     </label>
 
-    <div class="modal__error" id="loginError"></div>
+    <div class="modal__error" id="phError"></div>
 
-    <button class="btn btn--primary gate__submit" id="btnLogin" type="submit">로그인</button>
-
-    <div class="gate__links">
-      <button type="button" class="gate__link" id="goSignup">처음이신가요? 가입하기</button>
-      <button type="button" class="gate__link" id="goReset">비밀번호를 잊으셨나요?</button>
-    </div>
+    <button class="btn btn--primary gate__submit" id="btnPhone" type="submit">들어가기</button>
 
     <p class="gate__foot">
-      가입하려면 선생님께 받은 <b>팀 가입 코드</b>가 필요합니다.<br>
+      처음이면 넣은 이름으로 바로 등록됩니다. 다음부터 같은 이름 · 번호로 들어오세요.<br>
       공용 PC 에서는 사용하지 마세요.
       <span class="gate__ver" id="appVersion"></span>
     </p>
-  </form>
 
-  <!-- 조교 가입 — 팀 가입 코드가 맞으면 조교로 등록되고 바로 코치룸이 열린다 -->
-  <form class="gate__card" id="signupForm" hidden>
-    <div class="gate__brand"><span class="brand__dot" aria-hidden="true"></span><span>코치룸 가입</span></div>
-    <p class="gate__desc">선생님께 받은 팀 가입 코드를 함께 넣어 주세요</p>
-    <label class="field"><span class="field__label">이름</span>
-      <input class="input" id="suName" type="text" maxlength="30" autocomplete="name" required></label>
-    <label class="field" style="margin-top:10px"><span class="field__label">이메일</span>
-      <input class="input" id="suEmail" type="email" autocomplete="username" autocapitalize="off" spellcheck="false" required></label>
-    <label class="field" style="margin-top:10px"><span class="field__label">비밀번호 <span class="field__opt">8자 이상</span></span>
-      <input class="input" id="suPw" type="password" autocomplete="new-password" minlength="8" required></label>
-    <label class="field" style="margin-top:10px"><span class="field__label">비밀번호 확인</span>
-      <input class="input" id="suPw2" type="password" autocomplete="new-password" required></label>
-    <label class="field" style="margin-top:10px"><span class="field__label">팀 가입 코드</span>
-      <input class="input" id="suCode" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" required></label>
-    <div class="modal__error" id="suError"></div>
-    <button class="btn btn--primary gate__submit" id="btnSignup" type="submit">가입하기</button>
-    <div class="gate__links"><button type="button" class="gate__link" data-back>로그인으로 돌아가기</button></div>
+    <details class="gate__other" id="otherLogin">
+      <summary>다른 방법으로 로그인</summary>
+      <div class="gate__otherbody" id="loginForm">
+        <label class="field">
+          <span class="field__label">이메일</span>
+          <input class="input" id="loginId" type="email" autocomplete="username"
+                 autocapitalize="off" autocorrect="off" spellcheck="false">
+        </label>
+        <label class="field" style="margin-top:12px">
+          <span class="field__label">비밀번호</span>
+          <input class="input" id="loginPw" type="password" autocomplete="current-password">
+        </label>
+        <div class="modal__error" id="loginError"></div>
+        <button class="btn gate__submit" id="btnLogin" type="button">이메일로 로그인</button>
+        <div class="gate__links">
+          <button type="button" class="gate__link" id="goReset">비밀번호를 잊으셨나요?</button>
+        </div>
+      </div>
+    </details>
   </form>
 
   <!-- 비밀번호 찾기 -->
@@ -98,18 +94,6 @@
     <button class="btn btn--primary gate__submit" id="btnNewPw" type="submit">저장하고 들어가기</button>
   </form>
 
-  <!-- 로그인은 됐지만 아직 팀에 등록되지 않은 계정 -->
-  <form class="gate__card" id="joinForm" hidden>
-    <div class="gate__brand"><span class="brand__dot" aria-hidden="true"></span><span>팀 가입 코드 입력</span></div>
-    <p class="gate__desc" id="joWho"></p>
-    <label class="field"><span class="field__label">이름</span>
-      <input class="input" id="joName" type="text" maxlength="30" autocomplete="name" required></label>
-    <label class="field" style="margin-top:10px"><span class="field__label">팀 가입 코드</span>
-      <input class="input" id="joCode" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" required></label>
-    <div class="modal__error" id="joError"></div>
-    <button class="btn btn--primary gate__submit" id="btnJoin" type="submit">등록하고 들어가기</button>
-    <div class="gate__links"><button type="button" class="gate__link" id="joLogout">다른 계정으로 로그인</button></div>
-  </form>
 </div>
 
 <header class="topbar" id="topbar" hidden>
@@ -1683,13 +1667,24 @@
   <div class="modal__foot"><button class="btn" type="button" id="courseClose">닫기</button></div>
 </dialog>
 
+<!-- 더보기 → 운영진 (staff.js · migration-047) — 사용 중지 · 다시 사용은 원장 계정 화면에만 -->
+<dialog class="modal modal--wide" id="staffModal">
+  <div class="modal__head">
+    <h2 class="modal__title">운영진</h2>
+    <p class="modal__desc" id="staffDesc"></p>
+  </div>
+  <div class="modal__body"><div id="staffList"></div></div>
+  <div class="modal__foot"><div class="spacer"></div><button class="btn" type="button" id="staffClose">닫기</button></div>
+</dialog>
+
 <dialog class="modal sheet" id="moreMenu">
   <div class="modal__head"><h2 class="modal__title">더보기</h2></div>
   <div class="modal__body sheet__list">
     <button class="btn sheet__btn" role="tab" id="tab-notice" aria-controls="panel-notice" aria-selected="false"><span>반 공지</span><span class="sheet__hint">반 단톡방 공지 올리기</span></button>
     <button class="btn sheet__btn" type="button" data-more="exams"><span>D-day 시험 등록</span><span class="sheet__hint">학생·학부모 화면 위에 '수능 D-21'처럼 띄울 시험을 등록합니다</span></button>
     <button class="btn sheet__btn" type="button" data-more="course"><span>과정 관리</span><span class="sheet__hint">여러 반이 같은 회차를 요일만 다르게 듣는 과정 · 담당 조교</span></button>
-    <button class="btn sheet__btn" type="button" data-more="settings"><span>설정</span><span class="sheet__hint">결석 기준 · 직원 관리 (알림톡 · 문자는 「문자 발송」 → 연결 상태)</span></button>
+    <button class="btn sheet__btn" type="button" data-more="staff"><span>운영진</span><span class="sheet__hint">코치룸에 들어온 사람 · 번호 뒤 4자리 · 마지막 접속</span></button>
+    <button class="btn sheet__btn" type="button" data-more="settings"><span>설정</span><span class="sheet__hint">결석 기준 · 과제 기준 (알림톡 · 문자는 「문자 발송」 → 연결 상태)</span></button>
     <a class="btn sheet__btn" href="../guide/" target="_blank" rel="noopener" data-more="guide"><span>사용 설명서</span><span class="sheet__hint">새 창</span></a>
   </div>
   <div class="modal__foot"><div class="spacer"></div><button class="btn" type="button" id="moreMenuClose">닫기</button></div>
@@ -2165,8 +2160,6 @@
       <!-- 카카오 알림톡 · 문자 설정은 「문자 발송」 → 연결 상태로 옮겼다 (20261031m) -->
       <p class="field__hint td-set-sms">카카오 알림톡 · 문자 설정(키 · 단가 · 내 시험 번호)은 「문자 발송」 → 연결 상태에 있습니다.
         <button class="btn btn--sm" type="button" id="tdSetSmsGo">연결 상태 열기</button></p>
-      <!-- 직원 관리 (staff.js) -->
-      <div id="staffAdmin" hidden></div>
     </div>
     <div class="modal__foot">
       <div class="spacer"></div>
@@ -2252,58 +2245,58 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
 <!-- config.js 와 brand.js 가 먼저 와야 한다. 나머지가 이 값을 읽는다. -->
-<script src="../assets/config.js?v=20261031t"></script>
-<script src="../assets/brand.js?v=20261031t"></script>
-<script src="../assets/lesson.js?v=20261031t"></script>
-<script src="supabase.js?v=20261031t"></script>
-<script src="db.js?v=20261031t"></script>
-<script src="store.js?v=20261031t"></script>
-<script src="report.js?v=20261031t"></script>
-<script src="aipolish.js?v=20261031t"></script>
-<script src="app.js?v=20261031t"></script>
-<script src="import.js?v=20261031t"></script>
-<script src="appfetch.js?v=20261031t"></script>
-<script src="profile.js?v=20261031t"></script>
-<script src="course.js?v=20261031t"></script>
-<script src="write.js?v=20261031t"></script>
-<script src="publish.js?v=20261031t"></script>
-<script src="send.js?v=20261031t"></script>
-<script src="kakao.js?v=20261031t"></script>
-<script src="sms.js?v=20261031t"></script>
-<script src="contacts.js?v=20261031t"></script>
-<script src="notice.js?v=20261031t"></script>
-<script src="tb.js?v=20261031t"></script>
-<script src="tb-dash.js?v=20261031t"></script>
-<script src="tb-issue.js?v=20261031t"></script>
-<script src="tb-stock.js?v=20261031t"></script>
-<script src="tb-bill.js?v=20261031t"></script>
-<script src="../assets/dday.js?v=20261031t"></script>
-<script src="../assets/app-week.js?v=20261031t"></script>
-<script src="card.js?v=20261031t"></script>
-<script src="exams.js?v=20261031t"></script>
-<script src="photo.js?v=20261031t"></script>
-<script src="applink.js?v=20261031t"></script>
-<script src="skips.js?v=20261031t"></script>
-<script src="reviewnote.js?v=20261031t"></script>
-<script src="hwfix.js?v=20261031t"></script>
-<script src="attend.js?v=20261031t"></script>
-<script src="attbook.js?v=20261031t"></script>
-<script src="quicknote.js?v=20261031t"></script>
-<script src="today.js?v=20261031t"></script>
-<script src="staff.js?v=20261031t"></script>
-<script src="classes.js?v=20261031t"></script>
-<script src="weekly.js?v=20261031t"></script>
-<script src="filethumb.js?v=20261031t"></script>
-<script src="ytbm.js?v=20261031t"></script>
-<script src="summary.js?v=20261031t"></script>
-<script src="weeks.js?v=20261031t"></script>
-<script src="../assets/photos.js?v=20261031t"></script>
-<script src="review.js?v=20261031t"></script>
-<script src="draftguard.js?v=20261031t"></script>
-<script src="preview.js?v=20261031t"></script>
-<script src="rtabs.js?v=20261031t"></script>
-<script src="nav.js?v=20261031t"></script>
-<script src="sync.js?v=20261031t"></script>
-<script src="auth.js?v=20261031t"></script>
+<script src="../assets/config.js?v=20261031u"></script>
+<script src="../assets/brand.js?v=20261031u"></script>
+<script src="../assets/lesson.js?v=20261031u"></script>
+<script src="supabase.js?v=20261031u"></script>
+<script src="db.js?v=20261031u"></script>
+<script src="store.js?v=20261031u"></script>
+<script src="report.js?v=20261031u"></script>
+<script src="aipolish.js?v=20261031u"></script>
+<script src="app.js?v=20261031u"></script>
+<script src="import.js?v=20261031u"></script>
+<script src="appfetch.js?v=20261031u"></script>
+<script src="profile.js?v=20261031u"></script>
+<script src="course.js?v=20261031u"></script>
+<script src="write.js?v=20261031u"></script>
+<script src="publish.js?v=20261031u"></script>
+<script src="send.js?v=20261031u"></script>
+<script src="kakao.js?v=20261031u"></script>
+<script src="sms.js?v=20261031u"></script>
+<script src="contacts.js?v=20261031u"></script>
+<script src="notice.js?v=20261031u"></script>
+<script src="tb.js?v=20261031u"></script>
+<script src="tb-dash.js?v=20261031u"></script>
+<script src="tb-issue.js?v=20261031u"></script>
+<script src="tb-stock.js?v=20261031u"></script>
+<script src="tb-bill.js?v=20261031u"></script>
+<script src="../assets/dday.js?v=20261031u"></script>
+<script src="../assets/app-week.js?v=20261031u"></script>
+<script src="card.js?v=20261031u"></script>
+<script src="exams.js?v=20261031u"></script>
+<script src="photo.js?v=20261031u"></script>
+<script src="applink.js?v=20261031u"></script>
+<script src="skips.js?v=20261031u"></script>
+<script src="reviewnote.js?v=20261031u"></script>
+<script src="hwfix.js?v=20261031u"></script>
+<script src="attend.js?v=20261031u"></script>
+<script src="attbook.js?v=20261031u"></script>
+<script src="quicknote.js?v=20261031u"></script>
+<script src="today.js?v=20261031u"></script>
+<script src="staff.js?v=20261031u"></script>
+<script src="classes.js?v=20261031u"></script>
+<script src="weekly.js?v=20261031u"></script>
+<script src="filethumb.js?v=20261031u"></script>
+<script src="ytbm.js?v=20261031u"></script>
+<script src="summary.js?v=20261031u"></script>
+<script src="weeks.js?v=20261031u"></script>
+<script src="../assets/photos.js?v=20261031u"></script>
+<script src="review.js?v=20261031u"></script>
+<script src="draftguard.js?v=20261031u"></script>
+<script src="preview.js?v=20261031u"></script>
+<script src="rtabs.js?v=20261031u"></script>
+<script src="nav.js?v=20261031u"></script>
+<script src="sync.js?v=20261031u"></script>
+<script src="auth.js?v=20261031u"></script>
 </body>
 </html>
