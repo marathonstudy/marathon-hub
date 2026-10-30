@@ -1242,7 +1242,7 @@
           linesHtml(c, chips) +
           classWhen(c) +
           attHtml(c.name, '') +
-          (window.Notes ? Notes.cardHtml(c) : '') +          /* 필기 QR · 필기 미제출 · 끝 시각 안내 (notes.js · 20261031w) */
+          (window.Notes ? Notes.cardHtml(c) : '') +          /* 수업 시각 [바꾸기] · 필기 미제출(끝나기 n분 전부터) (notes.js · 20261101f) */
         '</div>' +
         '<div class="tdc-btns">' +
           (c.name === '(반 없음)' || !n ? '' : '<button type="button" class="btn btn--sm tdc-sms" data-sms-cls="' + esc(c.name) + '" aria-label="' + esc(c.name) + ' 전체 문자 발송">전체 문자 발송</button>') +
@@ -1750,6 +1750,8 @@
 
   /* 뒤로가기 · 새로고침 (nav.js) — 펼친 반 목록 */
   window.TodayView = {
+    /* 반 카드 한 장의 값 — 수업 시각 [바꾸기] 를 그 자리에서 다시 그릴 때 (notes.js · 20261101f) */
+    classCard: function (n) { return (st.classes || []).find(function (c) { return c.name === n; }) || null; },
     /* 레포트 발송 → 3 발송 · 문자 보내기도 같은 반 순서 — 오늘 수업 → 가까운 날 → 같은 날은 이름 순 → 수업일 미정 맨 아래 */
     orderClasses: function (names) {
       var out = names.map(function (n) { return { name: n, next: n === '(반 없음)' ? null : nextLesson(n) }; })

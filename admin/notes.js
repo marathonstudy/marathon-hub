@@ -1,12 +1,13 @@
 /* ============================================================
-   notes.js — 필기 QR · 필기 미제출 · 지금 다시 보내기 · 문의 연락처 (20261031w · migration-049 · 함수 note-remind)
+   notes.js — 반 카드 수업 시각 · 필기 미제출 · 지금 다시 보내기 · 문의 연락처 (20261031w · 20261101f · migration-049 · 053 · 함수 note-remind)
 
-   「오늘」 반 카드 (수업 당일)
-     · [필기 QR 띄우기] — 그 반 전용 QR 을 화면 가득 (학생이 찍으면 /s/?note=반 → 로그인돼 있으면 바로, 아니면 이름 + 8자리 로그인 뒤
-       러닝노트 「내 필기」 오늘 칸 — 사진 여러 장 · 카메라 바로 찍기). QR 화면에는 「지금 제출 n/전체」만 (학생 이름은 안 보임) · 10초마다
-     · 「필기 미제출 n명」 — 누르면 이름(결석 · 번호 없음 표시) · [지금 다시 보내기](안 낸 · 결석 아닌 · 번호 있는 학생 본인에게만)
-     · 수업 끝 시각이 비어 있는 반은 작게 「수업 끝 시각을 넣으면 필기 알림을 쓸 수 있어요」
-   운영진 문자의 「QR 띄우기」 링크(admin/#qr=반)로 들어오면 그 반 QR 을 바로 띄운다
+   「오늘」 반 카드
+     · 「수업 토 18:30~22:00 · 필기 문자 21:55 켜짐 [바꾸기]」 한 줄 — [바꾸기]를 누르면 그 자리에서
+       시작 · 끝 시각 · 필기 문자 켜기/끄기 · 끝나기 몇 분 전(기본 5분) · 종강일을 고치고 저장 (class_meta_set · 반 관리 → 수업 설정과 같은 값)
+       시각이 비어 있으면 눈에 띄는 [수업 시각 넣기] (보라 테두리)
+     · 「필기 미제출 n명」 — 수업 날 · 끝나기 n분 전(기본 5분)부터 그날 밤까지만 (수업 시작 전에는 안 보임)
+       누르면 이름(결석 · 번호 없음 표시) · [지금 다시 보내기](안 낸 · 결석 아닌 · 번호 있는 학생 본인에게만)
+     · 필기 QR 화면은 없앴다 (20261101f) — 학생은 문자의 링크나 러닝노트 「내 필기」로 올린다
    [설정] 「문의 연락처(카카오채널 링크)」 — 러닝노트 레포트 맨 아래 [문의하기] 버튼 (비우면 버튼 없이 문구만)
    ============================================================ */
 
@@ -36,17 +37,92 @@
     }, function () { return null; });
   }
 
-  /* 반 카드 한 줄 (today.js classCardHtml 이 부른다) — 수업 당일만 QR · 미제출 · 끝 시각이 없으면 안내 */
+  /* ---------- 수업 시각 한 줄 · 그 자리에서 바꾸기 ---------- */
+  var DOWS = ['일', '월', '화', '수', '목', '금', '토'];
+  var editing = {};
+  function hm2min(s) { var m = /^(\d{1,2}):(\d{2})/.exec(s || ''); return m ? (+m[1]) * 60 + (+m[2]) : null; }
+  function min2hm(n) { n = ((n % 1440) + 1440) % 1440; return String(Math.floor(n / 60)).padStart(2, '0') + ':' + String(n % 60).padStart(2, '0'); }
+  function mdOf(iso) { return iso ? (+iso.slice(5, 7)) + '/' + (+iso.slice(8, 10)) : ''; }
+  function dowOf(cls) { var s = Store.schedOf(cls); return s && s.dow != null && s.dow !== '' ? DOWS[+s.dow] || '' : ''; }
+  /* 필기 문자 보내는 시각 — 끝 시각 − n분 */
+  function remindAt(m) { var e = hm2min(m && m.end); return e == null ? '' : min2hm(e - (m.min || 5)); }
+  /* 지금 (한국 시각 · 분) */
+  function nowMin() { var d = new Date(Date.now() + 9 * 3600000); return d.getUTCHours() * 60 + d.getUTCMinutes(); }
+  /* 「필기 미제출」을 보일 때 — 수업 날 · 끝나기 n분 전부터 그날 밤까지 (끝 시각이 없으면 안 보임) */
+  function showMissing(c, m) {
+    if (!(c.next && c.next.dday === 0) || !m || !m.end) return false;
+    var e = hm2min(m.end);
+    return nowMin() >= e - (m.min || 5);
+  }
+  function timeLine(c, m) {
+    var has = !!(m && m.start && m.end);
+    if (!has) {
+      return '<div class="tdc-time tdc-time--empty"><button type="button" class="btn btn--sm tdc-time__add" data-note-edit="' + esc(c.name) + '">수업 시각 넣기</button>' +
+        '<span class="muted-note">넣으면 필기 문자를 쓸 수 있어요</span></div>';
+    }
+    var d = dowOf(c.name);
+    return '<div class="tdc-time"><span class="tdc-time__t num">수업 ' + (d ? esc(d) + ' ' : '') + esc(m.start + '~' + m.end) + '</span>' +
+      '<span class="tdc-time__rm' + (m.remind ? ' is-on' : '') + '"> · 필기 문자 ' + (m.remind ? esc(remindAt(m)) + ' 켜짐' : '꺼짐') + '</span>' +
+      '<button type="button" class="tdc-time__chg" data-note-edit="' + esc(c.name) + '">바꾸기</button></div>';
+  }
+  function editHtml(c, m) {
+    m = m || {};
+    var k = esc(c.name);
+    return '<div class="tdc-tedit" data-note-form="' + k + '">' +
+      '<div class="tdc-tedit__row">' +
+        '<label class="tdc-tedit__f"><span>시작</span><input type="time" class="input" data-tf="start" value="' + esc(m.start || '') + '" step="300"></label>' +
+        '<label class="tdc-tedit__f"><span>끝</span><input type="time" class="input" data-tf="end" value="' + esc(m.end || '') + '" step="300"></label>' +
+      '</div>' +
+      '<div class="tdc-tedit__row">' +
+        '<label class="tdc-tedit__chk"><input type="checkbox" data-tf="remind"' + (m.remind || !m.end ? ' checked' : '') + '> 필기 문자 켜기</label>' +
+        '<label class="tdc-tedit__f tdc-tedit__f--min"><span>끝나기</span><input type="number" class="input" data-tf="min" inputmode="numeric" min="1" max="60" value="' + esc(m.min || 5) + '"><span>분 전</span></label>' +
+      '</div>' +
+      '<label class="tdc-tedit__f"><span>종강일</span><input type="date" class="input" data-tf="endOn" value="' + esc(m.endOn || '') + '"></label>' +
+      '<p class="tdc-tedit__err" data-tf="err" role="alert"></p>' +
+      '<div class="tdc-tedit__foot"><button type="button" class="btn btn--sm" data-note-cancel="' + k + '">취소</button>' +
+        '<button type="button" class="btn btn--sm btn--primary" data-note-save="' + k + '">저장</button></div>' +
+    '</div>';
+  }
+  function saveTime(cls, form) {
+    var g = function (n) { return form.querySelector('[data-tf="' + n + '"]'); };
+    var m0 = Store.metaOf(cls) || {};
+    var args = { p_class: cls, p_start: g('start').value || '', p_end: g('end').value || '', p_end_on: g('endOn').value || null,
+                 p_staff: m0.staff || [], p_remind: g('remind').checked, p_min: parseInt(g('min').value, 10) || 5 };
+    var err = g('err');
+    if ((args.p_start && !args.p_end) || (!args.p_start && args.p_end)) { err.textContent = '시작 · 끝 시각을 둘 다 넣어 주세요.'; return Promise.resolve(false); }
+    if (args.p_remind && !args.p_end) { err.textContent = '필기 문자를 켜려면 수업 끝 시각을 넣어 주세요.'; return Promise.resolve(false); }
+    if (args.p_start && args.p_end && hm2min(args.p_end) <= hm2min(args.p_start)) { err.textContent = '끝 시각은 시작 시각보다 뒤여야 합니다.'; return Promise.resolve(false); }
+    if (args.p_min < 1 || args.p_min > 60) { err.textContent = '「끝나기 몇 분 전」은 1~60분으로 정해 주세요.'; return Promise.resolve(false); }
+    var btn = form.querySelector('[data-note-save]');
+    btn.disabled = true;
+    return Promise.resolve(sb().rpc('class_meta_set', args)).then(function (r) {
+      btn.disabled = false;
+      if (r.error) { err.textContent = missingFn(r.error) ? 'migration-049 SQL 을 먼저 실행해 주세요.' : r.error.message; return false; }
+      Store.setMetaLocal(cls, { start: args.p_start, end: args.p_end, endOn: args.p_end_on || '', staff: (r.data && r.data.staff) || args.p_staff, remind: args.p_remind, min: args.p_min });
+      delete editing[cls];
+      toast(cls + ' 수업 시각을 저장했습니다' + (args.p_remind ? ' · 필기 문자 ' + remindAt({ end: args.p_end, min: args.p_min }) : ''), 'good');
+      window.dispatchEvent(new CustomEvent('jt:roster-changed'));
+      return true;
+    }, function (e) { btn.disabled = false; err.textContent = (e && e.message) || '저장하지 못했습니다'; return false; });
+  }
+  function repaintCard(cls) {
+    var box = document.querySelector('[data-note-box="' + cssq(cls) + '"]');
+    if (!box || !window.TodayView || !TodayView.classCard) { window.dispatchEvent(new CustomEvent('jt:roster-changed')); return; }
+    box.outerHTML = cardHtml(TodayView.classCard(cls));
+    paint();
+  }
+
+  /* 반 카드 (today.js classCardHtml 이 부른다) — 수업 시각 한 줄 · 수업 날 끝나기 n분 전부터 필기 미제출 */
   function cardHtml(c) {
     if (!c || c.name === '(반 없음)' || !c.rows || !c.rows.length) return '';
-    var m = Store.metaOf(c.name), lesson = !!(c.next && c.next.dday === 0);
-    var hint = !m || !m.end ? '<p class="tdc-note-hint">수업 끝 시각을 넣으면 필기 알림을 쓸 수 있어요 <span class="muted-note">(반 관리 → 수업 설정)</span></p>' : '';
-    if (!lesson) return hint;
-    return '<div class="tdc-note" data-note-cls="' + esc(c.name) + '">' +
-        '<button type="button" class="btn btn--sm tdc-note__qr" data-note-qr="' + esc(c.name) + '">필기 QR 띄우기</button>' +
-        '<span class="tdc-note__st" data-note-st="' + esc(c.name) + '">' + stHtml(c.name) + '</span>' +
-        (m && m.end ? '<span class="muted-note tdc-note__rm">' + (m.remind ? '필기 알림 ' + esc(m.end) + ' ' + m.min + '분 전' : '필기 알림 꺼짐') + '</span>' : '') +
-      '</div>' + (open[c.name] ? missHtml(c.name) : '') + hint;
+    var m = Store.metaOf(c.name);
+    var html = '<div class="tdc-notebox" data-note-box="' + esc(c.name) + '">' + (editing[c.name] ? editHtml(c, m) : timeLine(c, m));
+    if (showMissing(c, m)) {
+      html += '<div class="tdc-note" data-note-cls="' + esc(c.name) + '">' +
+          '<span class="tdc-note__st" data-note-st="' + esc(c.name) + '">' + stHtml(c.name) + '</span>' +
+        '</div>' + (open[c.name] ? missHtml(c.name) : '');
+    }
+    return html + '</div>';
   }
   function stHtml(cls) {
     var v = stat[cls] && stat[cls].v;
@@ -94,50 +170,6 @@
     });
   }
 
-  /* ---------- 필기 QR — 화면 가득 · 「지금 제출 n/전체」만 ---------- */
-  var QR_LIB = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js';
-  var qrLib = null, qrTimer = null, qrCls = '';
-  function libLoad() {
-    if (window.qrcode) return Promise.resolve(window.qrcode);
-    if (qrLib) return qrLib;
-    qrLib = new Promise(function (res, rej) {
-      var s = document.createElement('script');
-      s.src = QR_LIB; s.async = true;
-      s.onload = function () { window.qrcode ? res(window.qrcode) : rej(new Error('qr')); };
-      s.onerror = function () { qrLib = null; rej(new Error('qr')); };
-      document.head.appendChild(s);
-    });
-    return qrLib;
-  }
-  function qrUrl(cls) { return CONFIG.siteUrl + '/s/?note=' + encodeURIComponent(cls); }
-  function openQr(cls) {
-    qrCls = cls;
-    var m = $('#noteQrModal');
-    $('#noteQrTitle').textContent = cls + ' · 오늘 수업 필기';
-    $('#noteQrCount').textContent = '지금 제출 —';
-    $('#noteQrUrl').textContent = qrUrl(cls);
-    $('#noteQrBox').innerHTML = '<p class="muted-note">QR 만드는 중…</p>';
-    if (!m.open) m.showModal();
-    libLoad().then(function (qrcode) {
-      var q = qrcode(0, 'M');
-      q.addData(qrUrl(cls));
-      q.make();
-      $('#noteQrBox').innerHTML = q.createSvgTag({ cellSize: 8, margin: 2, scalable: true });
-    }).catch(function () {
-      $('#noteQrBox').innerHTML = '<p class="panel__hint">QR 을 만들지 못했습니다 (인터넷 연결 확인). 아래 주소를 화면에 보여 주세요.</p>';
-    });
-    count();
-    clearInterval(qrTimer);
-    qrTimer = setInterval(count, 10000);
-  }
-  function count() {
-    if (!qrCls) return;
-    load(qrCls, true).then(function (v) {
-      $('#noteQrCount').textContent = v && v.total ? '지금 제출 ' + v.done + '/' + v.total : '지금 제출 —';
-    });
-  }
-  function closeQr() { clearInterval(qrTimer); qrTimer = null; qrCls = ''; paint(); }
-
   /* ---------- 문의 연락처 (설정 창) ---------- */
   function loadContact() {
     var inp = $('#tdSetContact');
@@ -155,8 +187,12 @@
   }
 
   document.addEventListener('click', function (e) {
-    var q = e.target.closest('[data-note-qr]');
-    if (q) { openQr(q.dataset.noteQr); return; }
+    var ed = e.target.closest('[data-note-edit]');
+    if (ed) { editing[ed.dataset.noteEdit] = true; repaintCard(ed.dataset.noteEdit); var f0 = document.querySelector('[data-note-form="' + cssq(ed.dataset.noteEdit) + '"] [data-tf="start"]'); if (f0) try { f0.focus(); } catch (x) {} return; }
+    var cc = e.target.closest('[data-note-cancel]');
+    if (cc) { delete editing[cc.dataset.noteCancel]; repaintCard(cc.dataset.noteCancel); return; }
+    var sv = e.target.closest('[data-note-save]');
+    if (sv) { var form = sv.closest('[data-note-form]'); saveTime(sv.dataset.noteSave, form); return; }
     var mi = e.target.closest('[data-note-miss]');
     if (mi) {
       var cls = mi.dataset.noteMiss;
@@ -170,21 +206,9 @@
     }
     var sn = e.target.closest('[data-note-send]');
     if (sn) { sendNow(sn.dataset.noteSend); return; }
-    if (e.target.closest('#noteQrClose')) { $('#noteQrModal').close(); return; }
     if (e.target.closest('#tdSetContactSave')) saveContact();
   });
-  $('#noteQrModal').addEventListener('close', closeQr);
   $('#tdSettingsBtn').addEventListener('click', loadContact);
 
-  /* 운영진 문자의 「QR 띄우기」 링크 — admin/#qr=반 */
-  function fromHash() {
-    var m = /(?:^#|&)qr=([^&]+)/.exec(location.hash || '');
-    if (!m) return;
-    var cls = decodeURIComponent(m[1]);
-    try { history.replaceState(null, '', location.pathname); } catch (x) {}
-    if (cls) setTimeout(function () { openQr(cls); }, 300);
-  }
-  window.addEventListener('jt:loaded', fromHash);
-
-  window.Notes = { cardHtml: cardHtml, paint: paint, openQr: openQr, qrUrl: qrUrl, status: load };
+  window.Notes = { cardHtml: cardHtml, paint: paint, status: load, showMissing: showMissing, remindAt: remindAt, save: saveTime };
 })();
