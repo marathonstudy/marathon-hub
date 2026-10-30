@@ -3671,3 +3671,14 @@ textarea.aip-text--new:focus { outline: 2px solid #B9AEF0; outline-offset: 1px; 
 .start-line .gate__link { min-height: 40px; }
 .imp-start { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin: 8px 0; padding: 8px 10px; border-radius: 10px; background: #F7F8FB; font-size: 13px; }
 .imp-start__b { min-height: 40px; }
+
+/* 상담 카드 맨 아래 퇴원 처리 · 반 카드 「퇴원 n명」 (card.js · today.js · 20261101c) */
+.cd-leave { border-top: 1px dashed #E4E6EE; padding-top: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.cd-leave__btn { appearance: none; font: inherit; font-size: 12.5px; font-weight: 700; color: #8A8FA6; background: #F6F7FA; border: 1px solid #D9DCE6; border-radius: 999px; padding: 0 12px; min-height: 36px; cursor: pointer; }
+.cd-leave__form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 12px; }
+.cd-leave__t { margin: 0; font-size: 13.5px; font-weight: 700; color: var(--ink-mid); }
+.tdc-left { margin-top: 8px; padding: 6px 2px; border-top: 1px dashed #E4E6EE; }
+.tdc-left > summary { cursor: pointer; font-size: 12.5px; font-weight: 700; color: var(--ink-light); padding: 6px 0; }
+.tdc-left__list { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 0; }
+.tdc-left__nm { appearance: none; font: inherit; font-size: 13px; font-weight: 700; color: var(--ink-mid); background: #fff; border: 1px solid #E1E3EC; border-radius: 8px; padding: 0 10px; min-height: 36px; cursor: pointer; }
+.tdc-left__nm small { font-weight: 500; color: var(--ink-light); }

@@ -1238,8 +1238,17 @@
         '</div>' +
       '</div>' +
       (n ? toggleBar(c.name, n, open, c) : '') +
-      (open ? '<div class="tdc-list">' + sortRows(rows, c).map(function (s) { return studentRow(s, c); }).join('') + '</div>' : '') +
+      (open ? '<div class="tdc-list">' + sortRows(rows, c).map(function (s) { return studentRow(s, c); }).join('') + leftHtml(c.name) + '</div>' : '') +
     '</div>';
+  }
+  /* 반 카드 학생 목록 맨 아래 — 퇴원한 학생(퇴원일이 지남 · 퇴원 표시 아님) 접어 둠 · 이름 = 상담 카드([다시 다니는 중으로]) · 20261101c */
+  function leftHtml(cls) {
+    var t = DDay.today();
+    var list = Store.getStudents().filter(function (s) { return (s.className || '').trim() === cls && !s.archived && s.leftOn && s.leftOn < t; }).sort(byName);
+    if (!list.length) return '';
+    return '<details class="tdc-left"><summary>퇴원 ' + list.length + '명</summary><div class="tdc-left__list">' + list.map(function (s) {
+      return '<button type="button" class="tdc-left__nm" data-card="' + esc(s.id) + '">' + esc(s.name) + ' <small>' + esc(md(s.leftOn)) + ' 마지막 수업</small></button>';
+    }).join('') + '</div></details>';
   }
   /* 카드 차례 — 과정은 한 묶음 (가장 가까운 반 수업일 자리) · 담당 조교의 반(또는 그 반이 든 과정)이 맨 위 */
   function cardsOf(classes) {

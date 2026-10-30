@@ -687,6 +687,10 @@ delete from public.staff where email = '조교이메일@example.com';
 - `supabase/check-start-dates.sql` — 이미 등록된 학생 수강 시작일 분포 (읽기 전용)
 - admin/index.html — 탭 아이콘 · 홈 화면 아이콘 `assets/coach-icon.svg` · `coach-icon-180/192.png` (보라 동그라미 · 러닝노트 · 학생 입구는 그대로)
 
+### 5-60. 20261101c — 퇴원 처리를 상담 카드 맨 아래로 (SQL · 함수 배포 없음)
+- card.js — 「기본 정보」의 퇴원일 칸(students.left_on · migration-037)을 맨 아래 [퇴원 처리]로 옮김 (마지막 수업일 기본 = 가장 최근 지난 수업일) · 퇴원한 학생은 [다시 다니는 중으로]
+- today.js — 반 카드 학생 목록 맨 아래 「퇴원 n명」(접힘 · 이름 = 상담 카드) · 빠지는 곳은 그대로(Store.isActiveOn · inLesson · 서버 필기 알림 left_on)
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

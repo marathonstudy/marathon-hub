@@ -78,6 +78,7 @@
   var C = null;   /* 열린 카드 { sid, card, cardAt, studentAt, grades, notes, extra, filter, editing } */
 
   function open(sid, opts) {
+    leaveOpen = false;
     var s = student(sid);
     if (!s) return;
     C = {
@@ -158,7 +159,8 @@
       '<section class="cd-sec" id="cdMine"></section>' +
       '<section class="cd-sec" id="cdGrades-school"></section>' +
       '<section class="cd-sec" id="cdGrades-mock"></section>' +
-      '<section class="cd-sec" id="cdNotes"></section>';
+      '<section class="cd-sec" id="cdNotes"></section>' +
+      '<section class="cd-sec cd-leave" id="cdLeave"></section>';
     renderPinned();
     renderBasic();
     renderMine();
@@ -166,7 +168,50 @@
     renderGrades('school');
     renderGrades('mock');
     renderNotes();
+    renderLeave();
   }
+
+  /* ---------- 퇴원 처리 (맨 아래 · 20261101c) ----------
+     예전 「기본 정보」의 퇴원일 칸(students.left_on · migration-037)을 여기로 옮겼다 — 같은 칸이다
+     [퇴원 처리] → 마지막 수업일(기본 = 가장 최근 지난 수업일) · [퇴원 처리] 만 · 그 날짜 다음 수업부터
+       레포트 대상 · 챙길 학생 · 과제 평균 · 필기 알림 · 문자 대상 · 링크 연결 필요 수에서 빠진다 (지난 레포트 · 기록 · 러닝노트 링크는 그대로)
+     퇴원한 학생은 [다시 다니는 중으로] — 퇴원일을 비운다 */
+  var leaveOpen = false;
+  function renderLeave() {
+    var host = $('#cdLeave'), s = student(C.sid) || {};
+    if (!host) return;
+    if (s.leftOn) {
+      host.innerHTML = '<p class="cd-leave__t">퇴원 · 마지막 수업 ' + esc(Store.dateWithDow(s.leftOn)) + '</p>' +
+        '<button type="button" class="btn btn--sm" id="cdUnleave">다시 다니는 중으로</button>';
+      return;
+    }
+    var d0 = Store.defaultStartDate ? Store.defaultStartDate(s.className || '') : '';
+    host.innerHTML = leaveOpen
+      ? '<div class="cd-leave__form"><label class="field"><span class="field__label">마지막 수업일</span><input class="input" id="cdLeaveDate" type="date" value="' + esc(d0) + '"></label>' +
+        '<button type="button" class="btn btn--sm btn--danger" id="cdLeaveOk">퇴원 처리</button></div>'
+      : '<button type="button" class="cd-leave__btn" id="cdLeaveOpen">퇴원 처리</button>';
+  }
+  function setLeft(v, msg) {
+    var s = student(C.sid), sid = C.sid;
+    if (!s) return;
+    Store.upsertStudent(Object.assign({}, s, { leftOn: v || '' }));
+    Store.flushNow(Store.KEYS.students).then(function () {
+      if (C && C.sid === sid) { C.studentAt = Store.baseAt('students', sid); leaveOpen = false; renderLeave(); }
+      window.dispatchEvent(new CustomEvent('jt:roster-changed'));
+      toast(msg, 'good');
+    });
+  }
+  document.addEventListener('click', function (e) {
+    if (!C || !e.target.closest) return;
+    if (e.target.closest('#cdLeaveOpen')) { leaveOpen = true; renderLeave(); return; }
+    if (e.target.closest('#cdLeaveOk')) {
+      var v = ($('#cdLeaveDate') || {}).value || '';
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) { toast('마지막 수업일을 골라 주세요', 'bad'); return; }
+      setLeft(v, (student(C.sid) || {}).name + ' — 퇴원 처리했습니다 (' + Store.dateWithDow(v) + ' 다음 수업부터 빠짐)');
+      return;
+    }
+    if (e.target.closest('#cdUnleave')) setLeft('', (student(C.sid) || {}).name + ' — 다시 다니는 중으로 바꿨습니다');
+  });
 
   /* ---------- 다음 상담 때 확인 (맨 위 고정) ---------- */
 
@@ -234,8 +279,6 @@
         '<label class="field"><span class="field__label">학교</span><input class="input" id="cdSchool" value="' + esc(s.school) + '"></label>' +
         '<label class="field"><span class="field__label">학년</span><input class="input" id="cdGrade" list="gradeOptions" value="' + esc(s.grade) + '"></label>' +
         '<label class="field"><span class="field__label">수강 시작일</span><input class="input" id="cdStart" type="date" value="' + esc(c.start_date || (student(C.sid) || {}).startOn || '') + '"></label>' +
-        /* 퇴원일 — 그 날 뒤 수업부터 출석 체크 · 레포트 작성 · 발송 · 「오늘」 · 문자 대상에서 빠진다 · 지우면 다시 (20261031i · migration-037) */
-        '<label class="field"><span class="field__label">퇴원일 <span class="field__opt">넣으면 그 뒤 수업부터 빠짐 · 지우면 다시</span></span><input class="input" id="cdLeft" type="date" value="' + esc(s.leftOn || '') + '"></label>' +
         '<label class="field grid2__full"><span class="field__label">특이사항 <span class="field__opt">고정 메모 · 여러 줄</span></span>' +
           '<textarea class="textarea" id="cdNotesText" rows="3">' + esc(c.notes || '') + '</textarea></label>' +
       '</div>' +
@@ -252,7 +295,7 @@
     var name = $('#cdName').value.trim();
     if (!name) { toast('이름은 비울 수 없습니다', 'bad'); return; }
     /* 수강 시작일은 학생 줄(students.start_on · migration-044)에도 — 그 앞 수업 레포트에서 빠진다 (20261031q) */
-    var stud = { name: name, school: $('#cdSchool').value.trim(), grade: $('#cdGrade').value.trim(), leftOn: ($('#cdLeft') && $('#cdLeft').value) || '', startOn: $('#cdStart').value || s.startOn || '' };
+    var stud = { name: name, school: $('#cdSchool').value.trim(), grade: $('#cdGrade').value.trim(), leftOn: s.leftOn || '', startOn: $('#cdStart').value || s.startOn || '' };
     var stChanged = stud.name !== s.name || stud.school !== (s.school || '') || stud.grade !== (s.grade || '') || stud.leftOn !== (s.leftOn || '') || stud.startOn !== (s.startOn || '');
     var cardPatch = { start_date: $('#cdStart').value || null, notes: $('#cdNotesText').value.replace(/\s+$/, '') };
     var c = C.card || {};
