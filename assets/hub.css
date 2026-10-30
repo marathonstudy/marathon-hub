@@ -845,6 +845,8 @@ label.hub-btn { cursor: pointer; text-align: center; }
 .aw-hw--exempt { color: #9A9DB3; font-size: 10.5px; font-weight: 800; }
 .aw-lec--done { color: #2F8F6E; font-weight: 900; } .aw-lec--todo { color: #B4B8CC; }
 .aw-cell[class*="--future"] { color: #C9CCDC; background: #FAFAFD; }
+.aw-cell[class*="--today"] { color: #A3A7BB; background: #FAFAFD; font-size: 11px; font-weight: 700; box-shadow: inset 0 0 0 1px #E3E5EE; }   /* 오늘 — 마감 전 (20261031v) */
+.cal-cell--today { background: #fff; color: #8E92A8; box-shadow: inset 0 0 0 1px #D8DBE6; }
 .aw-cell[class*="--off"] { background: transparent; }
 .aw-cell.aw-wk { grid-row: span 2; align-self: stretch; height: auto; display: flex; align-items: center; justify-content: center; flex-direction: column;
   font-size: 11px; line-height: 1.15; font-weight: 700; letter-spacing: -0.04em; color: #ADAAC2; background: #F9F8FC; box-shadow: inset 0 0 0 1px #EEEDF5; }
@@ -1219,3 +1221,20 @@ html.rn-lock, html.rn-lock body { overflow: hidden; }
 .vd-kw { padding: 2px 9px; border-radius: 999px; background: #EFEBFF; color: #3A2799; font-size: 12.5px; font-weight: 700; max-width: 100%; overflow-wrap: anywhere; }
 .vd-find { display: block; margin: 0 0 12px; }
 .vd-find__in { width: 100%; box-sizing: border-box; min-height: 44px; padding: 8px 12px; border: 1px solid #D9D4F5; border-radius: 12px; font: inherit; font-size: 16px; background: #fff; }
+
+/* 과제 상세 「진행 중 · 다음 수업까지」 — 원형 없이 요일 칸 한 줄 · 작고 연하게 (20261031v) */
+.apg { background: #FBFBFE; border: 1px dashed #D9DCE8; box-shadow: none; }
+.apg-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 8px; }
+.apg-t { font-size: 14px; font-weight: 800; color: var(--ink-mid); }
+.apg-note { font-size: 12px; color: var(--ink-light); }
+.apg-row { display: grid; gap: 4px; }
+.apg-c { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; min-height: 52px; padding: 4px 0; border-radius: 8px; background: #F3F4F9; color: var(--ink-mid); }
+.apg-c b { font-size: 12.5px; color: var(--ink-mid); }
+.apg-c small { font-size: 10.5px; color: var(--ink-light); }
+.apg-c i { font-style: normal; font-size: 14px; line-height: 18px; min-height: 18px; }
+.apg-c--onTime i { color: #4A34B8; } .apg-c--late i { color: #C07A3E; } .apg-c--none i { color: #B4B8CC; }
+.apg-c--today i { font-size: 10.5px; font-weight: 700; color: #A3A7BB; }
+.apg-c--future { background: #FAFAFD; } .apg-c--off { background: transparent; box-shadow: inset 0 0 0 1px #EEF0F5; }
+.apg-c--wk { background: #F5F3FC; } .apg-c--wkDone i { color: #7B6CC4; font-weight: 900; }
+.apg-sum { margin-top: 8px; font-size: 12.5px; color: var(--ink-light); }
+@media (max-width: 380px) { .apg-c { min-height: 46px; } .apg-c i { font-size: 13px; } }

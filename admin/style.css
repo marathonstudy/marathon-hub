@@ -3026,6 +3026,8 @@ td .av--s { margin-right: 6px; }
 .hd-c--none   { background: #FDECEF; border-color: #F0B9C6; color: #9E1F3B; }
 .hd-c--off    { background: transparent; border-style: dashed; cursor: default; }
 .hd-c--future { background: #F6F7FA; color: #B3B7C6; }
+.hd-c--today { background: #F6F7FA; color: #9A9EB3; font-size: 11px; font-weight: 700; border-style: dashed; }   /* 오늘 — 마감 전 (20261031v) */
+.hd-l--today { color: #A7ABBE; font-size: 11px; font-weight: 700; }
 .hd-c--wk { flex-direction: column; gap: 2px; font-size: 11px; font-weight: 700; color: #6E7389; background: #F3F4F8; border-color: #E4E6EE; }
 .hd-c--wk.is-done { color: #135C3B; }
 .hd-c--wk b { font-size: 13px; }
@@ -3556,3 +3558,34 @@ textarea.aip-text--new:focus { outline: 2px solid #B9AEF0; outline-offset: 1px; 
 /* 레포트 발송 학생 줄 — 이름 아래 「마지막 상담」과 그 아래 과제 칸이 붙지 않게 (20261031t 점검) */
 .snd-row__line .qn-namebox { padding: 2px 0; }
 .snd-row__line + .snd-row__app { margin-top: 4px; }
+
+/* ============================================================
+   레포트 작성 — 테스트 상태 결석 · 미응시 · 응시 · 「따로」 (review.js · 20261031v) · 못 불러온 n명 다시 불러오기 (write.js)
+   ============================================================ */
+.fieldline--rv { flex-wrap: wrap; }
+.entry__rvst { flex: 1 1 100%; min-width: 0; }
+.rvst { display: flex; flex-direction: column; gap: 6px; min-width: 0; width: 100%; }
+.rvst-main { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; }
+.rvst-seg { display: inline-flex; border: 1px solid #D9DCE8; border-radius: 10px; overflow: hidden; background: #fff; }
+.rvst-b { appearance: none; border: 0; border-right: 1px solid #E4E6EE; background: transparent; font: inherit; font-size: 13px; font-weight: 700;
+  color: var(--ink-mid); min-height: 36px; min-width: 56px; padding: 0 10px; cursor: pointer; }
+.rvst-b:last-child { border-right: 0; }
+.rvst-b.is-on { background: #EEEAFD; color: #4A34B8; }
+.rvst-b--absent.is-on { background: #FDECEF; color: #9E1F3B; }
+.rvst-b--taken.is-on { background: #E6F6EE; color: #135C3B; }
+.rvst-b:disabled { opacity: .5; cursor: default; }
+.rvst-split { font-size: 11px; font-weight: 800; color: #7B6CC4; background: #F1EEFC; border-radius: 6px; padding: 1px 6px; }
+.rvst-hint { font-size: 12px; color: var(--ink-light); }
+.rvst-sep { appearance: none; border: 0; background: none; font: inherit; font-size: 12.5px; font-weight: 700; color: var(--indigo); cursor: pointer;
+  padding: 6px 2px; text-decoration: underline; text-underline-offset: 3px; }
+.rvst-each { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-radius: 10px; background: #F7F8FB; }
+.rvst-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; }
+.rvst-name { font-size: 12.5px; font-weight: 800; color: var(--ink-deep); min-width: 6.5em; }
+.rvst-score { font-size: 13px; font-weight: 700; color: #135C3B; }
+.rvst-done { font-size: 12.5px; color: #135C3B; font-weight: 700; }
+.ar-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin: 0 0 10px; padding: 9px 12px; border: 1px solid #F1CC99;
+  border-radius: 12px; background: #FFF8EE; font-size: 13px; }
+.ar-bar__btn { min-height: 38px; }
+.ar-bar__t { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: var(--ink-mid); }
+.ar-bar__msg { color: var(--ink-mid); line-height: 1.6; }
+@media (max-width: 420px) { .rvst-b { min-width: 0; flex: 1 1 auto; padding: 0 12px; } .rvst-seg { flex: 1 1 100%; } .ar-bar__btn { width: 100%; } }

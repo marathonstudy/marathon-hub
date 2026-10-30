@@ -19,6 +19,10 @@
    과제 수정 (20261031j · migration-038) — 조교가 고친 값을 앱 기록 위에 덮는다 (withFix). 앱 기록은 바꾸지 않는다
      fix = { 'YYYY-MM-DD': onTime | late | none | exempt } — exempt(면제)는 셈에서 뺀다 (제출 수 · 과제 있던 날 모두)
      코치룸은 hwfix.js 가, 러닝노트는 hub_hw_fix 로 받은 값을 덮는다 (「수정」 표시 · 사유는 코치룸에만)
+   오늘 (20261031v) — 앱 과제 · 강의 마감은 그날 밤 12시(한국 시간 · 복습테스트와 같다). 오늘은 마감 전이라
+     아직 안 냈으면 분모에 넣지 않고 칸에 연하게 「오늘」 (hw · lec 'today') · 오늘 이미 냈으면(강의를 다 봤으면) 넣는다.
+     예: 목 제출 · 오늘(금) 아직 → 1/1일 100%. compute · cumulative 를 쓰는 곳(러닝노트 · 레포트 · 전체 누적 · 과제 색 · 챙길 학생 · 반 평균)이 모두 같이
+     today 에는 꼭 진짜 오늘을 넘긴다 (어제를 넘기면 어제가 「오늘」로 보인다)
    신입생 (20261031q · migration-044) — data.startOn(수강 시작일)이 있으면 그 앞 날은 회색 「신입생」(hw · lec 'new')
      제출 수 · 과제 있던 날 · 누적 어디에도 세지 않는다. 기간 중간에 시작했으면 시작일부터만 (예: 2/2일) · 시작일 뒤 평일이 없으면 allNew
      그 수업 레포트 기간(D-7 ~ D-1)이 모두 시작 전이면 forLesson 의 newStudent — 「첫 수업입니다 · 다음 레포트부터 과제 기록이 보입니다」
@@ -28,7 +32,7 @@
   'use strict';
 
   var DOW = ['일', '월', '화', '수', '목', '금', '토'];
-  var LEGEND = '● 정시 제출 ◐ 늦게 제출 ○ 미제출 / ✓ 그날 강의 영상을 다 봄 – 아직 안 봄 / ' +
+  var LEGEND = '● 정시 제출 ◐ 늦게 제출 ○ 미제출 / ✓ 그날 강의 영상을 다 봄 – 아직 안 봄 / 오늘은 밤 12시 마감 전이라 아직 안 냈으면 「오늘」(세지 않음) / ' +
                '토 · 일은 주중 복습 날이라 제출 수에 넣지 않아요(앱에 제출하면 ✓). ' +
                '강의는 오늘까지 본 것을 기준으로 표시돼요. 지난 강의를 나중에 봐도 ✓로 바뀝니다.';
 
@@ -97,11 +101,14 @@
         days.push({ date: d, dow: DOW[new Date(d + 'T00:00:00Z').getUTCDay()], hw: wd ? 'wkDone' : 'wk', lec: 'wk', weekend: true });
         continue;
       }
-      var future = !!today && d > today;
+      var future = !!today && d > today, isToday = !!today && d === today;
       var hw = future ? 'future' : !c ? 'off' : (c.status === 'onTime' ? 'onTime' : c.status === 'late' ? 'late' : c.status === 'exempt' ? 'exempt' : 'none');
       var L = c && c.order ? lec[c.order] : null;
       var lv = future ? 'future' : !c || !c.order || !L ? 'off' : (L.videosTotal > 0 && L.videosDone >= L.videosTotal ? 'done' : 'todo');
-      if (hw !== 'off' && hw !== 'future' && hw !== 'exempt') { hwDays++; if (hw === 'onTime' || hw === 'late') hwDone++; if (hw === 'onTime') hwOnTime++; }
+      /* 오늘 — 마감 전 · 아직이면 세지 않는다 (냈으면 · 다 봤으면 센다) */
+      if (isToday && hw === 'none') hw = 'today';
+      if (isToday && lv === 'todo') lv = 'today';
+      if (hw !== 'off' && hw !== 'future' && hw !== 'exempt' && hw !== 'today') { hwDays++; if (hw === 'onTime' || hw === 'late') hwDone++; if (hw === 'onTime') hwOnTime++; }
       if (lv === 'done' || lv === 'todo') { lecDays++; if (lv === 'done') lecDone++; }
       days.push({ date: d, dow: DOW[new Date(d + 'T00:00:00Z').getUTCDay()], hw: hw, lec: lv });
     }
@@ -143,11 +150,15 @@
     var days = 0, done = 0, onTime = 0, lDays = 0, lDone = 0, start = valid(data.startOn) ? data.startOn : '';
     (data.calendar || []).forEach(function (c) {
       if (!c || !valid(c.date) || c.date > to || (today && c.date > today) || isWeekend(c.date) || c.status === 'exempt' || (start && c.date < start)) return;
-      days++;
-      if (c.status === 'onTime' || c.status === 'late') done++;
-      if (c.status === 'onTime') onTime++;
-      var L = c.order ? lec[c.order] : null;
-      if (L) { lDays++; if (L.videosTotal > 0 && L.videosDone >= L.videosTotal) lDone++; }
+      var sub = c.status === 'onTime' || c.status === 'late', isToday = !!today && c.date === today;
+      var L = c.order ? lec[c.order] : null, seen = !!L && L.videosTotal > 0 && L.videosDone >= L.videosTotal;
+      /* 오늘 — 마감 전이라 아직이면 세지 않는다 (20261031v) */
+      if (!(isToday && !sub)) {
+        days++;
+        if (sub) done++;
+        if (c.status === 'onTime') onTime++;
+      }
+      if (L && !(isToday && !seen)) { lDays++; if (seen) lDone++; }
     });
     var pct = function (a, b) { return b ? Math.round(a / b * 100) : 0; };
     return { hw: pct(done, days), onTime: pct(onTime, days), lec: lDays ? pct(lDone, lDays) : null, days: days };
@@ -171,10 +182,10 @@
   function tone(done, days) { var r = days ? done / days : 0; return r >= 1 ? 'ok' : r >= 0.5 ? 'mid' : r > 0 ? 'low' : 'zero'; }
   function hwRate(w) { return w && w.hwDays ? Math.round(w.hwDone / w.hwDays * 100) : null; }
 
-  var HW_MARK = { onTime: '●', late: '◐', none: '○', exempt: '면제', future: '·', off: '' };
-  var HW_TIP = { onTime: '정시 제출', late: '늦게 제출', none: '미제출', exempt: '면제(셈에서 뺌)', future: '아직', off: '과제 없음', wk: '주중 복습', wkDone: '주중 복습 · 제출함' };
-  var LEC_MARK = { done: '✓', todo: '–', future: '·', off: '' };
-  var LEC_TIP = { done: '강의 영상을 다 봄', todo: '아직 안 봄', future: '아직', off: '강의 없음' };
+  var HW_MARK = { onTime: '●', late: '◐', none: '○', exempt: '면제', future: '·', off: '', today: '오늘' };
+  var HW_TIP = { onTime: '정시 제출', late: '늦게 제출', none: '미제출', exempt: '면제(셈에서 뺌)', future: '아직', off: '과제 없음', wk: '주중 복습', wkDone: '주중 복습 · 제출함', today: '오늘 — 밤 12시 마감 전 (아직 세지 않음)' };
+  var LEC_MARK = { done: '✓', todo: '–', future: '·', off: '', today: '오늘' };
+  var LEC_TIP = { done: '강의 영상을 다 봄', todo: '아직 안 봄', future: '아직', off: '강의 없음', today: '오늘 — 아직 세지 않음' };
 
   function md(iso) { return (+iso.slice(5, 7)) + '/' + (+iso.slice(8, 10)); }
 
@@ -219,7 +230,7 @@
     '</div>';
   }
 
-  global.AppWeek = { compute: compute, tableHtml: tableHtml, hwRate: hwRate, tone: tone, LEGEND: LEGEND,
+  global.AppWeek = { compute: compute, tableHtml: tableHtml, hwRate: hwRate, tone: tone, LEGEND: LEGEND, HW_MARK: HW_MARK, HW_TIP: HW_TIP,
                      lastWeek: lastWeek, startOf: startOf, cumulative: cumulative, forLesson: forLesson,
                      isWeekend: isWeekend, subDaysOf: subDaysOf, withFix: withFix };
 

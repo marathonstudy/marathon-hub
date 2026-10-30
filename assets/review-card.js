@@ -75,7 +75,7 @@
   function absent(t) { return !t.submission && !!t.absent; }
   function absentBadge(t) {
     var r = (t.absent && t.absent.label) || '';
-    return '<span class="rv-badge rv-badge--abs">' + esc(r ? '미응시 · ' + r : '미응시') + '</span>';
+    return '<span class="rv-badge rv-badge--abs">' + esc(r === '응시' ? '응시' : r && r !== '미응시' ? '미응시 · ' + r : '미응시') + '</span>';
   }
   /* 아직 낼 시험 (안 냈고 미응시도 아닌 것) — hub.js 가 [복습테스트 입력하기]를 띄울지 본다 */
   function pendingOf(d) { return ((d && d.tests) || []).filter(function (t) { return !t.submission && !t.absent; }); }

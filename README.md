@@ -639,6 +639,14 @@ delete from public.staff where email = '조교이메일@example.com';
 3. (권장) Authentication → Sign In / Providers → Email → **Allow new users to sign up 끄기** — 이메일 가입은 더 이상 쓰지 않는다. 번호 로그인은 함수가 계정을 만들므로 꺼도 된다.
 - 코치룸 로그인 화면: 이름 · 휴대폰 번호(010 뺀 8자리) · [들어가기] / 아래 「다른 방법으로 로그인」(이메일) · 더보기 → 운영진
 
+### 5-53. 20261031v — 못 불러온 n명 다시 불러오기 · 테스트 결석 기본값 · 「오늘」 기준 · 과제 상세 두 덩어리 (migration-048-test-status.sql · 함수 배포 없음)
+1. Supabase SQL Editor 에서 `supabase/migration-048-test-status.sql` 실행 (047 다음 · 여러 번 실행해도 안전 · 확인 세 줄 모두 true).
+   - `review_absences.auto` · 사유 `none`(미응시) · `taken`(응시 · 점수 없음) · `review_default_absent`(마감 지난 수업 · 하나도 안 낸 · 표시 없는 학생만 결석) · `review_status_set` · 하나 내면 다른 시험 기본값 결석도 풀림
+- 작성 화면(write.js · today.js) — 목록 위 「못 불러온 n명 다시 불러오기」 · 「불러오는 중 3/8」 · 끝나면 「다 불러왔습니다」 또는 이름(이유) · 처음 열 때 한 번 저절로
+- 학생 카드 [결석] [미응시] [응시] (review.js) — 같이 바뀜 · [따로 정하기] · 「따로」 · 직접 고른 값은 덮지 않음 · 기본값 결석은 출결을 안 바꿈
+- app-week.js — 오늘(밤 12시 마감 전)은 아직이면 안 셈 · 냈으면 셈 · 칸 「오늘」 (today.js 진행 중 기간도 어제 대신 오늘 기준)
+- 러닝노트 hub.js — 과제 상세 「이 수업 과제 (L-7~L-1)」 · 「진행 중 · 다음 수업까지 (L~다음 수업 전날)」 · 맨 아래 전체 누적 · 달력 (L = 연 레포트 수업일 · 바로 열면 가장 최근 수업일)
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

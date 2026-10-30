@@ -668,8 +668,10 @@
                  esc(dd + '일 · 주중 복습' + (wkd ? ' · 제출함' : '')) + '"><b>' + dd + '</b><small>주중 복습' + (wkd ? ' ✓' : '') + '</small></span>';
         continue;
       }
-      cells += '<span class="cal-cell' + (info ? ' cal-cell--' + info.status : '') + (inR ? ' cal-cell--range' : '') + '"' +
-               (info ? ' title="' + esc(dd + '일 · ' + CAL_LABEL[info.status]) + '"' : '') + '>' + dd + '</span>';
+      /* 오늘 — 밤 12시 마감 전 · 아직 안 냈으면 「미제출」 대신 연하게 (20261031v) */
+      var stt = info ? (key === t && info.status === 'none' ? 'today' : info.status) : '';
+      cells += '<span class="cal-cell' + (stt ? ' cal-cell--' + stt : '') + (inR ? ' cal-cell--range' : '') + '"' +
+               (stt ? ' title="' + esc(dd + '일 · ' + CAL_LABEL[stt]) + '"' : '') + '>' + dd + '</span>';
     }
     return '<div class="cal">' +
         '<div class="cal-nav"><button type="button" class="cal-step" data-awb="' + id + '" data-cal-step="-1" aria-label="이전 달"' + (b.i > 0 ? '' : ' disabled') + '>◀</button>' +
@@ -709,9 +711,9 @@
         Math.round(Number(s.onTimeRate) || 0) + '% · 강의 ' + Math.round(Number(s.lectureRate) || 0) + '%</p>';
     var inner = '<h2 class="card-title">📱 ' + esc(opt.title || '과제 요약') + '</h2>' +
       (opt.sub ? '<p class="awb-sub">' + opt.sub + '</p>' : '') +
-      body + total +
+      body + (opt.noTotal ? '' : total) +
       (w ? AppWeek.tableHtml(w, { pending: !!opt.pending }) : '') +
-      (months.length ? '<div class="awb-cal"><div class="awb-cal__t">🗓️ 날짜별 제출</div><div class="awb-cal__m" data-awb-cal="' + id + '">' + calMonthHtml(id) + '</div></div>' : '');
+      (months.length && !opt.noCal ? '<div class="awb-cal"><div class="awb-cal__t">🗓️ 날짜별 제출</div><div class="awb-cal__m" data-awb-cal="' + id + '">' + calMonthHtml(id) + '</div></div>' : '');
     return opt.card === false ? '<div class="awb" id="' + id + '">' + inner + '</div>' : '<div class="card awb aw-card" id="' + id + '">' + inner + '</div>';
   }
   function periodTitle(label, from, to) { return '과제 요약 · ' + label + ' (' + Lesson.md(from, false) + '~' + Lesson.md(to, false) + ')'; }
@@ -739,6 +741,58 @@
     var host = document.querySelector('[data-awb-cal="' + b.dataset.awb + '"]');
     if (host) host.innerHTML = calMonthHtml(b.dataset.awb);
   });
+  /* ---------- 과제 상세 탭 — 레포트 수업일 L 기준 두 덩어리 (20261031v) ----------
+       「이 수업 과제 (L-7 ~ L-1)」 레포트 과제 칸과 같은 기간 · 숫자 (AppWeek.forLesson) — 원형 3개 · 요일 칸 · 정답률
+       「진행 중 · 다음 수업까지 (L ~ 다음 수업 전날)」 원형 없이 요일 칸 한 줄 · 「지금까지 n/n일 제출」(작고 연하게 · 다음 레포트에 반영)
+       L = 지금 열어 둔 레포트의 수업일 (지난 레포트를 열면 그 수업일) · 바로 열면 가장 최근 수업일(오늘 포함)
+       전체 누적(시작일부터) · 날짜별 제출 달력은 맨 아래 */
+  function latestLessonDate() {
+    var t = todayISO(), mon = mondayOf(t);
+    for (var k = 0; k < 9; k++) {
+      var L = lessonOf(plusDays(mon, -7 * k));
+      if (L && !L.canceled && L.date && L.date <= t) return L.date;
+    }
+    return '';
+  }
+  function appBaseDate(reports) {
+    if (RP.cur >= 0 && RP.cur !== RP.latest && RP.list[RP.cur]) { var ld = lessonDateOf(RP.list[RP.cur], RP.cur === RP.list.indexOf(RP.r) ? RP.data : null); if (ld) return ld; }
+    var L = latestLessonDate();
+    if (L) return L;
+    var rep = (reports || []).filter(function (r) { return r && r.week_start && !r.draft; })[0];
+    return rep ? lessonDateOf(rep, null) : '';
+  }
+  function nextPeriod(L) {
+    var nx = nextLessonAfter(L);
+    return { from: L, to: nx ? plusDays(nx.date, -1) : plusDays(L, 6), next: nx ? nx.date : '' };
+  }
+  /* 진행 중 덩어리 — 요일 칸 한 줄(과제) · 「지금까지 n/n일 제출」 · 아직 안 온 날은 비움 · 오늘은 「오늘」 */
+  function progressHtml(w, p) {
+    var t = todayISO(), live = p.from <= t && t <= p.to;
+    var head = (live ? '진행 중 · 다음 수업까지' : '다음 수업까지') + ' (' + Lesson.md(p.from, false) + '~' + Lesson.md(p.to, false) + ')';
+    var cells = w ? w.days.map(function (d) {
+      var v = d.weekend ? (d.hw === 'wkDone' ? 'wkDone' : 'wk') : d.hw;
+      var mark = d.hw === 'new' ? '신입' : d.weekend ? (d.hw === 'wkDone' ? '✓' : '') : v === 'future' ? '' : (AppWeek.HW_MARK[v] || '');
+      var tip = Lesson.md(d.date, false) + ' ' + (d.hw === 'new' ? '신입생' : AppWeek.HW_TIP[v] || '');
+      return '<span class="apg-c apg-c--' + esc(v) + (d.weekend ? ' apg-c--wk' : '') + '" title="' + esc(tip) + '"><b class="num">' + (+d.date.slice(8)) + '</b><small>' + d.dow + '</small><i>' + esc(mark) + '</i></span>';
+    }).join('') : '';
+    var sum = !w ? '' : w.allNew ? '신입생' : w.hwDays ? '지금까지 ' + w.hwDone + '/' + w.hwDays + '일 제출' : '아직 센 날이 없어요';
+    return '<div class="card apg" aria-label="' + esc(head) + '">' +
+      '<div class="apg-h"><span class="apg-t">' + esc(head) + '</span><span class="apg-note">다음 레포트에 반영돼요</span></div>' +
+      (cells ? '<div class="apg-row" style="grid-template-columns:repeat(' + w.days.length + ', minmax(0, 1fr))">' + cells + '</div>' : '') +
+      (sum ? '<p class="apg-sum num">' + esc(sum) + '</p>' : '') +
+    '</div>';
+  }
+  /* 맨 아래 — 전체 누적(시작일부터) · 날짜별 제출 달력 */
+  function apBottomHtml(d, range) {
+    var id = 'awb' + (++AWB.n), t = todayISO(), months = calMonths(d, t.slice(0, 7));
+    AWB.list[id] = { data: d, months: months, i: Math.max(0, months.indexOf(t.slice(0, 7))), range: range || null };
+    var tt = d && d.calendar && d.calendar.length ? AppWeek.cumulative(d, t, t) : null, s = (d && d.stats) || {};
+    var total = tt ? '과제 ' + tt.hw + '% · 정시 ' + tt.onTime + '% · 강의 ' + (tt.lec == null ? '—' : tt.lec + '%')
+      : '과제 ' + Math.round(Number(s.submissionRate) || 0) + '% · 정시 ' + Math.round(Number(s.onTimeRate) || 0) + '% · 강의 ' + Math.round(Number(s.lectureRate) || 0) + '%';
+    return '<div class="card awb aw-card ap-bottom" id="' + id + '"><p class="awb-total">전체 누적(시작일부터): ' + total + '</p>' +
+      (months.length ? '<div class="awb-cal"><div class="awb-cal__t">🗓️ 날짜별 제출</div><div class="awb-cal__m" data-awb-cal="' + id + '">' + calMonthHtml(id) + '</div></div>' : '') + '</div>';
+  }
+
   /* 과제 상세 탭의 진행 중 기간 — 가장 최근 공개 레포트 수업일 ~ 다음 수업일 전날 (레포트가 없으면 오늘 기준 다음 수업의 과제 기간) */
   function currentPeriod(rep, lessonDate) {
     var start = rep ? (lessonDate || rep.lesson_date || ((lessonOf(rep.week_start) || {}).date) || '') : '';
@@ -1262,11 +1316,12 @@
       }
 
       /* 과제 상세 (예전 「앱 과제」) — 처음 열 때 불러온다 */
-      var appLoaded = false;
+      var appLoaded = null;
       function openApp() {
-        if (appLoaded) return;
-        appLoaded = true;
-        renderApp(h.code, d.app || {}, d.reports || []);
+        var b = appBaseDate(d.reports || []);
+        if (appLoaded === b) return;
+        appLoaded = b;
+        renderApp(h.code, d.app || {}, d.reports || [], b);
       }
 
       /* 내 필기 (예전 「필기 노트」) — date 가 있으면 그 수업일 칸으로 */
@@ -1866,7 +1921,7 @@
            '</div>';
   }
 
-  var CAL_LABEL = { onTime: '정시 제출', late: '늦게 제출', none: '미제출', exempt: '면제' };
+  var CAL_LABEL = { onTime: '정시 제출', late: '늦게 제출', none: '미제출', exempt: '면제', today: '오늘 — 밤 12시 마감 전' };
 
   function categoriesHtml(list) {
     if (!list.length) return '';
@@ -1915,7 +1970,7 @@
     (d.calendar || []).forEach(function (c) {
       if (!c || !isDay(c.date) || c.date < from || c.date > to || c.date > t) return;
       var we = AppWeek.isWeekend(c.date);
-      days[c.date] = { date: c.date, status: we ? (c.status === 'onTime' || c.status === 'late' ? 'wkDone' : 'wk') : c.status, weekend: we,
+      days[c.date] = { date: c.date, status: we ? (c.status === 'onTime' || c.status === 'late' ? 'wkDone' : 'wk') : c.date === t && c.status === 'none' ? 'today' : c.status, weekend: we,
                        lecture: c.order ? lec[c.order] || null : null, items: [] };
       if (c.order) byOrder[c.order] = c.date;
     });
@@ -1944,10 +1999,15 @@
     var all = list, on = 0, late = 0, none = 0, lecN = 0, lecDone = 0, items = [];
     all.forEach(function (x) { items = items.concat(x.items); });
     list = list.filter(function (x) { return !x.weekend && x.status !== 'exempt'; });      /* 토 · 일(주중 복습) · 면제한 날은 제출 · 정시 · 강의 수에 넣지 않는다 */
+    var tday = todayISO();
+    list.forEach(function (x) {
+      var seen = !!x.lecture && x.lecture.videosTotal > 0 && x.lecture.videosDone >= x.lecture.videosTotal;
+      if (x.lecture && x.lecture.videosTotal > 0 && !(x.date === tday && !seen)) { lecN++; if (seen) lecDone++; }
+    });
+    list = list.filter(function (x) { return x.status !== 'today'; });                     /* 오늘 — 마감 전 · 아직이면 세지 않는다 (20261031v) */
     var n = list.length;
     list.forEach(function (x) {
       if (x.status === 'onTime') on++; else if (x.status === 'late') late++; else none++;
-      if (x.lecture && x.lecture.videosTotal > 0) { lecN++; if (x.lecture.videosDone >= x.lecture.videosTotal) lecDone++; }
     });
     if (!n) return '<p class="awb-wait">이 기간에는 과제가 없었습니다</p>';
     var avg = rateAvg(items);
@@ -1972,7 +2032,7 @@
   }
 
   var AP_ST = { onTime: ['정시', 'app-tag'], late: ['늦게', 'app-tag app-tag--late'], none: ['미제출', 'app-tag app-tag--none'],
-                exempt: ['면제', 'app-tag app-tag--wk'],
+                exempt: ['면제', 'app-tag app-tag--wk'], today: ['오늘 · 마감 전', 'app-tag app-tag--wk'],
                 wk: ['주중 복습', 'app-tag app-tag--wk'], wkDone: ['주중 복습 ✓', 'app-tag app-tag--wk app-tag--wkdone'] };
   /* 날짜별 과제 — 펼치면 그날 과제마다 제목 · 제출 시각 · 정답률, 그날 강의 영상 */
   function apDaysHtml(list) {
@@ -1998,7 +2058,7 @@
                 (h.late ? '<span class="app-tag app-tag--late">지각</span>' : '<span class="app-tag">정시</span>') +
                 (h.correctRate == null ? '' : '<span class="app-recent__rate num">' + h.correctRate + '%</span>') +
               '</li>';
-            }).join('') + '</ul>' : '<p class="ap-muted">' + (x.weekend ? '토 · 일은 주중 복습 날입니다 (제출 수에 넣지 않아요)' : x.status === 'exempt' ? '면제한 날입니다 (제출 수에 넣지 않아요)' : x.status === 'none' ? '제출한 과제가 없습니다' : '과제 기록이 없습니다') + '</p>') +
+            }).join('') + '</ul>' : '<p class="ap-muted">' + (x.weekend ? '토 · 일은 주중 복습 날입니다 (제출 수에 넣지 않아요)' : x.status === 'exempt' ? '면제한 날입니다 (제출 수에 넣지 않아요)' : x.status === 'today' ? '오늘은 밤 12시 마감 전이에요 (아직 세지 않아요)' : x.status === 'none' ? '제출한 과제가 없습니다' : '과제 기록이 없습니다') + '</p>') +
           '</div></details>';
       }).join('') + '</div>';
   }
@@ -2053,7 +2113,7 @@
       : '<div class="ap-more"><p class="ap-more__t">' + APP_MORE + '</p><a class="hub-btn ap-more__btn" href="' + url + '" target="_blank" rel="noopener">앱에서 자세히 보기 ↗</a></div>';
   }
 
-  function renderApp(code, app, reports) {
+  function renderApp(code, app, reports, base) {
     var host = $('#panelApp');
 
     if (!app.linked) {
@@ -2063,7 +2123,7 @@
 
     host.innerHTML = appMoreHtml(app) + appWaitHtml();
     appWaitSlow(host);
-    APP_RETRY.detail = function () { renderApp(code, app, reports); };
+    APP_RETRY.detail = function () { renderApp(code, app, reports, base); };
 
     appData(code).then(function (dd) {
       var res = dd ? { ok: true, data: dd } : { ok: false, reason: APP.why || '' };
@@ -2078,16 +2138,23 @@
       }
 
       var d = res.data || {};
-      /* 이번 주 = 가장 최근 레포트 수업일 ~ 다음 수업 전날 (진행 중 · 오늘 기준) */
-      var rep = (reports || []).filter(function (r) { return r && r.week_start && !r.draft; })[0] || null;
-      var p = currentPeriod(rep, '');
-      var aw = p && p.from && global.AppWeek ? AppWeek.compute(d, p.from, p.to, todayISO()) : null;
-      host.innerHTML = appMoreHtml(app) +
-        appBlockHtml(d, aw, { title: p && p.from ? periodTitle('이번 주', p.from, p.to) : '과제 요약', month: todayISO().slice(0, 7), pending: true }) +
+      if (d.startOn) HUBSTART = String(d.startOn).slice(0, 10);
+      else if (HUBSTART) { d = Object.assign({}, d, { startOn: HUBSTART }); }
+      /* 레포트 수업일 L 기준 (20261031v) — 이 수업 과제 (L-7 ~ L-1) · 진행 중 (L ~ 다음 수업 전날) */
+      var L = base || appBaseDate(reports), t = todayISO();
+      var lp = L && global.AppWeek ? AppWeek.forLesson(d, L, t) : null;
+      var np = L ? nextPeriod(L) : null;
+      var nw = np ? AppWeek.compute(d, np.from, np.to, t) : null;
+      var top = !lp ? appBlockHtml(d, null, { title: '이 수업 과제', noTotal: true, noCal: true })
+        : appBlockHtml(d, lp.w, { title: '이 수업 과제 (' + Lesson.md(lp.from, false) + '~' + Lesson.md(lp.to, false) + ')', sub: esc(Lesson.md(L, false)) + ' 수업 레포트와 같은 기간',
+                                  first: lp.first, newStudent: !!lp.newStudent, range: { from: lp.from, to: lp.to }, noTotal: true, noCal: true });
+      host.innerHTML = appMoreHtml(app) + top +
+        (np ? progressHtml(nw, np) : '') +
         '<div id="apDetail">' + apDetailHtml(d) + '</div>' +
         apCatsHtml(d.categories || []) +
         apLecturesHtml(d.lectures) +
-        apShapeHtml(d);
+        apShapeHtml(d) +
+        apBottomHtml(d, lp ? { from: lp.from, to: lp.to } : null);
       /* 기간 고르기 — 요약 칸 · 날짜별 과제만 다시 그린다 */
       host.onclick = function (e) {
         var b = e.target.closest && e.target.closest('[data-ap-period]');

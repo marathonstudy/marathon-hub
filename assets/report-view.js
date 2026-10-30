@@ -241,9 +241,10 @@
     return card('📝 복습테스트', body);
   }
 
-  /* 「미응시 · 결석」 — 사유 이름이 없으면 「미응시」 */
+  /* 「미응시 · 결석」 — 사유 이름이 없으면 「미응시」 · 작성 화면에서 「응시」(점수는 아직)로 둔 것은 「응시」 (migration-048) */
   function absentText(reason) {
     var r = String(reason === true ? '' : reason || '').trim();
+    if (r === '응시') return '응시';
     return r && r !== '미응시' ? '미응시 · ' + r : '미응시';
   }
 

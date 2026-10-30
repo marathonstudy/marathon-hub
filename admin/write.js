@@ -864,6 +864,8 @@
             '<span class="fieldline__label">복습테스트</span>' +
             '<span class="entry__rv" data-role="rv"></span>' +
             '<button type="button" class="btn btn--sm btn--ghost" data-act="rvfix">고치기</button>' +
+            /* 테스트 상태 결석 · 미응시 · 응시 (review.js · migration-048 · 20261031v) — 같은 줄 안 아래쪽 */
+            '<div class="entry__rvst" data-role="rvst" hidden></div>' +
           '</div>' +
           /* 과제 — 그 레포트 기간(수업 전 일주일) 「과제 3/5일」 · 누르면 아래 7칸 표 · 링크 없으면 「과제 연동 전」 [+ 과제 링크 연결] (20261031h) */
           '<div class="fieldline fieldline--app">' +
@@ -944,6 +946,12 @@
     }
     host.textContent = line == null ? '불러오는 중…' : line;
     host.classList.toggle('is-none', line === '아직 제출 안 함');
+    var sh = el.querySelector('[data-role="rvst"]');
+    if (sh) {
+      var h = !isCourse(currentClass) && window.Review && Review.statusHtml ? Review.statusHtml(rvCls, draft.weekStart, id) : '';
+      if (sh.innerHTML !== h) sh.innerHTML = h;
+      sh.hidden = !h;
+    }
   }
   /* 학생 카드 「과제」 — 「오늘」이 받아 둔 과제 기록을 그대로 (반마다 한 번 · 10분 기억 · 새로 부르지 않는다 · today.js) */
   function lessonDateOf(s) {
@@ -982,7 +990,55 @@
     if ($('#panel-write').hidden) return;
     paintApps(e.detail && e.detail.sid);
     renderStatus();
+    paintRetryBar();
+    if (e.detail && e.detail.done) setTimeout(autoRetry, 0);
   });
+
+  /* ---------- 목록 위 「못 불러온 n명 다시 불러오기」 (20261031v) ----------
+     과제 기록을 못 불러온 학생이 있으면 한 버튼으로 한꺼번에 · 하는 동안 「불러오는 중 3/8」 · 끝나면 「다 불러왔습니다」 또는 안 되는 학생 이름과 짐작한 이유
+     그 반 그 수업을 처음 열 때 못 불러온 학생이 있으면 한 번은 저절로 다시 시도한다 · 학생마다 [다시 시도]는 그대로 */
+  var AR = { busy: false, done: 0, total: 0, msg: '', key: '', tried: {} };
+  function arKey() { return (currentClass || '') + '|' + ((draft && draft.weekStart) || ''); }
+  function arIds() { return studentsOfClass(currentClass).map(function (s) { return s.id; }); }
+  function paintRetryBar() {
+    var bar = $('#appRetryBar');
+    if (!bar) return;
+    if (AR.key !== arKey()) { AR.key = arKey(); AR.msg = ''; }
+    if (!window.Today || !Today.appFailed || mode === 'weeks') { bar.hidden = true; return; }
+    if (AR.busy) {
+      bar.hidden = false;
+      bar.innerHTML = '<span class="ar-bar__t"><i class="spin" aria-hidden="true"></i>불러오는 중 <span class="num">' + AR.done + '/' + AR.total + '</span></span>';
+      return;
+    }
+    var f = Today.appFailed(arIds());
+    var html = (f.length ? '<button type="button" class="btn btn--sm ar-bar__btn" data-ar-retry>못 불러온 ' + f.length + '명 다시 불러오기</button>' : '') +
+      (AR.msg ? '<span class="ar-bar__msg">' + AR.msg + '</span>' : '');
+    bar.hidden = !html;
+    bar.innerHTML = html;
+  }
+  function retryAll() {
+    if (AR.busy || !window.Today || !Today.retryMany) return;
+    var ids = Today.appFailed(arIds());
+    if (!ids.length) return;
+    AR.busy = true; AR.done = 0; AR.total = ids.length; AR.msg = '';
+    paintRetryBar();
+    Today.retryMany(ids, function (d, t) { AR.done = d; AR.total = t; paintRetryBar(); }).then(function (left) {
+      AR.busy = false;
+      AR.msg = !left.length ? '다 불러왔습니다 ✓'
+        : '아직 못 불러온 학생 — ' + left.map(function (x) { return escapeHtml(x.name) + '(' + escapeHtml(x.why) + ')'; }).join(', ');
+      if (!left.length) toast('다 불러왔습니다', 'good');
+      paintRetryBar();
+      paintApps();
+    });
+  }
+  function autoRetry() {
+    if ($('#panel-write').hidden || !window.Today || !Today.appSettled || !Today.appSettled()) return;
+    var k = arKey();
+    if (AR.tried[k] || !Today.appFailed(arIds()).length) return;
+    AR.tried[k] = true;
+    retryAll();
+  }
+  $('#appRetryBar').addEventListener('click', function (e) { if (e.target.closest('[data-ar-retry]')) retryAll(); });
   /* 링크 칸을 펼치거나 접을 때 · 저장한 뒤 (applink.js) — 링크 칸에 쓰던 글은 applink.js 가 기억한다 */
   window.addEventListener('jt:applink-ui', function () { if (!$('#panel-write').hidden) paintApps(); });
   window.addEventListener('jt:applink', function () { if (!$('#panel-write').hidden) { paintApps(); renderStatus(); } });
@@ -1037,6 +1093,8 @@
     }
 
     updateCounts();
+    paintRetryBar();
+    setTimeout(autoRetry, 0);
   }
 
   /* ---------- 입력 반응 (이벤트 위임) ---------- */
