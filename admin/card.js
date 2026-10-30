@@ -248,11 +248,23 @@
     Welcome.lastSent(sid).then(function (m) {
       var el = $('#cardWelcome');
       if (!el || !C || C.sid !== sid) return;
-      var at = m && m.welcome ? new Date(m.welcome) : null;
-      el.textContent = at ? '웰컴 안내 보냄 ' + (at.getMonth() + 1) + '/' + at.getDate() : '';
-      el.title = at ? '신입생 웰컴 · 앱 설치 안내 문자 ' + fmtDT(m.welcome) : '';
+      /* 「웰컴 안내 보냄 10/30」 · 「과제 독려 문자 10/31」 (migration-054 · 20261101g) */
+      var md = function (iso) { var d = new Date(iso); return (d.getMonth() + 1) + '/' + d.getDate(); };
+      var parts = [];
+      if (m && m.welcome) parts.push('웰컴 안내 보냄 ' + md(m.welcome));
+      if (m && m.nudge) parts.push('과제 독려 문자 ' + md(m.nudge));
+      el.textContent = parts.join(' · ');
+      el.title = [m && m.welcome ? '신입생 웰컴 · 앱 설치 안내 문자 ' + fmtDT(m.welcome) : '', m && m.nudge ? '과제 독려 문자 ' + fmtDT(m.nudge) : ''].filter(Boolean).join(' · ');
     });
   }
+  /* 맨 위 [학부모 화면 미리보기] [학생 화면 미리보기] — 카드를 닫고 미리보기 (미리보기는 창 위가 아니라 화면 위에 뜬다) */
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-cdpv]');
+    if (!b || !C || !C.sid) return;
+    var sid = C.sid;
+    if (modal.open) modal.close();
+    if (window.Preview) Preview.open(sid, b.dataset.cdpv);
+  });
   window.addEventListener('jt:welcome-sent', function () { if ($('#cardModal') && $('#cardModal').open) loadWelcome(); });
   function loadLogin() {
     loadWelcome();

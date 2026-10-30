@@ -958,7 +958,7 @@
         return v.a.pct === null
           ? '<span class="tdc-avg tdc-avg--none' + live + ' num" title="' + esc(tip + ' — 과제 기록이 있는 학생이 없습니다') + '">' + esc(name) + ' 과제 없음</span>'
           : '<span class="tdc-avg tdc-avg--' + avgTone(v.a.pct) + live + ' num" title="' + esc(tip + ' — 반 평균 과제율') + '">' + esc(name + ' ' + v.a.pct + '%') + '</span>';
-      }).join('') + '</span>';
+      }).join('') + nudgeHtml(c) + '</span>';
       var a0 = avgs[0].a, ex = [];
       if (a0.need) ex.push('링크 없는 ' + a0.need + '명');
       if (a0.fail) ex.push('못 불러온 ' + a0.fail + '명');
@@ -966,6 +966,74 @@
     }
     return '<div class="tdc-line tdc-line--app" data-cls="' + esc(c.name) + '"><span class="tdc-line__t">과제 평균</span>' + body + '</div>';
   }
+  /* ---------- 과제 독려 (20261101g · welcome.js · migration-054) ----------
+     대상 = 진행 중 기간(지난 수업 ~ 오늘)에서 마감이 지난 과제(평일 · 앱 기록 「안 냄」) 중 하나라도 안 낸 학생
+       오늘 과제는 마감 전이라 세지 않는다 (AppWeek 「오늘」 · 냈으면 센다) · 퇴원 · 결석 처리와 무관하게 앱 과제 기록으로만
+       링크가 없거나 못 불러온 학생은 판단할 수 없어 뺀다 · 학생 번호가 없으면 「번호 없음 n명」
+     「진행 중」 칩 오른쪽 [안 낸 학생 n명에게 독려 문자] · 0명이면 연하게 「이번 주 모두 냄 👍」 · 옆에 작게 「오늘 10:20 보냄 4명」 */
+  function nudgeOf(c) {
+    var p = c && c.per && c.per.now;
+    if (!p || !window.AppWeek) return null;
+    var t0 = DDay.today(), to = p.to < t0 ? p.to : t0;
+    if (to < p.from) return null;
+    var out = { ids: [], miss: {}, phone: 0, noPhone: 0, judged: 0 };
+    c.rows.forEach(function (s) {
+      var a = app[s.id];
+      if (!a || !a.ok || !a.data) return;
+      var w = AppWeek.compute(a.data, p.from, to, t0);
+      if (!w) return;
+      out.judged++;
+      var ds = w.days.filter(function (x) { return !x.weekend && x.hw === 'none' && x.date < t0; }).map(function (x) { return x.date; }).sort().reverse();
+      if (!ds.length) return;
+      out.ids.push(s.id);
+      out.miss[s.id] = ds.map(mdw).join(' ');
+      var x = stu(s.id) || s;
+      if (Store.phoneDigits(x.studentPhone || x.student_phone || '').length >= 10) out.phone++; else out.noPhone++;
+    });
+    return out;
+  }
+  var nudgeSent = null;            /* 오늘 보낸 과제 독려 [{ student_id, target, at }] */
+  function loadNudgeSent() {
+    if (!window.Welcome || !Welcome.sentToday) return;
+    Welcome.sentToday('nudge').then(function (list) {
+      var h = JSON.stringify(list || []);
+      if (JSON.stringify(nudgeSent || []) === h && nudgeSent) return;
+      nudgeSent = list || [];
+      Array.prototype.forEach.call(document.querySelectorAll('[data-nudge-sent]'), function (el) { el.innerHTML = sentText(el.dataset.nudgeSent); });
+    });
+  }
+  function sentText(cls) {
+    var c = (st.clsBy || {})[cls];
+    if (!c || !nudgeSent || !nudgeSent.length) return '';
+    var mine = {}, last = '';
+    nudgeSent.forEach(function (x) { if (c.rows.some(function (s) { return s.id === x.student_id; })) { mine[x.student_id] = 1; if (!last || x.at > last) last = x.at; } });
+    var n = Object.keys(mine).length;
+    if (!n) return '';
+    var d = new Date(last);
+    return '오늘 ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ' 보냄 ' + n + '명';
+  }
+  function nudgeHtml(c) {
+    var v = nudgeOf(c);
+    if (!v || !v.judged) return '';
+    if (nudgeSent === null) setTimeout(loadNudgeSent, 0);
+    var sent = '<small class="tdc-nudge__sent num" data-nudge-sent="' + esc(c.name) + '">' + sentText(c.name) + '</small>';
+    if (!v.ids.length) return '<span class="tdc-nudge-ok">이번 주 모두 냄 👍</span>' + sent;
+    return (v.phone ? '<button type="button" class="btn btn--sm tdc-nudge" data-nudge="' + esc(c.name) + '">안 낸 학생 ' + v.phone + '명에게 독려 문자</button>'
+                    : '<span class="tdc-nudge-ok is-warn">안 낸 학생 ' + v.ids.length + '명</span>') +
+      (v.noPhone ? '<small class="tdc-nudge__nophone num">번호 없음 ' + v.noPhone + '명</small>' : '') + sent;
+  }
+  function openNudge(cls) {
+    var c = (st.clsBy || {})[cls];
+    var v = nudgeOf(c);
+    if (!v || !v.ids.length || !window.Welcome) return;
+    Welcome.nudge({ students: v.ids, miss: v.miss });
+  }
+  window.addEventListener('jt:welcome-sent', function (e) {
+    if (e.detail && e.detail.kind !== 'nudge') return;
+    nudgeSent = null;
+    loadNudgeSent();
+  });
+
   function linesHtml(c, chips) {
     if (c.name === '(반 없음)' || !c.rows.length) return '';
     return (chips.length ? '<div class="tdc-line"><span class="tdc-line__t">레포트 발송</span><span class="tdc-chips" aria-label="최근 수업 레포트 발송">' + chips.map(function (x) { return chipHtml(c, x); }).join('') + '</span></div>' : '') +
@@ -973,13 +1041,12 @@
       (window.RNote ? RNote.cardLine(c.name, c.rows.length) : '');          /* 이번 복습 노트 연 학생 8/11 — 반 전체 숫자만 (20261031l) */
   }
 
-  /* 학생 줄 — 이름 | 세 칸 | 버튼 (휴대폰에서는 버튼을 「⋯」 하나로 묶는다 · 20261031g) */
+  /* 학생 줄 — 이름 | 세 칸 | 버튼 (휴대폰에서는 버튼을 「⋯」 하나로 묶는다 · 20261031g)
+     버튼은 [상담 카드] [문자]만 — 학부모 · 학생 화면 미리보기는 상담 카드 맨 위로 옮겼다 (20261101g) */
   function actsHtml(s) {
     var id = esc(s.id);
     var btns = '<button type="button" class="btn btn--sm" data-card="' + id + '">상담 카드</button>' +
-      '<button type="button" class="btn btn--sm" data-sms-sid="' + id + '">문자</button>' +
-      '<button type="button" class="btn btn--sm btn--ghost" data-pv="parent" data-sid="' + id + '">학부모 화면 미리보기</button>' +
-      '<button type="button" class="btn btn--sm btn--ghost" data-pv="student" data-sid="' + id + '">학생 화면 미리보기</button>';
+      '<button type="button" class="btn btn--sm" data-sms-sid="' + id + '">문자</button>';
     /* [상담 +] — 휴대폰에서도 「⋯」 앞에 그대로 (quicknote.js · 20261031o) */
     return '<div class="tdc-st__acts">' + btns + (window.QuickNote ? QuickNote.btnHtml(s.id, s.name) : '') +
       '<details class="tdc-more"><summary class="btn btn--sm tdc-more__b" aria-label="' + esc(s.name) + ' 더 보기">⋯</summary><div class="tdc-more__menu">' + btns +
@@ -1503,6 +1570,8 @@
     if (rt) { loadApp(rt.dataset.appRetry); return; }
     var arb = e.target.closest('[data-ar-cls]');
     if (arb) { arRetry(arb.dataset.arCls); return; }
+    var ng = e.target.closest('[data-nudge]');
+    if (ng) { openNudge(ng.dataset.nudge); return; }
     var to = e.target.closest('[data-todo-open]');
     if (to) { var k0 = to.dataset.todoOpen; if (st.todoOpen[k0]) delete st.todoOpen[k0]; else st.todoOpen[k0] = true; render(); return; }
     var ss = e.target.closest('[data-skip1-sid]');
