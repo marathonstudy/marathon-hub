@@ -40,11 +40,12 @@
 
   var confirmModal = $('#confirmModal');
 
-  function confirmAsk(title, desc, okLabel) {
+  function confirmAsk(title, desc, okLabel, noLabel) {
     return new Promise(function (resolve) {
       $('#confirmTitle').textContent = title;
       $('#confirmDesc').textContent = desc;
       $('#btnConfirmYes').textContent = okLabel || '삭제';
+      $('#btnConfirmNo').textContent = noLabel || '취소';
       function cleanup(result) {
         $('#btnConfirmYes').removeEventListener('click', onYes);
         $('#btnConfirmNo').removeEventListener('click', onNo);
@@ -245,17 +246,10 @@
     var n = noPhoneCount();
     el.textContent = n ? '학생 휴대폰 번호가 없는 재원생 ' + n + '명 — 「번호 한꺼번에 넣기」 → 학생 본인 번호' : '';
   }
-  /* 단톡방 안내 — 학생 입구 주소 → 이름과 휴대폰 번호 8자리로 로그인 · 「내 정보」와 얼굴 사진 (20261031c) */
-  var ENTRY_NOTICE = '[마라톤국어] 러닝노트 학생 입구 안내\n' +
-    '모두 같은 주소로 내 러닝노트에 들어와요.\n{주소}\n' +
-    '반과 이름을 고르고, 비밀번호는 내 휴대폰 번호에서 010을 뺀 8자리예요.\n' +
-    '로그인하면 「내 정보」에서 내 정보와 얼굴 사진도 채워 주세요.\n' +
-    '「이 휴대폰에서 로그인 유지」를 켜 두면 다음부터 바로 열려요.\n' +
-    '휴대폰 번호가 등록돼 있지 않으면 조교 선생님께 말해 주세요.\n' +
-    "과제를 더 자세히 보시려면 레포트의 '앱에서 자세히 보기'를 눌러 주세요.";
+  /* 학생 입구 — [학생 입구 주소 복사] · [입구 문자 보내기](welcome.js · 학생 본인 번호로 · 예전 「단톡방 안내 문구 복사」 자리 · 20261101e) */
   if ($('#btnEntryCopy')) {
     $('#btnEntryCopy').addEventListener('click', function () { entryCopy(entryUrl(), '학생 입구 주소'); });
-    $('#btnEntryNotice').addEventListener('click', function () { entryCopy(ENTRY_NOTICE.split('{주소}').join(entryUrl()), '단톡방 안내 문구'); });
+    $('#btnEntrySms').addEventListener('click', function () { if (window.Welcome) Welcome.openEntry(); });
   }
 
   /* 링크가 없는 학생 여럿에게 한 번에 */
@@ -350,7 +344,7 @@
         '<button class="btn btn--sm btn--ghost" data-pv="student" title="학생 링크로 열었을 때 모습 (작성 화면에서 고른 주 · 공개 전 내용 포함)">학생 화면 미리보기</button>' +
         '<button class="btn btn--sm btn--ghost" data-pv="parent" data-pv-view="app" title="러닝노트 「과제 상세」 탭 — 과제 세부 기록 (학부모 화면과 같은 화면)">과제 상세 보기</button>' +
         '<button class="btn btn--sm btn--ghost" data-sms-sid="" title="「문자 발송」 → 보내기 (이 학생만 골라진 채로)">문자</button>' +
-        '<button class="btn btn--sm btn--ghost" data-app-invite="" title="마라톤 앱 설치 · 입장코드 안내 문자 (「문자 발송」 → 보내기)">앱 안내 문자</button>' +
+        '<button class="btn btn--sm btn--ghost" data-app-invite="" title="신입생 웰컴 + 마라톤 앱 설치 안내 다시 보내기 (학생 / 학부모 / 둘 다 · 미리보기)">웰컴 안내</button>' +
         '<button class="btn btn--sm" data-act="edit">수정</button>' +
       '</td>';
   }
@@ -518,8 +512,20 @@
         tag.title = '반 관리에서 보관한 반 — 작성 · 「오늘」 등 반 목록에는 나오지 않습니다';
         head.querySelector('.class-head__name').after(tag);
       }
-      wrap.appendChild(head);
-      /* 반마다 「학생 링크 모두 복사」 줄은 없앴다 — 학생은 /s/ 입구 주소 하나로 로그인한다 (위쪽 「학생 입구 주소 복사」 · 「단톡방 안내 문구 복사」 · 20261031c) */
+      if (g.name !== ARCHIVE_GROUP && g.name !== '(반 없음)' && g.rows.length) {
+        /* 반 이름 옆 [반 전체에 웰컴 안내] (welcome.js · 받는 사람 · 「아직 앱 링크 연결 안 된 학생만」 · 20261101e) */
+        var hrow = document.createElement('div');
+        hrow.className = 'class-headrow';
+        hrow.appendChild(head);
+        var wc = document.createElement('button');
+        wc.type = 'button';
+        wc.className = 'btn btn--sm btn--ghost class-wc';
+        wc.setAttribute('data-wc-class', g.name);
+        wc.textContent = '반 전체에 웰컴 안내';
+        hrow.appendChild(wc);
+        wrap.appendChild(hrow);
+      } else wrap.appendChild(head);
+      /* 반마다 「학생 링크 모두 복사」 줄은 없앴다 — 학생은 /s/ 입구 주소 하나로 로그인한다 (위쪽 「학생 입구 주소 복사」 · 「입구 문자 보내기」 · 20261101e) */
 
       /* 얼굴 사진으로 보기 — 사진과 이름 바둑판 (누르면 상담 카드) */
       if (faceView) {
@@ -1088,7 +1094,7 @@
 
     renderLinkBox();
     renderExtraFields(s);
-    /* 새 학생만 — 「등록하면 마라톤 앱 안내 문자 보내기」 (sms.js · 20261031m) */
+    /* 새 학생만 — 「웰컴 문자 보내기」 (기본 켜짐 · sms.js · welcome.js · 20261101e) */
     if (window.Sms && Sms.resetInvite) Sms.resetInvite('f', !s);
     showStudentError('');
     studentModal.showModal();
@@ -1244,13 +1250,13 @@
     var link = Store.linkOf(rec.id);
     var needIssue = !rec.archived && (!link.hubCode || !link.studentCode);          /* 학부모 · 학생 링크 둘 다 바로 (20261031s) */
     var appChanged = (appCode || '') !== (link.appCode || '');
-    /* 앱 안내 문자 — 새 학생 · 체크했을 때만. 서버에 학생 줄이 생긴 뒤 「문자 발송」 → 보내기에서 확인을 띄운다 */
+    /* 웰컴 문자 — 새 학생 · 「웰컴 문자 보내기」(기본 켜짐)면 서버에 학생 줄이 생긴 뒤 바로 보낸다 (welcome.js · 20261101e) */
     var invite = !prev && !rec.archived && window.Sms && Sms.inviteOpts ? Sms.inviteOpts('f') : null;
     function afterInvite() {
-      if (!invite) return;
+      if (!invite || !window.Welcome) return;
       Store.flushNow(Store.KEYS.students, Store.getStudents()).then(function () {
-        Sms.appInvite([rec.id], { code: invite.code, to: invite.to, from: 'roster', confirm: true });
-      }, function (e) { toast('학생은 저장했지만 앱 안내 문자를 준비하지 못했습니다 — ' + e.message, 'bad'); });
+        UI.welcomeSent = Welcome.sendNow([rec.id], { code: invite.code, to: invite.to });
+      }, function (e) { toast('학생은 저장했지만 웰컴 문자를 보내지 못했습니다 — ' + e.message, 'bad'); });
     }
 
     studentModal.close();

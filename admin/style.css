@@ -3686,3 +3686,38 @@ textarea.aip-text--new:focus { outline: 2px solid #B9AEF0; outline-offset: 1px; 
 /* 과제 칩 — 못 불러온 이유 · 반 카드 다시 불러오기 줄 (today.js · 20261101d) */
 .tdc-app__why { display: block; font-size: 11px; font-weight: 600; opacity: .8; }
 .tdc-card .ar-bar { margin: 8px 0 6px; }
+
+/* ============================================================
+   입구 문자 · 신입생 웰컴 (welcome.js · 20261101e) — 휴대폰에서는 화면 가득 · 누르기 쉬운 크기
+   ============================================================ */
+.class-headrow { display: flex; align-items: center; gap: 6px; border-bottom: 1px solid var(--line-soft); }
+.class-headrow .class-head { flex: 1; min-width: 0; border-bottom: 0; }
+.class-headrow .class-wc { flex: none; white-space: nowrap; }
+.class-group.is-collapsed .class-wc { display: none; }
+.cd-welcome { color: var(--ink-mid); }
+.wc-modal { width: min(560px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); }
+.wc-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.wc-body { display: flex; flex-direction: column; gap: 10px; }
+.wc-sec { display: flex; flex-direction: column; gap: 8px; }
+.wc-who, .wc-note { margin: 0; font-size: 14px; }
+.wc-cls { display: flex; flex-wrap: wrap; gap: 6px; }
+.wc-cls .chip { min-height: 36px; }
+.wc-to { display: flex; gap: 6px; }
+.wc-to__opt { flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px; min-height: 40px; border: 1px solid var(--line); border-radius: 10px; font-weight: 700; cursor: pointer; }
+.wc-to__opt.is-on { border-color: var(--indigo); background: var(--surface-2); }
+.wc-filter, .wc-again { min-height: 36px; }
+.wc-text textarea { width: 100%; font-size: 16px; line-height: 1.5; resize: vertical; }
+.wc-vars { font-size: 12px; }
+.wc-sum { margin: 0; font-size: 14px; }
+.wc-miss { margin: 0; font-size: 12.5px; color: var(--ink-mid); }
+.wc-pv .sms-pv__text { white-space: pre-wrap; word-break: break-all; }
+.wc-res { margin: 0; padding: 8px 10px; border-radius: 10px; font-weight: 700; }
+.wc-res.is-ok { background: #EAF7EE; color: #1E6B39; }
+.wc-res.is-bad { background: #FDECEC; color: #A12A2A; }
+.wc-foot { display: flex; gap: 8px; justify-content: flex-end; position: sticky; bottom: 0; background: var(--surface, #fff); padding-top: 6px; }
+.wc-foot .btn { min-height: 44px; }
+@media (max-width: 600px) {
+  .wc-modal { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; border-radius: 0; }
+  .wc-foot .btn { flex: 1; }
+  .class-headrow .class-wc { font-size: 12px; padding: 4px 8px; }
+}

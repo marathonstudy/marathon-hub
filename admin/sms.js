@@ -1444,12 +1444,13 @@
     if (!inp || inp.dataset.typed === '1') return;
     inp.value = st.codes[($('#fClass').value || '').trim()] || '';
   }
-  /* 학생 등록 창을 열 때 (app.js · import.js) — 새 학생만 · 체크는 꺼진 채로 */
+  /* 학생 등록 창을 열 때 (app.js) — 새 학생만 · 「웰컴 문자 보내기」 기본 켜짐 (20261101e · 예전에는 꺼진 채로)
+     엑셀 · CSV 는 체크 없이 다 넣은 뒤 묻는다 (welcome.js askAfterImport) */
   function resetInvite(p, isNew) {
     var box = $('#' + p + 'Inv');
     if (!box) return;
     box.hidden = !isNew;
-    $('#' + p + 'InvOn').checked = false;
+    $('#' + p + 'InvOn').checked = true;
     $('#' + p + 'InvSt').checked = true;
     $('#' + p + 'InvPa').checked = true;
     var inp = $('#' + p + 'InvCode');
@@ -1637,8 +1638,12 @@
       if (!s) return;
       if (s.archived) { toast('퇴원한 학생에게는 문자를 보낼 수 없습니다', 'bad'); return; }
       var from = b.closest('#panel-roster') ? 'roster' : b.closest('#cardModal') ? 'card' : 'today';
-      if (b.closest('#cardModal') && $('#cardModal').open) $('#cardModal').close();
-      if (b.hasAttribute('data-app-invite')) { appInvite([sid], { to: 'both', from: from }); return; }
+      if (b.closest('#cardModal') && $('#cardModal').open && !b.hasAttribute('data-app-invite')) $('#cardModal').close();
+      /* [웰컴·앱 설치 안내 다시 보내기] — 학생 / 학부모 / 둘 다 · 미리보기 · 보내기 (welcome.js · 20261101e) */
+      if (b.hasAttribute('data-app-invite')) {
+        if (window.Welcome) Welcome.open({ students: [sid] }); else appInvite([sid], { to: 'both', from: from });
+        return;
+      }
       open({ students: [sid], single: true, from: from });
     }, true);
 
@@ -1667,6 +1672,17 @@
   window.Sms = {
     open: open, openLog: function (o) { goTab(); openLog(o); }, openSettings: openSettings, showPane: function (p) { goTab(); showPane(p); },
     appInvite: appInvite, inviteOpts: inviteOpts, resetInvite: resetInvite,
+    /* 입구 문자 · 웰컴 문자 (welcome.js · 20261101e) — 함수 · 설정 · 반 입장코드 · 자주 쓰는 문구를 같이 쓴다 */
+    invoke: function (body) { return invoke(body); },
+    prep: function () {
+      /* 문자 설정(migration-023)이 없으면 문구 · 입장코드는 읽지 않는다 */
+      return loadCfg().then(function () {
+        if (st.missing) return null;
+        return Promise.all([loadCodes(), loadTemplates()]);
+      }).then(function () {
+        return { links: appLinks(), codes: st.codes, templates: st.templates, missing: st.missing };
+      });
+    },
     build: build, bytes: bytes, kdate: kdate, state: function () { return st; },
     isOpen: function () { return !!$('#panel-sms') && !$('#panel-sms').hidden && st.pane === 'send'; },
     /* 「내 번호로도 한 통 받기」 — kakao.js · send.js 도 같이 (20261031r) */

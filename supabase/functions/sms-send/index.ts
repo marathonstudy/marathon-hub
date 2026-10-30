@@ -5,7 +5,8 @@
 //    action "status" — 키 세 개가 들어갔는지(있음/없음)와 발신번호(숫자만 · 문자 창 「보내는 번호: 02-…」 · 20261031e)를 돌려준다.
 //                      API 키 · 시크릿 값은 절대 돌려주지 않는다.
 //    action "send"   — { items: [{ student_id, to: "parent1" | "parent2" | "student" }], body, ad, lessons, siblings, markWeek,
-//                        label(묶음 이름 · 보낸 기록), purpose(app 앱 안내 …), vars({ 학생 id: { code: 입장코드 } }) }   (label · purpose · vars 는 migration-040)
+//                        label(묶음 이름 · 보낸 기록), purpose(app 앱 안내 · entry 입구 안내 · welcome 웰컴 안내 …),
+//                        vars({ 학생 id: { code: 입장코드, first: 첫수업일 } }) }   (label · purpose · vars 는 migration-040 · first 는 052)
 //                      화면은 학생 id 와 보낼 곳만 보낸다. 번호 · 링크 코드는 부른 직원의 로그인으로 DB 함수 sms_prepare 가 찾는다
 //                      (같은 번호는 한 번만 · 한 번 · 하루 상한 · 광고 문구). 보낸 결과는 sms_record 로 기록(번호는 뒤 4자리만).
 //    action "test"   — 같은 내용을 첫 사람 것으로 바꿔, 설정에 넣은 내 시험 번호에 한 건만.
@@ -115,11 +116,17 @@ async function handle(req: Request, cors: Record<string, string>) {
   /* 묶음 이름 · 목적 · 학생마다 입장코드 (migration-040) */
   const label = String(body.label ?? "").slice(0, 60);
   const purpose = String(body.purpose ?? "").replace(/[^a-z]/g, "").slice(0, 20);
-  const vars: Record<string, { code: string }> = {};
+  const vars: Record<string, { code?: string; first?: string }> = {};
   if (body.vars && typeof body.vars === "object") {
     Object.keys(body.vars).slice(0, 3000).forEach((k) => {
+      if (!/^[0-9a-f-]{36}$/i.test(k)) return;
       const c = String(body.vars[k]?.code ?? "").trim();
-      if (/^[0-9a-f-]{36}$/i.test(k) && /^[A-Za-z0-9가-힣_-]{2,30}$/.test(c)) vars[k] = { code: c };
+      /* {첫수업일} — 「11월 1일(토)」 같은 짧은 글 (줄바꿈 · 제어 문자 없이 30자 · 052) */
+      const first = String(body.vars[k]?.first ?? "").replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 30);
+      const v: { code?: string; first?: string } = {};
+      if (/^[A-Za-z0-9가-힣_-]{2,30}$/.test(c)) v.code = c;
+      if (first) v.first = first;
+      if (v.code || v.first) vars[k] = v;
     });
   }
   const missing = KEYS.filter((k) => !have[k]);

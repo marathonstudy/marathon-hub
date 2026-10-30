@@ -349,8 +349,6 @@
 
   function apply() {
     if (!plan) return;
-    /* 새로 들어오는 학생에게 앱 안내 문자 (sms.js · 20261031m) — 반영한 뒤 「문자 발송」 → 보내기 */
-    var invite = window.Sms && Sms.inviteOpts ? Sms.inviteOpts('i') : null;
     var btn = $('#btnImportApply');
     btn.disabled = true;
     btn.textContent = '반영하는 중…';
@@ -405,7 +403,8 @@
           var s = Store.getStudents().find(function (x) { return x.id === id; });
           return s && !s.archived;
         });
-        if (invite && newIds.length) Sms.appInvite(newIds, { code: invite.code, to: invite.to, from: 'roster', confirm: true });
+        /* 엑셀 · CSV 는 저절로 보내지 않는다 — 다 넣은 뒤 「새로 넣은 n명에게 웰컴 문자 보낼까요? [보내기] [나중에]」 (welcome.js · 20261101e) */
+        if (newIds.length && window.Welcome) UI.welcomeAsk = Welcome.askAfterImport(newIds);
       })
       .catch(function (e) {
         btn.disabled = false;
@@ -444,7 +443,6 @@
     renderPlan();
     showError('');
     $('#importPreview').textContent = '';
-    if (window.Sms && Sms.resetInvite) Sms.resetInvite('i', true);
     $('#importModal').showModal();
   });
   $('#btnImportCancel').addEventListener('click', function () { $('#importModal').close(); });

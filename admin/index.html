@@ -14,10 +14,10 @@
 <link rel="stylesheet" as="style" crossorigin
       href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
 <!-- 탭 아이콘 · 홈 화면 아이콘 — 보라 동그라미 (코치룸만 · 러닝노트 RUN 아이콘 · 학생 입구는 그대로 · 20261101b) -->
-<link rel="icon" type="image/svg+xml" href="../assets/coach-icon.svg?v=20261101d">
-<link rel="icon" type="image/png" sizes="192x192" href="../assets/coach-icon-192.png?v=20261101d">
-<link rel="apple-touch-icon" href="../assets/coach-icon-180.png?v=20261101d">
-<link rel="stylesheet" href="style.css?v=20261101d">
+<link rel="icon" type="image/svg+xml" href="../assets/coach-icon.svg?v=20261101e">
+<link rel="icon" type="image/png" sizes="192x192" href="../assets/coach-icon-192.png?v=20261101e">
+<link rel="apple-touch-icon" href="../assets/coach-icon-180.png?v=20261101e">
+<link rel="stylesheet" href="style.css?v=20261101e">
 </head>
 <body class="is-locked">
 
@@ -246,7 +246,7 @@
       <div class="toolbar entry-bar">
         <span class="entry-bar__label">학생 입구</span>
         <button class="btn btn--sm btn--student" id="btnEntryCopy" type="button">학생 입구 주소 복사</button>
-        <button class="btn btn--sm" id="btnEntryNotice" type="button">단톡방 안내 문구 복사</button>
+        <button class="btn btn--sm" id="btnEntrySms" type="button">입구 문자 보내기</button>
         <span class="panel__hint" id="entryHint"></span>
       </div>
       <!-- 학생이 채운 「내 정보」 · 얼굴 사진 (profile.js · migration-035 · 20261031c) -->
@@ -1335,10 +1335,10 @@
         <p class="field__hint" id="linkBoxNew" hidden>새 학생은 저장하면 개인 링크가 자동으로 발급됩니다.</p>
       </div>
 
-      <!-- 새 학생 앱 안내 문자 (sms.js · 20261031m) — 체크하면 입장코드 · 받는 사람 · 저장한 뒤 「문자 발송」 → 보내기에서 한 번 보여 주고 [보내기] -->
+      <!-- 신입생 웰컴 문자 (welcome.js · sms.js · 20261101e) — 기본 켜짐 · 저장하는 순간 학생 본인 · 학부모 1 · 2 로 「신입생 웰컴」 문구 -->
       <div class="app-inv" id="fInv">
-        <label class="check-line"><input type="checkbox" id="fInvOn"> <span>등록하면 마라톤 앱 안내 문자 보내기</span></label>
-        <div class="app-inv__body" id="fInvBody" hidden>
+        <label class="check-line"><input type="checkbox" id="fInvOn" checked> <span>웰컴 문자 보내기 <span class="field__opt">신입생 웰컴 + 마라톤 앱 설치 안내</span></span></label>
+        <div class="app-inv__body" id="fInvBody">
           <label class="field"><span class="field__label">입장코드 <span class="field__opt">반 설정의 「앱 입장코드」가 있으면 저절로 · 바꿀 수 있음</span></span>
             <input class="input" id="fInvCode" type="text" maxlength="30" autocomplete="off" spellcheck="false" placeholder="예: MARA2026"></label>
           <div class="app-inv__to"><span class="field__label">받는 사람</span>
@@ -1346,7 +1346,7 @@
             <label class="chk-inline"><input type="checkbox" id="fInvPa" checked> 학부모</label>
           </div>
           <p class="cp-warn" id="fInvWarn" hidden></p>
-          <p class="field__hint">입장코드만 치면 나머지는 「자주 쓰는 문구」의 「앱 안내(기본)」로 채웁니다. 저장하면 받는 사람 · 번호 뒤 4자리 · 실제 문구를 한 번 보여 주고, [보내기]를 눌러야 나갑니다.</p>
+          <p class="field__hint">저장하는 순간 「자주 쓰는 문구」의 「신입생 웰컴(학생)」 · 「신입생 웰컴(학부모)」로 바로 보냅니다 (학부모는 1 · 2 모두 · 번호 없는 사람은 뺍니다).</p>
         </div>
       </div>
       <div id="extraFields"></div>
@@ -1393,20 +1393,7 @@
         <span>새로 들어오는 학생에게 개인 링크를 바로 발급</span>
       </label>
 
-      <!-- 새 학생 앱 안내 문자 (sms.js · 20261031m) — 체크하면 입장코드 · 받는 사람 · 저장한 뒤 「문자 발송」 → 보내기에서 한 번 보여 주고 [보내기] -->
-      <div class="app-inv" id="iInv">
-        <label class="check-line"><input type="checkbox" id="iInvOn"> <span>등록하면 마라톤 앱 안내 문자 보내기</span></label>
-        <div class="app-inv__body" id="iInvBody" hidden>
-          <label class="field"><span class="field__label">입장코드 <span class="field__opt">비우면 학생마다 그 반의 「앱 입장코드」 · 치면 모두 이 코드로</span></span>
-            <input class="input" id="iInvCode" type="text" maxlength="30" autocomplete="off" spellcheck="false" placeholder="예: MARA2026"></label>
-          <div class="app-inv__to"><span class="field__label">받는 사람</span>
-            <label class="chk-inline"><input type="checkbox" id="iInvSt" checked> 학생</label>
-            <label class="chk-inline"><input type="checkbox" id="iInvPa" checked> 학부모</label>
-          </div>
-          <p class="cp-warn" id="iInvWarn" hidden></p>
-          <p class="field__hint">입장코드만 치면 나머지는 「자주 쓰는 문구」의 「앱 안내(기본)」로 채웁니다. 저장하면 받는 사람 · 번호 뒤 4자리 · 실제 문구를 한 번 보여 주고, [보내기]를 눌러야 나갑니다.</p>
-        </div>
-      </div>
+      <!-- 웰컴 문자는 다 넣은 뒤 「새로 넣은 n명에게 웰컴 문자 보낼까요? [보내기] [나중에]」 (welcome.js · 20261101e · 예전 「앱 안내 문자」 체크는 없앴다) -->
       <div id="importPreview"></div>
       <div class="modal__error" id="importError"></div>
     </div>
@@ -1514,6 +1501,15 @@
       <button class="btn btn--primary" type="submit" id="btnPassOk">확인</button>
     </div>
   </form>
+</dialog>
+
+<!-- 입구 문자 · 신입생 웰컴 (welcome.js · 20261101e) -->
+<dialog class="modal wc-modal" id="wcModal" aria-labelledby="wcTitle">
+  <div class="modal__head wc-head">
+    <h2 class="modal__title" id="wcTitle">문자</h2>
+    <button class="btn btn--sm" type="button" id="wcClose">닫기</button>
+  </div>
+  <div class="modal__body wc-body" id="wcBody"></div>
 </dialog>
 
 <!-- 확인 -->
@@ -1978,12 +1974,12 @@
   <div class="modal__head cd-head">
     <span class="cd-avatar" id="cardAvatar"></span>
     <div class="cd-head__text">
-      <h2 class="modal__title"><span id="cardTitle">상담 카드</span> <span class="cd-lastlogin" id="cardLogin"></span></h2>
+      <h2 class="modal__title"><span id="cardTitle">상담 카드</span> <span class="cd-lastlogin" id="cardLogin"></span> <span class="cd-lastlogin cd-welcome" id="cardWelcome"></span></h2>
       <p class="modal__desc" id="cardDesc"></p>
     </div>
     <span class="cd-appopen" id="cardAppOpen"></span>
     <button class="btn btn--sm" type="button" id="btnCardSms" data-sms-sid="">문자</button>
-    <button class="btn btn--sm" type="button" id="btnCardApp" data-app-invite="">앱 안내 문자</button>
+    <button class="btn btn--sm" type="button" id="btnCardApp" data-app-invite="">웰컴·앱 설치 안내 다시 보내기</button>
     <button class="btn btn--sm" type="button" id="btnCardClose">닫기</button>
   </div>
   <!-- 「+ 과제 링크 연결」 칸 (applink.js) — 카드 머리 아래 그 자리에 -->
@@ -2290,59 +2286,60 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
 <!-- config.js 와 brand.js 가 먼저 와야 한다. 나머지가 이 값을 읽는다. -->
-<script src="../assets/config.js?v=20261101d"></script>
-<script src="../assets/brand.js?v=20261101d"></script>
-<script src="../assets/lesson.js?v=20261101d"></script>
-<script src="supabase.js?v=20261101d"></script>
-<script src="db.js?v=20261101d"></script>
-<script src="store.js?v=20261101d"></script>
-<script src="report.js?v=20261101d"></script>
-<script src="aipolish.js?v=20261101d"></script>
-<script src="app.js?v=20261101d"></script>
-<script src="import.js?v=20261101d"></script>
-<script src="appfetch.js?v=20261101d"></script>
-<script src="profile.js?v=20261101d"></script>
-<script src="course.js?v=20261101d"></script>
-<script src="write.js?v=20261101d"></script>
-<script src="publish.js?v=20261101d"></script>
-<script src="send.js?v=20261101d"></script>
-<script src="kakao.js?v=20261101d"></script>
-<script src="sms.js?v=20261101d"></script>
-<script src="contacts.js?v=20261101d"></script>
-<script src="notice.js?v=20261101d"></script>
-<script src="tb.js?v=20261101d"></script>
-<script src="tb-dash.js?v=20261101d"></script>
-<script src="tb-issue.js?v=20261101d"></script>
-<script src="tb-stock.js?v=20261101d"></script>
-<script src="tb-bill.js?v=20261101d"></script>
-<script src="../assets/dday.js?v=20261101d"></script>
-<script src="../assets/app-week.js?v=20261101d"></script>
-<script src="card.js?v=20261101d"></script>
-<script src="exams.js?v=20261101d"></script>
-<script src="photo.js?v=20261101d"></script>
-<script src="applink.js?v=20261101d"></script>
-<script src="skips.js?v=20261101d"></script>
-<script src="reviewnote.js?v=20261101d"></script>
-<script src="hwfix.js?v=20261101d"></script>
-<script src="attend.js?v=20261101d"></script>
-<script src="attbook.js?v=20261101d"></script>
-<script src="quicknote.js?v=20261101d"></script>
-<script src="today.js?v=20261101d"></script>
-<script src="staff.js?v=20261101d"></script>
-<script src="notes.js?v=20261101d"></script>
-<script src="classes.js?v=20261101d"></script>
-<script src="weekly.js?v=20261101d"></script>
-<script src="filethumb.js?v=20261101d"></script>
-<script src="ytbm.js?v=20261101d"></script>
-<script src="summary.js?v=20261101d"></script>
-<script src="weeks.js?v=20261101d"></script>
-<script src="../assets/photos.js?v=20261101d"></script>
-<script src="review.js?v=20261101d"></script>
-<script src="draftguard.js?v=20261101d"></script>
-<script src="preview.js?v=20261101d"></script>
-<script src="rtabs.js?v=20261101d"></script>
-<script src="nav.js?v=20261101d"></script>
-<script src="sync.js?v=20261101d"></script>
-<script src="auth.js?v=20261101d"></script>
+<script src="../assets/config.js?v=20261101e"></script>
+<script src="../assets/brand.js?v=20261101e"></script>
+<script src="../assets/lesson.js?v=20261101e"></script>
+<script src="supabase.js?v=20261101e"></script>
+<script src="db.js?v=20261101e"></script>
+<script src="store.js?v=20261101e"></script>
+<script src="report.js?v=20261101e"></script>
+<script src="aipolish.js?v=20261101e"></script>
+<script src="app.js?v=20261101e"></script>
+<script src="import.js?v=20261101e"></script>
+<script src="appfetch.js?v=20261101e"></script>
+<script src="profile.js?v=20261101e"></script>
+<script src="course.js?v=20261101e"></script>
+<script src="write.js?v=20261101e"></script>
+<script src="publish.js?v=20261101e"></script>
+<script src="send.js?v=20261101e"></script>
+<script src="kakao.js?v=20261101e"></script>
+<script src="sms.js?v=20261101e"></script>
+<script src="welcome.js?v=20261101e"></script>
+<script src="contacts.js?v=20261101e"></script>
+<script src="notice.js?v=20261101e"></script>
+<script src="tb.js?v=20261101e"></script>
+<script src="tb-dash.js?v=20261101e"></script>
+<script src="tb-issue.js?v=20261101e"></script>
+<script src="tb-stock.js?v=20261101e"></script>
+<script src="tb-bill.js?v=20261101e"></script>
+<script src="../assets/dday.js?v=20261101e"></script>
+<script src="../assets/app-week.js?v=20261101e"></script>
+<script src="card.js?v=20261101e"></script>
+<script src="exams.js?v=20261101e"></script>
+<script src="photo.js?v=20261101e"></script>
+<script src="applink.js?v=20261101e"></script>
+<script src="skips.js?v=20261101e"></script>
+<script src="reviewnote.js?v=20261101e"></script>
+<script src="hwfix.js?v=20261101e"></script>
+<script src="attend.js?v=20261101e"></script>
+<script src="attbook.js?v=20261101e"></script>
+<script src="quicknote.js?v=20261101e"></script>
+<script src="today.js?v=20261101e"></script>
+<script src="staff.js?v=20261101e"></script>
+<script src="notes.js?v=20261101e"></script>
+<script src="classes.js?v=20261101e"></script>
+<script src="weekly.js?v=20261101e"></script>
+<script src="filethumb.js?v=20261101e"></script>
+<script src="ytbm.js?v=20261101e"></script>
+<script src="summary.js?v=20261101e"></script>
+<script src="weeks.js?v=20261101e"></script>
+<script src="../assets/photos.js?v=20261101e"></script>
+<script src="review.js?v=20261101e"></script>
+<script src="draftguard.js?v=20261101e"></script>
+<script src="preview.js?v=20261101e"></script>
+<script src="rtabs.js?v=20261101e"></script>
+<script src="nav.js?v=20261101e"></script>
+<script src="sync.js?v=20261101e"></script>
+<script src="auth.js?v=20261101e"></script>
 </body>
 </html>

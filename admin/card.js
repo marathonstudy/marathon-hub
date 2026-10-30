@@ -100,9 +100,10 @@
     }
     /* 이름 옆 「마지막 로그인 10/24」 · 학생 한 명 [문자] (20261031e) */
     $('#cardLogin').textContent = '';
+    $('#cardWelcome').textContent = '';
     $('#btnCardSms').setAttribute('data-sms-sid', sid);
     $('#btnCardSms').hidden = !!s.archived;
-    /* [앱 안내 문자] — 「문자 발송」 → 보내기 (앱 안내(기본) · 그 반 입장코드 · 20261031m) */
+    /* [웰컴·앱 설치 안내 다시 보내기] — 학생 / 학부모 / 둘 다 · 미리보기 (welcome.js · 20261101e · 예전 [앱 안내 문자]) */
     $('#btnCardApp').setAttribute('data-app-invite', sid);
     $('#btnCardApp').hidden = !!s.archived;
     /* 「앱에서 보기 ↗」 · 링크가 없으면 「+ 과제 링크 연결」 (applink.js · 20261031n) */
@@ -240,7 +241,21 @@
 
   /* ---------- 학생 입구 로그인 (migration-024) — 이름 옆 「마지막 로그인 10/24」 한 줄만 (20261031e) ----------
      예전 「학생 입구 로그인 기록」 펼침 칸은 없앴다. 기록(student_login_log)은 지우지 않는다 */
+  /* 「웰컴 안내 보냄 10/30」 (migration-052 sms_purpose_last · 20261101e) */
+  function loadWelcome() {
+    var sid = C && C.sid;
+    if (!sid || !window.Welcome) return;
+    Welcome.lastSent(sid).then(function (m) {
+      var el = $('#cardWelcome');
+      if (!el || !C || C.sid !== sid) return;
+      var at = m && m.welcome ? new Date(m.welcome) : null;
+      el.textContent = at ? '웰컴 안내 보냄 ' + (at.getMonth() + 1) + '/' + at.getDate() : '';
+      el.title = at ? '신입생 웰컴 · 앱 설치 안내 문자 ' + fmtDT(m.welcome) : '';
+    });
+  }
+  window.addEventListener('jt:welcome-sent', function () { if ($('#cardModal') && $('#cardModal').open) loadWelcome(); });
   function loadLogin() {
+    loadWelcome();
     var sid = C.sid;
     sb().rpc('student_login_log', { p_student: sid }).then(function (r) {
       var el = $('#cardLogin');
