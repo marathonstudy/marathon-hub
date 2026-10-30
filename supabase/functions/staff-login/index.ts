@@ -2,12 +2,14 @@
 //  staff-login — 조교가 이름 + 휴대폰 번호 8자리(010 뺀)로 코치룸에 들어온다 (migration-047)
 //
 //  코치룸 로그인 화면 [들어가기] 가 부른다. 로그인 전이라 토큰 없이 { name, phone } 만 보낸다.
-//    1) DB 함수 staff_phone_login(이름, 번호) — 처음 보는 번호면 그 이름으로 조교 등록 · 있으면 이름이 맞는지
-//       (번호는 DB 안에서 비밀 값과 섞은 해시로만 남는다 · 이 함수도 번호를 저장하거나 기록하지 않는다)
+//    1) DB 함수 staff_phone_login(이름, 번호) — 처음 보는 번호면 「승인 대기」로 만들고 들어가지 못한다 (migration-051)
+//       코치룸 「오늘」 맨 위에 운영진 모두에게 「새 조교 승인 대기」 — 누구든 승인하면 같은 이름 · 번호로 다시 들어온다 (문자는 보내지 않는다)
+//       거절된 번호는 reason rejected
+//       (로그인 확인값은 DB 안에서 비밀 값과 섞은 해시로만 · 문자용 번호는 운영진만 읽는 staff_phones · 이 함수는 번호를 기록하지 않는다)
 //    2) 그 사람의 로그인 계정(이메일 칸은 ph-…@coach.… 로 저절로 정해진다 · 메일은 가지 않는다)을 만들고
 //       한 번 쓰는 로그인 토큰으로 바로 세션을 만들어 돌려준다 → 화면이 그 세션으로 로그인해 이 기기에 계속 유지
 //    돌려주는 것: { ok, session: { access_token, refresh_token }, created } 또는 { ok: false, reason }
-//      reason — name · phone · mismatch(이름이나 번호가 맞지 않음) · disabled · locked · busy · nosql
+//      reason — name · phone · mismatch(이름이나 번호가 맞지 않음) · pending(승인 대기) · rejected · disabled · locked · nosql
 //
 //  키 — 새로 넣을 것 없음. Supabase 가 모든 함수에 기본으로 주는 SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY 를
 //       이 함수 안에서만 쓴다. 화면 · 저장소에는 어떤 키도 없다.
@@ -66,6 +68,7 @@ async function handle(req: Request, cors: Record<string, string>) {
     return json({ ok: false, reason: "error", message: m.slice(0, 160) }, cors);
   }
   const r = chk.j || {};
+  if (!r.ok && r.reason === "pending") return json({ ok: false, reason: "pending", created: !!r.created }, cors);
   if (!r.ok) return json({ ok: false, reason: String(r.reason || "error") }, cors);
   const email = String(r.email);
 

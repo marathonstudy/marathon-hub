@@ -1212,7 +1212,8 @@
     $('#tdInfo').setAttribute('aria-expanded', String(!!st.rulesOpen));
 
     setTimeout(renderApp, 0);
-    $('#tdBody').innerHTML = transitionHtml() +
+    $('#tdBody').innerHTML = '<div class="td-pending-wrap" id="tdPending" hidden></div>' +   /* 맨 위 — 운영진 모두에게 「새 조교 승인 대기 … [승인] [거절]」 (staff.js · migration-051) */
+      transitionHtml() +
       '<div class="td-rules" id="tdRules"' + (st.rulesOpen ? '' : ' hidden') + '><p class="panel__hint tdc-rule">반 이름 아래 칩 = 최근 3번 수업 레포트를 보낸 학생 비율 (초록 100% · 주황 일부 · 빨강 0% · 회색 수업 당일 작성 중). 칩을 누르면 그 수업 발송 화면으로 갑니다. ' +
         '학생 줄 「과제 n/5일」 = 지난 수업 레포트 기간(수업 전 일주일) 평일 중 과제를 낸 날 (토 · 일은 세지 않음). 회색 「과제 링크 연결 필요」 = 마라톤 앱 공유 링크가 없는 학생(누르면 링크 넣는 칸). ' +
         '챙길 학생 = 마감이 지났는데 복습테스트를 안 낸 학생(그 수업 레포트를 보내면 사라짐) · 결석이 기준(설정)을 넘은 학생(그 뒤 상담 기록을 남기면 사라짐).</p></div>' +
@@ -1223,6 +1224,7 @@
       endedHtml();
     paintDetail();
     if (window.Notes) setTimeout(Notes.paint, 0);
+    if (window.Staff && Staff.paintToday) setTimeout(Staff.paintToday, 0);
     paintStamp();
     if (window.QuickNote) QuickNote.mount();
   }

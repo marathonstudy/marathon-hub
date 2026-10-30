@@ -669,6 +669,14 @@ delete from public.staff where email = '조교이메일@example.com';
   (달력이 정시라도 그날 과제가 모두 늦었으면 늦게 · 달력에 없던 과제 날짜는 새 칸 · 조교가 고친 칸은 그대로) — compute · cumulative · 정답률이 같은 기준
 - 러닝노트 「날짜별 과제」 — 머리줄 「10/29(목) · 정시 · 67%」 · 개수는 2개 이상일 때만 · [숙제인증] · 이름 안 날짜 뺌 · 「늦게 · 10/29 제출」 · 「▶ 강의 다 봄 / 안 봄」
 
+### 5-57. 20261031z — 새 조교 승인 (migration-051-staff-approval.sql · staff-login 배포)
+1. SQL Editor 에서 `supabase/migration-051-staff-approval.sql` 실행 (049 다음 · 확인 줄: approval · 승인 대기 막기 true · 승인됨 n명 = 지금 운영진 모두).
+   - `staff.approval` approved · pending · rejected (지금 있는 사람은 approved) · `is_staff` · 원장 확인 · `staff_status` 는 승인된 사람만
+   - `staff_phone_login` 처음 보는 번호 → 승인 대기(사용 중 아님) · 거절 → rejected · 시간당 가입 제한 없앰
+   - `staff_pending` · `staff_approve` — 사용 중인 운영진 누구나 · `approved_by` 를 운영진 목록에 · 사용 중지 · 다시 사용은 원장만(047 그대로)
+2. Edge Function `staff-login` 배포 (문자는 보내지 않는다 · 새로 넣을 키 없음)
+- 화면: 「승인을 기다리는 중입니다…」 · 「승인되지 않은 번호입니다」 · 「오늘」 맨 위 「새 조교 승인 대기: 이름(뒤 4자리) [승인] [거절]」(운영진 모두) · 운영진 맨 위 승인 대기
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.
