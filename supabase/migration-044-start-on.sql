@@ -71,8 +71,18 @@ create trigger students_start_sync after insert or update of start_on on public.
 revoke all on function public._card_start_sync() from public, anon, authenticated;
 revoke all on function public._student_start_sync() from public, anon, authenticated;
 
-alter table public.care_checks drop constraint if exists care_checks_kind;
-alter table public.care_checks add constraint care_checks_kind check (kind in ('review', 'absent', 'report'));
+/* 037 의 material · makeup 을 그대로 두고 report 를 더한다. 표에 이미 있는 다른 kind 값도 모두 허용 (기존 기록은 바꾸지 않는다) */
+do $$
+declare ks text;
+begin
+  select string_agg(quote_literal(k), ', ' order by k) into ks
+    from (select unnest(array['review', 'absent', 'material', 'makeup', 'report']) as k
+          union
+          select distinct kind from public.care_checks where kind is not null) u;
+  alter table public.care_checks drop constraint if exists care_checks_kind;
+  execute format('alter table public.care_checks add constraint care_checks_kind check (kind in (%s))', ks);
+end;
+$$;
 
 
 -- ============================================================
