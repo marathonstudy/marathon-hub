@@ -664,6 +664,11 @@ delete from public.staff where email = '조교이메일@example.com';
 - hub.js — 카드 제목 「10/29(목) 수업」만 · 큰 제목 · 오른쪽 위 「n개」 · # 태그 없앰 · 영상 「▶ 수업 영상 보기」(여러 개면 차시 이름) · 키워드는 수업 영상 탭 카드에서만
 - 코치룸 — 「수업 내용」 차시 칸 · 요약 초안 칸 여러 줄 · [요약 다시 만들기]
 
+### 5-56. 20261031y — 날짜별 제출을 「과제 날짜」로 (SQL · 함수 배포 없음)
+- app-week.js `normalize` — 과제 기록을 과제 날짜(강 번호의 달력 날짜 → 과제 이름 안의 「10/23(금)」 → 낸 날)로 묶고, 다음 날 마감을 넘겨 낸 과제는 늦게
+  (달력이 정시라도 그날 과제가 모두 늦었으면 늦게 · 달력에 없던 과제 날짜는 새 칸 · 조교가 고친 칸은 그대로) — compute · cumulative · 정답률이 같은 기준
+- 러닝노트 「날짜별 과제」 — 머리줄 「10/29(목) · 정시 · 67%」 · 개수는 2개 이상일 때만 · [숙제인증] · 이름 안 날짜 뺌 · 「늦게 · 10/29 제출」 · 「▶ 강의 다 봄 / 안 봄」
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

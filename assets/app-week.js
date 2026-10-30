@@ -23,6 +23,11 @@
      아직 안 냈으면 분모에 넣지 않고 칸에 연하게 「오늘」 (hw · lec 'today') · 오늘 이미 냈으면(강의를 다 봤으면) 넣는다.
      예: 목 제출 · 오늘(금) 아직 → 1/1일 100%. compute · cumulative 를 쓰는 곳(러닝노트 · 레포트 · 전체 누적 · 과제 색 · 챙길 학생 · 반 평균)이 모두 같이
      today 에는 꼭 진짜 오늘을 넘긴다 (어제를 넘기면 어제가 「오늘」로 보인다)
+   과제 날짜 (20261031y) — 과제 기록(history)은 「낸 날」이 아니라 「과제 날짜」로 묶는다:
+     강 번호의 달력 날짜 → 과제 이름 안의 날짜(「… 10/23(금)」) → (둘 다 없으면) 낸 날(한국 날짜)
+     과제 날짜 다음 날 마감을 넘겨 낸 과제(앱의 지각 표시 · 또는 다음 날보다 뒤에 냄)는 「늦게」 —
+     달력이 정시로 적혀 있어도 그날 낸 과제가 모두 늦었으면 그날은 「늦게」, 달력에 없던 과제 날짜는 새 칸으로 (조교가 고친 칸은 그대로)
+     compute · cumulative(제출 수 · 정시율 · 정답률 · 레포트 과제 칸 · 과제 색)와 러닝노트 「날짜별 과제」가 같은 기준 (normalize)
    신입생 (20261031q · migration-044) — data.startOn(수강 시작일)이 있으면 그 앞 날은 회색 「신입생」(hw · lec 'new')
      제출 수 · 과제 있던 날 · 누적 어디에도 세지 않는다. 기간 중간에 시작했으면 시작일부터만 (예: 2/2일) · 시작일 뒤 평일이 없으면 allNew
      그 수업 레포트 기간(D-7 ~ D-1)이 모두 시작 전이면 forLesson 의 newStudent — 「첫 수업입니다 · 다음 레포트부터 과제 기록이 보입니다」
@@ -51,6 +56,84 @@
     ((data && (data.history || data.recent)) || []).forEach(function (h) { var x = String((h && h.submittedAt) || '').slice(0, 10); if (valid(x)) out[x] = 1; });
     return out;
   }
+  /* ---------- 과제 날짜 (20261031y) ---------- */
+  function kstDay(v) {
+    var x = String(v || '');
+    if (/T/.test(x) && /(Z|[+-]\d\d:?\d\d)$/i.test(x)) { var t = Date.parse(x); if (!isNaN(t)) return new Date(t + 9 * 3600000).toISOString().slice(0, 10); }
+    return x.slice(0, 10);
+  }
+  /* 과제 이름 안의 날짜 「10/23(금)」 · 「10.23」 — 해는 낸 날에 맞춘다 (12월 과제를 1월에 내면 지난해) */
+  var TITLE_DATE = /(\d{1,2})\s*[\/.]\s*(\d{1,2})\s*(?:\(\s*[월화수목금토일]\s*\))?/;
+  function titleDate(title, ref) {
+    var m = TITLE_DATE.exec(String(title || ''));
+    if (!m) return '';
+    var mo = +m[1], d = +m[2];
+    if (mo < 1 || mo > 12 || d < 1 || d > 31) return '';
+    var y = +(String(ref || '').slice(0, 4)) || new Date().getUTCFullYear(), rm = +(String(ref || '').slice(5, 7)) || mo;
+    if (mo - rm > 6) y--; else if (rm - mo > 6) y++;
+    var iso = y + '-' + String(mo).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    return valid(iso) ? iso : '';
+  }
+  /* 과제 이름 — 앞의 [숙제인증] · 이름 안의 날짜는 칸 날짜와 겹치니 뺀다 */
+  function cleanTitle(t) {
+    return String(t || '').replace(/^\s*\[[^\]]{1,12}\]\s*/, '').replace(new RegExp('\\s*' + TITLE_DATE.source + '\\s*', 'g'), ' ').replace(/\s+/g, ' ').trim() || String(t || '').trim();
+  }
+  function orderDays(data) {
+    var by = {};
+    ((data && data.calendar) || []).forEach(function (c) { if (c && c.order && valid(c.date)) by[c.order] = c.date; });
+    return by;
+  }
+  /* 과제 날짜 { date, how: 'order' | 'title' | 'sub' } */
+  function hwDateOf(h, byOrder) {
+    if (h && h.order && byOrder && byOrder[h.order]) return { date: byOrder[h.order], how: 'order' };
+    var sub = kstDay(h && h.submittedAt), td = titleDate(h && h.title, sub);
+    if (td) return { date: td, how: 'title' };
+    return { date: valid(sub) ? sub : '', how: 'sub' };
+  }
+  /* 늦게 낸 과제 — 앱의 지각 표시 · 또는 과제 날짜 다음 날보다 뒤에 냄 */
+  function lateOf(h, date) {
+    if (h && h.late) return true;
+    var sub = kstDay(h && h.submittedAt);
+    return !!(valid(sub) && valid(date) && sub > addDays(date, 1));
+  }
+  /* 달력을 과제 기록에 맞춘다 — 결과는 기억해 둔다 (같은 data 를 여러 번 센다) */
+  var NORM = typeof WeakMap === 'function' ? new WeakMap() : null;
+  function normalize(data) {
+    if (!data || data._norm || !(data.history || data.recent)) return data;
+    if (NORM && NORM.has(data)) return NORM.get(data);
+    var byOrder = orderDays(data), groups = {};
+    (data.history || data.recent || []).forEach(function (h) {
+      if (!h || !h.submittedAt) return;
+      var d = hwDateOf(h, byOrder);
+      if (!valid(d.date) || d.how === 'sub') return;              /* 날짜를 모르면 달력을 건드리지 않는다 */
+      (groups[d.date] = groups[d.date] || []).push(h);
+    });
+    var cal = (data.calendar || []).map(function (c) {
+      var g = c && groups[c.date];
+      if (!g || c.fixed || isWeekend(c.date)) return c;
+      var allLate = g.every(function (h) { return lateOf(h, c.date); });
+      var st = allLate ? 'late' : 'onTime';
+      if (c.status === st) return c;
+      if (c.status === 'onTime' && st === 'onTime') return c;
+      var x = {}; Object.keys(c).forEach(function (k) { x[k] = c[k]; });
+      x.status = c.status === 'none' || c.status === 'onTime' ? st : c.status;
+      return x;
+    });
+    var have = {};
+    cal.forEach(function (c) { if (c) have[c.date] = 1; });
+    Object.keys(groups).forEach(function (d) {
+      if (have[d] || isWeekend(d)) return;
+      var g = groups[d];
+      cal.push({ date: d, order: g[0].order || 0, status: g.every(function (h) { return lateOf(h, d); }) ? 'late' : 'onTime', fromHistory: true });
+    });
+    var out = {};
+    Object.keys(data).forEach(function (k) { out[k] = data[k]; });
+    out.calendar = cal;
+    out._norm = true;
+    if (NORM) NORM.set(data, out);
+    return out;
+  }
+
   /* 수정값 덮기 — data 는 그대로 두고 calendar 만 새로 (그날 앱 칸이 없으면 새 칸) */
   var FIX_OK = { onTime: 1, late: 1, none: 1, exempt: 1 };
   function withFix(data, fix) {
@@ -64,9 +147,10 @@
       seen[c.date] = 1;
       var x = {}; Object.keys(c).forEach(function (k) { x[k] = c[k]; });
       x.status = fix[c.date];
+      x.fixed = 1;                                       /* 조교가 고친 칸 — 과제 날짜 맞추기(normalize)가 건드리지 않는다 */
       return x;
     });
-    keys.forEach(function (k) { if (!seen[k]) out.calendar.push({ date: k, order: 0, status: fix[k] }); });
+    keys.forEach(function (k) { if (!seen[k]) out.calendar.push({ date: k, order: 0, status: fix[k], fixed: 1 }); });
     return out;
   }
   function esc(v) {
@@ -77,6 +161,7 @@
   /* data = app-report 의 data · from ~ to = 과제 기간 · today = 오늘(한국 날짜) */
   function compute(data, from, to, today) {
     if (!data || !valid(from) || !valid(to) || to < from) return null;
+    data = normalize(data);
     var cal = {}, lec = {}, dateOfOrder = {};
     (data.calendar || []).forEach(function (c) {
       if (!c || !valid(c.date)) return;
@@ -113,11 +198,11 @@
       days.push({ date: d, dow: DOW[new Date(d + 'T00:00:00Z').getUTCDay()], hw: hw, lec: lv });
     }
 
-    /* 그 기간 과제의 평균 정답률 — 강 번호의 날짜(없으면 제출한 날)로 기간 안인지 본다 */
+    /* 그 기간 과제의 평균 정답률 — 과제 날짜(강 번호의 날짜 → 과제 이름 안의 날짜 → 낸 날)로 기간 안인지 본다 */
     var rates = [];
     (data.history || data.recent || []).forEach(function (h) {
       if (!h || h.correctRate == null) return;
-      var day = (h.order && dateOfOrder[h.order]) || String(h.submittedAt || '').slice(0, 10);
+      var day = hwDateOf(h, dateOfOrder).date;
       if (day >= from && day <= to) rates.push(Number(h.correctRate));
     });
     var rate = rates.length ? Math.round(rates.reduce(function (a, b) { return a + b; }, 0) / rates.length) : null;
@@ -145,6 +230,7 @@
   /* 전체 누적 — 시작일 ~ to (과제 제출 · 정시 · 강의 시청 %, 강의가 있던 날이 없으면 lec = null) · 토 · 일(주중 복습)은 세지 않는다 */
   function cumulative(data, to, today) {
     if (!data || !valid(to)) return null;
+    data = normalize(data);
     var lec = {};
     (data.lectures || []).forEach(function (l) { if (l && l.order) lec[l.order] = l; });
     var days = 0, done = 0, onTime = 0, lDays = 0, lDone = 0, start = valid(data.startOn) ? data.startOn : '';
@@ -232,6 +318,7 @@
 
   global.AppWeek = { compute: compute, tableHtml: tableHtml, hwRate: hwRate, tone: tone, LEGEND: LEGEND, HW_MARK: HW_MARK, HW_TIP: HW_TIP,
                      lastWeek: lastWeek, startOf: startOf, cumulative: cumulative, forLesson: forLesson,
-                     isWeekend: isWeekend, subDaysOf: subDaysOf, withFix: withFix };
+                     isWeekend: isWeekend, subDaysOf: subDaysOf, withFix: withFix,
+                     normalize: normalize, hwDateOf: hwDateOf, orderDays: orderDays, lateOf: lateOf, cleanTitle: cleanTitle, kstDay: kstDay, titleDate: titleDate };
 
 })(window);

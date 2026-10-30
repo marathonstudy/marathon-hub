@@ -1975,7 +1975,8 @@
   /* 과제 날짜마다 — 앱 달력의 그날 상태 · 그날 차시(강의 영상) · 그 차시 과제 기록
      토 · 일은 앱 기록이 없어도 늘 「주중 복습」 줄 (weekend · 제출 기록이 있으면 ✓ · 요약 칸에서는 세지 않는다 · 20261030d) */
   function appDays(d, from, to) {
-    var t = todayISO(), lec = {}, byOrder = {}, days = {};
+    d = AppWeek.normalize ? AppWeek.normalize(d) : d;           /* 과제 날짜로 맞춘 달력 (요약 · 요일 칸과 같은 정시 기준 · 20261031y) */
+    var t = todayISO(), lec = {}, byOrder = AppWeek.orderDays ? AppWeek.orderDays(d) : {}, days = {};
     for (var wd = from, k = 0; wd <= to && wd <= t && k < 400; wd = plusDays(wd, 1), k++) {
       if (AppWeek.isWeekend(wd)) days[wd] = { date: wd, status: 'wk', weekend: true, lecture: null, items: [] };
     }
@@ -1989,9 +1990,9 @@
     });
     (d.history || d.recent || []).forEach(function (h) {
       if (!h) return;
-      var day = (h.order && byOrder[h.order]) || String(h.submittedAt || '').slice(0, 10);
+      var day = AppWeek.hwDateOf ? AppWeek.hwDateOf(h, byOrder).date : String(h.submittedAt || '').slice(0, 10);
       if (!isDay(day) || day < from || day > to) return;
-      if (!days[day]) days[day] = { date: day, status: h.late ? 'late' : 'onTime', weekend: false, lecture: h.order ? lec[h.order] || null : null, items: [] };
+      if (!days[day]) days[day] = { date: day, status: AppWeek.lateOf(h, day) ? 'late' : 'onTime', weekend: AppWeek.isWeekend(day), lecture: h.order ? lec[h.order] || null : null, items: [] };
       if (days[day].weekend) days[day].status = 'wkDone';
       days[day].items.push(h);
     });
@@ -2055,20 +2056,20 @@
     var openAt = Math.max(0, list.findIndex(function (x) { return !x.weekend || x.items.length; }));
     return '<div class="card ap-days"><h2 class="card-title">📅 날짜별 과제<span class="card-note">' + (nWeek ? '과제 ' + nWeek + '일' : '') + '</span></h2>' +
       list.map(function (x, i) {
+        /* 머리줄 「10/29(목) · 정시 · 67%」 — 과제 날짜 칸 · 정시 기준은 과제 요약과 같다 · 개수는 하루 2개 이상일 때만 (20261031y) */
         var st = AP_ST[x.status] || AP_ST.none, avg = rateAvg(x.items), L = x.lecture;
         return '<details class="ap-day' + (x.weekend ? ' ap-day--wk' : '') + '"' + (i === openAt ? ' open' : '') + '><summary>' +
             '<span class="ap-day__d num">' + esc(Lesson.md(x.date)) + '</span>' +
             '<span class="' + st[1] + '">' + st[0] + '</span>' +
-            (x.items.length ? '<span class="ap-muted">과제 ' + x.items.length + '개</span>' : '') +
             (avg == null ? '' : '<span class="ap-day__r num">' + avg + '%</span>') +
+            (x.items.length >= 2 ? '<span class="ap-muted">과제 ' + x.items.length + '개</span>' : '') +
           '</summary><div class="ap-day__body">' +
-            (L ? '<p class="ap-lec">🎬 ' + esc(L.title || '그날 강의') + (L.videosTotal ? ' <span class="num">' + L.videosDone + '/' + L.videosTotal + '개 시청</span>' : '') +
-                 (L.videosTotal > 0 && L.videosDone >= L.videosTotal ? ' <span class="app-tag">다 봄</span>' : '') + '</p>' : '') +
+            (L && L.videosTotal ? '<p class="ap-lec">▶ 강의 ' + (L.videosDone >= L.videosTotal ? '다 봄' : '안 봄') + '</p>' : '') +
             (x.items.length ? '<ul class="app-recent">' + x.items.map(function (h) {
+              var late = AppWeek.lateOf ? AppWeek.lateOf(h, x.date) : !!h.late, sub = AppWeek.kstDay ? AppWeek.kstDay(h.submittedAt) : String(h.submittedAt || '').slice(0, 10);
               return '<li class="app-recent__row">' +
-                '<span class="app-recent__title">' + esc(h.title || '과제') + '</span>' +
-                (h.submittedAt ? '<span class="app-recent__date num">' + esc(Lesson.md(String(h.submittedAt).slice(0, 10), false) + ' ' + hhmm(h.submittedAt)) + '</span>' : '') +
-                (h.late ? '<span class="app-tag app-tag--late">지각</span>' : '<span class="app-tag">정시</span>') +
+                '<span class="app-recent__title">' + esc(AppWeek.cleanTitle ? AppWeek.cleanTitle(h.title || '과제') : (h.title || '과제')) + '</span>' +
+                (late ? '<span class="app-tag app-tag--late">늦게' + (isDay(sub) ? ' · ' + esc(Lesson.md(sub, false)) + ' 제출' : '') + '</span>' : '<span class="app-tag">정시</span>') +
                 (h.correctRate == null ? '' : '<span class="app-recent__rate num">' + h.correctRate + '%</span>') +
               '</li>';
             }).join('') + '</ul>' : '<p class="ap-muted">' + (x.weekend ? '토 · 일은 주중 복습 날입니다 (제출 수에 넣지 않아요)' : x.status === 'exempt' ? '면제한 날입니다 (제출 수에 넣지 않아요)' : x.status === 'today' ? '오늘은 밤 12시 마감 전이에요 (아직 세지 않아요)' : x.status === 'none' ? '제출한 과제가 없습니다' : '과제 기록이 없습니다') + '</p>') +

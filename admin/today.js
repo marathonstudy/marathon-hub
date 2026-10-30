@@ -670,7 +670,8 @@
   function dayInfo(data, d) {
     var date = d.date;
     var c = (data.calendar || []).find(function (x) { return x.date === date; });
-    var hs = (data.history || []).filter(function (h) { return (c && c.order && h.order === c.order) || (!(c && c.order) && kstDay(h.submittedAt) === date); });
+    var byO = window.AppWeek && AppWeek.orderDays ? AppWeek.orderDays(data) : null;
+    var hs = (data.history || []).filter(function (h) { return byO ? AppWeek.hwDateOf(h, byO).date === date : ((c && c.order && h.order === c.order) || (!(c && c.order) && kstDay(h.submittedAt) === date)); });
     var lec = c && c.order ? (data.lectures || []).find(function (l) { return l.order === c.order; }) : null;
     var title = (hs[0] && hs[0].title) || (lec && lec.title) || (d.weekend ? '주중 복습' : '과제');
     var h = hs.filter(function (x) { return x.submittedAt; }).pop();
