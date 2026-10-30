@@ -8,7 +8,9 @@
 //
 //  무엇을 받나
 //    ?code=개인링크코드   ← 앱 공유 코드가 아니다
-//    ?codes=코드,코드,…   반 단위로 한 번에 (30명까지 · 20261031g) — 함수 안에서 8명씩 동시에 받아 한 번에 돌려준다.
+//    ?codes=코드,코드,…   반 단위로 한 번에 (30명까지 · 20261031g) — 함수 안에서 3명씩 동시에 받아 한 번에 돌려준다 (20261101d · 예전 8명)
+//                         앱 서버가 바쁘다(429 · 5xx) · 응답이 없다(시간 초과)면 잠깐 쉬었다가 2번까지 다시 묻는다
+//                         실패 이유: nolink(링크 없음) · expired(링크 만료) · timeout(앱 응답 없음) · busy(앱 서버 바쁨) · upstream(앱 서버 오류) · lookup
 //                        「오늘」 첫 화면용 가벼운 기록만 (날짜별 제출 · 강의 · 과제 제목 · 제출 시각 — 최근 120일)
 //                        { ok: true, items: { 코드: { ok, data } | { ok: false, reason } } }
 //    함수가 그 학생의 앱 공유 코드를 DB 함수(hub_app_code)로 찾는다.
@@ -172,8 +174,19 @@ function lite(full: Any) {
   };
 }
 
-/* 개인 링크 코드 하나 → { ok, data } | { ok: false, reason } (한 명 · 반 단위 모두 이것을 쓴다) */
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/* 개인 링크 코드 하나 → { ok, data } | { ok: false, reason } (한 명 · 반 단위 모두 이것을 쓴다)
+   앱 서버가 바쁘거나 응답이 없으면 0.7초 · 1.8초 쉬었다가 2번까지 다시 (20261101d) */
 async function fetchOne(code: string, base: string, headers: Record<string, string>): Promise<Any> {
+  let last: Any = null;
+  for (let k = 0; k < 3; k++) {
+    if (k) await sleep(k === 1 ? 700 : 1800);
+    last = await fetchOnce(code, base, headers);
+    if (last.ok || !["timeout", "busy", "upstream", "lookup"].includes(last.reason)) return last;
+  }
+  return last;
+}
+async function fetchOnce(code: string, base: string, headers: Record<string, string>): Promise<Any> {
   let share: string | null = null;
   try {
     const r = await fetch(`${base}/rest/v1/rpc/hub_app_code`, { method: "POST", headers, body: JSON.stringify({ p_code: code }) });
@@ -185,14 +198,15 @@ async function fetchOne(code: string, base: string, headers: Record<string, stri
   if (!share || !/^[A-Za-z0-9_-]{8,128}$/.test(share)) return { ok: false, reason: "nolink" };
   try {
     const ctl = new AbortController();
-    const t = setTimeout(() => ctl.abort(), 12000);
+    const t = setTimeout(() => ctl.abort(), 10000);
     const r = await fetch(APP_API + encodeURIComponent(share), { headers: { "Accept": "application/json" }, signal: ctl.signal });
     clearTimeout(t);
     if (r.status === 404) return { ok: false, reason: "expired" };
-    if (!r.ok) return { ok: false, reason: "upstream" };
+    if (r.status === 429 || r.status === 503) return { ok: false, reason: "busy", status: r.status };
+    if (!r.ok) return { ok: false, reason: "upstream", status: r.status };
     return { ok: true, data: pick(await r.json()) };
-  } catch {
-    return { ok: false, reason: "upstream" };
+  } catch (e) {
+    return { ok: false, reason: (e as Error)?.name === "AbortError" ? "timeout" : "upstream" };
   }
 }
 
@@ -212,7 +226,7 @@ Deno.serve(async (req: Request) => {
   const headers: Record<string, string> = { "apikey": key, "Content-Type": "application/json" };
   if (key.startsWith("eyJ")) headers["Authorization"] = `Bearer ${key}`;
 
-  // 반 단위 — 코드마다 따로 찾고 받는다 (8명씩 동시에 · 한 명이 늦어도 12초에서 끊는다)
+  // 반 단위 — 코드마다 따로 찾고 받는다 (3명씩 동시에 · 한 명이 늦어도 10초에서 끊고 2번까지 다시)
   if (many.length) {
     const codes = [...new Set(many)];
     if (codes.length > 30 || codes.some((c) => !/^[A-Za-z0-9]{20,64}$/.test(c))) return json({ ok: false, reason: "invalid" }, 400, cors);
@@ -225,7 +239,7 @@ Deno.serve(async (req: Request) => {
         items[c] = r.ok ? { ok: true, data: lite(r.data) } : r;
       }
     };
-    await Promise.all(Array.from({ length: Math.min(8, codes.length) }, worker));
+    await Promise.all(Array.from({ length: Math.min(3, codes.length) }, worker));
     return json({ ok: true, items }, 200, cors, "private, max-age=60");
   }
 

@@ -3682,3 +3682,7 @@ textarea.aip-text--new:focus { outline: 2px solid #B9AEF0; outline-offset: 1px; 
 .tdc-left__list { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 0; }
 .tdc-left__nm { appearance: none; font: inherit; font-size: 13px; font-weight: 700; color: var(--ink-mid); background: #fff; border: 1px solid #E1E3EC; border-radius: 8px; padding: 0 10px; min-height: 36px; cursor: pointer; }
 .tdc-left__nm small { font-weight: 500; color: var(--ink-light); }
+
+/* 과제 칩 — 못 불러온 이유 · 반 카드 다시 불러오기 줄 (today.js · 20261101d) */
+.tdc-app__why { display: block; font-size: 11px; font-weight: 600; opacity: .8; }
+.tdc-card .ar-bar { margin: 8px 0 6px; }

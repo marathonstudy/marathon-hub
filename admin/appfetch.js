@@ -5,13 +5,14 @@
      (30분 동안 이 화면 메모리에만 · 브라우저에 저장하지 않는다)
    · 같은 코드를 부르는 중이면 그 요청을 같이 기다린다
    · 15초 안에 답이 없으면 실패로 본다 → 화면은 「과제 기록 못 불러옴 · 다시 시도」
-   · 앱 서버는 학생마다 따로 응답해서(한꺼번에 받는 주소가 없다) 여러 명을 동시에 부른다 (호출하는 쪽에서 6명씩)
+   · 앱 서버는 학생마다 따로 응답해서(한꺼번에 받는 주소가 없다) 여러 명을 부른다 — 20261101d 부터 4명씩 한 묶음, 묶음은 하나씩 차례로
+     (예전: 반 4개를 동시에 · 함수 안에서 8명씩 → 앱 서버에 한꺼번에 30여 건 → 시간 초과 · 「못 불러옴」이 여러 명 한꺼번에)
    ============================================================ */
 
 (function (global) {
   'use strict';
 
-  var TTL = 30 * 60 * 1000, TIMEOUT = 15000;
+  var TTL = 30 * 60 * 1000, TIMEOUT = 15000, CHUNK = 4;
   var cache = {};      /* code → { at, res } */
   var flying = {};     /* code → Promise */
 
@@ -46,10 +47,13 @@
   function getMany(codes) {
     codes = (codes || []).filter(Boolean);
     if (!codes.length) return Promise.resolve({});
-    if (codes.length > 30) {
-      var parts = [];
-      for (var i = 0; i < codes.length; i += 30) parts.push(codes.slice(i, i + 30));
-      return Promise.all(parts.map(getMany)).then(function (rs) { return Object.assign.apply(null, [{}].concat(rs)); });
+    if (codes.length > CHUNK) {
+      /* 4명씩 한 묶음 — 묶음은 하나씩 차례로 (동시에 여러 묶음을 보내지 않는다) */
+      var parts = [], out = {};
+      for (var i = 0; i < codes.length; i += CHUNK) parts.push(codes.slice(i, i + CHUNK));
+      return parts.reduce(function (p, part) {
+        return p.then(function () { return getMany(part).then(function (r) { Object.assign(out, r); }); });
+      }, Promise.resolve()).then(function () { return out; });
     }
     if (manyOff) return oneByOne(codes);
     var ctl = global.AbortController ? new AbortController() : null;
@@ -76,7 +80,7 @@
       var c = codes[i++];
       return get(c).then(function (res) { out[c] = res; return next(); });
     }
-    return Promise.all([next(), next(), next(), next(), next(), next()]).then(function () { return out; });
+    return Promise.all([next(), next(), next()]).then(function () { return out; });           /* 예전 함수일 때 — 3명씩 */
   }
 
   function peek(code) { var c = cache[code]; return c && Date.now() - c.at < TTL ? c.res : null; }

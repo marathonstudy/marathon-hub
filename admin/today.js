@@ -260,7 +260,8 @@
         return nextGroup();
       });
     }
-    Promise.all([nextGroup(), nextGroup(), nextGroup(), nextGroup()]).then(function () {
+    /* 반 묶음도 하나씩 차례로 (20261101d · 예전 4개 동시) — 끝나면 못 불러온 학생만 1.5초 · 4초 쉬었다가 2번까지 다시 */
+    nextGroup().then(function () { return autoRetry(all, 0); }).then(function () {
       appMeta.busy = false;
       appMeta.at = appMeta.shown = Date.now();
       clearInterval(appProg.timer);
@@ -270,6 +271,17 @@
       /* 처음 채웠을 때만 한 번 — 펼친 반을 정렬대로 다시 세운다 (다시 받을 때는 줄 순서를 바꾸지 않는다) */
       if (firstFill && !$('#appRoot').hidden && Object.keys(st.open).length) render();
       window.dispatchEvent(new CustomEvent('jt:app', { detail: { done: true } }));
+    });
+  }
+  function autoRetry(all, k) {
+    var bad = all.filter(function (s) { var a = app[s.id]; return a && a.failed; });
+    if (!bad.length || k >= 2) return Promise.resolve();
+    return new Promise(function (r) { setTimeout(r, k ? 4000 : 1500); }).then(function () {
+      return AppFetch.getMany(bad.map(function (s) { return s.code; })).then(function (res) {
+        bad.forEach(function (s) { var e = entryOf(res[s.code]); if (!e.failed || (app[s.id] && app[s.id].failed)) setEntry(s, e); });
+        renderApp(); paintAvg();
+        return autoRetry(all, k + 1);
+      });
     });
   }
   /* 5분마다 — 「오늘」이 보일 때만 (다른 탭 · 숨긴 창이면 멈춤) */
@@ -542,7 +554,7 @@
     if (x.k === 'need' && x.why === 'expired') return warnHtml(s) || '<button type="button" class="tdc-warn" data-app-relink="' + esc(s.id) + '" data-warn="expired">링크 확인 필요</button>';
     if (x.k === 'need') return '<button type="button" class="tdc-link-btn" data-app-link="' + esc(s.id) + '" aria-expanded="' + (window.AppLink && AppLink.current() === s.id) + '" title="' + esc((NEED_TIP[x.why] || NEED_TIP.nolink) + ' · 누르면 바로 아래에 링크 칸') + '">+ 과제 링크 연결</button>';
     if (x.k === 'wait') return '<span class="tdc-app tdc-app--wait" title="과제 기록 불러오는 중"><i class="spin" aria-hidden="true"></i>과제 불러오는 중</span>';
-    if (x.k === 'fail') return '<button type="button" class="tdc-app tdc-app--fail" data-app-retry="' + esc(s.id) + '">과제 기록 못 불러옴 · 다시 시도</button>';
+    if (x.k === 'fail') return '<button type="button" class="tdc-app tdc-app--fail" data-app-retry="' + esc(s.id) + '">과제 기록 못 불러옴 · 다시 시도<small class="tdc-app__why">' + esc(whyText(s.id)) + '</small></button>';
     if (x.k === 'nosched') return '<span class="tdc-app tdc-app--none" title="수업 요일을 정하면 그 수업 전 일주일 과제를 셉니다">과제 · 수업일 정하면 보임</span>';
     var w = x.w;
     if (!w) {
@@ -1238,9 +1250,38 @@
         '</div>' +
       '</div>' +
       (n ? toggleBar(c.name, n, open, c) : '') +
-      (open ? '<div class="tdc-list">' + sortRows(rows, c).map(function (s) { return studentRow(s, c); }).join('') + leftHtml(c.name) + '</div>' : '') +
+      (open ? arHtml(c.name, rows) + '<div class="tdc-list">' + sortRows(rows, c).map(function (s) { return studentRow(s, c); }).join('') + leftHtml(c.name) + '</div>' : '') +
     '</div>';
   }
+  /* 반 카드 학생 목록 위 「못 불러온 n명 다시 불러오기」 — 작성 화면과 같다 (불러오는 중 3/8 · 다 불러왔습니다 · 이름(이유) · 20261101d) */
+  var AR = {};
+  function arHtml(cls, rows) {
+    var a = AR[cls] || {};
+    var f = failedIds(rows.map(function (s) { return s.id; }));
+    var body = a.busy ? '<span class="ar-bar__t"><i class="spin" aria-hidden="true"></i>불러오는 중 <span class="num">' + a.done + '/' + a.total + '</span></span>'
+      : (f.length ? '<button type="button" class="btn btn--sm ar-bar__btn" data-ar-cls="' + esc(cls) + '">못 불러온 ' + f.length + '명 다시 불러오기</button>' : '') +
+        (a.msg ? '<span class="ar-bar__msg">' + a.msg + '</span>' : '');
+    return body ? '<div class="ar-bar" data-ar-host="' + esc(cls) + '">' + body + '</div>' : '<div data-ar-host="' + esc(cls) + '" hidden></div>';
+  }
+  function arPaint(cls) {
+    var c = (st.clsBy || {})[cls], el = document.querySelector('[data-ar-host="' + String(cls).replace(/["\\]/g, '\\$&') + '"]');
+    if (!c || !el) return;
+    el.outerHTML = arHtml(cls, c.rows);
+  }
+  function arRetry(cls) {
+    var c = (st.clsBy || {})[cls];
+    if (!c) return;
+    var ids = failedIds(c.rows.map(function (s) { return s.id; }));
+    if (!ids.length || (AR[cls] && AR[cls].busy)) return;
+    AR[cls] = { busy: true, done: 0, total: ids.length, msg: '' };
+    arPaint(cls);
+    retryMany(ids, function (d, t) { AR[cls].done = d; AR[cls].total = t; arPaint(cls); }).then(function (left) {
+      AR[cls] = { busy: false, msg: !left.length ? '다 불러왔습니다 ✓' : '아직 못 불러온 학생 — ' + left.map(function (x) { return esc(x.name) + '(' + esc(x.why) + ')'; }).join(', ') };
+      if (!left.length) toast('다 불러왔습니다', 'good');
+      render();
+    });
+  }
+
   /* 반 카드 학생 목록 맨 아래 — 퇴원한 학생(퇴원일이 지남 · 퇴원 표시 아님) 접어 둠 · 이름 = 상담 카드([다시 다니는 중으로]) · 20261101c */
   function leftHtml(cls) {
     var t = DDay.today();
@@ -1362,7 +1403,7 @@
      못 불러옴(failed)인 학생만 한꺼번에 · 6명씩 동시에 · 하나 끝날 때마다 onProg(끝난 수, 전체)
      끝나면 그래도 안 되는 학생 [{ id, name, why }] — why = 짐작한 이유 (링크 없음 · 링크 만료 · 앱 응답 없음 · 인터넷 연결 · 앱 서버 오류 …) */
   var WHY = { nolink: '링크 없음', nohub: '학부모 링크 없음', expired: '링크 만료', timeout: '앱 응답 없음', network: '인터넷 연결 확인',
-              upstream: '앱 서버 오류', lookup: '앱 서버 오류', invalid: '링크 형식 확인', config: '서버 설정 확인' };
+              upstream: '앱 서버 오류', lookup: '앱 서버 오류', invalid: '링크 형식 확인', config: '서버 설정 확인', busy: '앱 서버 바쁨' };
   function whyText(sid) {
     var s = rowById(sid), a = app[sid];
     if (!s) return '명단 확인';
@@ -1460,6 +1501,8 @@
     if (e.target.closest('.al-box')) return;                 /* 과제 링크 칸 (applink.js) */
     var rt = e.target.closest('[data-app-retry]');
     if (rt) { loadApp(rt.dataset.appRetry); return; }
+    var arb = e.target.closest('[data-ar-cls]');
+    if (arb) { arRetry(arb.dataset.arCls); return; }
     var to = e.target.closest('[data-todo-open]');
     if (to) { var k0 = to.dataset.todoOpen; if (st.todoOpen[k0]) delete st.todoOpen[k0]; else st.todoOpen[k0] = true; render(); return; }
     var ss = e.target.closest('[data-skip1-sid]');

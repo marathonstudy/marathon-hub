@@ -691,6 +691,12 @@ delete from public.staff where email = '조교이메일@example.com';
 - card.js — 「기본 정보」의 퇴원일 칸(students.left_on · migration-037)을 맨 아래 [퇴원 처리]로 옮김 (마지막 수업일 기본 = 가장 최근 지난 수업일) · 퇴원한 학생은 [다시 다니는 중으로]
 - today.js — 반 카드 학생 목록 맨 아래 「퇴원 n명」(접힘 · 이름 = 상담 카드) · 빠지는 곳은 그대로(Store.isActiveOn · inLesson · 서버 필기 알림 left_on)
 
+### 5-61. 20261101d — 과제 기록 「못 불러옴」이 한꺼번에 생기던 것 (함수 app-report 다시 배포)
+1. Edge Functions → `app-report` 에 `supabase/functions/app-report/index.ts` 다시 붙여 넣고 Deploy (Verify JWT 설정은 지금 그대로).
+- 원인: 「오늘」이 반 4개를 동시에 · 함수가 반마다 8명씩 동시에 → 앱 서버에 한꺼번에 30여 건 · 12초에 끊고 다시 묻지 않음 · 25초가 넘으면 화면이 6명씩 또 부름
+- 지금: 화면은 4명씩 한 묶음을 하나씩 차례로 · 함수는 3명씩 · 앱 서버가 바쁘거나(429 · 503) 응답이 없으면 0.7초 · 1.8초 쉬었다가 2번까지 다시 · 화면도 못 불러온 학생만 1.5초 · 4초 뒤 2번까지
+- 「오늘」 반 카드 학생 목록 위 「못 불러온 n명 다시 불러오기」(작성 화면과 같음) · 칩에 짧은 이유(링크 없음 · 앱 응답 없음 · 앱 서버 바쁨 …) · 불러온 기록은 지금처럼 10분 기억(다시 불러오기 · 새로고침은 새로)
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.
