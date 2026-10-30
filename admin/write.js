@@ -736,10 +736,11 @@
       row.className = 'row-item';
       row.innerHTML =
         '<span class="row-item__no num">' + (i + 1) + '차시</span>' +
-        '<input class="input" type="text" data-kind="lesson" data-i="' + i + '"' +
-        ' placeholder="예) 현대시 「진달래꽃」 — 화자의 정서와 반어 표현 분석">' +
+        /* 여러 줄 — 첫 줄 머리말(예: 독서 · 인문) · 다음 줄부터 「· 」 핵심 (20261031x) */
+        '<textarea class="input lesson-ta" rows="3" data-kind="lesson" data-i="' + i + '"' +
+        ' placeholder="독서 · 인문&#10;· 롤스와 매킨타이어의 정의관&#10;· 모의고사 구성과 시간 배분"></textarea>' +
         '<button class="btn btn--sm btn--ghost" type="button" data-del="lesson" data-i="' + i + '" aria-label="삭제">×</button>';
-      row.querySelector('input').value = text || '';
+      row.querySelector('textarea').value = text || '';
       lessons.appendChild(row);
     });
 

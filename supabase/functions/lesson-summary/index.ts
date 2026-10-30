@@ -64,12 +64,18 @@ async function rpcAs(auth: string, apikey: string, name: string, args: Record<st
 const SYSTEM = [
   "너는 고등학교 국어 학원 「마라톤국어」의 수업 기록 도우미다.",
   "선생님의 수업 영상 자막(유튜브 자동 생성 자막이거나 직접 붙여 넣은 스크립트)을 읽고,",
-  "학부모에게 보내는 주간 레포트의 「이번주 학습 내용」에 들어갈 차시별 한 줄 요약을 만든다.",
+  "학부모에게 보내는 주간 레포트의 「수업」 카드에 들어갈 차시별 요약을 만든다 (20261031x — 차시별 짧은 머리말 + 점 목록).",
+  "",
+  "모양 (차시마다)",
+  "- head 머리말: 그 차시 영역을 아주 짧게 (10자 안팎) — 「독서 · 인문」 「문학 · 소설」 「화법과 작문」처럼. 「1교시」 같은 번호는 쓰지 않는다(화면이 붙인다).",
+  "- points 핵심: 2~4줄. 한 줄은 25자 안팎, 한 줄에 내용 하나만. 「—」나 쉼표로 여러 내용을 이어 붙이지 않는다. 명사형으로 끝낸다.",
+  "  예) head 「독서 · 인문」 points [「롤스와 매킨타이어의 정의관」, 「지시 표현 확인, 지문 근거로 정답 확정」은 X → 「지시 표현을 지문 근거로 확인」, 「모의고사 구성과 시간 배분」]",
+  "  예) head 「문학 · 소설」 points [「고전소설 「운영전」 인물 관계」, 「현대소설 주인공 심리와 회상의 기능」, 「〈보기〉 활용해서 풀기」]",
   "",
   "규칙",
   "- 요청한 차시 수만큼, 수업 순서대로 나눈다. 한 영상에 여러 차시가 들어 있으면 쉬는 시간, '2교시' 같은 말, 다루는 작품·단원이 바뀌는 곳을 경계로 삼는다.",
-  "- 한 줄은 80자 안팎. 무엇을 배웠는지가 드러나게: 갈래 · 작품/지문 · 핵심 개념이나 활동. 예) 현대시 「진달래꽃」 — 화자의 정서와 반어 표현 분석",
-  "- 작품명은 「 」로 감싼다. 문장을 길게 늘이지 말고 명사형으로 끝낸다.",
+  "- 무엇을 배웠는지가 드러나게: 작품/지문 · 핵심 개념 · 푸는 방법 · 과제 안내.",
+  "- 작품명은 「 」로 감싼다.",
   "- 자동 자막은 받아쓰기 오류가 많다(예: '국어 강사'가 '구어왕사'로). 작품명·작가·용어는 확실할 때만 바로잡고, 확실하지 않으면 그 이름을 빼고 내용만 쓴다. 자막에 없는 내용을 지어내지 않는다.",
   "- 요약은 그 반 학부모 모두가 본다. 학생 개인 이야기가 나오면 안 된다.",
   "- 출석 부르기, 학생 이름, 잡담(학교 · 가족 · 개인 이야기), 성적, 개인 정보는 모두 뺀다. 자막의 「학생」은 이름을 가린 자리다 — 그 부분은 쓰지 않는다.",
@@ -84,8 +90,8 @@ const SCHEMA = {
       type: "array",
       items: {
         type: "object",
-        properties: { no: { type: "integer" }, text: { type: "string" } },
-        required: ["no", "text"],
+        properties: { no: { type: "integer" }, head: { type: "string" }, points: { type: "array", items: { type: "string" } } },
+        required: ["no", "head", "points"],
         additionalProperties: false,
       },
     },
@@ -96,12 +102,26 @@ const SCHEMA = {
 };
 
 function userPrompt(mode: string, n: number, texts: string[]): string {
+  /* 「요약 다시 만들기」 — 이미 있는 요약을 새 모양(머리말 + 점 목록)으로만 바꾼다. 자막이 없으니 내용을 더하지 않는다 */
+  if (mode === "reformat") {
+    return `아래는 이미 만든 차시별 수업 요약이다. 내용을 더하거나 지어내지 말고, 차시마다 head(짧은 머리말)와 points(2~4줄 · 한 줄 25자 안팎 · 한 줄에 하나)로만 바꿔 lessons 에 ${n}개를 담아라 (no 는 1부터). note 는 빈 문자열.\n\n` +
+      `<summary>\n${texts[0]}\n</summary>`;
+  }
   if (mode === "split") {
-    return `차시마다 자막이 따로 있다. 각 자막을 그 차시 한 줄로 요약해 lessons 에 ${n}개를 담아라 (no 는 1부터).\n\n` +
+    return `차시마다 자막이 따로 있다. 각 자막을 그 차시 머리말 + 점 목록으로 요약해 lessons 에 ${n}개를 담아라 (no 는 1부터).\n\n` +
       texts.map((t, i) => `<transcript lesson="${i + 1}">\n${t}\n</transcript>`).join("\n\n");
   }
-  return `아래는 한 영상(한 수업)의 자막이다. 수업 순서대로 ${n}개 차시로 나눠 각 차시를 한 줄로 요약하고 lessons 에 ${n}개를 담아라 (no 는 1부터).\n\n` +
+  return `아래는 한 영상(한 수업)의 자막이다. 수업 순서대로 ${n}개 차시로 나눠 각 차시를 머리말 + 점 목록으로 요약하고 lessons 에 ${n}개를 담아라 (no 는 1부터).\n\n` +
     `<transcript>\n${texts[0]}\n</transcript>`;
+}
+
+/* 저장 모양 — 「독서 · 인문\n· 롤스와 매킨타이어의 정의관\n· …」 (번호는 화면이 「1교시」로 붙인다 · 한 차시 300자 안) */
+function lessonText(l: Any): string {
+  const head = String(l?.head ?? "").replace(/\s+/g, " ").replace(/^\s*\d+\s*(교시|차시)\s*[:：.]?\s*/, "").trim().slice(0, 30);
+  const points = (Array.isArray(l?.points) ? l.points : []).map((p: unknown) => String(p ?? "").replace(/\s+/g, " ").replace(/^[·•\-*]\s*/, "").trim()).filter(Boolean).slice(0, 4);
+  let out = head;
+  for (const p of points) { const next = out + "\n· " + p; if (next.length > 300) break; out = next; }
+  return out.trim();
 }
 
 async function summarize(req: Request, cors: Record<string, string>) {
@@ -113,17 +133,17 @@ async function summarize(req: Request, cors: Record<string, string>) {
   if (body.kind === "review") return reviewNote(body, auth, apikey, cors);
   const cls = String(body.class_name ?? "").trim();
   const week = String(body.week_start ?? "");
-  const mode = body.mode === "split" ? "split" : "one";
+  const mode = body.mode === "split" ? "split" : body.mode === "reformat" ? "reformat" : "one";
   const n = Math.round(Number(body.lessons) || 2);
-  const source = body.source === "paste" ? "paste" : "file";
+  const source = body.source === "paste" || mode === "reformat" ? "paste" : "file";
   const texts: string[] = (Array.isArray(body.texts) ? body.texts : []).map((t: unknown) => String(t ?? "").trim());
   if (!cls || !/^\d{4}-\d{2}-\d{2}$/.test(week)) return json({ ok: false, reason: "input", message: "반과 주차를 골라 주세요." }, cors, 400);
   if (n < 1 || n > 4) return json({ ok: false, reason: "input", message: "차시 수는 1 ~ 4 로 골라 주세요." }, cors, 400);
-  if (mode === "one" ? (texts.length !== 1 || !texts[0]) : (texts.length !== n || texts.some((t) => !t))) {
-    return json({ ok: false, reason: "input", message: "자막을 넣어 주세요." }, cors, 400);
+  if (mode !== "split" ? (texts.length !== 1 || !texts[0]) : (texts.length !== n || texts.some((t) => !t))) {
+    return json({ ok: false, reason: "input", message: mode === "reformat" ? "다시 만들 요약이 없습니다." : "자막을 넣어 주세요." }, cors, 400);
   }
   const chars = texts.reduce((a, t) => a + t.length, 0);
-  if (chars < 200) return json({ ok: false, reason: "input", message: "자막이 너무 짧습니다. 파일이나 붙여 넣은 내용을 확인해 주세요." }, cors, 400);
+  if (mode !== "reformat" && chars < 200) return json({ ok: false, reason: "input", message: "자막이 너무 짧습니다. 파일이나 붙여 넣은 내용을 확인해 주세요." }, cors, 400);
   if (chars > MAX_CHARS) return json({ ok: false, reason: "input", message: `자막이 너무 깁니다 (${chars.toLocaleString()}자). ${MAX_CHARS.toLocaleString()}자까지 보낼 수 있습니다.` }, cors, 400);
 
   const key = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
@@ -192,9 +212,8 @@ async function summarize(req: Request, cors: Record<string, string>) {
   const lessons: string[] = (parsed?.lessons ?? [])
     .slice()
     .sort((a: Any, b: Any) => (Number(a?.no) || 0) - (Number(b?.no) || 0))
-    .map((l: Any, i: number) => String(l?.text ?? "").replace(/\s+/g, " ").trim())
-    .filter(Boolean)
-    .map((t: string, i: number) => (/^\d+\s*차시\s*[:：]/.test(t) ? t : `${i + 1}차시: ${t}`).slice(0, 300));
+    .map((l: Any) => (l && l.text != null && l.head == null ? String(l.text).replace(/\s+/g, " ").trim().slice(0, 300) : lessonText(l)))
+    .filter(Boolean);
   if (!lessons.length) {
     await finish({ ...usage, p_error: "empty" }).catch(() => {});
     return json({ ok: false, reason: "claude", message: "요약을 받지 못했습니다. 다시 한 번 눌러 주세요." }, cors, 200);

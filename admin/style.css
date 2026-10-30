@@ -3623,3 +3623,6 @@ textarea.aip-text--new:focus { outline: 2px solid #B9AEF0; outline-offset: 1px; 
 .note-qr__count { font-size: clamp(22px, 4vw, 44px); font-weight: 900; color: #4A34B8; margin: 0; }
 .note-qr__url { font-size: 12px; color: var(--ink-light); word-break: break-all; margin: 0; }
 .note-qr__close { min-height: 44px; min-width: 120px; }
+
+/* 차시 칸 · 요약 초안 칸 — 여러 줄 (머리말 + 「· 」 점 · 20261031x) */
+.lesson-ta { min-height: 76px; resize: vertical; line-height: 1.55; font: inherit; }

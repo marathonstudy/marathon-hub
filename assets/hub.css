@@ -818,7 +818,7 @@ label.hub-btn { cursor: pointer; text-align: center; }
 .tw-comment.is-open { -webkit-line-clamp: unset; display: block; }
 .tw-rv-btn { appearance: none; border: 0; font: inherit; cursor: pointer; width: 100%; min-height: 56px; margin-bottom: 12px;
   border-radius: 16px; background: var(--grad-strong); color: #fff; font-size: 17px; font-weight: 900; box-shadow: var(--card-shadow); }
-.tw-learn.is-short .lesson-item:nth-child(n+4) { display: none; }
+.tw-learn.is-short .lesson-item:nth-child(n+4), .tw-learn.is-short .lb:nth-child(n+4) { display: none; }
 .tw-more, .tw-detail { appearance: none; border: 0; font: inherit; cursor: pointer; background: none; color: #5A3FD0; font-size: 14px; font-weight: 800; min-height: 40px; padding: 6px 4px; }
 .tw-trend__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
 .tw-trend__head .card-title { margin-bottom: 0; }
@@ -1243,3 +1243,14 @@ html.rn-lock, html.rn-lock body { overflow: hidden; }
 .rw-contact { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; background: #FBFBFE; }
 .rw-contact__t { margin: 0; font-size: 14px; line-height: 1.65; color: var(--ink-mid); }
 .rw-contact__btn { min-height: 44px; padding: 0 20px; }
+
+/* 「수업」 카드 — 차시 머리말 + 점 목록 (report-view.js lessonBlocksHtml · 20261031x) · 휴대폰에서 읽기 편하게 */
+.lb-list { display: grid; gap: 14px; }
+.lb-head { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; font-size: 15.5px; line-height: 1.5; color: var(--ink-deep, #2C3566); }
+.lb-no { font-weight: 900; color: #4A34B8; }
+.lb-topic { font-weight: 800; }
+.lb-pts { margin: 6px 0 0; padding: 0; list-style: none; display: grid; gap: 5px; }
+.lb-pts li { position: relative; padding-left: 14px; font-size: 15px; font-weight: 400; line-height: 1.65; color: #3E4670; overflow-wrap: anywhere; }
+.lb-pts li::before { content: '·'; position: absolute; left: 2px; top: 0; font-weight: 900; color: #8A7FD0; }
+.vd-watch { font-size: 15px; font-weight: 800; color: var(--ink-deep, #2C3566); }
+.vd-kws { margin-top: 4px; }

@@ -289,26 +289,27 @@
       .sort(function (a, b) { return (o(a.v) - o(b.v)) || (a.i - b.i); })
       .map(function (x) { return x.v; });
   }
-  function weekVideoHtml(v) {
-    var part = PART_NAME[v.part] || '';
-    return videoHtml(v.url,
-      '<span class="wk-part wk-part--' + esc(v.part) + '">' + esc(part) + (v.personal ? ' · 나만 보는 영상' : '') + '</span>' +
-      esc(v.title || (v.part === 'full' ? '수업 영상' : part + ' 영상')));
+  /* 영상 한 줄 — 「▶ 수업 영상 보기」 · 여러 개면 차시 이름을 붙인다 (「▶ 1교시 영상 보기」 · 20261031x) */
+  var PART_WATCH = { full: '수업 전체 영상 보기', '1': '1교시 영상 보기', '2': '2교시 영상 보기', makeup: '보강 영상 보기' };
+  var VD_PLAIN = /^\s*(수업\s*영상|수업\s*전체|전체\s*영상|전체|영상|\d\s*(차시|교시)(\s*영상)?|강의\s*영상|보강(\s*영상)?)?\s*$/;
+  function weekVideoHtml(v, i, all) {
+    var many = all && all.length > 1;
+    /* 선생님이 붙인 제목(예: 관동별곡 해설 · 가나 보강)은 그 제목 한 줄 · 기본값이면 「수업 영상 보기」 */
+    var label = !VD_PLAIN.test(v.title || '') ? String(v.title).trim()
+      : many ? (PART_WATCH[v.part] || '수업 영상 보기') : (v.part === 'makeup' ? '보강 영상 보기' : '수업 영상 보기');
+    return videoHtml(v.url, '<span class="vd-watch">▶ ' + esc(label) + (v.personal ? ' · 나만 보는 영상' : '') + '</span>');
   }
 
-  /* 「어떤 수업이었는지」 (20261031t · migration-046) — 차시별 한 줄(확정된 수업 내용 요약) · 키워드 칩 3~5개(복습 노트 「다룬 지문」 우선)
-     영상 제목이 「수업 영상」 「수업 전체」 같은 기본값이면 첫 차시 한 줄을 크게 */
-  var VD_DEFAULT = /^\s*(수업\s*영상|수업\s*전체|전체\s*영상|전체|영상|\d\s*차시(\s*영상)?|강의\s*영상)?\s*$/;
+  /* 「어떤 수업이었는지」 (20261031t · migration-046) — 확정된 수업 내용 요약 · 키워드 칩(복습 노트 「다룬 지문」 우선) */
   function lessonLines(w) { return ((w && w.lessons) || []).map(function (x) { return String(x || '').trim(); }).filter(Boolean); }
-  function bareLine(l) { return String(l).replace(/^\s*\d+\s*차시\s*[:：.]?\s*/, ''); }
-  function lessonInfoHtml(w, vids) {
-    var lines = lessonLines(w), kws = ((w && w.keywords) || []).filter(function (k) { return String(k || '').trim(); }).slice(0, 5);
+  /* 「수업」 카드 안 (20261031x) — 큰 제목 없이 차시마다 「1교시  독서 · 인문」 머리말 + 점 목록 (예전 한 줄 요약도 같은 모양)
+     키워드는 # 없이 · 수업 영상 탭 카드(opt.kws)에서만 */
+  function lessonInfoHtml(w, vids, opt) {
+    var lines = lessonLines(w), kws = opt && opt.kws ? ((w && w.keywords) || []).filter(function (k) { return String(k || '').trim(); }).slice(0, 5) : [];
     if (!lines.length && !kws.length) return '';
-    var big = lines.length && (vids || []).every(function (v) { return VD_DEFAULT.test(v.title || ''); });
     return '<div class="vd-info">' +
-      (big ? '<p class="vd-big">' + esc(bareLine(lines[0])) + '</p>' : '') +
-      (lines.length ? '<ul class="vd-lines">' + lines.map(function (l) { return '<li>' + esc(l) + '</li>'; }).join('') + '</ul>' : '') +
-      (kws.length ? '<div class="vd-kws" aria-label="키워드">' + kws.map(function (k) { return '<span class="vd-kw">#' + esc(k) + '</span>'; }).join('') + '</div>' : '') +
+      (lines.length ? ReportView.lessonBlocksHtml(lines) : '') +
+      (kws.length ? '<div class="vd-kws" aria-label="수업 영상 키워드">' + kws.map(function (k) { return '<span class="vd-kw">' + esc(k) + '</span>'; }).join('') + '</div>' : '') +
     '</div>';
   }
   function vdText(x) { return [weekName(x.w.week_start)].concat(lessonLines(x.w), (x.w.keywords || []), x.vids.map(function (v) { return v.title || ''; })).join(' ').toLowerCase(); }
@@ -354,12 +355,7 @@
   function lessonsHtml(lines) {
     var list = (lines || []).filter(function (t) { return String(t || '').trim(); });
     if (!list.length) return '';
-    return '<div class="nt-sub">📖 수업 내용</div><ul class="lesson-list wk-lessons">' + list.map(function (t, i) {
-      var m = /^(\d+)\s*차시\s*[:：.\-]?\s*([\s\S]*)$/.exec(String(t).trim());
-      var no = m && m[2].trim() ? m[1] + '차시' : (i + 1) + '차시';
-      var text = m && m[2].trim() ? m[2].trim() : String(t).trim();
-      return '<li class="lesson-item"><span class="lesson-check">✓</span><span><b class="lesson-no">' + esc(no) + '</b>' + md(text) + '</span></li>';
-    }).join('') + '</ul>';
+    return '<div class="nt-sub">📖 수업 내용</div>' + ReportView.lessonBlocksHtml(list);
   }
 
   function weekBodyHtml(w) {
@@ -467,8 +463,8 @@
   }
   function videoWeekCard(x) {
     return '<div class="card vd-week">' +
-             '<h2 class="card-title">▶️ ' + esc(weekName(x.w.week_start)) + '<span class="card-note">' + x.vids.length + '개</span></h2>' +
-             lessonInfoHtml(x.w, x.vids) +
+             '<h2 class="card-title">' + esc(weekName(x.w.week_start)) + '</h2>' +
+             lessonInfoHtml(x.w, x.vids, { kws: true }) +
              '<div class="nt-videos">' + x.vids.map(weekVideoHtml).join('') + '</div>' +
            '</div>';
   }
@@ -932,7 +928,7 @@
     var html = lessonsHtml(list).replace('<div class="nt-sub">📖 수업 내용</div>', '');
     return '<div class="card tw-learn' + (list.length > 3 ? ' is-short' : '') + '" id="twLearn">' +
       '<h2 class="card-title">📖 오늘 배운 것</h2>' + html +
-      (list.length > 3 ? '<button type="button" class="tw-more" data-tw-more>더 보기 (' + list.length + '줄)</button>' : '') + '</div>';
+      (list.length > 3 ? '<button type="button" class="tw-more" data-tw-more>더 보기 (' + list.length + '차시)</button>' : '') + '</div>';
   }
 
   /* ============================================================
@@ -1019,7 +1015,7 @@
   function weekVideosHtml(w) {
     var vids = w ? sortVideos((w.videos || []).filter(function (v) { return v && safeUrl(v.url); })) : [];
     if (!vids.length) return '';
-    return '<div class="card tw-videos rw-videos"><h2 class="card-title">▶️ 이 수업 영상</h2>' + lessonInfoHtml(w, vids) + '<div class="nt-videos">' + vids.map(weekVideoHtml).join('') + '</div></div>';
+    return '<div class="card tw-videos rw-videos"><h2 class="card-title">' + esc(weekName(w.week_start)) + '</h2>' + lessonInfoHtml(w, vids) + '<div class="nt-videos">' + vids.map(weekVideoHtml).join('') + '</div></div>';
   }
 
   /* 선생님 공지 — 수업일 · 영상 · 자료는 위 칸과 겹치므로 빼고, 공지 글만 */

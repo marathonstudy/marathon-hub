@@ -180,17 +180,43 @@
 
   /* ---------- 학습 내용 · 집중도 · 테스트 ---------- */
 
+  /* ---------- 수업 요약 한 차시 → 머리말 + 점 목록 (20261031x) ----------
+     새 모양: 「독서 · 인문\n· 롤스와 매킨타이어의 정의관\n· …」 (lesson-summary 가 만든다 · 번호는 화면이 「1교시」로)
+     예전 한 줄 「1차시: 현대시 「진달래꽃」 — 화자의 정서와 반어 표현 분석」도 같은 모양으로 보여 준다
+       (— 앞 = 머리말 · 뒤 = 점 · 쉼표로 이어 붙인 것은 나눈다) · 저장된 글은 바꾸지 않는다 */
+  function lessonBlock(raw, i) {
+    var parts = String(raw == null ? '' : raw).replace(/\r/g, '').split('\n').map(function (x) { return x.trim(); }).filter(Boolean);
+    var first = parts[0] || '';
+    var m = /^(?:수업\s*)?(\d+)\s*(?:차시|교시)\s*[:：.\-]?\s*([\s\S]*)$/.exec(first);
+    var no = i + 1, rest = m ? m[2].trim() : first;          /* 번호는 자리 순서로 (적힌 「N차시」는 떼어 낸다) */
+    var head = rest, points = [];
+    if (parts.length > 1) {
+      points = parts.slice(1).map(function (p) { return p.replace(/^[·•\-*]\s*/, '').trim(); }).filter(Boolean);
+    } else {
+      var seg = rest.split(/\s+[—–]\s+/);
+      if (seg.length > 1) {
+        head = seg[0];
+        seg.slice(1).join(', ').split(/\s*,\s+|\s+·\s+/).forEach(function (p) { p = p.trim(); if (p) points.push(p); });
+      } else if (rest.length > 18) { head = ''; points = [rest]; }
+    }
+    return { no: no, head: head.replace(/^[·•\-*]\s*/, '').trim(), points: points.slice(0, 6) };
+  }
+  function lessonBlocksHtml(list) {
+    list = (list || []).filter(function (l) { return String(l || '').trim(); });
+    if (!list.length) return '';
+    return '<div class="lb-list">' + list.map(function (raw, i) {
+      var b = lessonBlock(raw, i);
+      return '<div class="lb">' +
+               '<p class="lb-head"><b class="lb-no">' + b.no + '교시</b>' + (b.head ? '<span class="lb-topic">' + mdHtml(b.head) + '</span>' : '') + '</p>' +
+               (b.points.length ? '<ul class="lb-pts">' + b.points.map(function (p) { return '<li>' + mdHtml(p) + '</li>'; }).join('') + '</ul>' : '') +
+             '</div>';
+    }).join('') + '</div>';
+  }
+
   function lessonsHtml(d) {
     var list = (d.lessons || []).filter(function (l) { return String(l || '').trim(); });
     if (!list.length) return '';
-    var body = '<ul class="lesson-list">' + list.map(function (raw, i) {
-      var L = splitLesson(raw, i);
-      return '<li class="lesson-item">' +
-               '<span class="lesson-check">✓</span>' +
-               '<span><b class="lesson-no">' + esc(L.no) + '</b>' + mdHtml(L.text) + '</span>' +
-             '</li>';
-    }).join('') + '</ul>';
-    return card('📖 이번주 학습 내용', body, '총 ' + list.length + '차시');
+    return card('📖 이번주 학습 내용', lessonBlocksHtml(list), '총 ' + list.length + '차시');
   }
 
   function focusHtml(d) {
@@ -329,6 +355,8 @@
     shortDate: shortDate,
     dowDate: dowDate,
     lessonLine: lessonLine,
+    lessonBlock: lessonBlock,
+    lessonBlocksHtml: lessonBlocksHtml,
     formatPeriod: formatPeriod,
     DAYS: DAYS
   };

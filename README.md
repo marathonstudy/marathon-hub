@@ -657,6 +657,13 @@ delete from public.staff where email = '조교이메일@example.com';
 3. SQL Editor 에서 `supabase/migration-050-note-cron.sql` 실행 (매분 note-remind 호출 · pg_cron · pg_net). 「pg_cron is not available」이면 대시보드 → Integrations → Cron 을 켠 뒤 다시.
 4. 코치룸 반 관리 → 수업 설정에서 반마다 「필기 알림 켜기」 (처음엔 모두 꺼짐 · 켜기 전에는 아무 문자도 안 감) · 설정 → 문의 연락처에 카카오채널 링크.
 
+### 5-55. 20261031x — 「수업」 카드 읽기 쉽게 (함수 lesson-summary 다시 배포 · SQL 없음)
+1. Edge Functions → `lesson-summary` 에 `supabase/functions/lesson-summary/index.ts` 다시 붙여 넣고 Deploy (Verify JWT 끔 그대로).
+   - 요약 모양: 차시마다 `{ head, points[2~4] }` → 저장은 「머리말\n· 점\n· 점」 (번호는 화면이 「1교시」) · `mode: "reformat"` = 「요약 다시 만들기」(자막 없이 지금 요약을 새 모양으로)
+- report-view.js `lessonBlocksHtml` — 새 모양 · 예전 한 줄(「1차시: … — …」)을 같은 모양으로 (러닝노트 레포트 · 수업 영상 탭 · 코치룸 미리보기 같다)
+- hub.js — 카드 제목 「10/29(목) 수업」만 · 큰 제목 · 오른쪽 위 「n개」 · # 태그 없앰 · 영상 「▶ 수업 영상 보기」(여러 개면 차시 이름) · 키워드는 수업 영상 탭 카드에서만
+- 코치룸 — 「수업 내용」 차시 칸 · 요약 초안 칸 여러 줄 · [요약 다시 만들기]
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

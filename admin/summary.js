@@ -241,12 +241,14 @@
         (!confirmed && r.draft_note ? '<p class="ai-note">⚠️ AI 확인 메모: ' + esc(r.draft_note) + '</p>' : '') +
         '<div class="ai-lines">' + lines.map(function (t, i) {
           return '<div class="row-item ai-line">' +
-            '<input class="input" type="text" maxlength="300" data-ai-line="' + i + '" value="' + esc(t) + '">' +
+            '<textarea class="input lesson-ta" rows="3" maxlength="300" data-ai-line="' + i + '">' + esc(t) + '</textarea>' +
             '<button class="btn btn--sm btn--ghost" type="button" data-ai-del="' + i + '" aria-label="줄 지우기">×</button>' +
           '</div>';
         }).join('') + '</div>' +
         '<div class="wk-edit__btns">' +
           '<button class="btn btn--sm" type="button" data-ai-act="add">+ 줄 추가</button>' +
+          /* 「요약 다시 만들기」 — 지금 요약을 차시 머리말 + 점 목록 모양으로 (자막 없이 · 내용은 그대로 · 20261031x) */
+          '<button class="btn btn--sm" type="button" data-ai-act="reformat" title="지금 요약을 「1교시  독서 · 인문 / · 핵심」 모양으로 다시 만듭니다 (새 초안 · 이번 달 횟수 1회)">요약 다시 만들기</button>' +
           '<div class="spacer"></div>' +
           (confirmed
             ? '<button class="btn btn--sm btn--ghost" type="button" data-ai-act="unconfirm">확정 취소</button>'
@@ -528,9 +530,34 @@
 
   /* ---------- 확정 ---------- */
 
+  /* 차시 칸 — 줄바꿈(머리말 · 「· 」 점)은 그대로, 줄마다 띄어쓰기만 정리 (20261031x) */
   function readLines() {
-    return Array.prototype.map.call(document.querySelectorAll('#aiResult [data-ai-line]'), function (el) { return el.value.replace(/\s+/g, ' ').trim(); })
-      .filter(Boolean);
+    return Array.prototype.map.call(document.querySelectorAll('#aiResult [data-ai-line]'), function (el) {
+      return el.value.split('\n').map(function (x) { return x.replace(/\s+/g, ' ').trim(); }).filter(Boolean).join('\n');
+    }).filter(Boolean);
+  }
+
+  /* [요약 다시 만들기] — 지금 요약(초안이 있으면 초안 · 없으면 확정본)을 머리말 + 점 목록 모양의 새 초안으로 (자막 없이 · 내용은 그대로) */
+  function reformat() {
+    var lines = readLines();
+    if (!lines.length) { toast('다시 만들 요약이 없습니다', 'bad'); return; }
+    if (lines.length > 4) { toast('4차시까지 다시 만들 수 있습니다', 'bad'); return; }
+    if (st.busy) return;
+    if (st.usage && st.usage.cap != null && st.usage.used >= st.usage.cap) { toast('이번 달 AI 요약 상한을 모두 썼습니다', 'bad'); return; }
+    UI.confirmAsk('요약 다시 만들기', '지금 요약을 「1교시  독서 · 인문 / · 핵심」 모양의 새 초안으로 만듭니다. 내용은 더하지 않습니다. 이번 달 AI 요약 횟수를 1회 씁니다. 확정하기 전에는 학부모 화면이 바뀌지 않습니다.', '다시 만들기').then(function (yes) {
+      if (!yes) return;
+      st.busy = true;
+      var key = st.key;
+      toast('요약을 다시 만드는 중입니다…');
+      invoke({ class_name: st.cls, week_start: st.week, mode: 'reformat', lessons: lines.length,
+               texts: [lines.map(function (l, i) { return (i + 1) + '차시: ' + l; }).join('\n\n')], source: 'paste' }).then(function (res) {
+        st.busy = false;
+        loadUsage();
+        if (!res || !res.ok) { toast((res && res.message) || '다시 만들지 못했습니다', 'bad'); return; }
+        if (key === st.key) { st.row = res.summary || st.row; st.edit = null; renderResult(); }
+        toast('새 초안을 만들었습니다 — 읽고 [확정]을 눌러 주세요', 'good');
+      });
+    });
   }
 
   function confirm() {
@@ -691,6 +718,7 @@
         if (ins.length) ins[ins.length - 1].focus();
       }
       if (act.dataset.aiAct === 'confirm') confirm();
+      if (act.dataset.aiAct === 'reformat') reformat();
       if (act.dataset.aiAct === 'discard') serverAct('summary_discard', '초안 지우기', '이 초안을 지웁니다. 되돌릴 수 없습니다. (이번 달 사용 횟수는 돌아오지 않습니다)', '지우기', '초안을 지웠습니다');
       if (act.dataset.aiAct === 'unconfirm') serverAct('summary_unconfirm', '확정 취소', '학부모 화면에서 요약이 내려가고 초안으로 돌아갑니다. 「수업 내용」 칸과 이미 공개한 레포트는 그대로입니다.', '확정 취소', '확정을 취소했습니다 — 초안으로 돌아갔습니다');
     });
