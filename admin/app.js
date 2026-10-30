@@ -755,12 +755,21 @@
   function paintStartHint(isNew) {
     var h = $('#fStartHint'), v = $('#fStart') && $('#fStart').value;
     if (!h) return;
+    /* 새 학생 — 「수강 시작일: 11/1(토) · 바꾸기」 한 줄 (바꾸기를 누르면 날짜 칸 · 20261101b) */
+    var ln = $('#fStartLine');
+    if (ln) {
+      var open = !isNew || $('#fStart').dataset.open === '1';
+      ln.hidden = open;
+      $('#fStart').hidden = !open;
+      ln.querySelector('[data-start-text]').textContent = '수강 시작일: ' + (v ? Store.dateWithDow(v) : '등록한 날');
+    }
     h.textContent = isNew ? (v ? Store.dateWithDow(v) + ' 수업부터 레포트에 들어갑니다 (그 앞 수업 레포트에는 넣지 않음)' : '비워 두면 등록한 날부터') : (v ? '이날 수업부터 레포트 · 과제를 셉니다' : '');
   }
   if ($('#fStart')) $('#fStart').addEventListener('input', function (e) { e.target.dataset.typed = '1'; paintStartHint(!editingId); });
+  if ($('#fStartChange')) $('#fStartChange').addEventListener('click', function () { $('#fStart').dataset.open = '1'; paintStartHint(!editingId); setTimeout(function () { $('#fStart').focus(); }, 0); });
   $('#fClass').addEventListener('change', function () {
     var sf = $('#fStart');
-    if (sf && !editingId && !sf.dataset.typed && $('#fClass').value !== NEW_CLASS) { sf.value = Store.nextLessonDate($('#fClass').value); paintStartHint(true); }
+    if (sf && !editingId && !sf.dataset.typed && $('#fClass').value !== NEW_CLASS) { sf.value = Store.defaultStartDate($('#fClass').value); paintStartHint(true); }
     var sel = $('#fClass');
     if (sel.value === NEW_CLASS) { showNewClass(true); return; }
     sel.dataset.prev = sel.value;
@@ -1062,7 +1071,7 @@
     fillStudentClass(s ? (s.className || '') : (settings.lastClass || ''), !!s);
     /* 수강 시작일 — 있는 학생은 그 값, 새 학생은 그 반 다음 수업일 (20261031q) */
     var fs0 = $('#fStart');
-    if (fs0) { fs0.dataset.typed = ''; fs0.value = s ? (Store.startOf(s) || '') : Store.nextLessonDate($('#fClass').value); paintStartHint(!s); }
+    if (fs0) { fs0.dataset.typed = ''; fs0.dataset.open = ''; fs0.value = s ? (Store.startOf(s) || '') : Store.defaultStartDate($('#fClass').value); paintStartHint(!s); }
     $('#fParentTitle').value = s ? (s.parentTitle || '') : (settings.lastParentTitle || '');
     /* 번호는 가려서 보여 준다 — 그대로 두면 원래 번호가 남고, 지우고 새로 적으면 바뀐다 */
     $('#fPhone').value  = s && s.parentPhone ? Store.phoneMask(s.parentPhone) : '';
@@ -1219,7 +1228,7 @@
       extra: collectExtra(prev),
       sortOrder: prev ? prev.sortOrder || 0 : 0,
       createdAt: prev ? prev.createdAt : new Date().toISOString(),
-      startOn: ($('#fStart') && $('#fStart').value) || (prev ? prev.startOn || '' : Store.nextLessonDate($('#fClass').value.trim()))
+      startOn: ($('#fStart') && $('#fStart').value) || (prev ? prev.startOn || '' : Store.defaultStartDate($('#fClass').value.trim()))
     };
     if (prev && prev.leftOn) rec.leftOn = prev.leftOn;
 

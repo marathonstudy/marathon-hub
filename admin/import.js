@@ -229,12 +229,12 @@
           className: vals.className, parentTitle: vals.parentTitle,
           parentPhone: parentPhone, studentPhone: studentPhone,
           archived: false, extra: {}, sortOrder: 0, createdAt: new Date().toISOString(),
-          /* 수강 시작일 — 칸에 없으면 그 반 다음 수업일 (오늘이 수업일이면 오늘 · migration-044 · 20261031q) */
-          startOn: startDate || Store.nextLessonDate(vals.className)
+          /* 수강 시작일 — 칸에 없으면 그 반의 오늘이거나 앞선 가장 가까운 수업일 · 첫 수업 전이면 첫 수업일 (20261101b) · 미리 보기에서 바꿀 수 있다 */
+          startOn: startDate || Store.defaultStartDate(vals.className)
         };
         if (appCode) out.appCodes[rec.id] = appCode;
         if (startDate) out.startDates[rec.id] = startDate;
-        out.adds.push({ line: line, student: rec });
+        out.adds.push({ line: line, student: rec, autoStart: !startDate });
       }
     });
 
@@ -290,7 +290,26 @@
     section('새로 추가', plan.adds, function (a) {
       var s = a.student;
       return s.name + ' · ' + (s.className || '반 없음') + (s.parentPhone ? ' · ' + Store.phoneMask(s.parentPhone) : '') +
-             (plan.appCodes[s.id] ? ' · 앱 연결' : '');
+             (plan.appCodes[s.id] ? ' · 앱 연결' : '') + ' · 수강 시작일 ' + (s.startOn ? Store.dateWithDow(s.startOn) : '등록한 날');
+    });
+    /* 칸에 수강 시작일이 없는 새 학생 — 「수강 시작일: 11/1(토) · 바꾸기」 (반마다 · 바꾸면 그 반 새 학생 모두 · 20261101b) */
+    var byCls = {};
+    plan.adds.filter(function (a) { return a.autoStart; }).forEach(function (a) { var c = a.student.className || ''; (byCls[c] = byCls[c] || []).push(a); });
+    Object.keys(byCls).forEach(function (c) {
+      var list = byCls[c], d0 = list[0].student.startOn || '';
+      var row = document.createElement('div');
+      row.className = 'imp-start';
+      row.innerHTML = '<span class="imp-start__t"></span> <button type="button" class="btn btn--sm btn--ghost imp-start__b">바꾸기</button><input class="input imp-start__in" type="date" hidden>';
+      row.querySelector('.imp-start__t').textContent = (c || '반 없음') + ' 새 학생 ' + list.length + '명 — 수강 시작일: ' + (d0 ? Store.dateWithDow(d0) : '등록한 날');
+      var inp = row.querySelector('.imp-start__in');
+      inp.value = d0;
+      row.querySelector('.imp-start__b').addEventListener('click', function () { inp.hidden = false; inp.focus(); });
+      inp.addEventListener('change', function () {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(inp.value)) return;
+        list.forEach(function (a) { a.student.startOn = inp.value; });
+        row.querySelector('.imp-start__t').textContent = (c || '반 없음') + ' 새 학생 ' + list.length + '명 — 수강 시작일: ' + Store.dateWithDow(inp.value);
+      });
+      host.appendChild(row);
     });
     section('고침', plan.updates, function (u) {
       var parts = u.changes.map(function (c) {

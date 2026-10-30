@@ -448,7 +448,7 @@
     var pct = n ? Math.round(sent / n * 100) : 0;
     var wip = date === DDay.today() && sent < n;              /* 수업 당일 — 아직 보낼 때가 아니다 */
     /* 건너뛴 수업 (skips.js · migration-036) — 회색 「건너뜀」 · 「오늘 할 일」 · 배지에서 빠진다 (다 보냈으면 그대로 초록) */
-    var skip = sent < n && !!(window.Skips && Skips.skipped(c.name, date));
+    var skip = (sent < n || !n) && !!(window.Skips && Skips.skipped(c.name, date));
     var kind = skip ? 'skip' : wip ? 'wip' : !n ? 'wip' : sent === n ? 'ok' : sent ? 'part' : 'none';
     return { date: date, week: week, n: n, sent: sent, pct: pct, kind: kind, left: n - sent, ids: ids };
   }
@@ -456,16 +456,31 @@
     if (c.name === '(반 없음)' || !c.rows.length) return [];
     return recentLessons(c.name, 3).map(function (d) { return chipOf(c, d); });
   }
+  /* 그 반 그 수업 레포트를 한 명이라도 공개했나 — 공개한 레포트에는 [건너뛰기]를 붙이지 않는다 (20261101b) */
+  function publishedAny(c, x) {
+    var pm = (Store.read && Store.KEYS ? Store.read(Store.KEYS.published, {}) : {})[x.week] || {};
+    return c.rows.some(function (s) { return !!pm[s.id]; });
+  }
+  function canSkipChip(c, x) { return x.kind === 'wip' && !!window.Skips && !publishedAny(c, x); }
   function chipHtml(c, x) {
     var day = Store.dateWithDow(x.date);
     if (x.kind === 'skip') {
-      var sk = window.Skips && Skips.skipRow(c.name, x.date);
-      return '<button type="button" class="tdc-chip tdc-chip--skip num" data-unskip-cls="' + esc(c.name) + '" data-unskip-date="' + esc(x.date) + '" title="' +
-        esc(day + ' 레포트 — 보내지 않고 건너뜀' + (sk && sk.skipped_name ? ' (' + sk.skipped_name + ')' : '') + ' · 누르면 되돌리기') + '">' + esc(day + ' 건너뜀') + '</button>';
+      /* 「건너뜀」 — 누르면 [다시 작성하기] 하나만 (20261101b) */
+      var sk = window.Skips && Skips.skipRow(c.name, x.date), mk = c.name + '|' + x.date;
+      return '<span class="tdc-chipwrap"><button type="button" class="tdc-chip tdc-chip--skip num" data-skipmenu="' + esc(mk) + '" aria-expanded="' + (st.skipMenu === mk) + '" title="' +
+        esc(day + ' 레포트 — 보내지 않고 건너뜀' + (sk && sk.skipped_name ? ' (' + sk.skipped_name + ')' : '')) + '">' + esc(day + ' 건너뜀') + '</button>' +
+        (st.skipMenu === mk ? '<button type="button" class="tdc-chip__act" data-rewrite-cls="' + esc(c.name) + '" data-rewrite-date="' + esc(x.date) + '" data-rewrite-week="' + esc(x.week) + '">다시 작성하기</button>' : '') + '</span>';
     }
     var t = x.kind === 'wip' ? day + ' 작성 중' : x.kind === 'part' ? day + ' ' + x.pct + '% · 안 보냄 ' + x.left + '명' : day + ' ' + x.pct + '%';
-    return '<button type="button" class="tdc-chip tdc-chip--' + x.kind + ' num" data-go-send="' + esc(c.name) + '" data-week="' + esc(x.week) + '" title="' +
+    var chip = '<button type="button" class="tdc-chip tdc-chip--' + x.kind + ' num" data-go-send="' + esc(c.name) + '" data-week="' + esc(x.week) + '" title="' +
       esc(day + ' 수업 레포트 — 보냄 ' + x.sent + '/' + x.n + ' · 누르면 발송 화면') + '">' + esc(t) + '</button>';
+    /* 「작성 중」 칩 바로 오른쪽 [건너뛰기] — 묻지 않고 바로 · 아래 「되돌리기」 5초 (20261101b) */
+    return canSkipChip(c, x) ? '<span class="tdc-chipwrap">' + chip + '<button type="button" class="tdc-chip__skip" data-skipq-cls="' + esc(c.name) + '" data-skipq-date="' + esc(x.date) + '" aria-label="' + esc(day + ' 레포트 건너뛰기') + '">건너뛰기</button></span>' : chip;
+  }
+  /* 반 이름 줄 — 지난 「작성 중」이 2개 이상이면 [지난 작성 중 n개 모두 건너뛰기] */
+  function skipAllHtml(c, chips) {
+    var list = chips.filter(function (x) { return x.date < DDay.today() && canSkipChip(c, x); });
+    return list.length >= 2 ? '<button type="button" class="tdc-skipall" data-skipall="' + esc(c.name) + '" data-dates="' + esc(list.map(function (x) { return x.date; }).join(',')) + '">지난 작성 중 ' + list.length + '개 모두 건너뛰기</button>' : '';
   }
   /* 아직 다 안 보낸 지난 수업 레포트 (수업 당일은 빼고) — 「오늘 할 일」 · 배지 */
   function unsentOf(classes) {
@@ -1211,7 +1226,7 @@
       '<div class="tdc-head">' +
         '<div class="tdc-main">' +
           '<div class="tdc-title"><span class="tdc-name">' + esc(c.name) + '</span>' + (c.academy ? '<span class="muted-note">' + esc(c.academy) + '</span>' : '') +
-            '<span class="muted-note num tdc-n">' + n + '명</span>' + needBtn(needIds(rows, c.cy)) + '</div>' +
+            '<span class="muted-note num tdc-n">' + n + '명</span>' + needBtn(needIds(rows, c.cy)) + skipAllHtml(c, chips) + '</div>' +
           linesHtml(c, chips) +
           classWhen(c) +
           attHtml(c.name, '') +
@@ -1442,6 +1457,19 @@
     if (ss) { if (window.Skips) Skips.check('report', ss.dataset.skip1Cls, ss.dataset.skip1Date, ss.dataset.skip1Sid); return; }
     var sk = e.target.closest('[data-skip-cls]');
     if (sk) { if (window.Skips) Skips.skip(sk.dataset.skipCls, sk.dataset.skipDate); return; }
+    /* 「작성 중」 [건너뛰기] · [모두 건너뛰기] · 「건너뜀」 → [다시 작성하기] (20261101b) */
+    var sq = e.target.closest('[data-skipq-cls]');
+    if (sq) { if (window.Skips) Skips.skipNow([{ cls: sq.dataset.skipqCls, date: sq.dataset.skipqDate }]); return; }
+    var sa = e.target.closest('[data-skipall]');
+    if (sa) { if (window.Skips) Skips.skipNow(sa.dataset.dates.split(',').map(function (d) { return { cls: sa.dataset.skipall, date: d }; })); return; }
+    var sm = e.target.closest('[data-skipmenu]');
+    if (sm) { st.skipMenu = st.skipMenu === sm.dataset.skipmenu ? '' : sm.dataset.skipmenu; render(); return; }
+    var rw = e.target.closest('[data-rewrite-cls]');
+    if (rw) {
+      st.skipMenu = '';
+      if (window.Skips) Skips.unskip(rw.dataset.rewriteCls, rw.dataset.rewriteDate, false).then(function () { writeWeek(rw.dataset.rewriteCls, rw.dataset.rewriteWeek); });
+      return;
+    }
     var us = e.target.closest('[data-unskip-cls]');
     if (us) { if (window.Skips) Skips.unskip(us.dataset.unskipCls, us.dataset.unskipDate, true); return; }
     var ck = e.target.closest('[data-care-ok], [data-care-x]');

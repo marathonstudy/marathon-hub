@@ -65,6 +65,38 @@
           .then(function (r) { return done(r, Lesson.md(d, false) + ' 레포트를 건너뛰었습니다'); });
       });
   }
+  /* 묻지 않고 바로 건너뛰기 — 반 카드 「작성 중」 옆 [건너뛰기] · [지난 작성 중 n개 모두 건너뛰기] (today.js · 20261101b)
+     list = [{ cls, date }] · 화면 아래 「10/10(토) 건너뜀 · 되돌리기」 5초 · 되돌리기 = 원래대로 (「오늘 할 일」 건너뛰기와 같은 report_skips) */
+  function skipNow(list) {
+    list = (list || []).filter(function (x) { return x && x.cls && /^\d{4}-\d{2}-\d{2}/.test(String(x.date || '')); });
+    if (!list.length) return Promise.resolve(false);
+    if (st.missing) { toast(MISSING, 'bad'); return Promise.resolve(false); }
+    var rows = list.map(function (x) { return { class_name: x.cls, lesson_date: String(x.date).slice(0, 10), undone_at: null }; });
+    return sb().from('report_skips').upsert(rows, { onConflict: 'class_name,lesson_date' }).then(function (r) {
+      if (r && r.error) { toast(isMissing(r.error) ? MISSING : '저장하지 못했습니다 — ' + r.error.message, 'bad'); return false; }
+      undoToast((list.length === 1 ? Store.dateWithDow(rows[0].lesson_date) : list.length + '개 수업') + ' 건너뜀', function () { unskipMany(list); });
+      return load().then(function () { return true; });
+    });
+  }
+  function unskipMany(list) {
+    return Promise.all(list.map(function (x) {
+      return sb().from('report_skips').update({ undone_at: new Date().toISOString() }).eq('class_name', x.cls).eq('lesson_date', String(x.date).slice(0, 10));
+    })).then(function () { toast('되돌렸습니다', 'good'); return load(); });
+  }
+  /* 화면 아래 알림 + [되돌리기] — 5초 */
+  function undoToast(msg, onUndo) {
+    var host = document.getElementById('toastHost');
+    if (!host) return;
+    var el = document.createElement('div');
+    el.className = 'toast toast--undo';
+    el.innerHTML = '<span></span> · <button type="button" class="toast__undo">되돌리기</button>';
+    el.firstChild.textContent = msg;
+    var gone = false;
+    var close = function () { if (gone) return; gone = true; el.style.transition = 'opacity .2s'; el.style.opacity = '0'; setTimeout(function () { el.remove(); }, 220); };
+    el.querySelector('.toast__undo').addEventListener('click', function () { close(); onUndo(); });
+    host.appendChild(el);
+    setTimeout(close, 5000);
+  }
   function unskip(cls, date, ask) {
     var d = String(date || '').slice(0, 10);
     var go = function () {
@@ -132,6 +164,6 @@
   window.addEventListener('jt:loaded', function () { load(); });
   window.addEventListener('jt:remote', function (e) { var t = e.detail && e.detail.table; if (t === 'report_skips' || t === 'care_checks' || t === '*') load(); });
 
-  window.Skips = { load: load, skipped: skipped, skipRow: skipRow, skip: skip, unskip: unskip, checked: checked, check: check, checkMany: checkMany, uncheck: uncheck,
+  window.Skips = { load: load, skipped: skipped, skipRow: skipRow, skip: skip, unskip: unskip, skipNow: skipNow, unskipMany: unskipMany, checked: checked, check: check, checkMany: checkMany, uncheck: uncheck,
     history: history, checkKey: checkKey, paintNote: paintNote, missing: function () { return st.missing; }, loaded: function () { return st.loaded; } };
 })();

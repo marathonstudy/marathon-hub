@@ -681,6 +681,12 @@ delete from public.staff where email = '조교이메일@example.com';
 - today.js — 「김민규 · 고2 선수능반 · 10/29 결석 → 보강 영상 안 봄, 자료 안 받음 [확인함]」 · 같은 학생 이유는 한 줄 · 반별 「n명」 · [모두 확인함] · 이름 = 상담 카드 · 최근 수업일이 위 · 2주 지난 것은 「지난 항목 n개」 · 종강 반 제외 · 「확인함 기록 보기」는 맨 아래 작게
 - skips.js `checkMany` (여러 건 한 번에 확인함)
 
+### 5-59. 20261101b — 「작성 중」 건너뛰기 · 수강 시작일 기본값 · 코치룸 아이콘 (SQL · 함수 배포 없음)
+- today.js · skips.js — 반 카드 「작성 중」 칩 옆 [건너뛰기](묻지 않음 · 아래 「건너뜀 · 되돌리기」 5초) · 「건너뜀」 → [다시 작성하기] · [지난 작성 중 n개 모두 건너뛰기] · 공개한 레포트에는 없음 (report_skips 그대로)
+- store.js `defaultStartDate` — 그 반 수업일 중 오늘이거나 앞선 가장 가까운 날 · 첫 수업 전이면 첫 수업일 · 한 명 등록 「수강 시작일: 11/1(토) · 바꾸기」 · 엑셀 넣기 반마다 같은 줄 · 이미 등록된 학생은 그대로
+- `supabase/check-start-dates.sql` — 이미 등록된 학생 수강 시작일 분포 (읽기 전용)
+- admin/index.html — 탭 아이콘 · 홈 화면 아이콘 `assets/coach-icon.svg` · `coach-icon-180/192.png` (보라 동그라미 · 러닝노트 · 학생 입구는 그대로)
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

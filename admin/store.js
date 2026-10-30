@@ -863,6 +863,25 @@
     }
     return from;
   }
+  /* 새 학생 수강 시작일 기본값 (20261101b) — 그 반 수업일 중 오늘이거나 오늘보다 앞선 가장 가까운 날 · 아직 첫 수업 전이면 반 첫 수업일
+     예) 첫 수업 11/1 · 11/2 등록 → 11/1 · 첫 수업 전 10/28 등록 → 11/1 (이미 등록된 학생은 바꾸지 않는다) */
+  function defaultStartDate(cls, from) {
+    from = from || todayISO();
+    cls = String(cls || '').trim();
+    var s = schedOf(cls), d = parseISO(from);
+    if (!s || !d || !global.Lesson) return from;
+    if (s.first && s.first > from) return s.first;
+    var mon = toISO(mondayOf(d));
+    for (var i = 0; i < 60; i++) {
+      var wk = global.Lesson.addDays(mon, -7 * i);
+      if (s.first && global.Lesson.addDays(wk, 6) < s.first) break;
+      var L = lessonOf(cls, wk);
+      if (!L || L.canceled) continue;
+      var ds = (L.days && L.days.length ? L.days : [L.date]).filter(function (x) { return x && x <= from && (!s.first || x >= s.first); }).sort();
+      if (ds.length) return ds[ds.length - 1];
+    }
+    return s.first || nextLessonDate(cls, from);
+  }
   function isGone(s) { return !!s && (!!s.archived || (!!s.leftOn && todayISO() > s.leftOn)); }
   function activeStudents(week) {
     return getStudents().filter(function (s) { return isActiveOn(s, week); });
@@ -1663,7 +1682,7 @@
     getStudents: getStudents,
     activeStudents: activeStudents,
     isActiveOn: isActiveOn,
-    loginBlock: loginBlock, startOf: startOf, joinedOf: joinedOf, kstDay: kstDay, inLesson: inLesson, isNew: isNew, nextLessonDate: nextLessonDate,
+    loginBlock: loginBlock, startOf: startOf, joinedOf: joinedOf, kstDay: kstDay, inLesson: inLesson, isNew: isNew, nextLessonDate: nextLessonDate, defaultStartDate: defaultStartDate,
     isGone: isGone,
     lessonDayOf: lessonDayOf,
     saveStudents: saveStudents,
