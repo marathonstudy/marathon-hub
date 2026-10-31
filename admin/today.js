@@ -966,24 +966,32 @@
     }
     return '<div class="tdc-line tdc-line--app" data-cls="' + esc(c.name) + '"><span class="tdc-line__t">과제 평균</span>' + body + '</div>';
   }
-  /* ---------- 과제 독려 (20261101g · welcome.js · migration-054) ----------
-     대상 = 진행 중 기간(지난 수업 ~ 오늘)에서 마감이 지난 과제(평일 · 앱 기록 「안 냄」) 중 하나라도 안 낸 학생
+  /* ---------- 과제 독려 (20261101g · 20261101h · welcome.js · migration-054 · 055) ----------
+     대상 = 「지난 수업 이후」 — 직전 주(가장 최근 수업 L1 의 레포트 기간 D-7 ~ D-1 · 「10/24~30」 칩)와
+       진행 중(L1 ~ 오늘)에서 마감이 지난 과제(평일 · 앱 기록 「안 냄」) 중 하나라도 안 낸 학생
+       두 칸은 학생 줄 칩과 똑같이 센다 (perVal · AppWeek) — 칩 「3/5」면 밀린 날 2개
        오늘 과제는 마감 전이라 세지 않는다 (AppWeek 「오늘」 · 냈으면 센다) · 퇴원 · 결석 처리와 무관하게 앱 과제 기록으로만
        링크가 없거나 못 불러온 학생은 판단할 수 없어 뺀다 · 학생 번호가 없으면 「번호 없음 n명」
-     「진행 중」 칩 오른쪽 [안 낸 학생 n명에게 독려 문자] · 0명이면 연하게 「이번 주 모두 냄 👍」 · 옆에 작게 「오늘 10:20 보냄 4명」 */
+     「진행 중」 칩 오른쪽 [안 낸 학생 n명에게 독려 문자] · 정말 0명이면 연하게 「밀린 과제 없음 👍」 · 옆에 작게 「오늘 10:20 보냄 4명」 */
   function nudgeOf(c) {
-    var p = c && c.per && c.per.now;
-    if (!p || !window.AppWeek) return null;
-    var t0 = DDay.today(), to = p.to < t0 ? p.to : t0;
-    if (to < p.from) return null;
+    if (!c || !c.per || !window.AppWeek) return null;
+    var t0 = DDay.today();
+    var ps = [c.per.recent, c.per.now].filter(function (p) { return p && (p.live ? (p.to < t0 ? p.to : t0) : p.to) >= p.from; });
+    if (!ps.length) return null;
     var out = { ids: [], miss: {}, phone: 0, noPhone: 0, judged: 0 };
     c.rows.forEach(function (s) {
       var a = app[s.id];
       if (!a || !a.ok || !a.data) return;
-      var w = AppWeek.compute(a.data, p.from, to, t0);
-      if (!w) return;
+      var seen = false, ds = [];
+      ps.forEach(function (p) {
+        var w = AppWeek.compute(a.data, p.from, p.live && p.to > t0 ? t0 : p.to, t0);
+        if (!w) return;
+        seen = true;
+        w.days.forEach(function (x) { if (!x.weekend && x.hw === 'none' && x.date < t0 && ds.indexOf(x.date) === -1) ds.push(x.date); });
+      });
+      if (!seen) return;
       out.judged++;
-      var ds = w.days.filter(function (x) { return !x.weekend && x.hw === 'none' && x.date < t0; }).map(function (x) { return x.date; }).sort().reverse();
+      ds.sort();
       if (!ds.length) return;
       out.ids.push(s.id);
       out.miss[s.id] = ds.map(mdw).join(' ');
@@ -1017,7 +1025,7 @@
     if (!v || !v.judged) return '';
     if (nudgeSent === null) setTimeout(loadNudgeSent, 0);
     var sent = '<small class="tdc-nudge__sent num" data-nudge-sent="' + esc(c.name) + '">' + sentText(c.name) + '</small>';
-    if (!v.ids.length) return '<span class="tdc-nudge-ok">이번 주 모두 냄 👍</span>' + sent;
+    if (!v.ids.length) return '<span class="tdc-nudge-ok" title="지난 수업 이후 마감이 지난 과제를 모두 냈습니다">밀린 과제 없음 👍</span>' + sent;
     return (v.phone ? '<button type="button" class="btn btn--sm tdc-nudge" data-nudge="' + esc(c.name) + '">안 낸 학생 ' + v.phone + '명에게 독려 문자</button>'
                     : '<span class="tdc-nudge-ok is-warn">안 낸 학생 ' + v.ids.length + '명</span>') +
       (v.noPhone ? '<small class="tdc-nudge__nophone num">번호 없음 ' + v.noPhone + '명</small>' : '') + sent;
