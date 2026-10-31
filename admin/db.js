@@ -274,7 +274,7 @@
     var out = {}, hm = function (t) { return t ? String(t).slice(0, 5) : ''; };
     rows.forEach(function (r) {
       if (!('end_time' in r)) return;
-      out[r.name] = { start: hm(r.start_time), end: hm(r.end_time), endOn: r.end_on || '', staff: r.staff_emails || [], remind: !!r.note_remind, min: r.remind_min || 5, pre: !!r.pre_remind, preH: r.pre_hours || 2, preSql: 'pre_remind' in r };
+      out[r.name] = { start: hm(r.start_time), end: hm(r.end_time), endOn: r.end_on || '', staff: r.staff_emails || [], remind: !!r.note_remind, min: r.remind_min || 5, pre: !!r.pre_remind, preH: r.pre_hours || 3, preSql: 'pre_remind' in r };
     });
     return out;
   }

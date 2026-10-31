@@ -2,10 +2,10 @@
    notes.js — 반 카드 수업 시각 · 필기 미제출 · 지금 다시 보내기 · 문의 연락처 (20261031w · 20261101f · migration-049 · 053 · 함수 note-remind)
 
    「오늘」 반 카드
-     · 「수업 토 18:30~22:00 · 수업 전 문자 16:30 켜짐 · 필기·복습 문자 21:55 켜짐 [바꾸기]」 한 줄 — [바꾸기]를 누르면 그 자리에서
-       시작 · 끝 시각 · 수업 전 문자 켜기/끄기 · 몇 시간 전(기본 2시간) · 필기·복습 문자 켜기/끄기 · 끝나기 몇 분 전(기본 5분) · 종강일을 고치고 저장
+     · 「수업 토 18:30~22:00 · 수업 전 문자 15:30 켜짐 · 필기·복습 문자 21:55 켜짐 [바꾸기]」 한 줄 — [바꾸기]를 누르면 그 자리에서
+       시작 · 끝 시각 · 수업 전 문자 켜기/끄기 · 몇 시간 전(기본 3시간) · 필기·복습 문자 켜기/끄기 · 끝나기 몇 분 전(기본 5분) · 종강일을 고치고 저장
        (class_meta_set · class_pre_set · 반 관리 → 수업 설정과 같은 값 · migration-056)
-     · 수업 전 예고를 보낸 날 — 그 아래 작게 「16:30 예고 문자 보냄 11명(밀린 4명)」 (pre_remind_status · 20261101j)
+     · 수업 전 예고를 보낸 날 — 그 아래 작게 「15:30 보냄 11명(다 냄 5 · 일부 4 · 밀림 2)」 (pre_remind_status · 20261101j)
        시각이 비어 있으면 눈에 띄는 [수업 시각 넣기] (보라 테두리)
      · 「필기 미제출 n명」 — 수업 날 · 끝나기 n분 전(기본 5분)부터 그날 밤까지만 (수업 시작 전에는 안 보임)
        누르면 이름(결석 · 번호 없음 표시) · [지금 다시 보내기](안 낸 · 결석 아닌 · 번호 있는 학생 본인에게만)
@@ -53,11 +53,14 @@
     }, function () { preSt.busy = null; return null; });
     return preSt.busy;
   }
-  /* 「16:30 예고 문자 보냄 11명(밀린 4명)」 · 실패가 있으면 「· 실패 n」 */
+  /* 「15:30 보냄 11명(다 냄 5 · 일부 4 · 밀림 2)」 · 0 인 구간은 빼고 · 실패가 있으면 「· 실패 n」 (migration-058 · 20261101l)
+     058 전(구간 없음)이면 「(밀린 n명)」 */
   function preHtml(cls) {
     var x = preSt.v && preSt.v[cls];
     if (!x || !(x.n || x.failed)) return '';
-    return '<small class="tdc-pre num">' + esc(x.at) + ' 예고 문자 보냄 ' + x.n + '명' + (x.missed ? '(밀린 ' + x.missed + '명)' : '') + (x.failed ? ' · 실패 ' + x.failed : '') + '</small>';
+    var parts = [['all', '다 냄'], ['part', '일부'], ['low', '밀림'], ['none', '과제 없음']].filter(function (b) { return x[b[0]]; }).map(function (b) { return b[1] + ' ' + x[b[0]]; });
+    var why = 'all' in x ? (parts.length ? '(' + parts.join(' · ') + ')' : '') : (x.missed ? '(밀린 ' + x.missed + '명)' : '');
+    return '<small class="tdc-pre num">' + esc(x.at) + ' 보냄 ' + x.n + '명' + why + (x.failed ? ' · 실패 ' + x.failed : '') + '</small>';
   }
 
   /* ---------- 수업 시각 한 줄 · 그 자리에서 바꾸기 ---------- */
@@ -67,8 +70,8 @@
   function min2hm(n) { n = ((n % 1440) + 1440) % 1440; return String(Math.floor(n / 60)).padStart(2, '0') + ':' + String(n % 60).padStart(2, '0'); }
   function mdOf(iso) { return iso ? (+iso.slice(5, 7)) + '/' + (+iso.slice(8, 10)) : ''; }
   function dowOf(cls) { var s = Store.schedOf(cls); return s && s.dow != null && s.dow !== '' ? DOWS[+s.dow] || '' : ''; }
-  /* 수업 전 문자 보내는 시각 — 시작 시각 − n시간 (migration-056) */
-  function preAt(m) { var s = hm2min(m && m.start); return s == null ? '' : min2hm(s - 60 * (m.preH || 2)); }
+  /* 수업 전 문자 보내는 시각 — 시작 시각 − n시간 (migration-056 · 기본 3시간 · 058) */
+  function preAt(m) { var s = hm2min(m && m.start); return s == null ? '' : min2hm(s - 60 * (m.preH || 3)); }
   /* 필기 문자 보내는 시각 — 끝 시각 − n분 */
   function remindAt(m) { var e = hm2min(m && m.end); return e == null ? '' : min2hm(e - (m.min || 5)); }
   /* 지금 (한국 시각 · 분) */
@@ -101,7 +104,7 @@
       '</div>' +
       '<div class="tdc-tedit__row">' +
         '<label class="tdc-tedit__chk"><input type="checkbox" data-tf="pre"' + (m.pre || !m.start ? ' checked' : '') + '> 수업 전 문자 켜기</label>' +
-        '<label class="tdc-tedit__f tdc-tedit__f--min"><span>시작</span><input type="number" class="input" data-tf="preH" inputmode="numeric" min="1" max="12" value="' + esc(m.preH || 2) + '"><span>시간 전</span></label>' +
+        '<label class="tdc-tedit__f tdc-tedit__f--min"><span>시작</span><input type="number" class="input" data-tf="preH" inputmode="numeric" min="1" max="12" value="' + esc(m.preH || 3) + '"><span>시간 전</span></label>' +
       '</div>' +
       '<div class="tdc-tedit__row">' +
         '<label class="tdc-tedit__chk"><input type="checkbox" data-tf="remind"' + (m.remind || !m.end ? ' checked' : '') + '> 필기·복습 문자 켜기</label>' +
@@ -123,7 +126,7 @@
     if (args.p_remind && !args.p_end) { err.textContent = '필기·복습 문자를 켜려면 수업 끝 시각을 넣어 주세요.'; return Promise.resolve(false); }
     if (args.p_start && args.p_end && hm2min(args.p_end) <= hm2min(args.p_start)) { err.textContent = '끝 시각은 시작 시각보다 뒤여야 합니다.'; return Promise.resolve(false); }
     if (args.p_min < 1 || args.p_min > 60) { err.textContent = '「끝나기 몇 분 전」은 1~60분으로 정해 주세요.'; return Promise.resolve(false); }
-    var pre = g('pre').checked && !!args.p_start, preH = parseInt(g('preH').value, 10) || 2;      /* 시각을 비우면 수업 전 문자도 끈다 */
+    var pre = g('pre').checked && !!args.p_start, preH = parseInt(g('preH').value, 10) || 3;      /* 시각을 비우면 수업 전 문자도 끈다 */
     if (preH < 1 || preH > 12) { err.textContent = '「수업 몇 시간 전」은 1~12시간으로 정해 주세요.'; return Promise.resolve(false); }
     if (pre && hm2min(args.p_start) < preH * 60) { err.textContent = '수업 전 문자 시각이 자정보다 앞이 됩니다 — 몇 시간 전을 줄여 주세요.'; return Promise.resolve(false); }
     var btn = form.querySelector('[data-note-save]');

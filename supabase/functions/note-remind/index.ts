@@ -104,7 +104,7 @@ async function sendRows(rows: Any[], record = "note_remind_record") {
 
 /* ============================================================
    수업 전 예고 (migration-056 · 20261101j) — 같은 매분 실행에서 함께 본다
-     pre_remind_due → 학생마다 앱 기록(marathonstudy.com 공유 리포트)을 받아 밀린 과제를 센다 → pre_remind_prepare → 솔라피 → pre_remind_record
+     pre_remind_due → 학생마다 앱 기록(marathonstudy.com 공유 리포트)을 받아 제출 수 · 전체 수 · 밀린 날을 센다 → pre_remind_prepare(구간 문구 · 058) → 솔라피 → pre_remind_record
      밀린 과제 = 직전 수업 이후(오늘 수업이면 지난 7일 · D-7 ~ D-1) 마감이 지난 평일 과제 중 「안 냄」
        코치룸 「오늘」 칩과 같은 규칙 (assets/app-week.js — 과제 날짜 맞추기 · 과제 수정값 · 수강 시작일 · 토 · 일 안 셈 · 면제 안 셈)
      앱 링크가 없거나 앱 기록을 못 받은 학생은 판단할 수 없어 이번 분에는 보내지 않는다 (시작 전까지 매분 다시 본다)
@@ -148,8 +148,10 @@ function appData(src: Any) {
     history: hist.map((h: Any) => ({ title: String(h?.title ?? ""), order: Number(h?.lectureOrder) || 0, submittedAt: String(h?.submittedAt ?? ""), late: !!h?.isLate })),
   };
 }
-/* 밀린 날 — 과제 수정값을 덮고(withFix) · 과제 날짜를 맞춘(normalize) 달력에서 평일 「안 냄」 (오래된 날 먼저) */
-export function missDays(data: Any, fix: Record<string, string>, startOn: string, from: string, to: string): string[] {
+/* 과제 수 — 과제 수정값을 덮고(withFix) · 과제 날짜를 맞춘(normalize) 달력에서 from ~ to 의 평일 (20261101l · migration-058)
+   total = 과제가 있던 평일(면제 · 수강 시작 전 제외) · done = 낸 날(늦게 낸 것 포함) · miss = 안 낸 날(오래된 날 먼저)
+   to 는 어제까지 — 오늘 과제는 마감 전이라 넣지 않는다 · 토 · 일(주중 복습)은 세지 않는다 */
+export function hwCount(data: Any, fix: Record<string, string>, startOn: string, from: string, to: string): { done: number; total: number; miss: string[] } {
   const OK: Record<string, number> = { onTime: 1, late: 1, none: 1, exempt: 1 };
   const cal: Any[] = (data?.calendar || []).map((c: Any) => fix && OK[fix[c.date]] ? { ...c, status: fix[c.date], fixed: 1 } : c);
   Object.keys(fix || {}).forEach((k) => { if (isoOk(k) && OK[fix[k]] && !cal.some((c) => c.date === k)) cal.push({ date: k, order: 0, status: fix[k], fixed: 1 }); });
@@ -174,12 +176,17 @@ export function missDays(data: Any, fix: Record<string, string>, startOn: string
     by[c.date] = st;
   });
   Object.keys(groups).forEach((d) => { if (!(d in by) && !isWeekend(d)) by[d] = "onTime"; });
-  const out: string[] = [];
+  const out = { done: 0, total: 0, miss: [] as string[] };
   for (let d = from, k = 0; d <= to && k < 31; d = addDays(d, 1), k++) {
     if (isWeekend(d) || (startOn && d < startOn)) continue;
-    if (by[d] === "none") out.push(d);
+    const st = by[d];
+    if (st === "none") { out.total++; out.miss.push(d); }
+    else if (st === "onTime" || st === "late") { out.total++; out.done++; }
   }
   return out;
+}
+export function missDays(data: Any, fix: Record<string, string>, startOn: string, from: string, to: string): string[] {
+  return hwCount(data, fix, startOn, from, to).miss;
 }
 const mdw = (iso: string) => `${+iso.slice(5, 7)}/${+iso.slice(8, 10)}(${DOWK[dowOf(iso)]})`;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -209,8 +216,8 @@ async function preRemind(now: string) {
       await Promise.all(list.slice(i, i + 3).map(async (s: Any) => {
         const data = s.share && /^[A-Za-z0-9_-]{8,128}$/.test(s.share) ? await fetchApp(s.share) : null;
         if (!data) { unknown++; return; }
-        const miss = missDays(data, s.fix || {}, s.startOn || "", addDays(day, -7), addDays(day, -1));
-        items.push({ id: s.id, miss: miss.map(mdw).join(" ") });
+        const n = hwCount(data, s.fix || {}, s.startOn || "", addDays(day, -7), addDays(day, -1));
+        items.push({ id: s.id, done: n.done, total: n.total, miss: n.miss.map(mdw).join(" ") });
       }));
     }
   }
