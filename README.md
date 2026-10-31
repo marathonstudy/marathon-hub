@@ -763,6 +763,11 @@ delete from public.staff where email = '조교이메일@example.com';
 - `supabase/check-unfilled-sms.sql` — 오늘 칸이 남은 채 나간 문자(이름 · 시각 · 받는 곳 · 결과 · 묶음) · 묶음마다 몇 명 (읽기만)
 - 배포: Edge Function `sms-send` · `note-remind` 다시 배포 (SQL 없음)
 
+### 5-71. 20261101n — 과제 기호 ● 정시 · △ 늦게 · ✕ 미제출 (SQL · 함수 배포 없음)
+- 「◐ 늦게 제출」 → 「△」 · 「○ 미제출」 → 「✕」 · 「● 정시 제출」 그대로 · 강의 줄 ✓ 다 봄 · – 안 봄 그대로
+- 바뀐 곳: 코치룸 학생 7일 과제표(today.js) · 러닝노트 · 레포트 · 미리보기 7칸(app-week.js) · 아래 설명 한 줄 · 상담 「지난번 약속」 과제 기록(quicknote.js) · 설명서
+- 색: 정시 초록 · 늦게 주황 · 미제출 빨강 — 러닝노트 · 레포트 7칸도 코치룸과 같게(예전 보라 · 주황 · 회색) · △ ✕ 는 ● 보다 가늘어 굵게 · 휴대폰 크기 맞춤
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

@@ -573,7 +573,7 @@
   /* ---------- 과제 칩 → 기간 · 날짜별 표 (20261031f) ----------
      칩을 누르면 그 학생 줄 바로 아래에 펼친다 (다시 누르면 접힘 · 한 번에 한 학생). 이미 불러온 과제 기록만 쓴다 (새로 부르지 않는다)
        맨 위 「10/15(목) ~ 10/21(수) · 10/22(목) 수업 레포트 기준」
-       7칸 — 날짜 · 요일 / 과제 ● 정시 ◐ 늦게 ○ 미제출 (과제 없는 날 빈칸) / 강의 ✓ 다 봄 – 안 봄 · 토 · 일은 두 줄을 합친 「주중 복습」
+       7칸 — 날짜 · 요일 / 과제 ● 정시 △ 늦게 ✕ 미제출 (과제 없는 날 빈칸 · 20261101n) / 강의 ✓ 다 봄 – 안 봄 · 토 · 일은 두 줄을 합친 「주중 복습」
        칸을 누르면 「10/19(월) 독서 1지문 · 23:40 제출(늦게)」 · 맨 아래 [과제 상세 보기 →] (러닝노트 과제 상세)
      「오늘」 · 레포트 발송 · 학생 명단이 같이 쓴다 — 줄을 다시 그린 뒤 paintDetail() 이 표를 다시 붙인다 */
   var DOWK = ['일', '월', '화', '수', '목', '금', '토'];
@@ -714,7 +714,7 @@
     else if (d.weekend) tail = '제출 기록 없음';
     return mdw(date) + ' ' + title + (tail ? ' · ' + tail.replace(/^ /, '') : '');
   }
-  var HW_MARK = { onTime: '●', late: '◐', none: '○', exempt: '면제', off: '', future: '', today: '오늘' };
+  var HW_MARK = { onTime: '●', late: '△', none: '✕', exempt: '면제', off: '', future: '', today: '오늘' };
   var HW_NAME = { onTime: '정시 제출', late: '늦게 제출', none: '미제출', exempt: '면제', off: '과제 없음', future: '아직', today: '오늘 — 마감 전 (아직 세지 않음)' };
   var LEC_MARK = { done: '✓', todo: '–', off: '', future: '', today: '오늘' };
   /* 오늘은 밤 12시 마감 전 — 아직 안 냈으면 연하게 「오늘」 · 세지 않음 (AppWeek · 20261031v) */
@@ -749,7 +749,7 @@
       '<div class="hd-head num">' + esc(mdw(w.from) + ' ~ ' + mdw(w.to) + (live ? ' · 진행 중' + (lesson ? ' (' + mdw(lesson) + ' 수업 레포트 기간)' : '') : lesson ? ' · ' + mdw(lesson) + ' 수업 레포트 기준' : '')) + '</div>' +
       '<div class="hd-grid" style="grid-template-columns:2.4em repeat(' + n + ', minmax(0, 1fr))">' + cells + '</div>' +
       (pick ? '<p class="hd-pick">' + esc(dayInfo(a.data, pick)) + '</p>' + fixHtml(sid, pick) : '') +
-      '<p class="hd-legend">● 정시 제출 ◐ 늦게 제출 ○ 미제출 · 빈칸 그날 과제 없음 / ✓ 강의 다 봄 – 안 봄 · 「오늘」 = 밤 12시 마감 전(아직 세지 않음) · 토 · 일은 주중 복습 · 칸을 누르면 그날 과제 · 「수정」 = 조교가 고친 칸</p>' +
+      '<p class="hd-legend">● 정시 제출 △ 늦게 제출 ✕ 미제출 · 빈칸 그날 과제 없음 / ✓ 강의 다 봄 – 안 봄 · 「오늘」 = 밤 12시 마감 전(아직 세지 않음) · 토 · 일은 주중 복습 · 칸을 누르면 그날 과제 · 「수정」 = 조교가 고친 칸</p>' +
       '<div class="hd-foot"><button type="button" class="hd-relink" data-app-relink="' + esc(sid) + '" aria-expanded="' + !!(window.AppLink && AppLink.current() === sid && AppLink.editing()) + '">링크 바꾸기</button>' +
         '<button type="button" class="hd-more" data-pv="parent" data-pv-view="app" data-sid="' + esc(sid) + '">과제 상세 보기 →</button>' +
         (window.AppLink && AppLink.openHtml ? AppLink.openHtml(sid, { noAdd: true, cls: 'hd-open' }) : '') + '</div>' +

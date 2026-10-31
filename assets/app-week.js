@@ -10,7 +10,7 @@
      lectures [{ order, videosDone, videosTotal }]
      history  [{ order, submittedAt, late, correctRate }]  (예전 함수는 recent 10건만 — 그때는 그것으로)
    날마다
-     과제 줄  ● 정시 · ◐ 늦게 · ○ 미제출 (그날 과제가 없으면 빈칸, 아직 오지 않은 날은 흐리게)
+     과제 줄  ● 정시 · △ 늦게 · ✕ 미제출 (그날 과제가 없으면 빈칸, 아직 오지 않은 날은 흐리게 · 20261101n)
      강의 줄  그날 강 번호의 강의 영상을 다 봤으면 ✓, 아니면 –   (강 번호는 화면에 보여 주지 않는다)
    오른쪽에 「n/5일 제출」 · 평균 정답률, 「n/5일 시청」. 5 = 그 기간에 과제가 있었던 평일 수
    토 · 일 = 「주중 복습」 (20261030d) — 앱 기록이 없어도 늘 「주중 복습」 칸(옅은 색 · 과제 · 강의 두 줄을 한 칸으로),
@@ -37,7 +37,7 @@
   'use strict';
 
   var DOW = ['일', '월', '화', '수', '목', '금', '토'];
-  var LEGEND = '● 정시 제출 ◐ 늦게 제출 ○ 미제출 / ✓ 그날 강의 영상을 다 봄 – 아직 안 봄 / 오늘은 밤 12시 마감 전이라 아직 안 냈으면 「오늘」(세지 않음) / ' +
+  var LEGEND = '● 정시 제출 △ 늦게 제출 ✕ 미제출 / ✓ 그날 강의 영상을 다 봄 – 아직 안 봄 / 오늘은 밤 12시 마감 전이라 아직 안 냈으면 「오늘」(세지 않음) / ' +
                '토 · 일은 주중 복습 날이라 제출 수에 넣지 않아요(앱에 제출하면 ✓). ' +
                '강의는 오늘까지 본 것을 기준으로 표시돼요. 지난 강의를 나중에 봐도 ✓로 바뀝니다.';
 
@@ -268,7 +268,7 @@
   function tone(done, days) { var r = days ? done / days : 0; return r >= 1 ? 'ok' : r >= 0.5 ? 'mid' : r > 0 ? 'low' : 'zero'; }
   function hwRate(w) { return w && w.hwDays ? Math.round(w.hwDone / w.hwDays * 100) : null; }
 
-  var HW_MARK = { onTime: '●', late: '◐', none: '○', exempt: '면제', future: '·', off: '', today: '오늘' };
+  var HW_MARK = { onTime: '●', late: '△', none: '✕', exempt: '면제', future: '·', off: '', today: '오늘' };
   var HW_TIP = { onTime: '정시 제출', late: '늦게 제출', none: '미제출', exempt: '면제(셈에서 뺌)', future: '아직', off: '과제 없음', wk: '주중 복습', wkDone: '주중 복습 · 제출함', today: '오늘 — 밤 12시 마감 전 (아직 세지 않음)' };
   var LEC_MARK = { done: '✓', todo: '–', future: '·', off: '', today: '오늘' };
   var LEC_TIP = { done: '강의 영상을 다 봄', todo: '아직 안 봄', future: '아직', off: '강의 없음', today: '오늘 — 아직 세지 않음' };

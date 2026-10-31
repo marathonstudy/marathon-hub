@@ -3862,3 +3862,7 @@ textarea.aip-text--new:focus { outline: 2px solid #B9AEF0; outline-offset: 1px; 
 .tpl-pre__lbl { display: block; font-size: 12px; font-weight: 700; color: #7858E8; margin-bottom: 4px; }
 .tpl-pre__pv .sms-pv__text { margin: 0; font-size: 13px; }
 .tpl-pre__card .btn { align-self: flex-start; margin-top: auto; }
+
+/* 과제 기호 △ 늦게 · ✕ 미제출 — ● 보다 가늘어 굵게 (20261101n) */
+.hd-c--late, .hd-c--none { font-weight: 900; }
+@media (max-width: 480px) { .hd-c--late, .hd-c--none { font-size: 14px; } }
