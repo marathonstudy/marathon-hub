@@ -978,7 +978,7 @@
     var t0 = DDay.today();
     var ps = [c.per.recent, c.per.now].filter(function (p) { return p && (p.live ? (p.to < t0 ? p.to : t0) : p.to) >= p.from; });
     if (!ps.length) return null;
-    var out = { ids: [], miss: {}, phone: 0, noPhone: 0, judged: 0 };
+    var out = { ids: [], miss: {}, seen: {}, phone: 0, noPhone: 0, judged: 0 };
     c.rows.forEach(function (s) {
       var a = app[s.id];
       if (!a || !a.ok || !a.data) return;
@@ -991,10 +991,11 @@
       });
       if (!seen) return;
       out.judged++;
+      out.seen[s.id] = 1;
       ds.sort();
       if (!ds.length) return;
       out.ids.push(s.id);
-      out.miss[s.id] = ds.map(mdw).join(' ');
+      out.miss[s.id] = ds.map(mdw).join('·');                 /* 「10/27(화)·10/29(목)」 (20261101m) */
       var x = stu(s.id) || s;
       if (Store.phoneDigits(x.studentPhone || x.student_phone || '').length >= 10) out.phone++; else out.noPhone++;
     });
@@ -1509,7 +1510,17 @@
       return rows.filter(function (s) { var a = app[s.id]; return !a || !a.ok; }).map(function (s) { return { id: s.id, name: s.name, why: whyText(s.id) }; });
     });
   }
+  /* 학생 한 명의 밀린 날 (문자 발송 화면 {밀린날짜} · 20261101m) — null: 아직 모름(과제 기록 전) · '': 밀린 과제 없음 */
+  function missFor(sid) {
+    var s = rowById(sid);
+    var c = s && (st.clsBy || {})[s.class_name || ''];
+    var v = c ? nudgeOf(c) : null;
+    if (!v || !v.seen[sid]) return null;
+    return v.miss[sid] || '';
+  }
+
   window.Today = {
+    missFor: missFor,
     appFailed: failedIds,
     appWhy: whyText,
     retryMany: retryMany,

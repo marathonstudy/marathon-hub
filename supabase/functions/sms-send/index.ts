@@ -158,7 +158,10 @@ async function handle(req: Request, cors: Record<string, string>) {
   }
   const skipped = (prep?.skipped || []).map((s: Any) => ({ student_id: s.student_id, name: s.name, to: s.to, reason: s.reason, label: REASON[s.reason] || s.reason }));
   if (!prep?.ok) return json({ ok: false, reason: prep?.reason || "prepare", message: prep?.message || "보낼 수 없습니다.", skipped }, cors, 200);
-  const rows: Any[] = prep.rows || [];
+  const all: Any[] = prep.rows || [];
+  /* 바뀌지 않은 칸이 남은 줄은 보내지 않는다 (20261101m) */
+  const blocked: Any[] = all.filter((r) => leftOf(r.text).length);
+  const rows: Any[] = all.filter((r) => !leftOf(r.text).length);
 
   /* 2) 솔라피 — 단문은 SMS, 90바이트를 넘으면 LMS */
   const from = env("SOLAPI_SENDER").replace(/\D/g, "");
@@ -170,7 +173,7 @@ async function handle(req: Request, cors: Record<string, string>) {
     customFields: { log: String(r.log_id) },
   }));
   const results: Any[] = rows.map((r) => ({ log_id: r.log_id, student_id: r.student_id, to: r.target, name: r.name, ok: true, error: "", message_id: "" }));
-  try {
+  if (rows.length) try {
     const res = await fetch(SOLAPI, {
       method: "POST",
       headers: { Authorization: await solapiAuth(env("SOLAPI_API_KEY"), env("SOLAPI_API_SECRET")), "Content-Type": "application/json" },
@@ -197,15 +200,27 @@ async function handle(req: Request, cors: Record<string, string>) {
     results.forEach((x) => { x.ok = false; x.error = "솔라피에 연결하지 못했습니다."; });
   }
 
+  blocked.forEach((r) => results.push({ log_id: r.log_id, student_id: r.student_id, to: r.target, name: r.name, ok: false, error: leftMsg(leftOf(r.text)), message_id: "" }));
+
   /* 3) 기록 (번호는 기록에 뒤 4자리만 — DB 가 처음부터 뒤 4자리만 받았다) */
   await rpcAs(auth, apikey, "sms_record", { p_results: results.map(({ log_id, ok, error, message_id }) => ({ log_id, ok, error, message_id })) }).catch(() => {});
   const sent = results.filter((x) => x.ok).length;
   return json({
     ok: true, test: action === "test", sent, failed: results.length - sent, skipped,
-    lms: rows.filter((r) => r.kind === "LMS").length,
+    lms: rows.filter((r) => r.kind === "LMS").length, blocked: blocked.length,
     results: results.map((x) => ({ student_id: x.student_id, to: x.to, name: x.name, ok: x.ok, error: x.error })),
   }, cors);
 }
+
+/* 바뀌지 않은 칸 — 보내기 직전 글에 {밀린날짜} · #{링크} 같은 칸이 남아 있으면 그 사람에게는 보내지 않는다 (20261101m)
+   「바뀌지 않은 칸이 있어 보내지 않음: {밀린날짜}」로 실패 기록 */
+const LEFT_RE = /#?\{[^{}\r\n]{1,20}\}/g;
+export function leftOf(text: string): string[] {
+  const out: string[] = [];
+  (String(text || "").match(LEFT_RE) || []).forEach((m) => { if (!out.includes(m)) out.push(m); });
+  return out;
+}
+export const leftMsg = (left: string[]) => "바뀌지 않은 칸이 있어 보내지 않음: " + left.join(" ");
 
 Deno.serve(async (req: Request) => {
   const cors = corsHeaders(req.headers.get("origin"));

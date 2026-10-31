@@ -756,6 +756,13 @@ delete from public.staff where email = '조교이메일@example.com';
 - 반 카드 「수업 전 문자 15:30 켜짐」 · 보낸 뒤 「15:30 보냄 11명(다 냄 5 · 일부 4 · 밀림 2)」
 - 배포: `supabase/migration-058-pre-counts.sql` 실행 → Edge Function `note-remind` 다시 배포
 
+### 5-70. 20261101m — 바뀌지 않은 칸 안전장치 · 과제 독려 {밀린날짜} (함수 sms-send · note-remind 다시 배포 · SQL 없음 · 확인용 check-unfilled-sms.sql)
+- 원인: 「문자 발송 → 보내기」(학생 줄 [문자] 등 같은 화면)에서 「자주 쓰는 문구」의 「과제 독려(학생)」을 고르면 {밀린날짜}를 채우는 곳이 없었다 — 화면 미리보기(sms.js render)와 실제 발송(sms-send → SQL sms_prepare)은 다른 코드인데 둘 다 {밀린날짜}를 몰라 그대로 나갔다 · 「오늘」 독려 창(welcome.js)은 채워서 보낸다
+- 문자 발송 화면도 {밀린날짜}를 「오늘」 과제 기록(과제 독려와 같은 계산 · Today.missFor)으로 채우고 같은 날짜끼리 묶어 보냄 · 날짜는 「10/27(화)·10/29(목)」
+- 안전장치: 보내기 직전 글에 {…} · #{…} 칸이 남으면 그 사람에게는 보내지 않고 「바뀌지 않은 칸이 있어 보내지 않음: {밀린날짜}」로 실패 — 화면(sms.js · welcome.js 경고 · 확인 창 · 결과 띠) · 함수 sms-send(모든 화면 발송의 마지막 관문) · note-remind(수업 전 예고 · 필기·복습 알림 예약 실행) · 카톡 알림톡은 템플릿 칸 방식이라 제외
+- `supabase/check-unfilled-sms.sql` — 오늘 칸이 남은 채 나간 문자(이름 · 시각 · 받는 곳 · 결과 · 묶음) · 묶음마다 몇 명 (읽기만)
+- 배포: Edge Function `sms-send` · `note-remind` 다시 배포 (SQL 없음)
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

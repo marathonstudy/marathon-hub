@@ -66,12 +66,24 @@ async function solapiAuth(key: string, secret: string): Promise<string> {
   return `HMAC-SHA256 apiKey=${key}, date=${date}, salt=${salt}, signature=${hex}`;
 }
 
-/* rows → 솔라피 → 결과 기록 */
-async function sendRows(rows: Any[], record = "note_remind_record") {
-  if (!rows.length) return { sent: 0, failed: 0 };
+/* 바뀌지 않은 칸 — 보내기 직전 글에 {밀린날짜} · #{링크} 같은 칸이 남아 있으면 그 사람에게는 보내지 않는다 (20261101m)
+   「바뀌지 않은 칸이 있어 보내지 않음: {밀린날짜}」로 실패 기록 */
+const LEFT_RE = /#?\{[^{}\r\n]{1,20}\}/g;
+export function leftOf(text: string): string[] {
+  const out: string[] = [];
+  (String(text || "").match(LEFT_RE) || []).forEach((m) => { if (!out.includes(m)) out.push(m); });
+  return out;
+}
+export const leftMsg = (left: string[]) => "바뀌지 않은 칸이 있어 보내지 않음: " + left.join(" ");
+
+/* rows → 솔라피 → 결과 기록 (바뀌지 않은 칸이 남은 줄은 보내지 않고 실패로 · 20261101m) */
+async function sendRows(all: Any[], record = "note_remind_record") {
+  if (!all.length) return { sent: 0, failed: 0 };
+  const blocked = all.filter((r) => leftOf(r.text).length);
+  const rows = all.filter((r) => !leftOf(r.text).length);
   const from = env("SOLAPI_SENDER").replace(/\D/g, "");
   const results: Any[] = rows.map((r) => ({ log_id: r.log_id, ok: true, error: "", message_id: "" }));
-  try {
+  if (rows.length) try {
     const res = await fetch(SOLAPI, {
       method: "POST",
       headers: { Authorization: await solapiAuth(env("SOLAPI_API_KEY"), env("SOLAPI_API_SECRET")), "Content-Type": "application/json" },
@@ -97,9 +109,10 @@ async function sendRows(rows: Any[], record = "note_remind_record") {
   } catch {
     results.forEach((x) => { x.ok = false; x.error = "솔라피에 연결하지 못했습니다."; });
   }
+  blocked.forEach((r) => results.push({ log_id: r.log_id, ok: false, error: leftMsg(leftOf(r.text)), message_id: "" }));
   await rpc(record, { p_results: results }).catch(() => {});
   const sent = results.filter((x) => x.ok).length;
-  return { sent, failed: results.length - sent };
+  return { sent, failed: results.length - sent, blocked: blocked.length };
 }
 
 /* ============================================================

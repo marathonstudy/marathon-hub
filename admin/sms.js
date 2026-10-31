@@ -246,7 +246,13 @@
     var d = Store.startOf(s) || (Store.defaultStartDate ? Store.defaultStartDate(clsOf(s) === NOCLS ? '' : clsOf(s)) : '');
     return d ? kdate(d) : '';
   }
-  /* 서버 sms_prepare(052) 와 같은 순서 — 예전 칸 #{…} 다음에 새 칸 {…} */
+  /* 바뀌지 않은 칸 (20261101m) — 보내기 직전 글에 {밀린날짜} · #{링크} 같은 칸이 남으면 그 사람에게는 보내지 않는다 (sms-send · note-remind 와 같은 규칙) */
+  function leftOf(text) { var out = []; (String(text || '').match(/#?\{[^{}\r\n]{1,20}\}/g) || []).forEach(function (m) { if (out.indexOf(m) === -1) out.push(m); }); return out; }
+  function leftMsg(left) { return '바뀌지 않은 칸이 있어 보내지 않음: ' + left.join(' '); }
+  /* {밀린날짜} — 「오늘」 과제 기록으로 센 그 학생의 밀린 날 (과제 독려와 같다). 모르거나 밀린 날이 없으면 칸을 그대로 둔다 → 보내지 않음 */
+  function missFor(s) { var v = window.Today && Today.missFor ? Today.missFor(s.id) : null; return v ? v : '{밀린날짜}'; }
+  function hasMiss(body) { return String(body || '').indexOf('{밀린날짜}') !== -1; }
+  /* 서버 sms_prepare(052) 와 같은 순서 — 예전 칸 #{…} 다음에 새 칸 {…} · {밀린날짜}는 화면이 채워서 보낸다 (20261101m) */
   function render(body, s, t, lessons, opt) {
     opt = opt || {};
     var code = opt.code != null ? opt.code : entryOf(s);
@@ -259,7 +265,8 @@
       .split('#{링크}').join(linkFor(s, t))
       .split('{학생이름}').join(s.name || '').split('{반이름}').join((s.className || '').trim())
       .split('{첫수업일}').join(firstOf(s)).split('{앱입장코드}').join(code)
-      .split('{러닝노트주소}').join(CONFIG.siteUrl + '/s/');
+      .split('{러닝노트주소}').join(CONFIG.siteUrl + '/s/')
+      .split('{밀린날짜}').join(missFor(s));
     if (opt.ad) txt = '(광고)' + cfg().adName + '\n' + txt + '\n무료수신거부 ' + cfg().optout;
     return txt;
   }
@@ -268,7 +275,7 @@
   /* 받는 줄 만들기 — 함수(sms_prepare)와 같은 규칙. list = [{ s, t }] (학생 순서 · 보낼 곳 순서) */
   function build(list, body, siblings) {
     var lessons = lessonsMap(list);
-    var out = { items: [], sib: [], noPhone: [], noLink: [], noCode: [], tooLong: [], lessons: lessons, people: 0 };
+    var out = { items: [], sib: [], noPhone: [], noLink: [], noCode: [], tooLong: [], left: [], lessons: lessons, people: 0 };
     var seen = {}, mineBy = {}, okBy = {};
     list.forEach(function (x) {
       var s = x.s, t = x.t;
@@ -281,6 +288,8 @@
       if (sib) { out.sib.push(x); if (!siblings) return; }
       if (hasCode(body) && !entryOf(s)) { out.noCode.push(x); return; }
       var txt = textFor(body, s, t, lessons);
+      var lf = leftOf(txt);
+      if (lf.length) { out.left.push({ s: s, t: t, left: lf }); return; }     /* 바뀌지 않은 칸 — 보내지 않음 (20261101m) */
       var b = bytes(txt);
       if (b > 2000) { out.tooLong.push(x); return; }
       mine[d] = 1;
@@ -515,6 +524,7 @@
         esc(plan.sib.slice(0, 6).map(function (x) { return x.s.name; }).join(', ')) + ' · 끄면 번호마다 한 번만 (앞 학생 이름으로)</span></span></label>';
     }
     if (plan.items.length > c.perSend) html += '<p class="cp-warn">한 번에 ' + c.perSend + '건까지 보낼 수 있습니다. 반을 나눠 보내 주세요.</p>';
+    if (plan.left.length) html += leftWarn(plan.left, body);
     host.innerHTML = html;
     /* 미리보기 1건 — 첫 번째 받는 사람 */
     pv.innerHTML = body.trim() && ex
@@ -523,6 +533,13 @@
     updateButtons();
   }
 
+  /* 바뀌지 않은 칸 경고 — 「바뀌지 않은 칸이 있어 n명에게는 보내지 않습니다: {밀린날짜} (김지우 · 이서준)」 */
+  function leftWarn(left, body) {
+    var names = [], keys = [];
+    left.forEach(function (x) { if (names.indexOf(x.s.name) === -1) names.push(x.s.name); x.left.forEach(function (k) { if (keys.indexOf(k) === -1) keys.push(k); }); });
+    return '<p class="cp-warn sms-left" id="smsLeftWarn">⚠ 바뀌지 않은 칸이 있어 ' + names.length + '명에게는 보내지 않습니다: <b>' + esc(keys.join(' ')) + '</b> (' + esc(names.slice(0, 8).join(' · ') + (names.length > 8 ? ' 외 ' + (names.length - 8) + '명' : '')) + ')' +
+      (hasMiss(body) ? ' — {밀린날짜}는 「오늘」에서 과제 기록을 불러온 학생 중 밀린 날이 있는 학생만 채워집니다. 과제 독려는 「오늘」 반 카드 [안 낸 학생 n명에게 독려 문자]가 편합니다.' : ' — 이 화면에서 쓸 수 없는 칸입니다. 칸 버튼으로 넣거나 지워 주세요.') + '</p>';
+  }
   function updateButtons() {
     var ok = !st.missing && !st.busy && plan && plan.items.length && $('#smsBody').value.trim() && !adBlock();
     $('#smsSend').disabled = st.done || !ok || plan.items.length > cfg().perSend;
@@ -1056,6 +1073,7 @@
       (payload(p.items).markWeek ? ' 보낸 학생은 레포트 발송 → 3 발송에 「보냄」으로 표시합니다.' : '') +
       (st.notify ? ' 바뀐 내용 알림입니다 — 3 발송의 「보냄」은 그대로 두고 「알림 n회」만 늘어납니다.' : '') +
       (st.purpose === 'app' ? ' 보내면 상담 카드에 「앱 안내 문자 보냄」이 남습니다.' : '') +
+      (p.left.length ? ' ⚠ 바뀌지 않은 칸이 있어 ' + p.left.map(function (x) { return x.s.id; }).filter(function (v, i, a) { return a.indexOf(v) === i; }).length + '명에게는 보내지 않습니다 (' + p.left.map(function (x) { return x.left.join(' '); }).filter(function (v, i, a) { return a.indexOf(v) === i; }).join(', ') + ').' : '') +
       ' 오늘 ' + ((st.cfg && st.cfg.today) || 0) + ' / ' + cfg().dailyMax + '건.' +
       detailText(st.purpose === 'app' || p.items.length <= 5 ? (kk ? p.items.filter(function (x) { return x.t === 'student'; }) : p.items) : []);
     UI.confirmAsk(retryList ? '실패만 다시 보내기' : again ? '다시 보내기' : lead || '문자 보내기', desc, '보내기').then(function (yes) {
@@ -1063,9 +1081,14 @@
       st.busy = true; updateButtons();
       var pl = payload(p.items);
       if (retryList) pl.siblings = true;           /* 다시 보내기는 실패한 줄 그대로 */
-      var go = st.notify ? sendNotify(pl, p.items) : kk ? sendKakao(pl, p.items) : invoke(Object.assign({ action: 'send' }, pl));
+      var go = st.notify ? sendNotify(pl, p.items) : kk ? sendKakao(pl, p.items) : hasMiss(pl.body) ? sendMiss(pl, p.items) : invoke(Object.assign({ action: 'send' }, pl));
       go.then(function (res) {
         st.busy = false;
+        /* 바뀌지 않은 칸이 남아 보내지 않은 사람 — 실패로 (20261101m) */
+        if (res && res.ok && p.left.length) {
+          res.failed = (res.failed || 0) + p.left.length;
+          res.results = (res.results || []).concat(p.left.map(function (x) { return { student_id: x.s.id, to: x.t, name: x.s.name, ok: false, error: leftMsg(x.left) }; }));
+        }
         showResult(res, !!retryList);
         if (copy && res && res.ok) sendCopy(pl, p.items[0], kk);
         if (st.notify) recordNotify(res);
@@ -1109,6 +1132,28 @@
         return all;
       });
     });
+  }
+
+  /* {밀린날짜} — 학생마다 달라서 같은 날짜끼리 묶어 채운 글로 보낸다 (20261101m · 함수는 그대로) */
+  function sendMiss(pl, items) {
+    var groups = {}, order = [];
+    items.forEach(function (x) {
+      var k = missFor(x.s);
+      if (!groups[k]) { groups[k] = []; order.push(k); }
+      groups[k].push(x);
+    });
+    var all = { ok: true, sent: 0, failed: 0, results: [], skipped: [] };
+    return order.reduce(function (p, k) {
+      return p.then(function () {
+        if (!all.ok) return null;
+        var g = groups[k];
+        return invoke(Object.assign({ action: 'send' }, pl, { items: g.map(function (x) { return { student_id: x.s.id, to: x.t }; }), body: pl.body.split('{밀린날짜}').join(k), vars: varsFor(g) })).then(function (r) {
+          if (!r || !r.ok) { all = r || { ok: false, message: '보내지 못했습니다.' }; return; }
+          all.sent += r.sent || 0; all.failed += r.failed || 0;
+          all.results = all.results.concat(r.results || []); all.skipped = all.skipped.concat(r.skipped || []);
+        });
+      });
+    }, Promise.resolve()).then(function () { return all; });
   }
 
   /* 「바뀐 내용 알리기」 — #{바뀐 내용}은 학생마다 달라서 바뀐 내용이 같은 학생끼리 묶어 한 번씩 보낸다 (함수는 그대로) */

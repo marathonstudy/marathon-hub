@@ -85,6 +85,9 @@
   function entryUrl() { return CONFIG.siteUrl + '/s/'; }
   function needCode(body) { return body.indexOf('{앱입장코드}') !== -1 || body.indexOf('#{입장코드}') !== -1; }
   function needApp(body) { return body.indexOf('#{앱 설치 링크}') !== -1; }
+  /* 바뀌지 않은 칸 (20261101m) — 보내기 직전 글에 {밀린날짜} · #{링크} 같은 칸이 남으면 그 사람에게는 보내지 않는다 (sms-send · note-remind 와 같은 규칙) */
+  function leftOf(text) { var out = []; (String(text || '').match(/#?\{[^{}\r\n]{1,20}\}/g) || []).forEach(function (m) { if (out.indexOf(m) === -1) out.push(m); }); return out; }
+  function leftMsg(left) { return '바뀌지 않은 칸이 있어 보내지 않음: ' + left.join(' '); }
   /* 서버 sms_prepare(052) 와 같은 순서 · 같은 글 */
   function fill(body, s) {
     var code = codeOf(s);
@@ -96,8 +99,8 @@
       .split('{러닝노트주소}').join(entryUrl())
       .split('{밀린날짜}').join(missOf(s));
   }
-  /* {밀린날짜} — 과제 독려 (학생마다 「10/31(금) 10/30(목)」) */
-  function missOf(s) { return (st && st.miss && st.miss[s.id]) || ''; }
+  /* {밀린날짜} — 과제 독려 (학생마다 「10/27(화)·10/29(목)」) · 모르면 칸을 그대로 둔다 → 보내지 않음 (20261101m) */
+  function missOf(s) { return (st && st.miss && st.miss[s.id]) || '{밀린날짜}'; }
   /* 함수에 넘기는 글 — {밀린날짜}만 여기서 채운다 (나머지 칸은 서버가) */
   function outBody(x) { return bodyFor(x.t).split('{밀린날짜}').join(missOf(x.s)); }
   function bytes(t) { return window.Sms && Sms.bytes ? Sms.bytes(t) : t.length * 2; }
@@ -136,7 +139,7 @@
   function targetsOf(to) { return to === 'none' ? [] : to === 'student' ? ['student'] : to === 'parent' ? ['parent1', 'parent2'] : ['parent1', 'parent2', 'student']; }
   function bodyFor(t) { return t === 'student' ? st.bodySt : st.bodyPa; }
   function plan(list) {
-    var out = { items: [], noPhone: [], noCode: [], dup: [], people: 0 };
+    var out = { items: [], noPhone: [], noCode: [], dup: [], left: [], people: 0 };
     var ts = targetsOf(st.to), okBy = {};
     list.forEach(function (s) {
       if (st.off && st.off[s.id]) return;
@@ -157,6 +160,8 @@
         var k = s.id + '|' + t;
         if (ctx.sent[k] && !st.again) { out.dup.push({ s: s, t: t, at: ctx.sent[k] }); return; }
         var text = fill(body, s), b = bytes(text);
+        var lf = leftOf(text);
+        if (lf.length) { out.left.push({ s: s, t: t, left: lf }); return; }     /* 바뀌지 않은 칸 — 보내지 않음 (20261101m) */
         out.items.push({ s: s, t: t, d: d, text: text, bytes: b, kind: b <= 90 ? 'SMS' : 'LMS', again: !!ctx.sent[k] });
         okBy[s.id] = 1;
       });
@@ -205,6 +210,13 @@
       window.dispatchEvent(new CustomEvent('jt:welcome-sent', { detail: { kind: st.kind } }));
       return all;
     });
+  }
+  /* 바뀌지 않은 칸이 남아 보내지 않은 사람 — 실패로 「바뀌지 않은 칸이 있어 보내지 않음: {밀린날짜}」 (20261101m) */
+  function addLeft(res, p) {
+    if (!res || !p || !p.left || !p.left.length) return res;
+    res.failed = (res.failed || 0) + p.left.length;
+    res.results = (res.results || []).concat(p.left.map(function (x) { return { student_id: x.s.id, to: x.t, name: x.s.name, ok: false, error: leftMsg(x.left) }; }));
+    return res;
   }
   function failNames(res) {
     var seen = {};
@@ -320,6 +332,11 @@
         esc((st.again ? p.items.filter(function (x) { return x.again; }) : p.dup).slice(0, 6).map(function (x) { return x.s.name + '(' + TO_LABEL[x.t] + ')'; }).join(', ')) + '</span></span></label>';
     }
     if (p.noCode.length) html += '<p class="cp-warn">입장코드가 없는 학생 ' + uniq(p.noCode) + '명은 보내지 않습니다 — 반 관리에서 그 반 「앱 입장코드」를 넣어 주세요.</p>';
+    if (p.left.length) {
+      var lk = [], ln = [];
+      p.left.forEach(function (x) { if (ln.indexOf(x.s.name) === -1) ln.push(x.s.name); x.left.forEach(function (k) { if (lk.indexOf(k) === -1) lk.push(k); }); });
+      html += '<p class="cp-warn" id="wcLeft">⚠ 바뀌지 않은 칸이 있어 ' + ln.length + '명에게는 보내지 않습니다: <b>' + esc(lk.join(' ')) + '</b> (' + esc(ln.slice(0, 8).join(' · ')) + (ln.length > 8 ? ' 외 ' + (ln.length - 8) + '명' : '') + ')</p>';
+    }
     if (block) html += '<p class="cp-warn" id="wcBlock">' + esc(block) + '</p>';
     html += ex
       ? '<div class="sms-pv wc-pv"><div class="sms-pv__head">미리보기 — ' + esc(ex.s.name) + ' · ' + (ex.t === 'student' ? '학생 본인' : '학부모') + ' <span class="num">…' + esc(ex.d.slice(-4)) + '</span> <span class="sms-kind sms-kind--' + ex.kind + '">' + (ex.kind === 'SMS' ? '단문' : '장문') + ' ' + ex.bytes + '바이트</span></div><pre class="sms-pv__text" id="wcPreview">' + esc(ex.text) + '</pre></div>'
@@ -341,11 +358,13 @@
       (p.noPhone.length ? ' 번호 없음 ' + p.noPhone.length + '명은 뺍니다.' : '') +
       (p.dup.length ? ' 오늘 이미 보낸 ' + p.dup.length + '건은 뺍니다.' : '') +
       (p.items.some(function (x) { return x.again; }) ? ' 오늘 이미 보낸 사람에게 한 번 더 보냅니다.' : '') +
+      (p.left.length ? ' ⚠ 바뀌지 않은 칸이 있어 ' + uniq(p.left) + '명에게는 보내지 않습니다.' : '') +
       ' 보낸 기록에 「' + KIND[st.kind].label + '」으로 남습니다.';
     UI.confirmAsk(KIND[st.kind].title, desc, '보내기').then(function (yes) {
       if (!yes) return;
       st.busy = true; paint();
       sendItems(p.items).then(function (res) {
+        addLeft(res, p);
         st.busy = false; st.res = res; st.resText = resultText(res, p);
         toast(st.resText, res.failed || !res.ok ? 'bad' : 'good');
         return load(st.kind).then(paint);
@@ -366,12 +385,14 @@
       /* 문자를 아직 안 쓰는 곳 — 등록 창에 이미 안내가 있으니 조용히 넘어간다 */
       if (ctx.smsMissing) return { ok: false, message: block, plan: p, skipped: 'nosms' };
       if (block) { toast('웰컴 문자를 보내지 못했습니다 — ' + block, 'bad'); return { ok: false, message: block, plan: p }; }
+      if (!p.items.length && p.left.length) { toast('웰컴 문자 — ' + leftMsg(p.left[0].left), 'bad'); return addLeft({ ok: true, sent: 0, failed: 0, results: [], plan: p }, p); }
       if (!p.items.length) {
         toast('웰컴 문자 — 보낼 번호가 없습니다' + (p.noPhone.length ? ' (번호 없음 ' + p.noPhone.length + '명)' : '') + (p.dup.length ? ' · 오늘 이미 보냄' : ''), 'bad');
         return { ok: true, sent: 0, failed: 0, results: [], plan: p };
       }
       return sendItems(p.items).then(function (res) {
         res.plan = p;
+        addLeft(res, p);
         toast('웰컴 문자 — ' + resultText(res, p), res.failed || !res.ok ? 'bad' : 'good');
         return res;
       });
