@@ -3764,3 +3764,86 @@ textarea.aip-text--new:focus { outline: 2px solid #B9AEF0; outline-offset: 1px; 
   .tdc-nudge { width: 100%; min-height: 40px; }
   .cd-pvbar .btn { flex: 1; min-height: 40px; }
 }
+
+/* ============================================================
+   문자 발송 「보내기」 (20261101i) — ① 누구에게 · ② 무엇을 · ③ 보내기 · 휴대폰 기준 · 맨 아래 큰 버튼 고정
+   ============================================================ */
+.sms-step { padding: 14px 0 16px; border-bottom: 1px solid var(--line-soft); }
+.sms-step__t { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 16px; font-weight: 800; color: var(--ink-deep); }
+.sms-step__n { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: #5A3FD0; color: #fff; font-size: 13px; }
+.sms-step--send { border-bottom: 0; }
+/* 반 버튼 — 큼직하게 나란히 */
+.sms-cls { display: flex; flex-wrap: wrap; gap: 8px; }
+.sms-cls__b { appearance: none; display: inline-flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 56px; min-width: 120px; padding: 8px 14px; border: 2px solid var(--line); border-radius: 14px; background: #fff; font: inherit; cursor: pointer; text-align: left; }
+.sms-cls__b:hover { border-color: #B9A9F2; }
+.sms-cls__b.is-on { border-color: #5A3FD0; background: #F1EDFF; }
+.sms-cls__b.is-on .sms-cls__n::before { content: '✓ '; color: #5A3FD0; }
+.sms-cls__n { font-size: 15px; font-weight: 800; color: var(--ink-deep); }
+.sms-cls__c { font-size: 12px; color: var(--ink-light); }
+.sms-cls__b:disabled { opacity: .6; cursor: default; }
+.sms-cls__ended { flex: 1 1 100%; margin-top: 2px; }
+.sms-cls__ended > summary { cursor: pointer; font-size: 13px; font-weight: 700; color: var(--ink-light); padding: 4px 0; }
+.sms-cls__ended .sms-cls { margin-top: 6px; }
+.sms-find { width: 100%; margin: 12px 0 8px; min-height: 42px; }
+/* 학생 체크 목록 — 반별로 묶음 */
+.sms-pick { display: flex; flex-direction: column; gap: 8px; }
+.sms-grp { border: 1px solid var(--line); border-radius: 12px; background: #fff; overflow: hidden; }
+.sms-grp--other { border-style: dashed; }
+.sms-grp__h { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 8px 12px; background: #F7F6FC; border-bottom: 1px solid var(--line-soft); }
+.sms-grp__n { font-size: 14.5px; color: var(--ink-deep); }
+.sms-grp__c { font-size: 12.5px; color: var(--ink-light); margin-left: auto; }
+.sms-grp__all { appearance: none; border: 1px solid #CFC5F5; border-radius: 999px; background: #fff; font: inherit; font-size: 12.5px; font-weight: 700; color: #5A3FD0; padding: 4px 12px; min-height: 32px; cursor: pointer; }
+.sms-grp__all:disabled { opacity: .5; cursor: default; }
+.sms-rows { list-style: none; margin: 0; padding: 2px 0; max-height: 320px; overflow: auto; }
+.sms-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 7px 12px; min-height: 40px; cursor: pointer; }
+.sms-row + .sms-row, .sms-rows li + li .sms-row { border-top: 1px solid var(--line-soft); }
+.sms-row input[type="checkbox"] { width: 20px; height: 20px; flex: 0 0 auto; }
+.sms-row__n { font-weight: 700; color: var(--ink-deep); }
+.sms-row__d { font-size: 12px; color: var(--ink-light); }
+.sms-row.is-off .sms-row__n { color: var(--ink-light); }
+.sms-row.is-nonum { cursor: default; opacity: .7; }
+.sms-row--add { cursor: default; }
+.sms-row__add { margin-left: auto; }
+.sms-tag { font-size: 11.5px; font-weight: 700; color: #5A3FD0; background: #F1EDFF; border-radius: 999px; padding: 1px 8px; }
+.sms-tag--other { color: #8A4B00; background: #FFF3E0; }
+.sms-tag.is-mute { color: var(--ink-light); background: #F1F1F4; }
+/* 받는 사람 세 버튼 */
+.sms-to { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 12px; }
+.sms-to__b { appearance: none; min-height: 46px; border: 2px solid var(--line); border-radius: 12px; background: #fff; font: inherit; font-size: 15px; font-weight: 800; color: var(--ink-deep); cursor: pointer; }
+.sms-to__b.is-on { border-color: #5A3FD0; background: #5A3FD0; color: #fff; }
+.sms-to__b:disabled { opacity: .6; cursor: default; }
+.sms-who-note { margin: 8px 0 0; font-size: 13.5px; color: var(--ink-deep); }
+.sms-who-note__mute { color: var(--ink-light); font-weight: 600; }
+/* ② 무엇을 */
+.sms-tpls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
+.sms-tpls__t { font-size: 12.5px; font-weight: 700; color: var(--ink-light); margin-right: 2px; }
+.sms-tpl-b { appearance: none; border: 1px solid var(--line); border-radius: 999px; background: #fff; font: inherit; font-size: 13px; font-weight: 700; color: var(--ink-deep); padding: 6px 12px; min-height: 36px; cursor: pointer; }
+.sms-tpl-b.is-on { border-color: #5A3FD0; background: #F1EDFF; color: #5A3FD0; }
+.sms-ask { border: 1px solid #DCD3FA; border-radius: 12px; background: #FAF8FF; padding: 10px 12px; margin-bottom: 10px; }
+.sms-ask__t { display: flex; align-items: baseline; gap: 8px; font-size: 13.5px; font-weight: 800; color: #4A33B0; margin-bottom: 6px; }
+.sms-ask__row { display: flex; gap: 8px; align-items: stretch; }
+.sms-ask__in { flex: 1 1 auto; min-width: 0; resize: vertical; }
+.sms-ask__go { flex: 0 0 auto; min-width: 72px; }
+.sms-ask__hint { margin: 6px 0 0; }
+.sms-ask__done { margin-top: 8px; font-size: 13px; color: var(--ink-deep); }
+.sms-ask__check { margin: 4px 0 0 18px; padding: 0; color: #8A4B00; font-size: 12.5px; }
+.sms-body { width: 100%; font-size: 15px; line-height: 1.55; }
+.sms-vars { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.sms-var { appearance: none; border: 1px dashed #CFC5F5; border-radius: 8px; background: #fff; font: inherit; font-size: 12px; color: #5A3FD0; padding: 3px 8px; min-height: 30px; cursor: pointer; }
+.sms-len { margin: 6px 0 0; font-size: 13px; color: var(--ink-deep); }
+.sms-lesson-hint { margin: 2px 0 0; }
+.sms-more { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.sms-ad { margin-top: 8px; }
+/* ③ 보내기 */
+.sms-side { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+.sms-foot { position: sticky; bottom: 0; z-index: 5; display: flex; flex-direction: column; align-items: stretch; gap: 8px; margin: 8px 0 0; padding: 10px 0 calc(12px + env(safe-area-inset-bottom, 0px)); background: rgba(255, 255, 255, .97); border-top: 1px solid var(--line); box-shadow: 0 -6px 18px rgba(30, 20, 80, .08); }
+.sms-foot__pv .sms-pv { margin: 0; max-height: 96px; overflow: auto; }
+.sms-foot__pv .sms-pv__text { font-size: 12.5px; }
+.sms-foot__none { margin: 0; font-size: 12.5px; color: var(--ink-light); }
+.sms-foot__go { width: 100%; min-height: 54px; font-size: 17px; font-weight: 800; border-radius: 14px; }
+@media (max-width: 600px) {
+  .sms-cls__b { flex: 1 1 calc(50% - 8px); min-width: 0; }
+  .sms-ask__row { flex-direction: column; }
+  .sms-ask__go { min-height: 44px; }
+  .sms-var { min-height: 36px; }
+}

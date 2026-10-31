@@ -2,17 +2,20 @@
    sms.js — 「문자 발송」 탭 (SMS · LMS · 솔라피 · Edge Function sms-send · migration-023 · 040)
 
    문자에 관한 것은 모두 위쪽 탭 「문자 발송」에 있다 (20261031m). 안쪽 작은 탭 네 개:
-   「보내기」
+   「보내기」 (20261101i — 휴대폰 기준 · 위에서 아래로 세 덩어리)
      · 맨 위 「보내는 번호: 02-…」 (sms-send status — 솔라피 등록 발신번호)
-     · 받는 사람: 반 전체(여러 반) 또는 학생 골라서 · 보낼 곳: 학부모 · 학생 (둘 다 기본 체크 · 20261030b)
-       학부모를 고르면 등록된 학부모 번호(1 · 2) 모두로. 학생 번호가 학부모 번호와 같으면 학부모 링크로 한 통만
-       학생 한 명(학생 줄 [문자] · 상담 카드)이면 그 학생만 골라진 채로 · 명단 고르기는 접어 두고 [+ 다른 학생 추가]
+     ① 누구에게 — 반 버튼(여러 개 · 종강한 반은 「종강한 반 보기」 안) → 그 반 학생 체크 목록(기본 전체 · 반별로 묶음 · 「전체 선택/해제」 · 「n명 중 n명」)
+       이름 검색(고른 반 안 · 다른 반 학생은 「다른 반」 [+ 추가]) · 받는 사람 [학생] [학부모] [둘 다] (기본 학생 · 레포트 안내는 둘 다)
+       학부모는 등록된 학부모 번호(1 · 2) 모두로. 학생 번호가 학부모 번호와 같으면 학부모 링크로 한 통만 · 번호 없는 사람 · 퇴원생은 빠지고 「번호 없음 n명」
+       다른 화면에서 학생을 정해 열면(학생 줄 [문자] · 상담 카드 …) 그 학생만 체크된 채로
+     ② 무엇을 — 「자주 쓰는 문구」 버튼 · 「AI에게 부탁하기」(비었으면 새로 · 있으면 부탁대로 고침 · text-polish revise) · 내용 칸 · 칸 넣기 버튼 · 글자 수 · 단문/장문
+     ③ 보내기 — 요약(명 · 통 · 예상 원) · 맨 아래 고정 「n명에게 보내기」 위에 첫 번째 받는 사람 미리보기 1건
+       확인 한 번(「목동반 학생 11명에게 보냅니다」) → 「보냄 n · 실패 n(이름)」 · 학생 줄마다 「보냄 18:09」 / 「실패(사유)」
      · 카톡 알림톡이 연동돼 있고 레포트 안내(3 발송에서 · 「레포트」 + #{링크})면 「카톡으로 보내기(안 받는 사람은 문자로)」 / 「문자로만」
        카톡은 학부모에게 템플릿(주간레포트안내) 그대로 · 학생 본인 번호는 문자로 (kakao-send · fallback)
-     · 미리보기 = 학생 한 줄씩의 표 (학생 · 학부모 · 학생 본인) — 줄 · 번호마다 체크로 빼고 보내기 · 이름을 누르면 전문
-     · 보낸 뒤 맨 위 큰 띠 「✓ 보냄 완료 · 22건 · 10/23 18:09」(실패면 빨간 띠 · 실패만 다시 보내기) · 칸마다 「보냄 18:09」/「실패(사유)」
-     · 내용: #{이름} #{반} #{링크}(학부모에겐 학부모 링크, 학생에겐 학생 링크) #{수업일} #{입장코드}(반 설정 「앱 입장코드」 또는 직접) #{앱 설치 링크}
-       단문(90바이트까지) · 장문 표시 · 예상 비용 · 「자주 쓰는 문구 불러오기」 · [본문 비우기] · [이 글을 문구로 저장]
+     · 보낸 뒤 맨 위 띠 「✓ 보냄 22 · 실패 0」(실패면 빨간 띠 · 실패만 다시 보내기)
+     · 내용 칸: {학생이름} {반이름} #{링크}(학부모에겐 학부모 링크, 학생에겐 학생 링크) #{수업일} {첫수업일} {앱입장코드} #{앱 설치 링크} {러닝노트주소}
+       예전 칸 #{이름} #{반} #{입장코드}도 그대로 · 단문(90바이트까지) · 장문 표시 · 예상 비용 · [내용 비우기] · [이 글을 문구로 저장]
      · 같은 번호는 한 번만 — 형제가 같은 번호를 쓰면 「따로 보내기」를 직접 켰을 때만 따로
      · 광고 문자: 맨 앞 (광고)와 발신처, 끝에 무료수신거부 안내. 수신거부 번호가 없거나 밤(21시 ~ 8시)이면 막는다
      · 보내기 전 확인 — 「n명 · 예상 약 n원」 · 몇 건 안 되거나 앱 안내면 받는 사람 · 번호 뒤 4자리 · 실제 문구까지
@@ -49,16 +52,18 @@
   var DEF = { smsWon: 20, lmsWon: 50, perSend: 200, dailyMax: 500, monthMax: 3000, adName: '마라톤국어', optout: '', androidUrl: '', iosUrl: '' };
 
   var st = {
-    mode: 'class', classes: {}, picked: {}, find: '',
+    classes: {},           /* 고른 반 (반 버튼 · 여러 개) */
+    extra: {},             /* 고른 반 밖에서 더한 학생 id (검색 「다른 반」 · 다른 화면에서 학생을 정해 열 때) */
+    find: '',
+    to: 'student',         /* 받는 사람 — student | parent | both (기본 학생 · 20261101i) */
+    tplOn: '',             /* 지금 들어간 「자주 쓰는 문구」 id */
     week: '', from: '',
     cfg: null, missing: false,
     templates: [],
     failed: [],            /* 마지막에 실패한 줄 [{ student_id, to }] — [실패만 다시 보내기] */
     busy: false,
-    off: {},               /* 체크를 끈 학생 id (그 줄 전체를 빼고 보낸다) */
-    offNum: {},            /* 체크를 끈 번호 '학생id|parent1' … */
+    off: {},               /* 체크를 끈 학생 id (명단에서 빼고 보낸다) */
     prev: {},              /* 그 주 레포트를 이미 보낸 학생 id → 보낸 시각 (레포트 발송 → 3 발송에서 열었을 때) */
-    expand: {},            /* 이름을 눌러 전문을 펼친 학생 */
     res: null,             /* 보낸 결과 { at, by: { '학생id|대상': { ok, error } } } */
     done: false,           /* 보냈다 — [보냄 완료] (다시 보내려면 [다시 보내기]) */
     pubBy: null,           /* 주 시작일 → { 학생 id: true } — 공개된 레포트 (레포트 안내 문자에서 공개 전 학생을 막는다 · 20261030e) */
@@ -67,6 +72,7 @@
     purpose: '',           /* app = 앱 안내 (보내면 상담 카드에 한 줄) */
     codes: {},             /* 반 → 앱 입장코드 (classes.app_code · migration-040) */
     kk: null,              /* 카톡 알림톡 상태 (kakao-send health) */
+    ask: null,             /* AI에게 부탁하기 — { busy, undo, check } */
     pane: 'send',
     back: -1,              /* 「← 돌아가기」 — 연 화면 */
     started: false
@@ -161,21 +167,22 @@
       return c || (a.name || '').localeCompare(b.name || '', 'ko');
     });
   }
-  function pickedStudents() {
-    return sortStudents(active().filter(function (s) {
-      return st.mode === 'class' ? !!st.classes[clsOf(s)] : !!st.picked[s.id];
-    }));
-  }
-  /* 보낼 곳 — 「학부모」 하나가 학부모 1 · 2 번호 모두 (20261030b) */
-  function targets() {
-    var out = [];
-    if ($('#smsToPa').checked) out.push('parent1', 'parent2');
-    if ($('#smsToSt').checked) out.push('student');
-    return out;
-  }
   function numberOf(s, t) { return t === 'parent1' ? s.parentPhone : t === 'parent2' ? s.parentPhone2 : s.studentPhone; }
   function labelOf(s, t) { return t === 'student' ? '학생 본인' : '학부모(' + Store.parentTitleOf(s) + ')'; }
   function mobile(d) { return /^01[016789]\d{7,8}$/.test(d); }
+  /* 명단에 보이는 학생 — 고른 반 학생 전부 + 더한 학생 (체크를 끈 학생도 들어 있다 · 빼는 것은 listFromPicks) */
+  function pickedStudents() {
+    return sortStudents(active().filter(function (s) { return !!st.classes[clsOf(s)] || !!st.extra[s.id]; }));
+  }
+  /* 받는 사람 — 「학부모」는 등록된 학부모 번호(1 · 2) 모두 */
+  function targets() {
+    return st.to === 'parent' ? ['parent1', 'parent2'] : st.to === 'both' ? ['parent1', 'parent2', 'student'] : ['student'];
+  }
+  function toWord() { return st.to === 'parent' ? '학부모' : st.to === 'both' ? '학생 · 학부모' : '학생'; }
+  /* 지금 받는 사람 기준으로 보낼 번호가 하나라도 있는가 */
+  function hasNum(s) { return targets().some(function (t) { return mobile(Store.phoneDigits(numberOf(s, t))); }); }
+  /* 이 학생이 보낼 수 있는 줄인가 (체크 · 번호 · 공개 전) */
+  function sendable(s) { return !st.off[s.id] && hasNum(s) && !blocked(s); }
 
   /* ---------- 글 ---------- */
 
@@ -208,7 +215,7 @@
     return n;
   }
   function hasLink(body) { return body.indexOf('#{링크}') !== -1; }
-  function hasCode(body) { return body.indexOf('#{입장코드}') !== -1; }
+  function hasCode(body) { return body.indexOf('#{입장코드}') !== -1 || body.indexOf('{앱입장코드}') !== -1; }
   function hasApp(body) { return body.indexOf('#{앱 설치 링크}') !== -1; }
   function linkFor(s, t) {
     var l = Store.linkOf(s.id);
@@ -234,15 +241,25 @@
     var has = !!(Store.linkOf(s.id) || {}).appCode;
     return has ? body.split('#{앱 안내}').join(APP_NOTE) : body.split('\n#{앱 안내}').join('').split('#{앱 안내}').join('');
   }
+  /* {첫수업일} — 수강 시작일 (없으면 반 첫 수업일) · welcome.js 와 같다 */
+  function firstOf(s) {
+    var d = Store.startOf(s) || (Store.defaultStartDate ? Store.defaultStartDate(clsOf(s) === NOCLS ? '' : clsOf(s)) : '');
+    return d ? kdate(d) : '';
+  }
+  /* 서버 sms_prepare(052) 와 같은 순서 — 예전 칸 #{…} 다음에 새 칸 {…} */
   function render(body, s, t, lessons, opt) {
     opt = opt || {};
+    var code = opt.code != null ? opt.code : entryOf(s);
     var txt = appNote(body, s).split('#{이름}').join(s.name || '')
       .split('#{반}').join((s.className || '').trim())
       .split('#{수업일}').join(String(lessons[(s.className || '').trim()] || '').slice(0, 30))
       .split('#{바뀐 내용}').join(st.notify ? String(st.notify[s.id] || '내용') : '')
-      .split('#{입장코드}').join(opt.code != null ? opt.code : entryOf(s))
+      .split('#{입장코드}').join(code)
       .split('#{앱 설치 링크}').join(appLinks())
-      .split('#{링크}').join(linkFor(s, t));
+      .split('#{링크}').join(linkFor(s, t))
+      .split('{학생이름}').join(s.name || '').split('{반이름}').join((s.className || '').trim())
+      .split('{첫수업일}').join(firstOf(s)).split('{앱입장코드}').join(code)
+      .split('{러닝노트주소}').join(CONFIG.siteUrl + '/s/');
     if (opt.ad) txt = '(광고)' + cfg().adName + '\n' + txt + '\n무료수신거부 ' + cfg().optout;
     return txt;
   }
@@ -315,7 +332,7 @@
     var ts = targets(), out = [];
     pickedStudents().forEach(function (s) {
       if (st.off[s.id] || blocked(s)) return;
-      ts.forEach(function (t) { if (!st.offNum[s.id + '|' + t]) out.push({ s: s, t: t }); });
+      ts.forEach(function (t) { out.push({ s: s, t: t }); });
     });
     return out;
   }
@@ -337,48 +354,89 @@
 
   /* ---------- 그리기 ---------- */
 
-  /* 학생 한 명 (학생 줄 [문자] · 20261031e) — 「받는 사람: 민태현(목동반)」 · 보낼 곳 옆에 번호 뒤 4자리 · [+ 다른 학생 추가] */
+  /* ============================================================
+     ① 누구에게 (20261101i)
+       반 버튼(여러 개 · 종강한 반은 「종강한 반 보기」 안) → 바로 아래 그 반 학생 체크 목록(기본 전체 체크 · 반별로 묶음)
+       반 줄에 「전체 선택/해제」 · 「n명 중 n명」 · 이름 검색 — 고른 반 안에서 찾고, 다른 반 학생은 「다른 반」 [+ 추가]
+       받는 사람 [학생] [학부모] [둘 다] (기본 학생) · 번호 없는 사람 · 퇴원생은 저절로 빠지고 「번호 없음 n명」만
+       학생 줄 표시 — 이미 보냄(그 주 레포트 · 처음부터 체크 꺼 둠) · 공개 전 · 발송 불가 · 바뀐 내용 · 보낸 뒤 「보냄 18:09」 · 「실패(사유)」
+     ============================================================ */
   function tail(d) { d = Store.phoneDigits(d || ''); return d ? '…' + d.slice(-4) : ''; }
-  function renderOne() {
-    var one = st.single, s = one ? pickedStudents()[0] : null;
-    $('#smsOne').hidden = !s;
-    $('#smsWhoTitle').hidden = !!s;
-    $('#smsMode').hidden = !!s;
-    $('#smsPickedHint').hidden = !!s;
-    if (!s) { $('#smsPaTail').textContent = ''; $('#smsStTail').textContent = ''; return false; }
-    $('#smsOne').innerHTML = '<div class="sms-one__who">받는 사람: <b></b></div>' +
-      '<button type="button" class="sms-one__add" data-sms-addmore>+ 다른 학생 추가</button>';
-    $('#smsOne').querySelector('b').textContent = (s.name || '') + '(' + clsOf(s) + ')';
-    var pa = [s.parentPhone, s.parentPhone2].map(tail).filter(Boolean);
-    $('#smsPaTail').textContent = '(' + (pa.length ? pa.join(' · ') : '번호 없음') + ')';
-    $('#smsStTail').textContent = '(' + (tail(s.studentPhone) || '번호 없음') + ')';
-    $('#smsClassBox').hidden = true;
-    $('#smsStudentBox').hidden = true;
-    return true;
+  function tailsOf(s) {
+    var seen = [];
+    targets().forEach(function (t) { var d = Store.phoneDigits(numberOf(s, t)); if (mobile(d) && seen.indexOf(d) === -1) seen.push(d); });
+    return seen.map(tail).join(' ');
   }
-
+  function clsBtn(n) {
+    var cnt = active().filter(function (s) { return clsOf(s) === n; }).length, on = !!st.classes[n];
+    return '<button class="sms-cls__b' + (on ? ' is-on' : '') + '" type="button" data-smscls="' + esc(n) + '" aria-pressed="' + on + '"' + (st.done ? ' disabled' : '') + '>' +
+      '<span class="sms-cls__n">' + esc(n) + '</span><span class="sms-cls__c num">' + cnt + '명</span></button>';
+  }
+  /* 학생 한 줄 결과 — 보낸 뒤 (그 학생 번호들 중 하나라도 실패면 실패) */
+  function resOf(s) {
+    if (!st.res) return '';
+    var rs = Object.keys(st.res.by).filter(function (k) { return k.split('|')[0] === s.id; }).map(function (k) { return st.res.by[k]; });
+    if (!rs.length) return '';
+    var bad = rs.filter(function (r) { return !r.ok; })[0];
+    return bad ? '<span class="sms-st sms-st--bad" title="' + esc(bad.error || '') + '">실패(' + esc(String(bad.error || '이유 모름').slice(0, 24)) + ')</span>'
+      : '<span class="sms-st sms-st--ok">보냄 ' + esc(hm(st.res.at)) + (rs.some(function (r) { return r.via === 'kakao'; }) ? ' · 카톡' : '') + '</span>';
+  }
+  function rowHtml(s, otherCls) {
+    var blk = blocked(s), num = hasNum(s), on = !st.off[s.id] && num && !blk, prev = st.prev[s.id];
+    return '<li><label class="sms-row' + (on ? '' : ' is-off') + (num ? '' : ' is-nonum') + '">' +
+      '<input type="checkbox" data-smsrow="' + esc(s.id) + '"' + (on ? ' checked' : '') + (st.done || blk || !num ? ' disabled' : '') + ' aria-label="' + esc(s.name || '') + ' 보내기">' +
+      '<span class="sms-row__n">' + esc(s.name || '') + '</span>' +
+      (otherCls ? '<small class="sms-tag sms-tag--other">다른 반</small>' : '') +
+      '<span class="sms-row__d num">' + esc(num ? tailsOf(s) : '') + '</span>' +
+      (!num ? '<small class="sms-tag is-mute">번호 없음</small>' : '') +
+      (prev ? '<span class="sms-st sms-st--prev">이미 보냄 ' + esc(fmtPrev(prev)) + '</span>' : '') +
+      (blk ? '<span class="sms-st sms-st--blocked" title="이 수업 레포트를 아직 공개하지 않았습니다 — 레포트 발송 → 2 공개에서 먼저 공개하세요">공개 전 · 발송 불가</span>' : '') +
+      (st.notify && st.notify[s.id] ? '<span class="sms-st sms-st--chg">' + esc(st.notify[s.id]) + '</span>' : '') +
+      resOf(s) + '</label></li>';
+  }
+  /* 반 버튼 — 다니는 학생이 있는 반 모두 (종강한 반은 따로 접어 둔다) */
+  function allClassNames() {
+    var seen = {};
+    active().forEach(function (s) { seen[clsOf(s)] = 1; });
+    return order(Object.keys(seen));
+  }
   function renderPick() {
-    if (renderOne()) return;
-    $$('[data-smsmode]').forEach(function (b) { b.classList.toggle('is-on', b.dataset.smsmode === st.mode); b.setAttribute('aria-pressed', String(b.dataset.smsmode === st.mode)); });
-    var names = classNames();
-    $('#smsClassBox').hidden = st.mode !== 'class';
-    $('#smsStudentBox').hidden = st.mode !== 'student';
-    if (st.mode === 'class') {
-      $('#smsClassBox').innerHTML = names.map(function (n) {
-        var cnt = active().filter(function (s) { return clsOf(s) === n; }).length;
-        return '<button class="chip' + (st.classes[n] ? ' is-on' : '') + '" type="button" data-smscls="' + esc(n) + '" aria-pressed="' + !!st.classes[n] + '">' + esc(n) + ' <span class="num">' + cnt + '</span></button>';
-      }).join('') || '<p class="panel__hint">다니는 학생이 없습니다.</p>';
-    } else {
-      var q = st.find.replace(/\s+/g, '').toLowerCase();
-      var list = sortStudents(active()).filter(function (s) {
-        return !q || ((s.name || '') + clsOf(s)).replace(/\s+/g, '').toLowerCase().indexOf(q) !== -1 || st.picked[s.id];
-      });
-      $('#smsStuList').innerHTML = list.map(function (s) {
-        return '<label class="check-line sms-stu"><input type="checkbox" data-smssid="' + esc(s.id) + '"' + (st.picked[s.id] ? ' checked' : '') + '> <span>' + esc(s.name || '') + ' <span class="muted-note">' + esc(clsOf(s)) + '</span></span></label>';
-      }).join('') || '<p class="panel__hint">찾는 학생이 없습니다.</p>';
+    var names = allClassNames(), open = names.filter(function (n) { return n === NOCLS || !Store.isArchivedClass(n); });
+    var ended = names.filter(function (n) { return n !== NOCLS && Store.isArchivedClass(n); });
+    var endedOn = ended.some(function (n) { return st.classes[n]; });
+    $('#smsClassBox').innerHTML = (open.map(clsBtn).join('') || '<p class="panel__hint">다니는 학생이 없습니다.</p>') +
+      (ended.length ? '<details class="sms-cls__ended"' + (endedOn ? ' open' : '') + '><summary>종강한 반 보기 <span class="num">' + ended.length + '</span></summary><div class="sms-cls">' + ended.map(clsBtn).join('') + '</div></details>' : '');
+    var q = st.find.replace(/\s+/g, '').toLowerCase();
+    var hit = function (s) { return !q || (s.name || '').replace(/\s+/g, '').toLowerCase().indexOf(q) !== -1; };
+    var list = pickedStudents();
+    /* 반별로 묶는다 (반 순서) */
+    var groups = [], by = {};
+    list.forEach(function (s) { var c = clsOf(s); if (!by[c]) { by[c] = []; groups.push(c); } by[c].push(s); });
+    var html = groups.map(function (c) {
+      var all = by[c], rows = all.filter(hit);
+      if (q && !rows.length) return '';
+      var can = all.filter(function (s) { return hasNum(s) && !blocked(s); }), on = can.filter(function (s) { return !st.off[s.id]; });
+      var whole = !!st.classes[c];
+      return '<div class="sms-grp" data-grp="' + esc(c) + '"><div class="sms-grp__h">' +
+          '<b class="sms-grp__n">' + esc(c) + '</b>' + (whole ? '' : '<small class="sms-tag">골라 담은 학생</small>') +
+          '<span class="sms-grp__c num">' + all.length + '명 중 ' + on.length + '명</span>' +
+          '<button type="button" class="sms-grp__all" data-sms-gall="' + esc(c) + '"' + (st.done || !can.length ? ' disabled' : '') + '>' + (can.length && on.length === can.length ? '전체 해제' : '전체 선택') + '</button>' +
+        '</div><ul class="sms-rows">' + rows.map(function (s) { return rowHtml(s, false); }).join('') + '</ul></div>';
+    }).join('');
+    /* 검색 — 명단에 없는 학생은 「다른 반」으로 · [+ 추가] */
+    if (q) {
+      var more = sortStudents(active()).filter(function (s) { return hit(s) && list.indexOf(s) === -1; }).slice(0, 12);
+      if (more.length) html += '<div class="sms-grp sms-grp--other"><div class="sms-grp__h"><b class="sms-grp__n">' + (list.length ? '다른 반' : '찾은 학생') + '</b></div><ul class="sms-rows">' + more.map(function (s) {
+        return '<li><div class="sms-row sms-row--add"><span class="sms-row__n">' + esc(s.name || '') + '</span><small class="sms-tag sms-tag--other">' + (list.length ? '다른 반 · ' : '') + esc(clsOf(s)) + '</small>' +
+          '<button type="button" class="btn btn--sm sms-row__add" data-sms-add="' + esc(s.id) + '"' + (st.done ? ' disabled' : '') + '>+ 추가</button></div></li>';
+      }).join('') + '</ul></div>';
+      else if (!html) html = '<p class="panel__hint">「' + esc(st.find.trim()) + '」 학생이 없습니다.</p>';
     }
-    var n = pickedStudents().length;
-    $('#smsPickedHint').textContent = n ? '학생 ' + n + '명 골랐습니다' : '받는 사람을 골라 주세요';
+    if (!list.length && !q) html = '<p class="panel__hint">위에서 반을 고르거나, 이름으로 찾아 더해 주세요.</p>';
+    $('#smsStuList').innerHTML = html;
+    $$('[data-smsto]').forEach(function (b) { var on = b.dataset.smsto === st.to; b.classList.toggle('is-on', on); b.setAttribute('aria-pressed', String(on)); b.disabled = st.done; });
+    var go = list.filter(sendable).length, noNum = list.filter(function (s) { return !hasNum(s); }).length;
+    $('#smsPickedHint').innerHTML = list.length ? '<b>' + go + '명</b>에게 · ' + esc(toWord()) + (noNum ? ' <small class="sms-who-note__mute">번호 없음 ' + noNum + '명</small>' : '') : '';
   }
 
   /* 보낼 수 없는 까닭 — 광고 문자 규칙 · 앱 설치 링크 */
@@ -393,13 +451,6 @@
     return '';
   }
 
-  /* ============================================================
-     미리보기 표 (20261030b) — 학생 한 줄 · 칸은 학생 · 학부모 · 학생 본인
-       칸마다 보낼 번호 「✓ 010-****-2836」 · 없으면 회색 「번호 없음」 · 학생 번호가 학부모 번호와 같으면 주황 「번호 같음」(학부모 링크로 한 통)
-       학부모 번호가 둘이면 한 칸에 두 줄. 줄 · 번호마다 체크 — 빼고 보낼 수 있다. 「… 외 n건」처럼 숨기지 않는다.
-       문자 내용은 표 위에 한 번(첫 학생 기준 예시) · 학생 이름을 누르면 그 학생에게 실제로 가는 전문
-       보낸 뒤 칸마다 「보냄 18:09」 · 「실패(사유)」 · 그 주 레포트를 이미 보낸 학생은 「이미 보냄 18:09」 + 처음부터 체크 꺼 둠
-     ============================================================ */
   function hm(iso) {
     var d = iso ? new Date(iso) : new Date();
     return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
@@ -409,72 +460,6 @@
     return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + hm(iso);
   }
   function key(sid, t) { return sid + '|' + t; }
-  function planKeyMap() {
-    var m = {};
-    ((plan && plan.items) || []).forEach(function (x) { m[key(x.s.id, x.t)] = x; });
-    return m;
-  }
-  function reasonMap() {
-    var m = {};
-    if (!plan) return m;
-    plan.noLink.forEach(function (x) { m[key(x.s.id, x.t)] = '링크 없음'; });
-    plan.noCode.forEach(function (x) { m[key(x.s.id, x.t)] = '입장코드 없음'; });
-    plan.tooLong.forEach(function (x) { m[key(x.s.id, x.t)] = '너무 김'; });
-    plan.sib.forEach(function (x) { if (!m[key(x.s.id, x.t)]) m[key(x.s.id, x.t)] = '형제 번호 · 한 번만'; });
-    return m;
-  }
-
-  /* 칸 한 줄 — 번호 하나 */
-  function numLine(s, t, d, items, why) {
-    var k = key(s.id, t), off = !!st.offNum[k] || !!st.off[s.id];
-    var it = items[k], r = st.res && st.res.by[k];
-    var stt = r ? (r.ok ? '<span class="sms-st sms-st--ok">보냄 ' + esc(hm(st.res.at)) + (r.via === 'kakao' ? ' · 카톡' : '') + '</span>' : '<span class="sms-st sms-st--bad" title="' + esc(r.error || '') + '">실패(' + esc(String(r.error || '이유 모름').slice(0, 24)) + ')</span>')
-      : (!off && !it && why[k] ? '<span class="sms-st sms-st--muted">' + esc(why[k]) + '</span>' : '');
-    return '<label class="sms-num' + (off ? ' is-off' : '') + '"><input type="checkbox" data-smsnum="' + esc(k) + '"' + (off ? '' : ' checked') + (st.done || st.off[s.id] ? ' disabled' : '') + '>' +
-      '<span class="num">' + (it && !off ? '✓ ' : '') + esc(Store.phoneMask(d)) + '</span>' + stt + '</label>';
-  }
-  function cellHtml(s, group, items, why) {
-    var on = group === 'parent' ? $('#smsToPa').checked : $('#smsToSt').checked;
-    if (!on) return '<td class="sms-c is-skip"><span class="sms-none">보내지 않음</span></td>';
-    var lines = [];
-    if (group === 'parent') {
-      var d1 = Store.phoneDigits(s.parentPhone), d2 = Store.phoneDigits(s.parentPhone2);
-      if (mobile(d1)) lines.push(numLine(s, 'parent1', d1, items, why));
-      if (mobile(d2) && d2 !== d1) lines.push(numLine(s, 'parent2', d2, items, why));
-    } else {
-      var ds = Store.phoneDigits(s.studentPhone);
-      var pd = [Store.phoneDigits(s.parentPhone), Store.phoneDigits(s.parentPhone2)];
-      if (mobile(ds) && $('#smsToPa').checked && pd.indexOf(ds) !== -1) {
-        return '<td class="sms-c"><span class="sms-same" title="학부모 번호와 같아 학부모 링크로 한 통만 갑니다">번호 같음</span></td>';
-      }
-      if (mobile(ds)) lines.push(numLine(s, 'student', ds, items, why));
-    }
-    return '<td class="sms-c">' + (lines.length ? lines.join('') : '<span class="sms-none">번호 없음</span>') + '</td>';
-  }
-
-  function tableHtml(list, items, why) {
-    return '<div class="sms-table-wrap"><table class="sms-table"><thead><tr>' +
-        '<th class="sms-c--chk"><input type="checkbox" data-smsall aria-label="모두 고르기"' + (list.every(function (s) { return !st.off[s.id]; }) ? ' checked' : '') + (st.done ? ' disabled' : '') + '></th>' +
-        '<th>학생</th><th>학부모</th><th>학생 본인</th></tr></thead><tbody>' +
-      list.map(function (s) {
-        var prev = st.prev[s.id];
-        var mine = ((plan && plan.items) || []).filter(function (x) { return x.s.id === s.id; });
-        var open = !!st.expand[s.id];
-        var blk = blocked(s), off = st.off[s.id] || blk;
-        return '<tr class="sms-r' + (off ? ' is-off' : '') + (blk ? ' is-blocked' : '') + '" data-sid="' + esc(s.id) + '">' +
-            '<td class="sms-c--chk"><input type="checkbox" data-smsrow="' + esc(s.id) + '"' + (off ? '' : ' checked') + (st.done || blk ? ' disabled' : '') + ' aria-label="' + esc(s.name || '') + ' 보내기"></td>' +
-            '<td class="sms-c--name"><button type="button" class="sms-name" data-smsname="' + esc(s.id) + '" aria-expanded="' + open + '">' + esc(s.name || '') + '</button>' +
-              (st.mode === 'student' || Object.keys(st.classes).length > 1 ? '<span class="muted-note"> ' + esc(clsOf(s)) + '</span>' : '') +
-              (prev ? '<span class="sms-st sms-st--prev">이미 보냄 ' + esc(fmtPrev(prev)) + '</span>' : '') +
-              (blk ? '<span class="sms-st sms-st--blocked" title="이 수업 레포트를 아직 공개하지 않았습니다 — 레포트 발송 → 2 공개에서 먼저 공개하세요">공개 전 · 발송 불가</span>' : '') +
-              (st.notify && st.notify[s.id] ? '<span class="sms-st sms-st--chg">' + esc(st.notify[s.id]) + '</span>' : '') + '</td>' +
-            cellHtml(s, 'parent', items, why) + cellHtml(s, 'student', items, why) +
-          '</tr>' +
-          (open ? '<tr class="sms-full"><td></td><td colspan="3">' + (mine.length ? mine.map(function (x) {
-            return '<div class="sms-pv"><div class="sms-pv__head">' + esc(labelOf(x.s, x.t)) + ' <span class="num">' + esc(Store.phoneMask(x.d)) + '</span> <span class="sms-kind sms-kind--' + x.kind + '">' + (x.kind === 'SMS' ? '단문' : '장문') + ' ' + x.bytes + '바이트</span></div><pre class="sms-pv__text">' + esc(x.text) + '</pre></div>';
-          }).join('') : '<p class="panel__hint">이 학생에게 갈 문자가 없습니다.</p>') + '</td></tr>' : '');
-      }).join('') + '</tbody></table></div>';
-  }
   /* 이미 보낸 시각 — 오늘이면 18:09, 아니면 10/22 18:09 */
   function fmtPrev(iso) {
     var d = new Date(iso), now = new Date();
@@ -497,46 +482,44 @@
   }
 
   var plan = null;
+  /* ③ 보내기 — 요약 한 줄 · 경고 · 맨 아래 미리보기 1건(첫 번째 받는 사람) · 「n명에게 보내기」 */
   function renderPreview() {
     var body = $('#smsBody').value;
     var sibOn = !!($('#smsSib') && $('#smsSib').checked);
     renderEntry();
     renderVia();
     plan = build(listFromPicks(), body, sibOn);
-    var b0 = bytes(body);
-    $('#smsLen').textContent = body ? (b0 <= 90 && !$('#smsAd').checked && !hasLink(body) && !hasApp(body) ? '단문 · ' : '') + '쓴 글 ' + b0 + '바이트 · 이름 · 링크를 넣고 90바이트가 넘으면 장문' : '';
+    var b0 = bytes(body), ex = plan.items[0];
+    var kind = ex ? ex.kind : b0 <= 90 && !$('#smsAd').checked && !hasLink(body) && !hasApp(body) ? 'SMS' : 'LMS';
+    $('#smsLen').innerHTML = body ? '<span class="sms-kind sms-kind--' + kind + '">' + (kind === 'SMS' ? '단문' : '장문') + '</span> ' + body.length + '자 · ' + (ex ? ex.bytes : b0) + '바이트 <span class="muted-note">90바이트가 넘으면 장문</span>' : '';
     var warn = adBlock();
     $('#smsAdWarn').hidden = !warn;
     $('#smsAdWarn').innerHTML = warn ? esc(warn) + (/연결 상태/.test(warn) ? ' <button class="btn btn--sm" type="button" data-smspane-go="conn">연결 상태 열기</button>' : '') : '';
 
     var host = $('#smsPreview');
-    if (st.missing) { host.innerHTML = ''; updateButtons(); return; }
+    renderPick();
+    var pv = $('#smsFootPv');
+    if (st.missing) { host.innerHTML = ''; pv.innerHTML = ''; updateButtons(); return; }
     var list = pickedStudents();
-    if (!list.length) { host.innerHTML = '<p class="panel__hint">받는 사람을 고르면 여기에 보입니다.</p>'; updateButtons(); return; }
-    if (!targets().length) { host.innerHTML = '<p class="panel__hint">보낼 곳(학부모 · 학생)을 하나 이상 골라 주세요.</p>'; updateButtons(); return; }
+    if (!list.length) { host.innerHTML = '<p class="panel__hint">① 에서 받는 사람을 고르면 여기에 보입니다.</p>'; pv.innerHTML = ''; updateButtons(); return; }
     var c = cfg();
-    var items = planKeyMap(), why = reasonMap();
     var par = plan.items.filter(function (x) { return x.t !== 'student'; }).length, stu = plan.items.length - par;
-    var people = list.filter(function (s) { return !st.off[s.id] && !blocked(s); }).length;
     var blockedN = list.filter(blocked).length;
-    /* 「11명 · 학부모 n통 · 학생 n통 · 번호 없음 n · 총 n통 · 약 n원」 */
     var html = (blockedN ? '<p class="sms-blocked-note">레포트 공개 전인 학생 ' + blockedN + '명은 보내지 않습니다 (회색 「공개 전 · 발송 불가」)</p>' : '') +
-      '<p class="sms-sum"><b class="num">' + people + '</b>명 · 학부모 <b class="num">' + par + '</b>통 · 학생 <b class="num">' + stu + '</b>통 · 번호 없음 <b class="num">' + plan.noPhone.length + '</b> · 총 <b class="num">' + plan.items.length + '</b>통 · 약 <b class="num">' + plan.won.toLocaleString() + '</b>원' +
+      '<p class="sms-sum"><b class="num">' + plan.people + '</b>명 · ' + (par ? '학부모 <b class="num">' + par + '</b>통 · ' : '') + (stu ? '학생 <b class="num">' + stu + '</b>통 · ' : '') + '총 <b class="num">' + plan.items.length + '</b>통 · 약 <b class="num">' + plan.won.toLocaleString() + '</b>원' +
       ' <span class="muted-note">단문 ' + c.smsWon + '원 · 장문 ' + c.lmsWon + '원' + (viaKakao() ? ' · 카톡이면 학부모는 알림톡 요금' : '') + '</span></p>';
-    if (plan.noCode.length) html += '<p class="cp-warn">입장코드가 없는 학생 ' + plan.noCode.map(function (x) { return x.s.id; }).filter(function (v, i, a) { return a.indexOf(v) === i; }).length + '명은 보내지 않습니다 — 위 「입장코드」 칸에 적거나 반 설정에 「앱 입장코드」를 넣어 주세요.</p>';
+    if (plan.noCode.length) html += '<p class="cp-warn">입장코드가 없는 학생 ' + plan.noCode.map(function (x) { return x.s.id; }).filter(function (v, i, a) { return a.indexOf(v) === i; }).length + '명은 보내지 않습니다 — 「입장코드」 칸에 적거나 반 설정에 「앱 입장코드」를 넣어 주세요.</p>';
+    if (plan.noLink.length) html += '<p class="cp-warn">링크가 없는 학생 ' + plan.noLink.map(function (x) { return x.s.name; }).filter(function (v, i, a) { return a.indexOf(v) === i; }).slice(0, 6).join(', ') + '은(는) 보내지 않습니다.</p>';
     if (plan.sib.length) {
       html += '<label class="check-line sms-sib"><input type="checkbox" id="smsSib"' + (sibOn ? ' checked' : '') + (st.done ? ' disabled' : '') + '> <span>같은 번호를 쓰는 형제 ' + plan.sib.length + '명에게도 따로 보내기 <span class="field__opt">' +
         esc(plan.sib.slice(0, 6).map(function (x) { return x.s.name; }).join(', ')) + ' · 끄면 번호마다 한 번만 (앞 학생 이름으로)</span></span></label>';
     }
-    var ex = plan.items[0];
-    html += body.trim()
-      ? '<div class="sms-pv sms-pv--ex"><div class="sms-pv__head">보낼 내용 <span class="muted-note">예시 — ' + (ex ? esc(ex.s.name) + ' · ' + esc(labelOf(ex.s, ex.t)) + ' · 이름을 누르면 학생마다 실제 전문' : '보낼 번호가 없습니다') + '</span>' +
-          (ex ? ' <span class="sms-kind sms-kind--' + ex.kind + '">' + (ex.kind === 'SMS' ? '단문' : '장문') + ' ' + ex.bytes + '바이트</span>' : '') + '</div>' +
-        '<pre class="sms-pv__text">' + esc(ex ? ex.text : body) + '</pre></div>'
-      : '<p class="panel__hint">내용을 쓰면 여기에 보낼 글이 보입니다.</p>';
-    html += tableHtml(list, items, why);
     if (plan.items.length > c.perSend) html += '<p class="cp-warn">한 번에 ' + c.perSend + '건까지 보낼 수 있습니다. 반을 나눠 보내 주세요.</p>';
     host.innerHTML = html;
+    /* 미리보기 1건 — 첫 번째 받는 사람 */
+    pv.innerHTML = body.trim() && ex
+      ? '<div class="sms-pv sms-pv--ex"><div class="sms-pv__head">미리보기 <span class="muted-note">' + esc(ex.s.name) + ' · ' + esc(labelOf(ex.s, ex.t)) + '</span></div><pre class="sms-pv__text">' + esc(ex.text) + '</pre></div>'
+      : body.trim() ? '<p class="sms-foot__none">보낼 번호가 없습니다</p>' : '';
     updateButtons();
   }
 
@@ -544,7 +527,7 @@
     var ok = !st.missing && !st.busy && plan && plan.items.length && $('#smsBody').value.trim() && !adBlock();
     $('#smsSend').disabled = st.done || !ok || plan.items.length > cfg().perSend;
     $('#smsTest').disabled = st.busy || !(plan && plan.items.length && $('#smsBody').value.trim());
-    $('#smsSend').textContent = st.busy ? '보내는 중…' : st.done ? '보냄 완료' : plan && plan.items.length ? plan.items.length + '건 보내기' : '보내기';
+    $('#smsSend').textContent = st.busy ? '보내는 중…' : st.done ? '보냄 완료' : plan && plan.people ? plan.people + '명에게 보내기' : '보내기';
     $('#smsResend').hidden = !st.done;
     /* 여러 명에게 보낼 때만 「내 번호로도 한 통 받기」 */
     var ch = $('#smsCopyHost');
@@ -562,12 +545,14 @@
       st.templates = r.data || [];
     }, function () { st.templates = []; }).then(function () { renderTemplates(); renderTplList(); });
   }
+  /* 「자주 쓰는 문구」 — 버튼 (누르면 내용 칸에 · 지금 들어간 문구는 진하게) */
   function renderTemplates() {
-    var sel = $('#smsTpl'), keep = sel.value;
-    sel.innerHTML = '<option value="">자주 쓰는 문구 불러오기 (' + st.templates.length + ')</option>' + st.templates.map(function (t) {
-      return '<option value="' + esc(t.id) + '">' + esc(t.title || '(이름 없음)') + '</option>';
-    }).join('');
-    sel.value = st.templates.some(function (t) { return t.id === keep; }) ? keep : '';
+    var host = $('#smsTplBtns');
+    if (!host) return;
+    host.innerHTML = st.templates.length ? '<span class="sms-tpls__t">자주 쓰는 문구</span>' + st.templates.map(function (t) {
+      var on = st.tplOn === t.id;
+      return '<button type="button" class="sms-tpl-b' + (on ? ' is-on' : '') + '" data-smstpl="' + esc(t.id) + '" aria-pressed="' + on + '">' + esc(t.title || '(이름 없음)') + '</button>';
+    }).join('') : '<span class="sms-tpls__t">자주 쓰는 문구 없음 <button type="button" class="sms-tpl-b" data-smspane-go="tpl">+ 만들기</button></span>';
   }
   function tplById(id) { return st.templates.find(function (t) { return t.id === id; }) || null; }
   function tplByTitle(title) { return st.templates.find(function (t) { return (t.title || '').trim() === title; }) || null; }
@@ -583,9 +568,9 @@
     var t = tplById(id);
     if (!t) return;
     var cur = $('#smsBody').value.trim();
-    var go = function () { setBody(t.body || '', t.title || ''); $('#smsTplName').value = t.title || ''; renderPreview(); };
+    var go = function () { setBody(t.body || '', t.title || ''); st.tplOn = t.id; $('#smsTplName').value = t.title || ''; if (st.ask) st.ask.undo = null; renderTemplates(); renderAsk(); renderPreview(); };
     if (cur && cur !== (t.body || '').trim()) {
-      UI.confirmAsk('문구 불러오기', '지금 쓴 내용을 「' + (t.title || '') + '」 문구로 바꿉니다.', '바꾸기').then(function (y) { if (y) go(); else $('#smsTpl').value = ''; });
+      UI.confirmAsk('문구 불러오기', '지금 쓴 내용을 「' + (t.title || '') + '」 문구로 바꿉니다.', '바꾸기').then(function (y) { if (y) go(); });
     } else go();
   }
 
@@ -597,7 +582,7 @@
     if (!title) { toast('문구 이름을 적어 주세요', 'bad'); $('#smsTplName').focus(); return; }
     upsertTemplate(null, title, body).then(function (row) {
       if (!row) return;
-      $('#smsTpl').value = row.id;
+      st.tplOn = row.id; renderTemplates();
       st.label = title;
       $('#smsTplSaveRow').hidden = true;
     });
@@ -718,6 +703,66 @@
     upsertTemplate(st.tplEditing, title, body).then(function (row) { if (row) closeTplEdit(); });
   }
 
+  /* ---------- AI에게 부탁하기 (20261101i · text-polish 'revise' · 새 키 없음) ----------
+     내용 칸이 비어 있으면 — 부탁 글을 메모로 넘기고 그 메모대로 문자를 새로 써 달라고 한다
+     내용이 있으면 — 그 글을 부탁대로 고친다 (「더 짧게」 「학부모용으로」)
+     결과는 바로 내용 칸에 · [되돌리기] · 「확인할 것」 2개까지. Claude 에는 글만 간다 (학생 이름 · 번호는 보내지 않는다) */
+  var ASK_NEW = '지금 글은 선생님이 쓴 부탁 메모다. 메모대로 학부모 · 학생에게 보낼 문자 한 통을 정중하고 짧게 완성해서, 지금 글을 그 문자로 바꿔 줘. 메모에 없는 사실은 넣지 마.';
+  function askState() { return st.ask || (st.ask = { busy: false, undo: null, check: [], msg: '' }); }
+  function renderAsk() {
+    var a = askState(), go = $('#smsAskGo'), req = $('#smsAsk').value.trim();
+    go.disabled = a.busy || req.length < 2 || st.done;
+    go.textContent = a.busy ? '쓰는 중…' : '써 줘';
+    $('#smsAskMsg').hidden = !a.msg;
+    $('#smsAskMsg').textContent = a.msg || '';
+    var d = $('#smsAskDone');
+    d.hidden = a.undo == null;
+    d.innerHTML = a.undo == null ? '' : '<span>AI가 쓴 글을 내용 칸에 넣었습니다. 날짜 · 시간 · 숫자 · 이름을 한 번 더 확인해 주세요.</span> <button type="button" class="btn btn--sm btn--ghost" id="smsAskUndo">되돌리기</button>' +
+      (a.check && a.check.length ? '<ul class="sms-ask__check">' + a.check.slice(0, 2).map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' : '');
+    $('#smsAskLeft').textContent = a.left == null ? '' : '이번 달 ' + a.left + '회 남음';
+  }
+  function askRun() {
+    var a = askState(), req = $('#smsAsk').value.replace(/\s+/g, ' ').trim(), cur = $('#smsBody').value;
+    if (a.busy || req.length < 2) return;
+    var fns = SB.client && SB.client.functions;
+    if (!fns || !fns.invoke) return;
+    a.busy = true; a.msg = ''; renderAsk();
+    var body = cur.trim()
+      ? { action: 'revise', kind: 'sms', text: cur, request: req }
+      : { action: 'revise', kind: 'sms', text: req, request: ASK_NEW };
+    Promise.resolve(fns.invoke('text-polish', { body: body })).then(function (r) {
+      if (!r.error) return r.data;
+      var ctx = r.error.context;
+      return ctx && typeof ctx.json === 'function' ? ctx.json().catch(function () { return null; }) : null;
+    }).catch(function () { return null; }).then(function (res) {
+      a.busy = false;
+      if (res && res.cap != null && res.used != null) a.left = Math.max(0, res.cap - res.used);
+      if (window.AiPolish) AiPolish.loadLeft();          /* 문구 고치기 칸의 「이번 달 n회 남음」도 같이 */
+      if (!res || !res.ok || typeof res.text !== 'string') {
+        a.msg = res && res.reason === 'input' && res.message ? res.message : window.AiPolish ? AiPolish.FAIL : '지금은 AI가 쓸 수 없습니다. 잠시 뒤 다시 눌러 주세요.';
+        renderAsk(); return;
+      }
+      a.undo = cur; a.check = res.check || [];
+      $('#smsBody').value = res.text;
+      st.tplOn = ''; renderTemplates();
+      $('#smsAsk').value = '';
+      renderAsk(); renderPreview();
+    });
+  }
+  /* 이번 달 남은 횟수 (AI로 다듬기와 같이 센다 · migration-026) */
+  function askLeft() {
+    if (!sb() || !sb().rpc) return;
+    Promise.resolve(sb().rpc('polish_status')).then(function (r) {
+      if (r && !r.error && r.data) { askState().left = Math.max(0, (r.data.cap || 0) - (r.data.used || 0)); renderAsk(); }
+    }, function () {});
+  }
+  function askUndo() {
+    var a = askState();
+    if (a.undo == null) return;
+    $('#smsBody').value = a.undo; a.undo = null; a.check = [];
+    renderAsk(); renderPreview();
+  }
+
   /* ---------- 열기 ---------- */
 
   /* 보내는 번호 — 솔라피에 등록된 발신번호 (서버 Secrets 의 SOLAPI_SENDER 를 sms-send 함수가 읽어 번호만 준다 · 20261031e) */
@@ -804,39 +849,35 @@
   }
 
   /* opts — { classes: [반], students: [학생 id], week: '주 시작일', from: 'send' | 'today' | 'roster' | 'card' | 'notify' | 'invite',
-              single, to: 'student' | 'parent' | 'both', body, template: '문구 이름', entry: '입장코드', purpose: 'app', confirm } */
+              single, to: 'student' | 'parent' | 'both', body, template: '문구 이름', entry: '입장코드', purpose: 'app', confirm }
+     받는 사람 — opts.to 가 먼저 · 레포트 안내(3 발송 · 바뀐 내용 알리기)는 예전처럼 둘 다 · 그 밖은 학생 (20261101i) */
   function open(opts) {
     opts = opts || {};
     st.started = true;
     var ids = (opts.students || []).filter(Boolean);
-    st.mode = ids.length ? 'student' : 'class';
-    /* 학생 줄 [문자] — 그 학생 한 명에게 (반 전체 / 학생 골라서 · 명단은 숨김 · 기본은 학부모만) */
-    st.single = !!opts.single && ids.length === 1;
-    st.classes = {}; st.picked = {}; st.find = '';
+    st.classes = {}; st.extra = {}; st.find = '';
     (opts.classes || []).forEach(function (c) { if (c) st.classes[c] = true; });
-    ids.forEach(function (id) { st.picked[id] = true; });
+    ids.forEach(function (id) { st.extra[id] = true; });
     st.week = opts.week || '';
     st.from = opts.from || '';
     st.failed = [];
     st.busy = false;
-    st.off = {}; st.offNum = {}; st.prev = {}; st.expand = {}; st.res = null; st.done = false;
-    st.label = ''; st.purpose = opts.purpose || ''; st.viaTouched = false;
+    st.off = {}; st.prev = {}; st.res = null; st.done = false;
+    st.label = ''; st.purpose = opts.purpose || ''; st.viaTouched = false; st.tplOn = '';
+    st.ask = null;
     /* 「바뀐 내용 알리기」 (publish.js) — 학생마다 바뀐 내용 · 문구 기본값 · 보냄 표시는 하지 않고 알림 횟수만 (20261030e) */
     st.notify = opts.notify || null;
+    st.to = opts.to === 'parent' || opts.to === 'both' || opts.to === 'student' ? opts.to
+      : st.notify || st.from === 'send' ? 'both' : 'student';
     $('#smsTitle').textContent = st.notify ? '바뀐 내용 알리기' : st.purpose === 'app' ? '앱 안내 문자' : '문자 보내기';
     $('#smsVarChange').hidden = !st.notify;
     $('#smsBody').value = opts.body || '';
     $('#smsEntry').value = opts.entry || '';
+    $('#smsAsk').value = '';
     $('#smsTplSaveRow').hidden = true;
     $('#smsTplName').value = '';
     $('#smsViaSms').checked = true;
     $('#smsViaSec').hidden = true;
-    /* 보낼 곳을 정해서 열기 — 'student' 면 학생만 (「내 정보를 채워 주세요」 · 20261031c) */
-    if (opts.to === 'student') { $('#smsToPa').checked = false; $('#smsToSt').checked = true; }
-    else if (opts.to === 'parent') { $('#smsToPa').checked = true; $('#smsToSt').checked = false; }
-    else if (opts.to === 'both') { $('#smsToPa').checked = true; $('#smsToSt').checked = true; }
-    else if (st.single) { $('#smsToPa').checked = true; $('#smsToSt').checked = false; }
-    else { $('#smsToPa').checked = true; $('#smsToSt').checked = true; }
     $('#smsFind').value = '';
     $('#smsResult').innerHTML = '';
     banner('', '');
@@ -851,28 +892,30 @@
     var cur = window.RTabs && RTabs.current ? RTabs.current() : -1;
     if (st.from) st.back = cur !== TAB ? cur : st.back; else st.back = -1;
     $('#smsClose').hidden = !(st.from && st.back >= 0);
-    renderPick();
+    renderTemplates();
+    renderAsk();
+    askLeft();
     renderPreview();
-    if (window.AiPolish) AiPolish.reset($('#smsBody'));
     goTab();
     showPane('send');
     try { window.scrollTo(0, 0); } catch (e) {}
     loadSender();
-    return Promise.all([loadCfg(), loadTemplates(), loadCodes(), loadKakao(), window.AiPolish ? AiPolish.loadLeft() : null, st.notify ? null : loadPrev(), st.notify ? null : loadPub()]).then(function () {
+    return Promise.all([loadCfg(), loadTemplates(), loadCodes(), loadKakao(), st.notify ? null : loadPrev(), st.notify ? null : loadPub()]).then(function () {
       $('#smsMissing').hidden = !st.missing;
       $('#smsMissing').textContent = st.missing ? 'migration-023 SQL 을 실행하고 Edge Function sms-send 를 배포하면 사이트에서 문자를 보낼 수 있습니다.' : '';
       /* 문구 이름으로 열기 (앱 안내) — 문구가 지워졌으면 기본 글 */
       if (opts.template && !$('#smsBody').value.trim()) {
         var tt = tplByTitle(opts.template);
         setBody(tt ? tt.body : (opts.template === APP_TPL ? APP_BODY : ''), opts.template);
-        if (tt) $('#smsTpl').value = tt.id;
+        if (tt) st.tplOn = tt.id;
       }
       /* 레포트 발송 → 3 발송에서 열었고 내용이 비어 있으면 「레포트 안내」 문구로 */
       if (st.from === 'send' && !$('#smsBody').value.trim()) {
         var t = st.templates.find(function (x) { return /레포트/.test(x.title || ''); });
-        if (t) { setBody(t.body || '', t.title || ''); $('#smsTplName').value = t.title || ''; $('#smsTpl').value = t.id; }
+        if (t) { setBody(t.body || '', t.title || ''); $('#smsTplName').value = t.title || ''; st.tplOn = t.id; }
       }
       if (!st.label && opts.body) st.label = opts.label || '';
+      renderTemplates();
       renderPreview();
       /* 등록하면서 앱 안내를 골랐으면 — 받는 사람 · 번호 뒤 4자리 · 실제 문구 확인을 바로 띄운다 ([보내기]를 눌러야 나간다) */
       if (opts.confirm && plan && plan.items.length && !adBlock()) send(null);
@@ -888,8 +931,14 @@
 
   function varsFor(items) {
     var body = $('#smsBody').value, v = {};
-    if (!hasCode(body)) return v;
-    items.forEach(function (x) { var c = entryOf(x.s); if (c) v[x.s.id] = { code: c }; });
+    var code = hasCode(body), first = body.indexOf('{첫수업일}') !== -1;
+    if (!code && !first) return v;
+    items.forEach(function (x) {
+      var o = {}, c = code ? entryOf(x.s) : '', f = first ? firstOf(x.s) : '';
+      if (c) o.code = c;
+      if (f) o.first = f;
+      if (c || f) v[x.s.id] = o;
+    });
     return v;
   }
   function payload(items) {
@@ -926,6 +975,14 @@
 
   function detailText(items) { return items.length ? '\n\n' + detailLines(items) : ''; }
 
+  /* 확인 창 첫 줄 — 「목동반 학생 11명에게 보냅니다」 */
+  function leadOf(p) {
+    var cs = [];
+    p.items.forEach(function (x) { var c = clsOf(x.s); if (cs.indexOf(c) === -1) cs.push(c); });
+    var where = cs.length > 3 ? cs.slice(0, 2).join(' · ') + ' 외 ' + (cs.length - 2) + '개 반' : cs.join(' · ');
+    var one = p.people === 1 && p.items[0] ? p.items[0].s.name + ' ' : '';
+    return (one ? where + ' ' + one + toWord() + '에게 보냅니다' : where + ' ' + toWord() + ' ' + p.people + '명에게 보냅니다').replace(/^ +/, '');
+  }
   function send(retryList, again) {
     var body = $('#smsBody').value;
     var list = retryList || listFromPicks();
@@ -940,7 +997,8 @@
     var prevN = p.items.filter(function (x) { return st.prev[x.s.id]; }).map(function (x) { return x.s.id; }).filter(function (v, i, a) { return a.indexOf(v) === i; }).length;
     var kkN = kk ? p.items.filter(function (x) { return x.t !== 'student'; }).map(function (x) { return x.s.id; }).filter(function (v, i, a) { return a.indexOf(v) === i; }).length : 0;
     var copy = !retryList && p.people > 1 && copyOn();
-    var desc = p.people + '명 · 문자 ' + p.items.length + '건' + (copy ? ' + 내 번호 1통' : '') + ' (단문 ' + p.sms + ' · 장문 ' + p.lms + ') · 예상 약 ' + p.won.toLocaleString() + '원을 보냅니다.' +
+    var lead = retryList || again ? '' : leadOf(p);
+    var desc = (lead ? lead + '. ' : '') + p.people + '명 · 문자 ' + p.items.length + '건' + (copy ? ' + 내 번호 1통' : '') + ' (단문 ' + p.sms + ' · 장문 ' + p.lms + ') · 예상 약 ' + p.won.toLocaleString() + '원을 보냅니다.' +
       (copy ? ' 맨 위 ' + p.items[0].s.name + ' 학생에게 가는 내용 그대로 내 번호(' + me.phone + ')로도 한 통 갑니다 (보냄 표시에는 세지 않음).' : '') +
       (kk ? ' 학부모 ' + kkN + '명은 카톡 알림톡(「' + KK_TEMPLATE + '」 템플릿)으로 — 카톡을 안 받으면 문자로 대신 갑니다.' : '') +
       (again ? ' 방금 보낸 사람에게 한 번 더 보냅니다.' : '') +
@@ -952,7 +1010,7 @@
       (st.purpose === 'app' ? ' 보내면 상담 카드에 「앱 안내 문자 보냄」이 남습니다.' : '') +
       ' 오늘 ' + ((st.cfg && st.cfg.today) || 0) + ' / ' + cfg().dailyMax + '건.' +
       detailText(st.purpose === 'app' || p.items.length <= 5 ? (kk ? p.items.filter(function (x) { return x.t === 'student'; }) : p.items) : []);
-    UI.confirmAsk(retryList ? '실패만 다시 보내기' : again ? '다시 보내기' : st.purpose === 'app' ? '앱 안내 문자 보내기' : '문자 보내기', desc, '보내기').then(function (yes) {
+    UI.confirmAsk(retryList ? '실패만 다시 보내기' : again ? '다시 보내기' : lead || '문자 보내기', desc, '보내기').then(function (yes) {
       if (!yes) return;
       st.busy = true; updateButtons();
       var pl = payload(p.items);
@@ -1073,14 +1131,17 @@
     st.failed = Object.keys(st.res.by).filter(function (k) { return !st.res.by[k].ok && st.res.by[k].via !== 'kakao'; }).map(function (k) { var a = k.split('|'); return { student_id: a[0], to: a[1] }; });
     st.done = true;
     var sk = (res.skipped || []).filter(function (x) { return x.reason !== 'sibling'; });
+    var badNames = [];
+    (res.results || []).forEach(function (x) { if (!x.ok && x.name && badNames.indexOf(x.name) === -1) badNames.push(x.name); });
     if (bad) {
-      banner('bad', '<b>보냄 ' + okN + '건 · 실패 ' + bad + '건</b>' + (st.failed.length ? ' <button class="btn btn--sm btn--primary" type="button" id="smsRetry">실패만 다시 보내기</button>' : '') +
+      banner('bad', '<b>보냄 ' + okN + ' · 실패 ' + bad + (badNames.length ? '(' + esc(badNames.slice(0, 8).join(', ')) + ')' : '') + '</b>' + (st.failed.length ? ' <button class="btn btn--sm btn--primary" type="button" id="smsRetry">실패만 다시 보내기</button>' : '') +
         '<span class="sms-banner__sub">' + esc(mdhm(now)) + ' · 실패한 칸은 아래 표에 빨간 글씨로 사유가 있습니다</span>');
     } else {
-      banner('ok', '<b>✓ 보냄 완료 · ' + okN + '건 · ' + esc(mdhm(now)) + '</b><span class="sms-banner__sub">솔라피가 받은 결과입니다. 실제 도착은 솔라피 발송 내역에서 봅니다 · 「보낸 기록」에도 남았습니다.</span>');
+      banner('ok', '<b>✓ 보냄 ' + okN + ' · 실패 0</b> <span class="num">' + esc(mdhm(now)) + '</span><span class="sms-banner__sub">솔라피가 받은 결과입니다. 실제 도착은 솔라피 발송 내역에서 봅니다 · 「보낸 기록」에도 남았습니다.</span>');
     }
     if (sk.length) host.innerHTML = '<p class="panel__hint">건너뜀: ' + esc(sk.slice(0, 20).map(function (x) { return (x.name || '') + ' ' + (TO_LABEL[x.to] || '') + '(' + (x.label || x.reason) + ')'; }).join(', ')) + '</p>';
     toast('문자 ' + okN + '건 접수' + (bad ? ' · 실패 ' + bad + '건' : ''), bad ? 'bad' : 'good');
+    renderPick();
     updateButtons();
   }
 
@@ -1484,17 +1545,23 @@
       if (pb) { showPane(pb.dataset.smspane); return; }
       var pg = e.target.closest('[data-smspane-go]');
       if (pg) { showPane(pg.dataset.smspaneGo); return; }
-      if (e.target.closest('[data-sms-addmore]')) {
-        /* 다른 학생을 더할 때만 — 학생 골라서 명단을 펼친다 */
-        st.single = false; st.mode = 'student';
-        renderPick(); renderPreview();
-        setTimeout(function () { $('#smsFind').focus(); }, 30);
-        return;
-      }
-      var m = e.target.closest('[data-smsmode]');
-      if (m) { st.mode = m.dataset.smsmode; renderPick(); renderPreview(); return; }
+      var to = e.target.closest('[data-smsto]');
+      if (to) { st.to = to.dataset.smsto; renderPreview(); return; }
       var c = e.target.closest('[data-smscls]');
-      if (c) { var n = c.dataset.smscls; if (st.classes[n]) delete st.classes[n]; else st.classes[n] = true; renderPick(); renderPreview(); return; }
+      if (c) { var n = c.dataset.smscls; if (st.classes[n]) delete st.classes[n]; else st.classes[n] = true; renderPreview(); return; }
+      var ad = e.target.closest('[data-sms-add]');
+      if (ad) { st.extra[ad.dataset.smsAdd] = true; delete st.off[ad.dataset.smsAdd]; st.find = ''; $('#smsFind').value = ''; renderPreview(); return; }
+      var ga = e.target.closest('[data-sms-gall]');
+      if (ga) {
+        var g = ga.dataset.smsGall;
+        var mine = pickedStudents().filter(function (s) { return clsOf(s) === g && hasNum(s) && !blocked(s); });
+        var allOn = mine.every(function (s) { return !st.off[s.id]; });
+        mine.forEach(function (s) { if (allOn) st.off[s.id] = true; else delete st.off[s.id]; });
+        renderPreview(); return;
+      }
+      var tb = e.target.closest('[data-smstpl]');
+      if (tb) { useTemplate(tb.dataset.smstpl); return; }
+      if (e.target.id === 'smsAskUndo') { askUndo(); return; }
       var v = e.target.closest('[data-var], [data-tvar]');
       if (v) {
         var ta = v.dataset.var ? $('#smsBody') : $('#tplBody'), word = v.dataset.var || v.dataset.tvar;
@@ -1507,8 +1574,6 @@
       }
       if (e.target.id === 'smsRetry') retry();
       if (e.target.id === 'smsOpenSet') openSettings();
-      var nm = e.target.closest('[data-smsname]');
-      if (nm) { var id = nm.dataset.smsname; st.expand[id] = !st.expand[id]; renderPreview(); return; }
       /* 자주 쓰는 문구 목록 */
       var ta2 = e.target.closest('[data-tact]');
       if (ta2) {
@@ -1540,27 +1605,21 @@
       }
     });
     pane.addEventListener('change', function (e) {
-      var b = e.target.closest('[data-smssid]');
-      if (b) { if (b.checked) st.picked[b.dataset.smssid] = true; else delete st.picked[b.dataset.smssid]; renderPick(); renderPreview(); return; }
-      if (e.target.id === 'smsTpl') { useTemplate(e.target.value); return; }
       if (e.target.id === 'tplExStu') { renderTplPreview(); return; }
       var rw = e.target.closest('[data-smsrow]');
       if (rw) { if (rw.checked) delete st.off[rw.dataset.smsrow]; else st.off[rw.dataset.smsrow] = true; renderPreview(); return; }
-      var nb = e.target.closest('[data-smsnum]');
-      if (nb) { if (nb.checked) delete st.offNum[nb.dataset.smsnum]; else st.offNum[nb.dataset.smsnum] = true; renderPreview(); return; }
-      if (e.target.hasAttribute && e.target.hasAttribute('data-smsall')) {
-        var on = e.target.checked;
-        pickedStudents().forEach(function (x) { if (on) delete st.off[x.id]; else st.off[x.id] = true; });
-        renderPreview(); return;
-      }
       if (e.target.name === 'smsVia') { st.viaTouched = true; renderPreview(); return; }
-      if (/^smsTo|^smsAd$|^smsSib$|^smsMark$/.test(e.target.id)) renderPreview();
+      if (/^smsAd$|^smsSib$|^smsMark$/.test(e.target.id)) renderPreview();
     });
     var tm = null;
-    $('#smsBody').addEventListener('input', function () { clearTimeout(tm); tm = setTimeout(renderPreview, 150); });
+    $('#smsBody').addEventListener('input', function () { clearTimeout(tm); tm = setTimeout(renderPreview, 150); if (st.tplOn) { var tt = tplById(st.tplOn); if (!tt || (tt.body || '') !== $('#smsBody').value) { st.tplOn = ''; renderTemplates(); } } });
     $('#smsEntry').addEventListener('input', function () { clearTimeout(tm); tm = setTimeout(renderPreview, 150); });
     $('#tplBody').addEventListener('input', renderTplPreview);
     $('#smsFind').addEventListener('input', function () { st.find = $('#smsFind').value; renderPick(); });
+    /* AI에게 부탁하기 — [써 줘] · 칸에서 Ctrl/⌘ + Enter */
+    $('#smsAsk').addEventListener('input', renderAsk);
+    $('#smsAsk').addEventListener('keydown', function (e) { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); askRun(); } });
+    $('#smsAskGo').addEventListener('click', askRun);
     $('#smsTplSaveOpen').addEventListener('click', function () {
       if (!$('#smsBody').value.trim()) { toast('저장할 내용을 먼저 써 주세요', 'bad'); return; }
       $('#smsTplSaveRow').hidden = false;
@@ -1573,14 +1632,13 @@
       if (!$('#smsBody').value) return;
       UI.confirmAsk('본문 비우기', '지금 쓴 글을 지웁니다. 저장된 「자주 쓰는 문구」는 그대로입니다.', '비우기').then(function (y) {
         if (!y) return;
-        setBody('', ''); $('#smsTpl').value = '';
-        if (window.AiPolish) AiPolish.reset($('#smsBody'));
+        setBody('', ''); st.tplOn = ''; askState().undo = null;
+        renderTemplates(); renderAsk();
         renderPreview();
       });
     });
     /* 「AI로 다듬기」 — 공통 부품 (aipolish.js) · 문자는 짧게 메신저용 · 길이 고르기 · 남은 횟수 */
     if (window.AiPolish) {
-      AiPolish.attach($('#smsBody'), { kind: 'sms', lengths: true, left: true, id: 'smsAi' });
       AiPolish.attach($('#tplBody'), { kind: 'sms', lengths: true, left: true, id: 'tplAi' });
     }
     $('#smsSend').addEventListener('click', function () { send(null); });
