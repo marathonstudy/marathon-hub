@@ -77,8 +77,14 @@
     if (k === 'settings') closeMore(function () { $('#tdSettingsBtn').click(); });
     if (k === 'staff') closeMore(function () { if (window.Staff) Staff.open(); });
     if (k === 'course') closeMore(function () { if (window.Course) Course.openManage(); });
+    if (k === 'a2hs') closeMore(function () { if (window.A2HS) A2HS.how('coach'); });
   });
   $('#moreMenuClose').addEventListener('click', function () { $('#moreMenu').close(); });
+
+  /* 홈 화면 앱 (20261101k · a2hs.js) — 로그인한 직후 첫 화면 맨 위 「📱 홈 화면에 추가하면 앱처럼 바로 열려요」 (휴대폰 · 앱으로 연 게 아닐 때)
+     서비스워커는 코치룸 범위(admin/sw.js)로 따로 */
+  window.addEventListener('jt:loaded', function () { if (window.A2HS) A2HS.band($('#appRoot'), 'coach'); });
+  if (window.A2HS) A2HS.register('sw.js');
 
   /* ---------- 주차 띠 ⋯ — 날짜 직접 고르기 · 이번 주로 ---------- */
   $('#btnWbarMore').addEventListener('click', function () { $('#weekPickModal').showModal(); });

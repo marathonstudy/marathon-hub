@@ -11,7 +11,11 @@
 <meta name="googlebot" content="noindex, nofollow">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#E8E6F8">
+<!-- 홈 화면 앱 「러닝노트」 (20261101k) — 시작 주소는 이 입구(?app=1 · 로그인돼 있으면 바로 내 러닝노트) · 범위 /marathon-hub/ (코치룸 /admin/ 은 코치룸 앱) -->
+<link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="../assets/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <link rel="icon" type="image/png" sizes="192x192" href="../assets/icon-192.png">
 <meta name="apple-mobile-web-app-title" content="러닝노트">
 
@@ -26,8 +30,8 @@
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" as="style" crossorigin
       href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
-<link rel="stylesheet" href="../assets/report.css?v=20261101j">
-<link rel="stylesheet" href="../assets/hub.css?v=20261101j">
+<link rel="stylesheet" href="../assets/report.css?v=20261101k">
+<link rel="stylesheet" href="../assets/hub.css?v=20261101k">
 </head>
 <body>
 
@@ -76,8 +80,10 @@
 
 </div>
 
-<script src="../assets/config.js?v=20261101j"></script>
-<script src="../assets/brand.js?v=20261101j"></script>
-<script src="../assets/entry.js?v=20261101j"></script>
+<script src="../assets/config.js?v=20261101k"></script>
+<script src="../assets/brand.js?v=20261101k"></script>
+<script src="../assets/a2hs.js?v=20261101k"></script>
+<script src="../assets/entry.js?v=20261101k"></script>
+<script>if (window.A2HS) A2HS.register('../sw.js');</script>
 </body>
 </html>

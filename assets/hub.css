@@ -1259,3 +1259,8 @@ html.rn-lock, html.rn-lock body { overflow: hidden; }
   border-radius: 12px; background: var(--rv-soft, #f3f0ff); font-size: 14px; }
 .tw-todo__btn { appearance: none; border: 0; font: inherit; font-weight: 700; cursor: pointer; padding: 8px 12px; border-radius: 10px;
   background: var(--brand, #5b3df5); color: #fff; white-space: nowrap; }
+/* 홈 화면에 추가하는 법 버튼 (a2hs.js · 20261101k) — 레포트 맨 아래 · 내 정보 */
+.a2hs-how { text-align: center; }
+.a2hs-how__btn { appearance: none; border: 1px solid #D9D3F5; background: #fff; color: #4B4380; font: inherit; font-weight: 800; cursor: pointer;
+  width: 100%; min-height: 48px; border-radius: 12px; }
+.a2hs-how .hub-muted { margin: 8px 0 0; }

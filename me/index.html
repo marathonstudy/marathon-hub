@@ -10,8 +10,13 @@
 <meta name="googlebot" content="noindex, nofollow">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#E8E6F8">
-<!-- 홈 화면 아이콘 (홈 화면에 추가할 때). 주소를 바꾸는 manifest 는 넣지 않는다 — # 뒤 개인 링크 코드가 그대로 담기게 -->
+<!-- 홈 화면 앱 「러닝노트」 (20261101k · a2hs.js)
+     manifest(../s/manifest.webmanifest · 시작 = 학생 입구)는 아이폰이 아닐 때만 아래 스크립트가 넣는다 —
+     아이폰은 manifest 없이 지금 주소(# 뒤 개인 링크 코드 그대로)로 홈 화면에 담겨 학부모 링크도 그대로 열린다.
+     안드로이드는 시작 주소가 학생 입구지만, 이 기기에서 마지막으로 연 러닝노트로 바로 간다 (entry.js · ?app=1) -->
 <link rel="apple-touch-icon" href="../assets/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <link rel="icon" type="image/png" sizes="192x192" href="../assets/icon-192.png">
 <meta name="apple-mobile-web-app-title" content="러닝노트">
 
@@ -31,8 +36,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../assets/report.css?v=20261101j">
-<link rel="stylesheet" href="../assets/hub.css?v=20261101j">
+<link rel="stylesheet" href="../assets/report.css?v=20261101k">
+<link rel="stylesheet" href="../assets/hub.css?v=20261101k">
 </head>
 <body>
 
@@ -82,18 +87,23 @@
 
 </div>
 
-<script src="../assets/config.js?v=20261101j"></script>
-<script src="../assets/brand.js?v=20261101j"></script>
-<script src="../assets/report-view.js?v=20261101j"></script>
-<script src="../assets/lesson.js?v=20261101j"></script>
-<script src="../assets/dday.js?v=20261101j"></script>
-<script src="../assets/photos.js?v=20261101j"></script>
-<script src="../assets/review-card.js?v=20261101j"></script>
-<script src="../assets/app-week.js?v=20261101j"></script>
-<script src="../assets/entry.js?v=20261101j"></script>
-<script src="../assets/me-info.js?v=20261101j"></script>
-<script src="../assets/review-note.js?v=20261101j"></script>
-<script src="../assets/hub.js?v=20261101j"></script>
-<script>Hub.bootMe();</script>
+<script src="../assets/config.js?v=20261101k"></script>
+<script src="../assets/brand.js?v=20261101k"></script>
+<script src="../assets/report-view.js?v=20261101k"></script>
+<script src="../assets/lesson.js?v=20261101k"></script>
+<script src="../assets/dday.js?v=20261101k"></script>
+<script src="../assets/photos.js?v=20261101k"></script>
+<script src="../assets/review-card.js?v=20261101k"></script>
+<script src="../assets/app-week.js?v=20261101k"></script>
+<script src="../assets/entry.js?v=20261101k"></script>
+<script src="../assets/me-info.js?v=20261101k"></script>
+<script src="../assets/review-note.js?v=20261101k"></script>
+<script src="../assets/a2hs.js?v=20261101k"></script>
+<script src="../assets/hub.js?v=20261101k"></script>
+<script>
+  if (window.A2HS && !A2HS.env().ios) { var mf = document.createElement('link'); mf.rel = 'manifest'; mf.href = '../s/manifest.webmanifest'; document.head.appendChild(mf); }
+  if (window.A2HS) A2HS.register('../sw.js');
+  Hub.bootMe();
+</script>
 </body>
 </html>

@@ -525,6 +525,7 @@
     b.textContent = '로그아웃';
     b.addEventListener('click', function () {
       EL.clear();
+      if (EL.last) EL.last('');
       global.location.replace('../s/?out=1');
     });
     head.appendChild(b);
@@ -555,6 +556,8 @@
   }
 
   function homeGuideHtml() {
+    /* a2hs.js 가 있으면 버튼 하나 — 누르면 지금 브라우저에 맞는 방법 그림 (20261101k) */
+    if (global.A2HS) return '<div class="card a2hs-how"><button type="button" class="a2hs-how__btn" data-a2hs-how>📱 홈 화면에 추가하는 법</button><p class="hub-muted">다음부터 링크를 찾지 않고 앱처럼 바로 열려요.</p></div>';
     return '<details class="card a2hs">' +
       '<summary>📲 홈 화면에 추가하는 법 — 다음부터 링크를 찾지 않고 바로 열어요</summary>' +
       '<p class="a2hs__warn">카톡 안에서는 추가가 안 돼요. 먼저 <b>⋮ · ⋯ → 다른 브라우저로 열기</b> 로 연 다음 아래대로 하세요.</p>' +
@@ -1266,6 +1269,7 @@
       var canWrite = d.can_write !== false;
       roleTag(d.role);
       if (EL && EL.get() === h.code) logoutButton(EL);
+      if (!PV && EL && EL.last) EL.last(h.code);           /* 홈 화면 앱 시작 주소(/s/?app=1)가 이 러닝노트로 (20261101k) */
 
       var st = d.student || {};
       $('#hubName').textContent = (st.name || '') + ' 학생의 러닝노트';
@@ -1284,6 +1288,8 @@
         '<section class="hub-panel" id="panelBook" role="tabpanel" hidden></section>' +
         '<section class="hub-panel" id="panelPhoto" role="tabpanel" hidden></section>' +
         '<section class="hub-panel" id="panelInfo" role="tabpanel" hidden></section>';
+      /* 홈 화면 앱 띠 — 휴대폰 · 앱으로 연 게 아닐 때 · [다음에] 7일 · 세 번이면 그만 (a2hs.js · 20261101k) */
+      if (!PV && global.A2HS) A2HS.band(root, 'hub');
 
       WEEKLY = d.weekly || null;
       APP.info = d.app || null;
@@ -1374,6 +1380,13 @@
         if (infoOpened || !infoOn) return;
         infoOpened = true;
         MeInfo.render($('#panelInfo'), h.code, rpc);
+        /* 「홈 화면에 추가하는 법」 — 언제든 (20261101k) */
+        if (global.A2HS && !$('#panelInfo').querySelector('[data-a2hs-how]')) {
+          var hw = document.createElement('div');
+          hw.className = 'card a2hs-how';
+          hw.innerHTML = '<button type="button" class="a2hs-how__btn" data-a2hs-how>📱 홈 화면에 추가하는 법</button><p class="hub-muted">홈 화면에 추가해 두면 링크를 찾지 않고 앱처럼 바로 열려요.</p>';
+          $('#panelInfo').appendChild(hw);
+        }
       }
 
       /* 탭 수에 맞춰 칸을 나눈다 (교재비 탭은 청구서가 있을 때만) */

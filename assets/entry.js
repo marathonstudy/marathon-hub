@@ -31,7 +31,13 @@
     try { global.localStorage.removeItem(KEY); } catch (e) {}
     try { global.sessionStorage.removeItem(KEY); } catch (e) {}
   }
-  global.EntryLogin = { KEY: KEY, get: get, save: save, clear: clear };
+  /* 이 기기에서 마지막으로 연 러닝노트 (학부모 링크 포함 · 20261101k) — 홈 화면 앱(시작 주소 /s/?app=1)이 학생 로그인이 없을 때 그리로 */
+  var LAST = (CFG && CFG.storagePrefix || 'mhub.') + 'lastme';
+  function last(code) {
+    try { if (code === '') global.localStorage.removeItem(LAST); else if (code) global.localStorage.setItem(LAST, code); else { var v = global.localStorage.getItem(LAST) || ''; return CODE_RE.test(v) ? v : ''; } } catch (e) {}
+    return '';
+  }
+  global.EntryLogin = { KEY: KEY, get: get, save: save, clear: clear, last: last };
 
   var root = global.document && global.document.getElementById('enForm');
   if (!root) return;                                   /* 러닝노트(/me/)에서는 위 도구만 쓴다 */
@@ -69,6 +75,8 @@
   /* 로그인을 남겨 둔 기기 — 바로 러닝노트 (로그아웃하고 온 때는 그대로 입구) */
   var out = /[?&]out=1\b/.test(global.location.search || '');
   if (!out && get()) { go(get()); return; }
+  /* 홈 화면 앱으로 열었고 학생 로그인이 없으면 — 이 기기에서 마지막으로 연 러닝노트 (학부모 링크) */
+  if (!out && /[?&]app=1\b/.test(global.location.search || '') && last()) { go(last()); return; }
 
   var REASON = {
     wrong: '비밀번호는 학생 휴대폰 번호에서 010을 뺀 8자리입니다.',

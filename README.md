@@ -740,6 +740,14 @@ delete from public.staff where email = '조교이메일@example.com';
 - 문구 「필기·복습 알림(둘 다)」 「필기·복습 알림(복습테스트만)」 추가 (필기만은 예전 「필기 알림(학생)」) · 반 카드 「필기·복습 문자 21:55 켜짐」
 - 배포: `supabase/migration-056-pre-remind.sql` 실행 → Edge Function `note-remind` 다시 배포 (050 매분 예약 · 솔라피 Secrets 그대로 · 새 키 없음)
 
+### 5-68. 20261101k — 홈 화면 앱 · 안내 띠 (SQL 057 · 함수 배포 없음)
+- 러닝노트 `s/manifest.webmanifest` — 이름 「러닝노트」 · RUN 아이콘(192 · 512 · maskable) · 시작 `/s/?app=1`(로그인돼 있으면 바로 내 러닝노트 · 학생 로그인이 없으면 이 기기에서 마지막으로 연 러닝노트) · 범위 `/marathon-hub/` · standalone
+- 코치룸 `admin/manifest.webmanifest` — 이름 「코치룸」 · 보라 동그라미(192 · 512 · maskable) · 시작 `/admin/` · 범위 `/marathon-hub/admin/` (러닝노트와 다른 앱 · 더 좁은 범위라 /admin/ 은 코치룸 앱으로)
+- `/me/` 는 아이폰이 아닐 때만 manifest 를 스크립트로 붙임 — 아이폰은 개인 링크 주소 그대로 홈 화면에 담김 · 세 화면 모두 apple-mobile-web-app-capable
+- 서비스워커 `sw.js`(러닝노트) · `admin/sw.js`(코치룸) — 화면을 저장하지 않고 인터넷이 끊겼을 때 안내 한 장만
+- `assets/a2hs.js` — 휴대폰에서 로그인한 직후 첫 화면 맨 위 띠 「📱 홈 화면에 추가하면 앱처럼 바로 열려요 [추가하기] [다음에]」 · 안드로이드 바로 설치 창 · 안 되면 ⋮ 그림 · 삼성 인터넷 ≡ 그림 · 아이폰 사파리 3단계 그림 · 아이폰 다른 브라우저 「사파리로 열어 주세요」 + 주소 복사 · 카카오톡 안은 「다른 브라우저로 열기」 먼저 · PC · 설치됨이면 없음 · [다음에] 7일 · 세 번이면 그만 · 러닝노트 내 정보 · 레포트 맨 아래 · 코치룸 더보기 「📱 홈 화면에 추가하는 법」
+- 웰컴 · 입구 문자 기본 문구 끝 「홈 화면에 추가해 두면 앱처럼 바로 열려요.」 (`supabase/migration-057-a2hs-text.sql` — 052 기본 글 그대로일 때만)
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

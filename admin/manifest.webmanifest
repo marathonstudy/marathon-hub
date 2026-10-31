@@ -1,0 +1,18 @@
+{
+  "id": "/marathon-hub/admin/",
+  "name": "코치룸",
+  "short_name": "코치룸",
+  "description": "마라톤 코치룸 — 선생님 · 조교용",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F6F5FC",
+  "theme_color": "#F6F5FC",
+  "icons": [
+    { "src": "../assets/coach-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "../assets/coach-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "../assets/coach-icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
