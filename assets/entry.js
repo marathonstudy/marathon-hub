@@ -47,10 +47,13 @@
       return r.json();
     });
   }
-  /* 필기 QR (/s/?note=반 · 20261031w) — 로그인돼 있으면 바로, 아니면 로그인한 뒤 러닝노트 「내 필기」 오늘 칸 (사진 여러 장 · 카메라) */
-  var NOTE = (function () { var m = /[?&]note=([^&]+)/.exec(global.location.search || ''); try { return m ? decodeURIComponent(m[1].replace(/\+/g, ' ')) : ''; } catch (e) { return ''; } })();
+  /* 필기 QR (/s/?note=반 · 20261031w) — 로그인돼 있으면 바로, 아니면 로그인한 뒤 러닝노트 「내 필기」 오늘 칸 (사진 여러 장 · 카메라)
+     수업 끝 필기·복습 문자 (migration-056) — ?review=반 → 복습테스트 입력 카드 · ?todo=반 → 복습테스트 입력 + 「필기 사진도 올려 주세요」 */
+  function qp(k) { var m = new RegExp('[?&]' + k + '=([^&]+)').exec(global.location.search || ''); try { return m ? decodeURIComponent(m[1].replace(/\+/g, ' ')) : ''; } catch (e) { return ''; } }
+  var WANT = qp('todo') ? 'todo' : qp('review') ? 'review' : qp('note') ? 'note' : '';
+  var NOTE = WANT ? qp(WANT) : '';
   function kstToday() { return new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10); }
-  function go(code) { global.location.replace('../me/#' + code + (NOTE ? '/photo/' + kstToday() : '')); }
+  function go(code) { global.location.replace('../me/#' + code + (WANT === 'note' ? '/photo/' + kstToday() : WANT === 'review' ? '/review' : WANT === 'todo' ? '/todo/' + kstToday() : '')); }
   function msg(t, kind) {
     var el = $('#enMsg');
     el.hidden = !t;

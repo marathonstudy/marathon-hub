@@ -1212,6 +1212,7 @@
   /* ============================================================
      뒤로가기 (개인 페이지) — 탭 · 레포트 한 편 · 크게 보기 사진마다 기록
        주소: #코드(레포트) · #코드/reports(누적 추이) · #코드/report/주차 · #코드/app · #코드/photo(/날짜) · #코드/book
+         · #코드/review(복습테스트 입력 카드 바로) · #코드/todo/날짜(복습테스트 입력 + 「필기 사진도 올려 주세요」) — 수업 끝 필기·복습 문자 링크 (migration-056)
        # 바로 뒤의 개인 링크 코드는 절대 바꾸지 않는다 (뒤에 /보기 만 붙였다 뗐다 한다)
        코치룸 미리보기(틀 안)에서는 기록하지 않는다 — 코치룸 뒤로가기를 흐트러뜨리지 않게
      ============================================================ */
@@ -1324,8 +1325,25 @@
             if (anySub) { btn.hidden = true; card.hidden = false; }
             else if (!left) { btn.hidden = true; card.hidden = true; }
             else if (card.hidden) btn.hidden = false;
+            rvLast = { left: left, any: anySub };
+            rvShow();
           });
         }
+      }
+
+      /* 문자 링크 #코드/review · #코드/todo/날짜 — 남은 복습테스트가 있으면 입력 카드를 바로 연다 (한 번만) */
+      var rvLast = null, rvWant = null;
+      function rvShow() {
+        if (!rvWant || !rvLast) return;
+        var btn = $('#twRvBtn'), card = $('#reviewCard'), top = $('#rvTop');
+        if (!btn || !card || !top) return;
+        if (rvLast.left || rvLast.any) { btn.hidden = true; card.hidden = false; }
+        var old = $('#twTodo'); if (old) old.remove();
+        if (rvWant.photo) top.insertAdjacentHTML('afterbegin', '<div class="tw-todo" id="twTodo"><span>📷 오늘 필기 사진도 올려 주세요</span>' +
+          '<button type="button" class="tw-todo__btn" data-photo-go="' + esc(rvWant.photo) + '">필기 올리기</button></div>');
+        var go = (rvLast.left || rvLast.any) ? card : top;
+        if (go.scrollIntoView) go.scrollIntoView({ block: 'start' });
+        rvWant = null;
       }
 
       /* 과제 상세 (예전 「앱 과제」) — 처음 열 때 불러온다 */
@@ -1419,6 +1437,11 @@
         else if (v === 'videos' || v === 'video') select('video');
         else if (v === 'app') select('app');
         else if (v === 'photo') { select('photo'); if (arg) openPhoto(arg); }
+        else if (v === 'review' || v === 'todo') {
+          select('report'); showLatest();
+          rvWant = { photo: v === 'todo' ? (/^\d{4}-\d{2}-\d{2}$/.test(arg) ? arg : new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10)) : '' };
+          rvShow();
+        }
         else if (v === 'book' && !$('#tabBook').hidden) select('book');
         else if (v === 'info' && infoOn) select('info');
         else { select('report'); showLatest(); }

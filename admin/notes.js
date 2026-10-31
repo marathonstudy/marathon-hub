@@ -2,8 +2,10 @@
    notes.js — 반 카드 수업 시각 · 필기 미제출 · 지금 다시 보내기 · 문의 연락처 (20261031w · 20261101f · migration-049 · 053 · 함수 note-remind)
 
    「오늘」 반 카드
-     · 「수업 토 18:30~22:00 · 필기 문자 21:55 켜짐 [바꾸기]」 한 줄 — [바꾸기]를 누르면 그 자리에서
-       시작 · 끝 시각 · 필기 문자 켜기/끄기 · 끝나기 몇 분 전(기본 5분) · 종강일을 고치고 저장 (class_meta_set · 반 관리 → 수업 설정과 같은 값)
+     · 「수업 토 18:30~22:00 · 수업 전 문자 16:30 켜짐 · 필기·복습 문자 21:55 켜짐 [바꾸기]」 한 줄 — [바꾸기]를 누르면 그 자리에서
+       시작 · 끝 시각 · 수업 전 문자 켜기/끄기 · 몇 시간 전(기본 2시간) · 필기·복습 문자 켜기/끄기 · 끝나기 몇 분 전(기본 5분) · 종강일을 고치고 저장
+       (class_meta_set · class_pre_set · 반 관리 → 수업 설정과 같은 값 · migration-056)
+     · 수업 전 예고를 보낸 날 — 그 아래 작게 「16:30 예고 문자 보냄 11명(밀린 4명)」 (pre_remind_status · 20261101j)
        시각이 비어 있으면 눈에 띄는 [수업 시각 넣기] (보라 테두리)
      · 「필기 미제출 n명」 — 수업 날 · 끝나기 n분 전(기본 5분)부터 그날 밤까지만 (수업 시작 전에는 안 보임)
        누르면 이름(결석 · 번호 없음 표시) · [지금 다시 보내기](안 낸 · 결석 아닌 · 번호 있는 학생 본인에게만)
@@ -37,6 +39,27 @@
     }, function () { return null; });
   }
 
+  /* ---------- 수업 전 예고 — 오늘 보낸 것 (30초 기억 · migration-056) ---------- */
+  var preSt = { at: 0, v: null, off: false, busy: null };
+  function loadPre(force) {
+    if (preSt.off) return Promise.resolve(null);
+    if (!force && preSt.v && Date.now() - preSt.at < 30000) return Promise.resolve(preSt.v);
+    if (preSt.busy) return preSt.busy;
+    preSt.busy = Promise.resolve(sb().rpc('pre_remind_status', { p_day: today() })).then(function (r) {
+      preSt.busy = null;
+      if (r.error) { if (missingFn(r.error)) preSt.off = true; return null; }
+      preSt.v = r.data || {}; preSt.at = Date.now();
+      return preSt.v;
+    }, function () { preSt.busy = null; return null; });
+    return preSt.busy;
+  }
+  /* 「16:30 예고 문자 보냄 11명(밀린 4명)」 · 실패가 있으면 「· 실패 n」 */
+  function preHtml(cls) {
+    var x = preSt.v && preSt.v[cls];
+    if (!x || !(x.n || x.failed)) return '';
+    return '<small class="tdc-pre num">' + esc(x.at) + ' 예고 문자 보냄 ' + x.n + '명' + (x.missed ? '(밀린 ' + x.missed + '명)' : '') + (x.failed ? ' · 실패 ' + x.failed : '') + '</small>';
+  }
+
   /* ---------- 수업 시각 한 줄 · 그 자리에서 바꾸기 ---------- */
   var DOWS = ['일', '월', '화', '수', '목', '금', '토'];
   var editing = {};
@@ -44,6 +67,8 @@
   function min2hm(n) { n = ((n % 1440) + 1440) % 1440; return String(Math.floor(n / 60)).padStart(2, '0') + ':' + String(n % 60).padStart(2, '0'); }
   function mdOf(iso) { return iso ? (+iso.slice(5, 7)) + '/' + (+iso.slice(8, 10)) : ''; }
   function dowOf(cls) { var s = Store.schedOf(cls); return s && s.dow != null && s.dow !== '' ? DOWS[+s.dow] || '' : ''; }
+  /* 수업 전 문자 보내는 시각 — 시작 시각 − n시간 (migration-056) */
+  function preAt(m) { var s = hm2min(m && m.start); return s == null ? '' : min2hm(s - 60 * (m.preH || 2)); }
   /* 필기 문자 보내는 시각 — 끝 시각 − n분 */
   function remindAt(m) { var e = hm2min(m && m.end); return e == null ? '' : min2hm(e - (m.min || 5)); }
   /* 지금 (한국 시각 · 분) */
@@ -58,11 +83,12 @@
     var has = !!(m && m.start && m.end);
     if (!has) {
       return '<div class="tdc-time tdc-time--empty"><button type="button" class="btn btn--sm tdc-time__add" data-note-edit="' + esc(c.name) + '">수업 시각 넣기</button>' +
-        '<span class="muted-note">넣으면 필기 문자를 쓸 수 있어요</span></div>';
+        '<span class="muted-note">넣으면 필기·복습 문자를 쓸 수 있어요</span></div>';
     }
     var d = dowOf(c.name);
     return '<div class="tdc-time"><span class="tdc-time__t num">수업 ' + (d ? esc(d) + ' ' : '') + esc(m.start + '~' + m.end) + '</span>' +
-      '<span class="tdc-time__rm' + (m.remind ? ' is-on' : '') + '"> · 필기 문자 ' + (m.remind ? esc(remindAt(m)) + ' 켜짐' : '꺼짐') + '</span>' +
+      (m.preSql === false ? '' : '<span class="tdc-time__rm tdc-time__pre' + (m.pre ? ' is-on' : '') + '"> · 수업 전 문자 ' + (m.pre ? esc(preAt(m)) + ' 켜짐' : '꺼짐') + '</span>') +
+      '<span class="tdc-time__rm' + (m.remind ? ' is-on' : '') + '"> · 필기·복습 문자 ' + (m.remind ? esc(remindAt(m)) + ' 켜짐' : '꺼짐') + '</span>' +
       '<button type="button" class="tdc-time__chg" data-note-edit="' + esc(c.name) + '">바꾸기</button></div>';
   }
   function editHtml(c, m) {
@@ -74,7 +100,11 @@
         '<label class="tdc-tedit__f"><span>끝</span><input type="time" class="input" data-tf="end" value="' + esc(m.end || '') + '" step="300"></label>' +
       '</div>' +
       '<div class="tdc-tedit__row">' +
-        '<label class="tdc-tedit__chk"><input type="checkbox" data-tf="remind"' + (m.remind || !m.end ? ' checked' : '') + '> 필기 문자 켜기</label>' +
+        '<label class="tdc-tedit__chk"><input type="checkbox" data-tf="pre"' + (m.pre || !m.start ? ' checked' : '') + '> 수업 전 문자 켜기</label>' +
+        '<label class="tdc-tedit__f tdc-tedit__f--min"><span>시작</span><input type="number" class="input" data-tf="preH" inputmode="numeric" min="1" max="12" value="' + esc(m.preH || 2) + '"><span>시간 전</span></label>' +
+      '</div>' +
+      '<div class="tdc-tedit__row">' +
+        '<label class="tdc-tedit__chk"><input type="checkbox" data-tf="remind"' + (m.remind || !m.end ? ' checked' : '') + '> 필기·복습 문자 켜기</label>' +
         '<label class="tdc-tedit__f tdc-tedit__f--min"><span>끝나기</span><input type="number" class="input" data-tf="min" inputmode="numeric" min="1" max="60" value="' + esc(m.min || 5) + '"><span>분 전</span></label>' +
       '</div>' +
       '<label class="tdc-tedit__f"><span>종강일</span><input type="date" class="input" data-tf="endOn" value="' + esc(m.endOn || '') + '"></label>' +
@@ -90,20 +120,32 @@
                  p_staff: m0.staff || [], p_remind: g('remind').checked, p_min: parseInt(g('min').value, 10) || 5 };
     var err = g('err');
     if ((args.p_start && !args.p_end) || (!args.p_start && args.p_end)) { err.textContent = '시작 · 끝 시각을 둘 다 넣어 주세요.'; return Promise.resolve(false); }
-    if (args.p_remind && !args.p_end) { err.textContent = '필기 문자를 켜려면 수업 끝 시각을 넣어 주세요.'; return Promise.resolve(false); }
+    if (args.p_remind && !args.p_end) { err.textContent = '필기·복습 문자를 켜려면 수업 끝 시각을 넣어 주세요.'; return Promise.resolve(false); }
     if (args.p_start && args.p_end && hm2min(args.p_end) <= hm2min(args.p_start)) { err.textContent = '끝 시각은 시작 시각보다 뒤여야 합니다.'; return Promise.resolve(false); }
     if (args.p_min < 1 || args.p_min > 60) { err.textContent = '「끝나기 몇 분 전」은 1~60분으로 정해 주세요.'; return Promise.resolve(false); }
+    var pre = g('pre').checked && !!args.p_start, preH = parseInt(g('preH').value, 10) || 2;      /* 시각을 비우면 수업 전 문자도 끈다 */
+    if (preH < 1 || preH > 12) { err.textContent = '「수업 몇 시간 전」은 1~12시간으로 정해 주세요.'; return Promise.resolve(false); }
+    if (pre && hm2min(args.p_start) < preH * 60) { err.textContent = '수업 전 문자 시각이 자정보다 앞이 됩니다 — 몇 시간 전을 줄여 주세요.'; return Promise.resolve(false); }
     var btn = form.querySelector('[data-note-save]');
     btn.disabled = true;
     return Promise.resolve(sb().rpc('class_meta_set', args)).then(function (r) {
       btn.disabled = false;
       if (r.error) { err.textContent = missingFn(r.error) ? 'migration-049 SQL 을 먼저 실행해 주세요.' : r.error.message; return false; }
-      Store.setMetaLocal(cls, { start: args.p_start, end: args.p_end, endOn: args.p_end_on || '', staff: (r.data && r.data.staff) || args.p_staff, remind: args.p_remind, min: args.p_min });
+      var staff = (r.data && r.data.staff) || args.p_staff;
+      /* 수업 전 문자 (migration-056) — 아직 안 돌렸으면 필기 문자 값만 저장 */
+      return Promise.resolve(sb().rpc('class_pre_set', { p_class: cls, p_on: pre, p_hours: preH })).then(function (r2) {
+        var preSql = !(r2.error && missingFn(r2.error));
+        if (r2.error && preSql) { err.textContent = r2.error.message; return false; }
+        return done(staff, preSql);
+      });
+    }, function (e) { btn.disabled = false; err.textContent = (e && e.message) || '저장하지 못했습니다'; return false; });
+    function done(staff, preSql) {
+      Store.setMetaLocal(cls, { start: args.p_start, end: args.p_end, endOn: args.p_end_on || '', staff: staff, remind: args.p_remind, min: args.p_min, pre: preSql && pre, preH: preH, preSql: preSql });
       delete editing[cls];
-      toast(cls + ' 수업 시각을 저장했습니다' + (args.p_remind ? ' · 필기 문자 ' + remindAt({ end: args.p_end, min: args.p_min }) : ''), 'good');
+      toast(cls + ' 수업 시각을 저장했습니다' + (preSql && pre ? ' · 수업 전 문자 ' + preAt({ start: args.p_start, preH: preH }) : '') + (args.p_remind ? ' · 필기·복습 문자 ' + remindAt({ end: args.p_end, min: args.p_min }) : '') + (preSql ? '' : ' (수업 전 문자는 migration-056 SQL 을 실행하면 저장됩니다)'), preSql ? 'good' : 'bad');
       window.dispatchEvent(new CustomEvent('jt:roster-changed'));
       return true;
-    }, function (e) { btn.disabled = false; err.textContent = (e && e.message) || '저장하지 못했습니다'; return false; });
+    }
   }
   function repaintCard(cls) {
     var box = document.querySelector('[data-note-box="' + cssq(cls) + '"]');
@@ -116,7 +158,8 @@
   function cardHtml(c) {
     if (!c || c.name === '(반 없음)' || !c.rows || !c.rows.length) return '';
     var m = Store.metaOf(c.name);
-    var html = '<div class="tdc-notebox" data-note-box="' + esc(c.name) + '">' + (editing[c.name] ? editHtml(c, m) : timeLine(c, m));
+    var html = '<div class="tdc-notebox" data-note-box="' + esc(c.name) + '">' + (editing[c.name] ? editHtml(c, m) : timeLine(c, m)) +
+      (c.next && c.next.dday === 0 && m && m.pre ? '<span data-pre-st="' + esc(c.name) + '">' + preHtml(c.name) + '</span>' : '');
     if (showMissing(c, m)) {
       html += '<div class="tdc-note" data-note-cls="' + esc(c.name) + '">' +
           '<span class="tdc-note__st" data-note-st="' + esc(c.name) + '">' + stHtml(c.name) + '</span>' +
@@ -146,6 +189,9 @@
     '</div>';
   }
   function paint() {
+    if (document.querySelector('[data-pre-st]')) loadPre().then(function () {
+      Array.prototype.forEach.call(document.querySelectorAll('[data-pre-st]'), function (el) { var h = preHtml(el.dataset.preSt); if (el.innerHTML !== h) el.innerHTML = h; });
+    });
     Array.prototype.forEach.call(document.querySelectorAll('[data-note-st]'), function (el) {
       var cls = el.dataset.noteSt;
       load(cls).then(function () {
@@ -210,5 +256,5 @@
   });
   $('#tdSettingsBtn').addEventListener('click', loadContact);
 
-  window.Notes = { cardHtml: cardHtml, paint: paint, status: load, showMissing: showMissing, remindAt: remindAt, save: saveTime };
+  window.Notes = { cardHtml: cardHtml, paint: paint, status: load, showMissing: showMissing, remindAt: remindAt, preAt: preAt, save: saveTime, preStatus: loadPre };
 })();

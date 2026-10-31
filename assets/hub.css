@@ -1254,3 +1254,8 @@ html.rn-lock, html.rn-lock body { overflow: hidden; }
 .lb-pts li::before { content: '·'; position: absolute; left: 2px; top: 0; font-weight: 900; color: #8A7FD0; }
 .vd-watch { font-size: 15px; font-weight: 800; color: var(--ink-deep, #2C3566); }
 .vd-kws { margin-top: 4px; }
+/* 수업 끝 필기·복습 문자 링크 #코드/todo/날짜 — 「필기 사진도 올려 주세요」 (migration-056 · 20261101j) */
+.tw-todo { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; padding: 10px 12px;
+  border-radius: 12px; background: var(--rv-soft, #f3f0ff); font-size: 14px; }
+.tw-todo__btn { appearance: none; border: 0; font: inherit; font-weight: 700; cursor: pointer; padding: 8px 12px; border-radius: 10px;
+  background: var(--brand, #5b3df5); color: #fff; white-space: nowrap; }

@@ -3847,3 +3847,6 @@ textarea.aip-text--new:focus { outline: 2px solid #B9AEF0; outline-offset: 1px; 
   .sms-ask__go { min-height: 44px; }
   .sms-var { min-height: 36px; }
 }
+
+/* 수업 전 예고 (20261101j · notes.js) — 수업 시각 줄 「수업 전 문자 16:30 켜짐」 · 그 아래 「16:30 예고 문자 보냄 11명(밀린 4명)」 */
+.tdc-pre { display: block; margin: 2px 0 0; font-size: 12px; font-weight: 600; color: var(--ink-light); }
