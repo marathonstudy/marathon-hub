@@ -143,7 +143,8 @@
       });
     }, function (e) { btn.disabled = false; err.textContent = (e && e.message) || '저장하지 못했습니다'; return false; });
     function done(staff, preSql) {
-      Store.setMetaLocal(cls, { start: args.p_start, end: args.p_end, endOn: args.p_end_on || '', staff: staff, remind: args.p_remind, min: args.p_min, pre: preSql && pre, preH: preH, preSql: preSql });
+      Store.setMetaLocal(cls, { start: args.p_start, end: args.p_end, endOn: args.p_end_on || '', staff: staff, remind: args.p_remind, min: args.p_min, pre: preSql && pre, preH: preH, preSql: preSql,
+                                appCode: m0.appCode || '', appClass: m0.appClass || '', appSql: !!m0.appSql });
       delete editing[cls];
       toast(cls + ' 수업 시각을 저장했습니다' + (preSql && pre ? ' · 수업 전 문자 ' + preAt({ start: args.p_start, preH: preH }) : '') + (args.p_remind ? ' · 필기·복습 문자 ' + remindAt({ end: args.p_end, min: args.p_min }) : '') + (preSql ? '' : ' (수업 전 문자는 migration-056 SQL 을 실행하면 저장됩니다)'), preSql ? 'good' : 'bad');
       window.dispatchEvent(new CustomEvent('jt:roster-changed'));

@@ -6,7 +6,7 @@
    · 삭제 — 학생(퇴원생 포함) 0명 · 기록 0건인 반만 버튼이 보인다
    · 수업 설정 (20261031w · migration-049) — 수업 시작 · 끝 시각 · 종강일 · 담당 운영진(여러 명) · 필기 알림 켜기/끄기 · 끝나기 몇 분 전(기본 5)
      종강일이 지난 반은 「오늘」 · 필기 알림 · 레포트 발송 대상 · 챙길 학생에서 빠지고 반 고르기에서 「종강」으로 접힌다 · 언제든 바꿀 수 있다
-   · 앱 입장코드 — 그 반 학생을 등록할 때 「마라톤 앱 안내 문자」의 입장코드 칸에 저절로 (classes.app_code · migration-040 · 20261031m)
+   · 앱 핀번호(입장코드 · 마라톤 앱 「핀번호」) — 그 반 학생을 등록할 때 「마라톤 앱 안내 문자」의 입장코드 칸에 저절로 (classes.app_code · migration-040 · 20261031m)
    전부 서버 함수(class_*)가 teacher 인지 다시 확인한다. 바뀐 내용은 class_log 에 남는다.
    ============================================================ */
 
@@ -165,7 +165,7 @@
       '<td>' + (c.review_names == null ? '<span class="muted-note">—</span>'
         : '<input class="input ca-names" type="text" maxlength="110" data-ca-names value="' + esc((c.review_names || []).join(', ')) + '" aria-label="복습테스트 기본 시험 목록 (쉼표로 나눠 순서대로)">') + '</td>' +
       '<td>' + (c.app_code == null ? '<span class="muted-note">—</span>'
-        : '<input class="input ca-code" type="text" maxlength="30" autocomplete="off" spellcheck="false" data-ca-code value="' + esc(c.app_code) + '" placeholder="예: MARA2026" aria-label="' + esc(c.name) + ' 앱 입장코드">') + '</td>' +
+        : '<input class="input ca-code" type="text" maxlength="30" autocomplete="off" spellcheck="false" data-ca-code value="' + esc(c.app_code) + '" placeholder="예: 993677" aria-label="' + esc(c.name) + ' 앱 핀번호(입장코드)">') + '</td>' +
       '<td>' + aiCell(c) + '</td>' +
       '<td class="ca-meta">' + metaCell(c) + '</td>' +
       '<td class="roster__actions tb-acts">' + acts + '</td></tr>';
@@ -174,7 +174,7 @@
   function table(list, empty) {
     if (!list.length) return '<p class="panel__hint">' + empty + '</p>';
     return '<div class="roster-scroll"><table class="roster tb-table ca-table"><thead><tr>' +
-      '<th>반</th><th>재원</th><th>퇴원</th><th>기록</th><th title="반 수업일마다 저절로 생기는 복습테스트 — 쉼표로 나눠 순서대로 (예: 복습 TEST, 화작문 TEST). 그 주만 끄기 · 더 넣기는 레포트 발송 → 1 작성 반 공통에서">복습 시험 (순서대로)</th><th title="그 반 학생을 등록할 때 마라톤 앱 안내 문자의 입장코드 칸에 저절로 들어갑니다 (바꿀 수 있음)">앱 입장코드</th><th title="AI 결과 창 「이 요청을 이 반 기본으로 기억하기」로 남긴 요청 — 다음 AI 초안부터 처음부터 따릅니다 · ×로 지웁니다">AI 기본 요청</th><th title="수업 시작 · 끝 시각 · 종강일 · 담당 운영진 · 필기 알림">수업 · 종강</th><th></th></tr></thead><tbody>' +
+      '<th>반</th><th>재원</th><th>퇴원</th><th>기록</th><th title="반 수업일마다 저절로 생기는 복습테스트 — 쉼표로 나눠 순서대로 (예: 복습 TEST, 화작문 TEST). 그 주만 끄기 · 더 넣기는 레포트 발송 → 1 작성 반 공통에서">복습 시험 (순서대로)</th><th title="마라톤 앱 관리자 → 클래스 → 클래스 정보 → 핀번호 (예: 993677). 문자 {앱입장코드} · 웰컴 문자에 저절로 들어갑니다 (바꿀 수 있음)">앱 핀번호(입장코드)</th><th title="AI 결과 창 「이 요청을 이 반 기본으로 기억하기」로 남긴 요청 — 다음 AI 초안부터 처음부터 따릅니다 · ×로 지웁니다">AI 기본 요청</th><th title="수업 시작 · 끝 시각 · 종강일 · 담당 운영진 · 필기 알림">수업 · 종강</th><th></th></tr></thead><tbody>' +
       list.map(row).join('') + '</tbody></table></div>';
   }
 
@@ -329,12 +329,12 @@
     if (!c) return;
     var code = e.target.value.trim();
     if (code && !/^[A-Za-z0-9가-힣_-]{2,30}$/.test(code)) {
-      UI.toast('입장코드는 영문 · 숫자 · 한글 2 ~ 30자로 적어 주세요 (띄어쓰기 없이)', 'bad'); e.target.value = c.app_code || ''; return;
+      UI.toast('앱 핀번호(입장코드)는 숫자 · 영문 2 ~ 30자로 적어 주세요 (띄어쓰기 없이)', 'bad'); e.target.value = c.app_code || ''; return;
     }
     sb().rpc('class_app_code_set', { p_name: c.name, p_code: code }).then(function (r) {
       if (r.error) { UI.toast(/Could not find the function|schema cache/i.test(r.error.message) ? 'migration-040 SQL 을 먼저 실행해 주세요' : r.error.message, 'bad'); e.target.value = c.app_code || ''; return; }
       c.app_code = code;
-      UI.toast('‘' + c.name + '’ 앱 입장코드 — ' + (code || '지움'), 'good');
+      UI.toast('‘' + c.name + '’ 앱 핀번호(입장코드) — ' + (code || '지움'), 'good');
     });
   });
 

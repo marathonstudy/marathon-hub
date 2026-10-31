@@ -167,6 +167,7 @@ function lite(full: Any) {
   const orders = new Set(cal.map((c: Any) => c.order));
   return {
     who: full.who || "",
+    classTitle: full.classTitle || "",          /* 앱 클래스 이름 — 반 카드 「앱 클래스」 · 클래스 바뀜 알림 (20261101p · migration-060) */
     calendar: cal,
     lectures: (full.lectures || []).filter((l: Any) => orders.has(l.order)).map((l: Any) => ({ order: l.order, title: l.title, videosDone: l.videosDone, videosTotal: l.videosTotal })),
     history: (full.history || []).filter((h: Any) => orders.has(h.order) || String(h.submittedAt).slice(0, 10) >= cut)

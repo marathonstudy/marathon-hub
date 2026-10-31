@@ -774,6 +774,15 @@ delete from public.staff where email = '조교이메일@example.com';
 - 반 전체 영상을 새로 넣고 저장하면 한 번 「수업 영상이 올라왔다고 알릴까요? [학생에게] [학생+학부모] [안 보냄]」 → 문자 발송 화면을 그 반 · 받는 사람 · 문구로 채워 연다 · 문구 「수업 영상 알림」(migration-059 · {날짜} {러닝노트주소})
 - 「오늘」 반 카드 레포트 칩 — 공개한 레포트인데 그 수업 영상이 없으면 작게 「영상 없음」
 
+### 5-73. 20261101p — 앱 클래스 · 앱 핀번호(입장코드) (SQL 060 · 함수 app-report 다시 배포)
+- 마라톤 앱 「핀번호」 = 코치룸 「앱 핀번호(입장코드)」 = classes.app_code (040 그대로) · 사람에게 보이는 「앱 입장코드」를 「앱 핀번호(입장코드)」로 (반 관리 · 문자 발송 · 웰컴 창 · 학생 등록) · 문자 칸 {앱입장코드} 그대로 · 문자 치환 · 웰컴 자동 발송은 이 값
+- 「오늘」 반 카드 수업 시각 줄 아래 「앱 클래스: … · 핀번호 … [바꾸기]」 — 클래스 이름 = 반 학생들 앱 링크 classTitle 중 가장 많은 값 · [바꾸기]로 그 자리에서 핀번호 저장(class_app_code_set)
+- 클래스 바뀜 — classes.app_class(지난번 기억 · migration-060)와 다른 학생이 절반 이상이면 노란 띠 「앱 클래스가 바뀌었어요: 새 이름 · 핀번호를 확인해 주세요 [앱 관리자 열기 ↗] [핀번호 넣기] [그대로]」 · 핀번호를 넣거나 [그대로] → 새 이름 기억 · 사라짐 · 처음에는 조용히 기억만
+- 반 안에서 클래스가 다른 학생 「앱 클래스가 다른 학생 n명」(누르면 이름 · 클래스)
+- 설정 「마라톤 앱 관리자 주소」(app_settings app_admin · 주소만 · 계정은 기존 로그인 정보 복사 버튼으로만)
+- app-report — 「오늘」 반 단위 기록에도 classTitle (다시 배포 전에는 앱 클래스 줄이 「아직 모름」)
+- 배포: `supabase/migration-060-app-class.sql` 실행 → Edge Function `app-report` 다시 배포
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

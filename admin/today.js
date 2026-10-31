@@ -56,7 +56,7 @@
     st.loading = true;
     st.last = Date.now();
     if (!st.data) $('#tdBody').innerHTML = '<p class="panel__hint">불러오는 중…</p>';
-    Promise.all([sb().rpc('coach_today'), DB.getSettingRow('dashboard').catch(function () { return null; }), loadRecentSent(), loadCare(), loadFails()]).then(function (res) {
+    Promise.all([sb().rpc('coach_today'), DB.getSettingRow('dashboard').catch(function () { return null; }), loadRecentSent(), loadCare(), loadFails(), loadAppAdmin()]).then(function (res) {
       var r = res[0];
       st.loading = false;
       if (r.error) throw new Error(r.error.message);
@@ -142,6 +142,7 @@
     cal.forEach(function (c) { if (c.order) orders[c.order] = 1; });
     return {
       who: String(d.who || ''),
+      classTitle: String(d.classTitle || '').slice(0, 120),
       calendar: cal,
       lectures: (d.lectures || []).filter(function (l) { return l && orders[l.order]; }).map(function (l) { return { order: l.order, title: l.title, videosDone: l.videosDone, videosTotal: l.videosTotal }; }),
       history: (d.history || d.recent || []).filter(function (h) { return h && (orders[h.order] || String(h.submittedAt || '').slice(0, 10) >= cutD); })
@@ -336,6 +337,7 @@
   }
   /* 과제 평균 줄만 다시 (반 카드 · 과정 카드의 반마다) */
   function paintAvg() {
+    paintAppCls();
     Array.prototype.forEach.call(document.querySelectorAll('#tdBody .tdc-line--app[data-cls]'), function (el) {
       var c = (st.clsBy || {})[el.dataset.cls];
       if (!c) return;
@@ -343,6 +345,126 @@
       if (h) el.outerHTML = h;
     });
   }
+
+  /* ---------- 앱 클래스 · 핀번호 (20261101p · migration-060 · app-report classTitle) ----------
+     반 카드 수업 시각 줄 아래 작게 「앱 클래스: [현장]파이널 마라톤 과제 클래스 · 핀번호 993677 [바꾸기]」
+       클래스 이름 = 그 반 학생들 앱 링크의 classTitle 중 가장 많이 나온 값 (같으면 기억한 값 · 그다음 가나다 순)
+       핀번호 = 반 설정 「앱 핀번호(입장코드)」 (classes.app_code — 문자 {앱입장코드} · 웰컴 문자가 쓰는 값)
+     클래스 바뀜 — 기억한 클래스 이름(classes.app_class)과 다른 학생이 절반 이상이면 노란 띠
+       「앱 클래스가 바뀌었어요: 새 이름 · 핀번호를 확인해 주세요 [앱 관리자 열기 ↗] [핀번호 넣기] [그대로]」 — 핀번호를 넣거나 [그대로]면 새 이름을 기억 → 사라짐
+       처음(기억한 값 없음)에는 지금 대표값을 조용히 기억만 한다
+     반 안에서 클래스 이름이 다른 학생 — 「앱 클래스가 다른 학생 n명」 (누르면 이름 · 그 학생 클래스)
+     [앱 관리자 열기 ↗] — 설정 「마라톤 앱 관리자 주소」(app_settings app_admin)를 새 탭으로 · 계정은 설정의 복사 버튼으로만 */
+  var PIN_RE = /^[A-Za-z0-9가-힣_-]{2,30}$/;
+  st.appAdmin = '';
+  st.pinEdit = '';
+  st.appDiffOpen = '';
+  st.appRemember = {};
+  function loadAppAdmin() {
+    return Promise.resolve(DB.getSetting('app_admin')).then(function (v) {
+      st.appAdmin = v && /^https:\/\/\S+$/.test(String(v.url || '')) ? String(v.url) : '';
+      var inp = document.getElementById('tdSetAppAdmin');
+      if (inp && document.activeElement !== inp) inp.value = st.appAdmin;
+    }, function () {});
+  }
+  /* 반 학생들 앱 클래스 — { list: [{ s, title }], rep, counts } (앱 기록을 받은 학생만) */
+  function appTitles(c) {
+    var list = [], counts = {};
+    (c.rows || []).forEach(function (s) {
+      var a = app[s.id], t = a && a.ok && a.data ? String(a.data.classTitle || '').trim() : '';
+      if (!t) return;
+      list.push({ s: s, title: t });
+      counts[t] = (counts[t] || 0) + 1;
+    });
+    var m = Store.metaOf(c.name) || {}, mem = m.appClass || '';
+    var rep = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a] || (b === mem) - (a === mem) || (a < b ? -1 : a > b ? 1 : 0); })[0] || '';
+    return { list: list, rep: rep, counts: counts, mem: mem, m: m };
+  }
+  function appClassHtml(c) {
+    if (!c || c.name === '(반 없음)' || !c.rows || !c.rows.length) return '';
+    var x = appTitles(c), m = x.m;
+    if (!m.appSql) return '';
+    /* 처음 — 지금 대표값을 기억만 (띠 없음) */
+    if (!x.mem && x.rep && !st.appRemember[c.name]) { st.appRemember[c.name] = 1; rememberApp(c.name, x.rep, true); }
+    var diff = x.list.filter(function (y) { return y.title !== x.rep; });
+    var away = x.mem ? x.list.filter(function (y) { return y.title !== x.mem; }).length : 0;
+    var changed = !!(x.mem && x.rep && x.rep !== x.mem && x.list.length && away * 2 >= x.list.length);
+    var k = esc(c.name), h = '';
+    if (changed) {
+      h += '<div class="tdc-appband" role="status"><span>앱 클래스가 바뀌었어요: <b>' + esc(x.rep) + '</b> · 핀번호를 확인해 주세요</span>' +
+        (st.appAdmin ? '<a class="btn btn--sm" href="' + esc(st.appAdmin) + '" target="_blank" rel="noopener" data-app-admin>앱 관리자 열기 ↗</a>'
+                     : '<button type="button" class="btn btn--sm" data-app-admin-none title="설정에서 마라톤 앱 관리자 주소를 넣으면 바로 열립니다">앱 관리자 열기 ↗</button>') +
+        '<button type="button" class="btn btn--sm btn--primary" data-pin-edit="' + k + '" data-pin-new="1">핀번호 넣기</button>' +
+        '<button type="button" class="btn btn--sm btn--ghost" data-app-keep="' + k + '">그대로</button></div>';
+    }
+    if (st.pinEdit === c.name) {
+      h += '<div class="tdc-appcls tdc-appcls--edit"><label>앱 핀번호(입장코드) <input class="input tdc-pin" type="text" inputmode="numeric" maxlength="30" autocomplete="off" spellcheck="false" data-pin-input="' + k + '" value="' + esc(m.appCode || '') + '" placeholder="예: 993677"></label>' +
+        '<button type="button" class="btn btn--sm btn--primary" data-pin-save="' + k + '">저장</button><button type="button" class="btn btn--sm" data-pin-cancel>취소</button>' +
+        '<small class="tdc-pin-err" data-pin-err></small></div>';
+    } else if (x.rep || m.appCode) {
+      h += '<div class="tdc-appcls"><span>앱 클래스: ' + (x.rep ? '<b>' + esc(x.rep) + '</b>' : '<span class="muted-note">아직 모름</span>') + ' · 핀번호 ' +
+        (m.appCode ? '<b class="num">' + esc(m.appCode) + '</b>' : '<span class="muted-note">없음</span>') + '</span>' +
+        '<button type="button" class="tdc-appcls__edit" data-pin-edit="' + k + '">바꾸기</button></div>';
+    }
+    if (diff.length) {
+      h += '<button type="button" class="tdc-appdiff" data-app-diff="' + k + '" aria-expanded="' + (st.appDiffOpen === c.name) + '">앱 클래스가 다른 학생 ' + diff.length + '명</button>' +
+        (st.appDiffOpen === c.name ? '<div class="tdc-appdiff__list">' + diff.map(function (y) { return '<span>' + esc(y.s.name || '') + ' · ' + esc(y.title) + '</span>'; }).join('') + '</div>' : '');
+    }
+    return h;
+  }
+  function paintAppCls() {
+    Array.prototype.forEach.call(document.querySelectorAll('#tdBody [data-appcls]'), function (el) {
+      if (el.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') return;
+      var h = appClassHtml((st.clsBy || {})[el.dataset.appcls]);
+      if (el.innerHTML !== h) el.innerHTML = h;
+    });
+  }
+  function setMeta(cls, patch) { Store.setMetaLocal(cls, Object.assign({}, Store.metaOf(cls) || {}, patch)); }
+  function rememberApp(cls, title, quiet) {
+    return Promise.resolve(sb().rpc('class_app_class_set', { p_class: cls, p_title: title })).then(function (r) {
+      if (r.error) { if (!quiet) UI.toast(r.error.message, 'bad'); return false; }
+      setMeta(cls, { appClass: title });
+      paintAppCls();
+      return true;
+    }, function () { return false; });
+  }
+  function savePin(cls) {
+    var box = document.querySelector('#tdBody [data-appcls="' + cls.replace(/"/g, '\\"') + '"]');
+    var inp = box && box.querySelector('[data-pin-input]'), err = box && box.querySelector('[data-pin-err]');
+    var pin = inp ? inp.value.trim() : '';
+    if (pin && !PIN_RE.test(pin)) { if (err) err.textContent = '핀번호는 숫자 · 영문 2 ~ 30자로 적어 주세요 (띄어쓰기 없이)'; return Promise.resolve(false); }
+    var c = (st.clsBy || {})[cls], rep = c ? appTitles(c).rep : '';
+    return Promise.resolve(sb().rpc('class_app_code_set', { p_name: cls, p_code: pin })).then(function (r) {
+      if (r.error) { if (err) err.textContent = r.error.message; return false; }
+      setMeta(cls, { appCode: pin });
+      st.pinEdit = '';
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();   /* 입력칸에서 나와야 줄을 다시 그린다 */
+      UI.toast(cls + ' 앱 핀번호(입장코드) — ' + (pin || '지움'), 'good');
+      window.dispatchEvent(new CustomEvent('jt:app-pin', { detail: { cls: cls, pin: pin } }));
+      /* 핀번호를 넣으면 지금 클래스 이름을 기억 — 바뀜 띠가 사라진다 */
+      return (rep ? rememberApp(cls, rep) : Promise.resolve(true)).then(function () { paintAppCls(); return true; });
+    });
+  }
+  document.addEventListener('click', function (e) {
+    var t = e.target;
+    if (!t.closest || !t.closest('#tdBody, #tdSettingsModal')) return;
+    var b;
+    if ((b = t.closest('[data-pin-edit]'))) { st.pinEdit = b.dataset.pinEdit; paintAppCls(); var i = document.querySelector('#tdBody [data-pin-input]'); if (i) { i.focus(); if (b.dataset.pinNew) i.select(); } return; }
+    if (t.closest('[data-pin-cancel]')) { st.pinEdit = ''; paintAppCls(); return; }
+    if ((b = t.closest('[data-pin-save]'))) { savePin(b.dataset.pinSave); return; }
+    if ((b = t.closest('[data-app-keep]'))) { var c = (st.clsBy || {})[b.dataset.appKeep]; if (c) rememberApp(c.name, appTitles(c).rep); return; }
+    if ((b = t.closest('[data-app-diff]'))) { st.appDiffOpen = st.appDiffOpen === b.dataset.appDiff ? '' : b.dataset.appDiff; paintAppCls(); return; }
+    if (t.closest('[data-app-admin-none]')) { UI.toast('더보기 → 설정 「마라톤 앱 관리자 주소」를 먼저 넣어 주세요', 'bad'); return; }
+    if (t.closest('#tdSetAppAdminSave')) {
+      var v = ($('#tdSetAppAdmin').value || '').trim();
+      if (v && !/^https:\/\/\S+$/.test(v)) { UI.toast('https:// 로 시작하는 주소를 넣어 주세요', 'bad'); return; }
+      DB.saveSetting('app_admin', { url: v }, UI.whoami ? UI.whoami() : '').then(function () { st.appAdmin = v; UI.toast('마라톤 앱 관리자 주소를 저장했습니다', 'good'); paintAppCls(); }, function (x) { UI.toast((x && x.message) || '저장하지 못했습니다', 'bad'); });
+    }
+  });
+  document.addEventListener('keydown', function (e) {
+    var i = e.target.closest && e.target.closest('[data-pin-input]');
+    if (i && e.key === 'Enter') { e.preventDefault(); savePin(i.dataset.pinInput); }
+  });
 
   /* ---------- 그리기 ---------- */
 
@@ -1331,6 +1453,7 @@
           classWhen(c) +
           attHtml(c.name, '') +
           (window.Notes ? Notes.cardHtml(c) : '') +          /* 수업 시각 [바꾸기] · 필기 미제출(끝나기 n분 전부터) (notes.js · 20261101f) */
+          (c.name === '(반 없음)' ? '' : '<div class="tdc-appbox" data-appcls="' + esc(c.name) + '">' + appClassHtml(c) + '</div>') +   /* 앱 클래스 · 핀번호 (20261101p) */
         '</div>' +
         '<div class="tdc-btns">' +
           (c.name === '(반 없음)' || !n ? '' : '<button type="button" class="btn btn--sm tdc-sms" data-sms-cls="' + esc(c.name) + '" aria-label="' + esc(c.name) + ' 전체 문자 발송">전체 문자 발송</button>') +

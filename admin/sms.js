@@ -486,8 +486,8 @@
     var typed = $('#smsEntry').value.trim();
     $('#smsEntryHint').textContent = typed
       ? (CODE_RE.test(typed) ? '모두 이 코드로 보냅니다' : '영문 · 숫자 · 한글 2 ~ 30자 (띄어쓰기 없이)')
-      : have.length ? '비우면 반 설정의 「앱 입장코드」 — ' + have.map(function (c) { return c + ' ' + cs[c]; }).join(' · ')
-      : '반 설정에 「앱 입장코드」가 없습니다 — 여기에 입장코드를 적어 주세요';
+      : have.length ? '비우면 반 설정의 「앱 핀번호(입장코드)」 — ' + have.map(function (c) { return c + ' ' + cs[c]; }).join(' · ')
+      : '반 설정에 「앱 핀번호(입장코드)」가 없습니다 — 여기에 핀번호를 적어 주세요';
   }
 
   var plan = null;
@@ -517,7 +517,7 @@
     var html = (blockedN ? '<p class="sms-blocked-note">레포트 공개 전인 학생 ' + blockedN + '명은 보내지 않습니다 (회색 「공개 전 · 발송 불가」)</p>' : '') +
       '<p class="sms-sum"><b class="num">' + plan.people + '</b>명 · ' + (par ? '학부모 <b class="num">' + par + '</b>통 · ' : '') + (stu ? '학생 <b class="num">' + stu + '</b>통 · ' : '') + '총 <b class="num">' + plan.items.length + '</b>통 · 약 <b class="num">' + plan.won.toLocaleString() + '</b>원' +
       ' <span class="muted-note">단문 ' + c.smsWon + '원 · 장문 ' + c.lmsWon + '원' + (viaKakao() ? ' · 카톡이면 학부모는 알림톡 요금' : '') + '</span></p>';
-    if (plan.noCode.length) html += '<p class="cp-warn">입장코드가 없는 학생 ' + plan.noCode.map(function (x) { return x.s.id; }).filter(function (v, i, a) { return a.indexOf(v) === i; }).length + '명은 보내지 않습니다 — 「입장코드」 칸에 적거나 반 설정에 「앱 입장코드」를 넣어 주세요.</p>';
+    if (plan.noCode.length) html += '<p class="cp-warn">앱 핀번호(입장코드)가 없는 학생 ' + plan.noCode.map(function (x) { return x.s.id; }).filter(function (v, i, a) { return a.indexOf(v) === i; }).length + '명은 보내지 않습니다 — 「앱 핀번호(입장코드)」 칸에 적거나 반 설정에 「앱 핀번호(입장코드)」를 넣어 주세요.</p>';
     if (plan.noLink.length) html += '<p class="cp-warn">링크가 없는 학생 ' + plan.noLink.map(function (x) { return x.s.name; }).filter(function (v, i, a) { return a.indexOf(v) === i; }).slice(0, 6).join(', ') + '은(는) 보내지 않습니다.</p>';
     if (plan.sib.length) {
       html += '<label class="check-line sms-sib"><input type="checkbox" id="smsSib"' + (sibOn ? ' checked' : '') + (st.done ? ' disabled' : '') + '> <span>같은 번호를 쓰는 형제 ' + plan.sib.length + '명에게도 따로 보내기 <span class="field__opt">' +
@@ -759,7 +759,7 @@
     var txt = render(body, s, 'parent1', lessons, { code: code });
     var b = bytes(txt);
     $('#tplPreview').textContent = txt || '(내용을 쓰면 여기에 보입니다)';
-    $('#tplLen').textContent = body ? (b <= 90 ? '단문' : '장문') + ' ' + b + '바이트 · ' + esc(s.name || '') + ' 학부모에게 가는 글' + (hasCode(body) ? ' · 입장코드 ' + code + (st.codes[clsOf(s)] ? '' : '(예시)') : '') + (hasApp(body) && !appLinks() ? ' · 앱 설치 링크가 아직 없습니다 (연결 상태)' : '') : '';
+    $('#tplLen').textContent = body ? (b <= 90 ? '단문' : '장문') + ' ' + b + '바이트 · ' + esc(s.name || '') + ' 학부모에게 가는 글' + (hasCode(body) ? ' · 앱 핀번호 ' + code + (st.codes[clsOf(s)] ? '' : '(예시)') : '') + (hasApp(body) && !appLinks() ? ' · 앱 설치 링크가 아직 없습니다 (연결 상태)' : '') : '';
   }
   function saveTplEdit() {
     var title = $('#tplTitle').value.trim(), body = $('#tplBody').value;
@@ -1586,7 +1586,7 @@
       if (on.checked && st.cfg && !appLinks()) msg = '문자 발송 → 연결 상태에서 앱 설치 링크를 먼저 넣어 주세요';
       else if (on.checked && st.missing) msg = 'migration-023 · 040 SQL 을 실행해야 문자를 보낼 수 있습니다';
       var code = $('#' + p + 'InvCode').value.trim();
-      if (!msg && on.checked && code && !CODE_RE.test(code)) msg = '입장코드는 영문 · 숫자 · 한글 2 ~ 30자로 적어 주세요 (띄어쓰기 없이)';
+      if (!msg && on.checked && code && !CODE_RE.test(code)) msg = '앱 핀번호(입장코드)는 숫자 · 영문 2 ~ 30자로 적어 주세요 (띄어쓰기 없이)';
       if (!msg && on.checked && !$('#' + p + 'InvSt').checked && !$('#' + p + 'InvPa').checked) msg = '받는 사람(학생 · 학부모)을 하나 이상 골라 주세요';
       w.hidden = !msg;
       w.textContent = msg;

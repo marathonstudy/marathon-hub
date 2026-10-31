@@ -13,7 +13,7 @@
      · 받는 사람 목록(이름 · 지난 수업 이후 밀린 날짜 모두 「10/27(월) 10/28(화) 10/30(목)」 · 체크를 빼면 제외 · 20261101h) · 「학생에게」 기본 켜짐 · 「학부모에게도」 기본 꺼짐
      · 「자주 쓰는 문구」의 「과제 독려(학생)」 · 「과제 독려(학부모)」 · {밀린날짜}는 학생마다 채워서 같은 글끼리 묶어 보낸다 (함수는 그대로)
    공통
-     · 칸: {학생이름} {반이름} {첫수업일}(수강 시작일) {앱입장코드}(반 설정 「앱 입장코드」) {러닝노트주소}(학생 입구 /s/)
+     · 칸: {학생이름} {반이름} {첫수업일}(수강 시작일) {앱입장코드}(반 설정 「앱 핀번호(입장코드)」) {러닝노트주소}(학생 입구 /s/)
        — 예전 칸(#{이름} #{반} #{입장코드} #{앱 설치 링크})도 그대로 바뀐다. 실제 글은 서버(sms_prepare)가 똑같이 만든다
      · 퇴원한 학생 · 번호 없는 사람은 빼고 「번호 없음 n명」 · 오늘 같은 종류를 이미 보낸 사람은 「오늘 이미 보냄」으로 빼 둔다
      · 미리보기 1건 → [n명에게 보내기] → 「n명에게 보냅니다」 확인 → 「보냄 n건 · 실패 n건(이름)」
@@ -331,7 +331,7 @@
       html += '<label class="check-line wc-again"><input type="checkbox" id="wcAgain"' + (st.again ? ' checked' : '') + '> <span>오늘 이미 보낸 ' + dn + '건도 다시 보내기 <span class="field__opt">' +
         esc((st.again ? p.items.filter(function (x) { return x.again; }) : p.dup).slice(0, 6).map(function (x) { return x.s.name + '(' + TO_LABEL[x.t] + ')'; }).join(', ')) + '</span></span></label>';
     }
-    if (p.noCode.length) html += '<p class="cp-warn">입장코드가 없는 학생 ' + uniq(p.noCode) + '명은 보내지 않습니다 — 반 관리에서 그 반 「앱 입장코드」를 넣어 주세요.</p>';
+    if (p.noCode.length) html += '<p class="cp-warn">앱 핀번호(입장코드)가 없는 학생 ' + uniq(p.noCode) + '명은 보내지 않습니다 — 반 관리 또는 「오늘」 반 카드에서 그 반 「앱 핀번호(입장코드)」를 넣어 주세요.</p>';
     if (p.left.length) {
       var lk = [], ln = [];
       p.left.forEach(function (x) { if (ln.indexOf(x.s.name) === -1) ln.push(x.s.name); x.left.forEach(function (k) { if (lk.indexOf(k) === -1) lk.push(k); }); });
