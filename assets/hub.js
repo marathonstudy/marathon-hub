@@ -1014,10 +1014,12 @@
     }
   }
 
-  /* 그 수업 영상 (수업 영상 탭과 같은 목록에서) */
+  /* 그 수업 영상 (수업 영상 탭과 같은 목록에서)
+     영상이 없으면 그 자리에 연하게 「수업 영상은 올라오는 대로 여기에 추가됩니다」 (20261101o) — 영상은 공개한 레포트에 담지 않고
+     러닝노트를 열 때마다 lesson_videos 에서 받으므로, 공개한 뒤 넣어도 「다시 공개」 없이 바로 보인다 */
   function weekVideosHtml(w) {
     var vids = w ? sortVideos((w.videos || []).filter(function (v) { return v && safeUrl(v.url); })) : [];
-    if (!vids.length) return '';
+    if (!vids.length) return '<div class="card tw-videos rw-videos rw-videos--none"><h2 class="card-title">▶️ 수업 영상</h2><p class="rw-novid">수업 영상은 올라오는 대로 여기에 추가됩니다</p></div>';
     return '<div class="card tw-videos rw-videos"><h2 class="card-title">' + esc(weekName(w.week_start)) + '</h2>' + lessonInfoHtml(w, vids) + '<div class="nt-videos">' + vids.map(weekVideoHtml).join('') + '</div></div>';
   }
 
@@ -1163,7 +1165,7 @@
       '<div id="rwApp"></div>' +
       (hasLessons ? ReportView.partsHtml(d2, ['lessons']) : learnHtml(w)) +
       ReportView.partsHtml(d2, ['comment']) +
-      weekVideosHtml(w) +                         /* 이 수업 영상 — 선생님 한마디 바로 아래 (영상이 없으면 칸 없음 · 20261030b) */
+      weekVideosHtml(w) +                         /* 이 수업 영상 — 선생님 한마디 바로 아래 (영상이 없으면 안내 한 줄 · 20261101o) */
       '<div id="rwNote"></div>' +                 /* 이번 수업 복습 노트 — 확정된 노트가 있을 때만 (20261031l) */
       (files ? '<div class="card tw-files rw-files"><h2 class="card-title">✏️ 이 수업 과제 · 자료</h2>' + files + '</div>' : '') +
       (latest ? otherFilesHtml(mon) : '') +

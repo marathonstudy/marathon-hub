@@ -3866,3 +3866,8 @@ textarea.aip-text--new:focus { outline: 2px solid #B9AEF0; outline-offset: 1px; 
 /* 과제 기호 △ 늦게 · ✕ 미제출 — ● 보다 가늘어 굵게 (20261101n) */
 .hd-c--late, .hd-c--none { font-weight: 900; }
 @media (max-width: 480px) { .hd-c--late, .hd-c--none { font-size: 14px; } }
+/* 수업 영상 알림 묻기 (weekly.js · 20261101o) */
+.wk-vidask { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 8px 0 4px; padding: 10px 12px; border-radius: 12px; background: #F1EEFD; }
+.wk-vidask__t { flex: 1 1 200px; font-weight: 700; font-size: 14px; }
+/* 레포트 칩 옆 「영상 없음」 (today.js · 20261101o) */
+.tdc-novid { font-size: 11px; color: #9E1F3B; background: #FDECEF; border-radius: 6px; padding: 1px 6px; margin-left: 4px; white-space: nowrap; }

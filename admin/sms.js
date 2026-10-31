@@ -928,7 +928,7 @@
     st.failed = [];
     st.busy = false;
     st.off = {}; st.prev = {}; st.res = null; st.done = false;
-    st.label = ''; st.purpose = opts.purpose || ''; st.viaTouched = false; st.tplOn = '';
+    st.label = String(opts.label || '').slice(0, 60); st.purpose = opts.purpose || ''; st.viaTouched = false; st.tplOn = '';
     st.ask = null;
     /* 「바뀐 내용 알리기」 (publish.js) — 학생마다 바뀐 내용 · 문구 기본값 · 보냄 표시는 하지 않고 알림 횟수만 (20261030e) */
     st.notify = opts.notify || null;

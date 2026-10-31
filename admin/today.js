@@ -79,8 +79,18 @@
      반마다 최근 3번 수업일로 「그 수업 레포트를 보낸 학생 / 반 학생」을 센다 (반 + 수업일 단위) */
   st.recent = {};
   st.todoOpen = {};
+  st.vids = null;              /* 반|주 → 반 전체 수업 영상 수 (20261101o · 레포트 칩 「영상 없음」) */
+  function loadVids(from) {
+    return Promise.resolve(sb().from('lesson_videos').select('class_name,week_start,student_ids').gte('week_start', from)).then(function (r) {
+      if (!r || r.error) { st.vids = null; return; }
+      var m = {};
+      (r.data || []).forEach(function (x) { if (!(x.student_ids || []).length) { var k = (x.class_name || '').trim() + '|' + x.week_start; m[k] = (m[k] || 0) + 1; } });
+      st.vids = m;
+    }, function () { st.vids = null; });
+  }
   function loadRecentSent() {
     var from = Lesson.addDays(DDay.today(), -42);
+    loadVids(from);
     return sb().from('sent').select('week_start,student_id,sent_at').gte('week_start', from).then(function (r) {
       if (r.error) return;
       var m = {};
@@ -486,6 +496,8 @@
     var t = x.kind === 'wip' ? day + ' 작성 중' : x.kind === 'part' ? day + ' ' + x.pct + '% · 안 보냄 ' + x.left + '명' : day + ' ' + x.pct + '%';
     var chip = '<button type="button" class="tdc-chip tdc-chip--' + x.kind + ' num" data-go-send="' + esc(c.name) + '" data-week="' + esc(x.week) + '" title="' +
       esc(day + ' 수업 레포트 — 보냄 ' + x.sent + '/' + x.n + ' · 누르면 발송 화면') + '">' + esc(t) + '</button>';
+    /* 공개한 레포트인데 그 수업 영상이 아직 없으면 작게 「영상 없음」 (20261101o · 영상을 넣으면 다시 공개 없이 바로 보인다) */
+    if (st.vids && publishedAny(c, x) && !st.vids[c.name + '|' + x.week]) chip = '<span class="tdc-chipwrap">' + chip + '<small class="tdc-novid" title="' + esc(day + ' 수업 영상이 아직 없습니다 — 레포트 발송 → 1 작성 → 반 공통에서 넣으면 다시 공개 없이 바로 보입니다') + '">영상 없음</small></span>';
     /* 「작성 중」 칩 바로 오른쪽 [건너뛰기] — 묻지 않고 바로 · 아래 「되돌리기」 5초 (20261101b) */
     return canSkipChip(c, x) ? '<span class="tdc-chipwrap">' + chip + '<button type="button" class="tdc-chip__skip" data-skipq-cls="' + esc(c.name) + '" data-skipq-date="' + esc(x.date) + '" aria-label="' + esc(day + ' 레포트 건너뛰기') + '">건너뛰기</button></span>' : chip;
   }
@@ -1776,7 +1788,7 @@
     loadLinks();
   });
   document.addEventListener('jt:tab', function (e) { if (e.detail.index === 7) load(false); });
-  var TABLES = { '*': 1, entries: 1, published: 1, sent: 1, note_photos: 1, tb_bills: 1, student_notes: 1, students: 1 };
+  var TABLES = { '*': 1, entries: 1, published: 1, sent: 1, note_photos: 1, tb_bills: 1, student_notes: 1, students: 1, lesson_videos: 1 };
   var remoteTimer = null;
   function remote() {
     clearTimeout(remoteTimer);

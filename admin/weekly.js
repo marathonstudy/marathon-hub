@@ -370,7 +370,7 @@
     var body = { class_name: st.cls, week_start: st.week, part: v.part, title: (v.title || '').trim(), url: url,
                  student_ids: v.part === 'makeup' ? (v.student_ids || []) : [],
                  sort: st.videos.indexOf(v) };
-    var key = st.key;
+    var key = st.key, wasNew = !v.id;
     var p = v.id
       ? sb().from('lesson_videos').update(body).eq('id', v.id).select()
       : sb().from('lesson_videos').insert(body).select();
@@ -390,6 +390,7 @@
       if (v._again) { v._again = false; return saveVideo(v); }
       toast('수업 영상을 저장했습니다', 'good');
       changed();
+      if (wasNew && !body.student_ids.length) askVideoNotify();       /* 반 전체 영상을 새로 넣었을 때 (20261101o) */
     }).catch(function (e) {
       v._saving = false; v._again = false; v._err = '저장하지 못했습니다 — ' + e.message; refreshRow(oldKey, v);
     });
@@ -845,6 +846,50 @@
 
   bind();
 
+  /* ---------- 수업 영상 알림 (20261101o) ----------
+     반 전체 영상을 새로 넣고 저장하면 영상 칸 아래에 한 번 묻는다 (그 반 그 주에 한 번 · 과정 화면은 묻지 않는다)
+       「수업 영상이 올라왔다고 알릴까요? [학생에게] [학생+학부모] [안 보냄]」
+     고르면 문자 발송 화면을 그 반 · 받는 사람 · 문구로 채워서 연다 (보내기 · 확인은 거기서)
+     문구 — 문자 문구 관리 「수업 영상 알림」(migration-059 · 없으면 기본 글) · {날짜}는 여기서 그 주 수업일로 채운다 */
+  var VID_BODY = '[마라톤국어] {날짜} 수업 영상이 올라왔어요. 러닝노트에서 바로 볼 수 있어요: {러닝노트주소}';
+  st.vidAsked = {};
+  function askVideoNotify() {
+    if (isCourseKey() || !st.cls || !window.Sms) return;
+    var k = st.cls + '|' + st.week;
+    if (st.vidAsked[k]) return;
+    st.vidAsked[k] = true;
+    var host = $('#wkVideos');
+    if (!host) return;
+    var old = $('#wkVidAsk'); if (old) old.remove();
+    var box = document.createElement('div');
+    box.className = 'wk-vidask'; box.id = 'wkVidAsk';
+    box.dataset.cls = st.cls; box.dataset.week = st.week;
+    box.innerHTML = '<span class="wk-vidask__t">수업 영상이 올라왔다고 알릴까요?</span>' +
+      '<button type="button" class="btn btn--sm btn--primary" data-vidnote="student">학생에게</button>' +
+      '<button type="button" class="btn btn--sm" data-vidnote="both">학생+학부모</button>' +
+      '<button type="button" class="btn btn--sm btn--ghost" data-vidnote="none">안 보냄</button>';
+    host.insertAdjacentElement('afterend', box);
+  }
+  function videoNotify(to, cls, week) {
+    var box = $('#wkVidAsk'); if (box) box.remove();
+    if (to === 'none') return Promise.resolve(false);
+    var L = Store.lessonOf ? Store.lessonOf(cls, week) : null;
+    var day = L && L.date && !L.canceled ? Store.dateWithDow(L.date) : Store.dateWithDow(week);
+    return Promise.resolve(sb().from('sms_templates').select('title,body').eq('title', '수업 영상 알림').limit(1)).then(function (r) {
+      var row = r && !r.error && r.data && r.data[0];
+      return (row && String(row.body || '').trim()) || VID_BODY;
+    }, function () { return VID_BODY; }).then(function (body) {
+      Sms.open({ classes: [cls], to: to, from: 'weekly', label: '수업 영상 알림', purpose: 'video', body: body.split('{날짜}').join(day) });
+      return true;
+    });
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-vidnote]');
+    if (!b) return;
+    var box = b.closest('#wkVidAsk');
+    videoNotify(b.dataset.vidnote, box ? box.dataset.cls : st.cls, box ? box.dataset.week : st.week);
+  });
+
   /* 자막 붙여 넣기(summary.js)에서 — 그 주 영상 칸이 비어 있을 때만 「수업 영상(전체)」 한 줄로 넣는다 */
   function addVideoUrl(cls, week, url, title) {
     if (!st.cls || st.missing || st.cls !== cls || st.week !== week) return Promise.resolve(false);
@@ -864,7 +909,7 @@
   function openSchedNow() { if ($('#wkSchedEdit').hidden) openSched(); }
   window.Weekly = { render: render, classify: classify, normalizeYoutube: normalizeYoutube, reload: load,
                     openSched: openSchedNow,
-                    videos: function () { return st.videos.slice(); }, addVideoUrl: addVideoUrl,
+                    videos: function () { return st.videos.slice(); }, addVideoUrl: addVideoUrl, videoNotify: videoNotify,
                     where: function () { return { cls: st.cls, week: st.week }; },
                     /* 코멘트 「AI로 초안 쓰기」 자료 — 그 반 그 주 파일 이름 · 분류 (write.js · 20261029g) */
                     fileFacts: function (cls, week) {

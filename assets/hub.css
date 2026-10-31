@@ -1265,3 +1265,6 @@ html.rn-lock, html.rn-lock body { overflow: hidden; }
 .a2hs-how__btn { appearance: none; border: 1px solid #D9D3F5; background: #fff; color: #4B4380; font: inherit; font-weight: 800; cursor: pointer;
   width: 100%; min-height: 48px; border-radius: 12px; }
 .a2hs-how .hub-muted { margin: 8px 0 0; }
+/* 영상이 아직 없는 수업 (20261101o) — 연하게 한 줄 */
+.rw-videos--none .card-title { color: var(--ink-soft, #8A8FA6); }
+.rw-novid { margin: 0; font-size: 13.5px; color: #9A9EB3; }
