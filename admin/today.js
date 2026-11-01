@@ -358,6 +358,7 @@
   var PIN_RE = /^[A-Za-z0-9가-힣_-]{2,30}$/;
   st.appAdmin = '';
   st.pinEdit = '';
+  st.pinAsk = null;
   st.appDiffOpen = '';
   st.appRemember = {};
   function loadAppAdmin() {
@@ -392,19 +393,24 @@
     var k = esc(c.name), h = '';
     if (changed) {
       h += '<div class="tdc-appband" role="status"><span>앱 클래스가 바뀌었어요: <b>' + esc(x.rep) + '</b> · 핀번호를 확인해 주세요</span>' +
-        (st.appAdmin ? '<a class="btn btn--sm" href="' + esc(st.appAdmin) + '" target="_blank" rel="noopener" data-app-admin>앱 관리자 열기 ↗</a>'
-                     : '<button type="button" class="btn btn--sm" data-app-admin-none title="설정에서 마라톤 앱 관리자 주소를 넣으면 바로 열립니다">앱 관리자 열기 ↗</button>') +
+        '<button type="button" class="btn btn--sm" data-app-check="' + k + '" title="클래스 이름을 복사하고 앱 관리자를 새 창으로 엽니다">앱 관리자 열기 ↗</button>' +
         '<button type="button" class="btn btn--sm btn--primary" data-pin-edit="' + k + '" data-pin-new="1">핀번호 넣기</button>' +
         '<button type="button" class="btn btn--sm btn--ghost" data-app-keep="' + k + '">그대로</button></div>';
     }
-    if (st.pinEdit === c.name) {
+    if (st.pinAsk && st.pinAsk.cls === c.name) {
+      /* 같은 앱 클래스를 쓰는 다른 반 — 같이 넣을지 묻기 (20261101q) */
+      h += '<div class="tdc-appcls tdc-appcls--ask" role="group"><span>같은 앱 클래스인 <b>' + esc(st.pinAsk.others.join('·')) + '</b>에도 넣을까요? (핀번호 <b class="num">' + esc(st.pinAsk.pin || '지움') + '</b>)</span>' +
+        '<button type="button" class="btn btn--sm btn--primary" data-pin-all="' + k + '">같이 넣기</button><button type="button" class="btn btn--sm" data-pin-one="' + k + '">이 반만</button></div>';
+    } else if (st.pinEdit === c.name) {
       h += '<div class="tdc-appcls tdc-appcls--edit"><label>앱 핀번호(입장코드) <input class="input tdc-pin" type="text" inputmode="numeric" maxlength="30" autocomplete="off" spellcheck="false" data-pin-input="' + k + '" value="' + esc(m.appCode || '') + '" placeholder="예: 993677"></label>' +
         '<button type="button" class="btn btn--sm btn--primary" data-pin-save="' + k + '">저장</button><button type="button" class="btn btn--sm" data-pin-cancel>취소</button>' +
         '<small class="tdc-pin-err" data-pin-err></small></div>';
-    } else if (x.rep || m.appCode) {
-      h += '<div class="tdc-appcls"><span>앱 클래스: ' + (x.rep ? '<b>' + esc(x.rep) + '</b>' : '<span class="muted-note">아직 모름</span>') + ' · 핀번호 ' +
-        (m.appCode ? '<b class="num">' + esc(m.appCode) + '</b>' : '<span class="muted-note">없음</span>') + '</span>' +
-        '<button type="button" class="tdc-appcls__edit" data-pin-edit="' + k + '">바꾸기</button></div>';
+    } else {
+      /* 핀번호 없으면 「핀번호 [넣기]」(보라 테두리) · 있으면 「핀번호 993677 [바꾸기]」 · 옆에 [앱에서 확인 ↗] (20261101q) */
+      h += '<div class="tdc-appcls"><span>앱 클래스: ' + (x.rep ? '<b>' + esc(x.rep) + '</b>' : '<span class="muted-note">아직 모름</span>') + ' · 핀번호' +
+        (m.appCode ? ' <b class="num">' + esc(m.appCode) + '</b></span><button type="button" class="tdc-appcls__edit" data-pin-edit="' + k + '">바꾸기</button>'
+                   : '</span><button type="button" class="btn btn--sm tdc-appcls__add" data-pin-edit="' + k + '" data-pin-new="1">넣기</button>') +
+        '<button type="button" class="btn btn--sm tdc-appcls__check" data-app-check="' + k + '" title="클래스 이름을 복사하고 앱 관리자를 새 창으로 엽니다">앱에서 확인 ↗</button></div>';
     }
     if (diff.length) {
       h += '<button type="button" class="tdc-appdiff" data-app-diff="' + k + '" aria-expanded="' + (st.appDiffOpen === c.name) + '">앱 클래스가 다른 학생 ' + diff.length + '명</button>' +
@@ -428,22 +434,72 @@
       return true;
     }, function () { return false; });
   }
+  /* 반의 앱 클래스 이름 — 학생들 링크의 대표값, 없으면 기억한 값 */
+  function appKey(c) { if (!c) return ''; var x = appTitles(c); return x.rep || x.mem || ''; }
+  /* 같은 앱 클래스를 쓰는 다른 반 (핀번호가 이미 같은 반은 빼고) */
+  function sameAppClasses(cls, pin) {
+    var by = st.clsBy || {}, key = appKey(by[cls]);
+    if (!key) return [];
+    return Object.keys(by).filter(function (n) {
+      if (n === cls || n === '(반 없음)') return false;
+      var m = Store.metaOf(n) || {};
+      return m.appSql && appKey(by[n]) === key && (m.appCode || '') !== pin;
+    });
+  }
+  /* 붙여 넣은 글에서 핀번호만 — 띄어쓰기를 빼고, 그래도 안 맞으면 숫자 4 ~ 12자리 */
+  function pinFromPaste(raw) {
+    var s = String(raw || '').replace(/\s+/g, '');
+    if (PIN_RE.test(s)) return s;
+    var d = /\d{4,12}/.exec(s);
+    return d ? d[0] : String(raw || '').trim();
+  }
   function savePin(cls) {
     var box = document.querySelector('#tdBody [data-appcls="' + cls.replace(/"/g, '\\"') + '"]');
     var inp = box && box.querySelector('[data-pin-input]'), err = box && box.querySelector('[data-pin-err]');
     var pin = inp ? inp.value.trim() : '';
     if (pin && !PIN_RE.test(pin)) { if (err) err.textContent = '핀번호는 숫자 · 영문 2 ~ 30자로 적어 주세요 (띄어쓰기 없이)'; return Promise.resolve(false); }
-    var c = (st.clsBy || {})[cls], rep = c ? appTitles(c).rep : '';
-    return Promise.resolve(sb().rpc('class_app_code_set', { p_name: cls, p_code: pin })).then(function (r) {
-      if (r.error) { if (err) err.textContent = r.error.message; return false; }
-      setMeta(cls, { appCode: pin });
-      st.pinEdit = '';
+    var others = sameAppClasses(cls, pin);
+    if (others.length) {
+      st.pinAsk = { cls: cls, pin: pin, others: others };
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      paintAppCls();
+      return Promise.resolve(false);
+    }
+    return writePins([cls], pin, err);
+  }
+  /* 여러 반에 같은 핀번호 저장 — 반마다 지금 클래스 이름도 기억 (바뀜 띠가 사라진다) */
+  function writePins(list, pin, err) {
+    var done = [];
+    return list.reduce(function (p, cls) {
+      return p.then(function () {
+        var c = (st.clsBy || {})[cls], rep = c ? appTitles(c).rep : '';
+        return Promise.resolve(sb().rpc('class_app_code_set', { p_name: cls, p_code: pin })).then(function (r) {
+          if (r.error) { if (err) err.textContent = r.error.message; else UI.toast(cls + ' — ' + r.error.message, 'bad'); return; }
+          setMeta(cls, { appCode: pin });
+          done.push(cls);
+          window.dispatchEvent(new CustomEvent('jt:app-pin', { detail: { cls: cls, pin: pin } }));
+          return rep ? rememberApp(cls, rep, true) : true;
+        });
+      });
+    }, Promise.resolve()).then(function () {
+      if (!done.length) return false;
+      if (done.indexOf(st.pinEdit) >= 0) st.pinEdit = '';
+      st.pinAsk = null;
       if (document.activeElement && document.activeElement.blur) document.activeElement.blur();   /* 입력칸에서 나와야 줄을 다시 그린다 */
-      UI.toast(cls + ' 앱 핀번호(입장코드) — ' + (pin || '지움'), 'good');
-      window.dispatchEvent(new CustomEvent('jt:app-pin', { detail: { cls: cls, pin: pin } }));
-      /* 핀번호를 넣으면 지금 클래스 이름을 기억 — 바뀜 띠가 사라진다 */
-      return (rep ? rememberApp(cls, rep) : Promise.resolve(true)).then(function () { paintAppCls(); return true; });
+      UI.toast(done.join('·') + ' 앱 핀번호(입장코드) — ' + (pin || '지움'), 'good');
+      paintAppCls();
+      return true;
     });
+  }
+  /* [앱에서 확인 ↗] — 클래스 이름을 복사해 두고 설정의 마라톤 앱 관리자 주소를 새 창으로 */
+  function appCheck(cls) {
+    if (!st.appAdmin) { UI.toast('설정 → 마라톤 앱 주소를 넣어 주세요', 'bad'); return; }
+    var name = appKey((st.clsBy || {})[cls]);
+    var copied = name ? UI.copyText(name) : null;   /* 새 창이 뜨기 전에 복사를 시작 */
+    window.open(st.appAdmin, '_blank', 'noopener');
+    if (!copied) { UI.toast('앱 관리자를 열었어요. 클래스 이름은 아직 몰라요', 'good'); return; }
+    copied.then(function () { UI.toast('클래스 이름이 복사됐어요. 앱에서 검색해 핀번호를 확인하세요', 'good'); },
+                function () { UI.toast('앱에서 「' + name + '」을 검색해 핀번호를 확인하세요', 'good'); });
   }
   document.addEventListener('click', function (e) {
     var t = e.target;
@@ -452,6 +508,9 @@
     if ((b = t.closest('[data-pin-edit]'))) { st.pinEdit = b.dataset.pinEdit; paintAppCls(); var i = document.querySelector('#tdBody [data-pin-input]'); if (i) { i.focus(); if (b.dataset.pinNew) i.select(); } return; }
     if (t.closest('[data-pin-cancel]')) { st.pinEdit = ''; paintAppCls(); return; }
     if ((b = t.closest('[data-pin-save]'))) { savePin(b.dataset.pinSave); return; }
+    if ((b = t.closest('[data-pin-all]'))) { if (st.pinAsk) writePins([st.pinAsk.cls].concat(st.pinAsk.others), st.pinAsk.pin); return; }
+    if ((b = t.closest('[data-pin-one]'))) { if (st.pinAsk) writePins([st.pinAsk.cls], st.pinAsk.pin); return; }
+    if ((b = t.closest('[data-app-check]'))) { appCheck(b.dataset.appCheck); return; }
     if ((b = t.closest('[data-app-keep]'))) { var c = (st.clsBy || {})[b.dataset.appKeep]; if (c) rememberApp(c.name, appTitles(c).rep); return; }
     if ((b = t.closest('[data-app-diff]'))) { st.appDiffOpen = st.appDiffOpen === b.dataset.appDiff ? '' : b.dataset.appDiff; paintAppCls(); return; }
     if (t.closest('[data-app-admin-none]')) { UI.toast('더보기 → 설정 「마라톤 앱 관리자 주소」를 먼저 넣어 주세요', 'bad'); return; }
@@ -460,6 +519,13 @@
       if (v && !/^https:\/\/\S+$/.test(v)) { UI.toast('https:// 로 시작하는 주소를 넣어 주세요', 'bad'); return; }
       DB.saveSetting('app_admin', { url: v }, UI.whoami ? UI.whoami() : '').then(function () { st.appAdmin = v; UI.toast('마라톤 앱 관리자 주소를 저장했습니다', 'good'); paintAppCls(); }, function (x) { UI.toast((x && x.message) || '저장하지 못했습니다', 'bad'); });
     }
+  });
+  document.addEventListener('paste', function (e) {
+    var i = e.target.closest && e.target.closest('[data-pin-input]');
+    var cd = e.clipboardData || window.clipboardData;
+    if (!i || !cd) return;
+    e.preventDefault();
+    i.value = pinFromPaste(cd.getData('text'));
   });
   document.addEventListener('keydown', function (e) {
     var i = e.target.closest && e.target.closest('[data-pin-input]');

@@ -3875,6 +3875,10 @@ textarea.aip-text--new:focus { outline: 2px solid #B9AEF0; outline-offset: 1px; 
 .tdc-appcls { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 2px; font-size: 12px; color: var(--ink-mid); }
 .tdc-appcls b { color: var(--ink-deep); font-weight: 700; }
 .tdc-appcls__edit { appearance: none; border: 0; background: none; padding: 0; font: inherit; font-size: 12px; color: #6A55D8; text-decoration: underline; cursor: pointer; }
+.tdc-appcls__add { min-height: 26px; padding: 1px 12px; border: 1.5px solid #6A55D8; background: #fff; color: #5A45C8; font-weight: 700; }
+.tdc-appcls__add:hover { background: #F3F0FF; }
+.tdc-appcls__check { min-height: 26px; padding: 1px 10px; font-size: 12px; }
+.tdc-appcls--ask { padding: 6px 8px; border-radius: 8px; background: #F3F0FF; color: #3F2E9E; }
 .tdc-appcls--edit label { display: inline-flex; align-items: center; gap: 6px; }
 .tdc-pin { width: 110px; height: 30px; padding: 2px 8px; }
 .tdc-pin-err { color: #9E1F3B; flex-basis: 100%; }

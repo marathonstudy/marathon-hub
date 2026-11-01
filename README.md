@@ -783,6 +783,12 @@ delete from public.staff where email = '조교이메일@example.com';
 - app-report — 「오늘」 반 단위 기록에도 classTitle (다시 배포 전에는 앱 클래스 줄이 「아직 모름」)
 - 배포: `supabase/migration-060-app-class.sql` 실행 → Edge Function `app-report` 다시 배포
 
+### 5-74. 20261101q — 반 카드 앱 핀번호 줄 (SQL · 함수 배포 없음)
+- 핀번호 없으면 「핀번호 [넣기]」(보라 테두리) · 있으면 「핀번호 993677 [바꾸기]」 (예전 「핀번호 없음 바꾸기」)
+- [앱에서 확인 ↗] — 클래스 이름 복사 + 설정 「마라톤 앱 관리자 주소」 새 창 · 「클래스 이름이 복사됐어요. 앱에서 검색해 핀번호를 확인하세요」 · 주소 없으면 「설정 → 마라톤 앱 주소를 넣어 주세요」 · 바뀜 띠 [앱 관리자 열기 ↗]도 같은 동작
+- [넣기] · [바꾸기] → 그 자리 숫자 입력칸 + [저장] · 붙여 넣기(띄어쓰기 · 다른 글 빼고 핀번호만) · 저장하면 바로 「핀번호 993677」
+- 같은 앱 클래스(학생 링크 classTitle 대표값 · 없으면 기억한 값)를 쓰는 다른 반이 있으면 저장할 때 「같은 앱 클래스인 목동반에도 넣을까요? [같이 넣기] [이 반만]」 (핀번호가 이미 같은 반은 빼고)
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.
