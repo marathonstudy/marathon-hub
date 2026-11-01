@@ -799,6 +799,14 @@ delete from public.staff where email = '조교이메일@example.com';
 - 데이터 바로잡기 — `supabase/check-exempt-notes.sql`(읽기 전용 · 지난 3일 면제 + 사유) · `supabase/fix-exempt-to-notes.sql`(맨 위 목록 · id 를 넣어야 실행됨 · 면제 앞 상태로 되돌리고 사유를 상담 기록 「과제」로)
 - 배포: `supabase/migration-061-worry-sms.sql` 실행
 
+### 5-76. 20261101s — 퇴원 사유 · 퇴원 기록 (SQL 062 · 함수 배포 없음)
+- 상담 카드 [퇴원 처리] — 마지막 수업일 + 「퇴원 사유」 버튼 하나 이상(일정 · 다른 학원 · 성적 · 거리·이사 · 비용 · 개인 사정 · 기타 · 필수 — 안 고르면 [퇴원 처리] 못 누름) + 메모(선택)
+- 저장 → 상담 기록 분류 「퇴원」 「퇴원 · 마지막 수업 11/14 · 사유: 일정, 다른 학원 · 메모」(student_notes.leave_on · leave_reasons · 처리한 사람 · 날짜는 서버) · [다시 다니는 중으로] → 「재등록 · 11/20」
+- 사유 · 메모는 상담 기록이라 운영진만 (학생 · 학부모 화면 · 문자는 student_notes 를 읽지 않음)
+- 이미 퇴원했는데 사유 기록이 없으면 상담 카드에 작게 「퇴원 사유 넣기」
+- 더보기 「퇴원 기록」(leaves.js) — 기간별 반 · 이름 · 마지막 수업일 · 사유 · 사유별 몇 명 · 「사유 없음 n명」
+- 배포: `supabase/migration-062-leave-reasons.sql` 실행 (061 다음)
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

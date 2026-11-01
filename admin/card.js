@@ -26,7 +26,7 @@
   function isMissing(e) { return /does not exist|Could not find the|schema cache/i.test((e && e.message) || ''); }
 
   /* 과제 독려 · 학습 상담 · 학부모 연락 — 「오늘」 학생 줄 [상담 +] 와 같은 분류 (migration-042-quick-note · 20261031o) */
-  var CATS = ['상담', '과제 독려', '학습 상담', '학부모 연락', '집중', '정서·컨디션', '출결', '학습', '기타', '과제', '걱정 문자'];   /* 과제 · 걱정 문자 (migration-061 · 20261101r) */
+  var CATS = ['상담', '과제 독려', '학습 상담', '학부모 연락', '집중', '정서·컨디션', '출결', '학습', '기타', '과제', '걱정 문자', '퇴원', '재등록'];   /* 과제 · 걱정 문자 (061) · 퇴원 · 재등록 (062 · 20261101s) */
   var CONSULT = ['상담', '과제 독려', '학습 상담', '학부모 연락', '과제', '걱정 문자'];
   function isConsult(n) { return (n.categories || []).some(function (c) { return CONSULT.indexOf(c) !== -1; }); }
   var SUBJ = [['kor', '국어'], ['eng', '영어'], ['math', '수학'], ['inq', '탐구']];
@@ -177,41 +177,125 @@
      [퇴원 처리] → 마지막 수업일(기본 = 가장 최근 지난 수업일) · [퇴원 처리] 만 · 그 날짜 다음 수업부터
        레포트 대상 · 챙길 학생 · 과제 평균 · 필기 알림 · 문자 대상 · 링크 연결 필요 수에서 빠진다 (지난 레포트 · 기록 · 러닝노트 링크는 그대로)
      퇴원한 학생은 [다시 다니는 중으로] — 퇴원일을 비운다 */
-  var leaveOpen = false;
+  /* 퇴원 사유 (20261101s · migration-062) — 마지막 수업일 + 「퇴원 사유」 버튼 하나 이상(필수) + 메모(선택)
+       저장하면 상담 기록 분류 「퇴원」 「퇴원 · 마지막 수업 11/14 · 사유: 일정, 다른 학원 · 메모」 (처리한 사람 · 날짜는 서버가 채움)
+       [다시 다니는 중으로] → 상담 기록 「재등록 · 11/20」
+       이미 퇴원했는데 사유 기록이 없으면 작게 「퇴원 사유 넣기」
+     사유 · 메모는 상담 기록이라 운영진만 본다 (학생 · 학부모 화면 · 문자는 student_notes 를 읽지 않는다) */
+  var LEAVE_REASONS = ['일정', '다른 학원', '성적', '거리·이사', '비용', '개인 사정', '기타'];
+  var leaveOpen = false, leaveFill = false, leavePicks = [], leaveBusy = false;
+  function mdOf(iso) { return (+String(iso).slice(5, 7)) + '/' + (+String(iso).slice(8, 10)); }
+  function todayIso() { return window.DDay ? DDay.today() : Store.toISO(new Date()); }
+  function leaveNoteOf(s) {
+    if (!C || !s || !s.leftOn) return null;
+    return (C.notes || []).find(function (n) { return !n.deleted_at && (n.categories || []).indexOf('퇴원') !== -1 && String(n.leave_on || '').slice(0, 10) === s.leftOn; }) || null;
+  }
+  function leaveFormHtml(withDate, d0) {
+    return '<div class="cd-leave__form">' +
+      (withDate ? '<label class="field"><span class="field__label">마지막 수업일</span><input class="input" id="cdLeaveDate" type="date" value="' + esc(d0) + '"></label>' : '') +
+      '<div class="field cd-leave__why"><span class="field__label">퇴원 사유 <small>(하나 이상)</small></span><div class="cd-leave__rs" role="group" aria-label="퇴원 사유">' +
+        LEAVE_REASONS.map(function (r) { var on = leavePicks.indexOf(r) !== -1; return '<button type="button" class="cd-leave__r' + (on ? ' is-on' : '') + '" data-leave-r="' + esc(r) + '" aria-pressed="' + on + '">' + esc(r) + '</button>'; }).join('') + '</div></div>' +
+      '<label class="field cd-leave__memo"><span class="field__label">메모 <small>(선택)</small></span><textarea class="textarea" id="cdLeaveMemo" rows="2" maxlength="300" placeholder="예) 학원 시간표와 겹침"></textarea></label>' +
+      '<p class="cd-leave__hint">사유와 메모는 운영진만 봅니다 (학생 · 학부모 화면과 문자에는 나오지 않습니다). 상담 기록에 「퇴원」으로 남습니다.</p>' +
+      '<div class="cd-leave__acts">' + (withDate
+        ? '<button type="button" class="btn btn--sm btn--danger" id="cdLeaveOk"' + (leavePicks.length && !leaveBusy ? '' : ' disabled') + '>퇴원 처리</button>'
+        : '<button type="button" class="btn btn--sm btn--primary" id="cdLeaveSave"' + (leavePicks.length && !leaveBusy ? '' : ' disabled') + '>사유 저장</button>') +
+        '<button type="button" class="btn btn--sm" id="cdLeaveCancel">취소</button></div></div>';
+  }
   function renderLeave() {
     var host = $('#cdLeave'), s = student(C.sid) || {};
     if (!host) return;
     if (s.leftOn) {
+      var n = leaveNoteOf(s);
       host.innerHTML = '<p class="cd-leave__t">퇴원 · 마지막 수업 ' + esc(Store.dateWithDow(s.leftOn)) + '</p>' +
+        (n ? '<p class="cd-leave__got">사유: ' + esc((n.leave_reasons || []).join(', ')) + '</p>'
+           : leaveFill ? leaveFormHtml(false, '') : '<button type="button" class="cd-leave__fill" id="cdLeaveFill">퇴원 사유 넣기</button>') +
         '<button type="button" class="btn btn--sm" id="cdUnleave">다시 다니는 중으로</button>';
       return;
     }
     var d0 = Store.defaultStartDate ? Store.defaultStartDate(s.className || '') : '';
-    host.innerHTML = leaveOpen
-      ? '<div class="cd-leave__form"><label class="field"><span class="field__label">마지막 수업일</span><input class="input" id="cdLeaveDate" type="date" value="' + esc(d0) + '"></label>' +
-        '<button type="button" class="btn btn--sm btn--danger" id="cdLeaveOk">퇴원 처리</button></div>'
-      : '<button type="button" class="cd-leave__btn" id="cdLeaveOpen">퇴원 처리</button>';
+    host.innerHTML = leaveOpen ? leaveFormHtml(true, d0) : '<button type="button" class="cd-leave__btn" id="cdLeaveOpen">퇴원 처리</button>';
+  }
+  function leaveBtns() {
+    ['#cdLeaveOk', '#cdLeaveSave'].forEach(function (q) { var b = $(q); if (b) b.disabled = !leavePicks.length || leaveBusy; });
+  }
+  function leaveBody(day, picks, memo) {
+    return '퇴원 · 마지막 수업 ' + mdOf(day) + ' · 사유: ' + picks.join(', ') + (memo ? ' · ' + memo : '');
+  }
+  function addLeaveNote(row) {
+    return Promise.resolve(sb().from('student_notes').insert(row)).then(function (r) {
+      if (r.error) {
+        var m = r.error.message || '';
+        toast(/leave_|student_notes_cat_check|schema cache/i.test(m) ? 'migration-062 SQL 을 먼저 실행해 주세요 (퇴원 사유)' : '상담 기록을 남기지 못했습니다 — ' + m, 'bad');
+        return false;
+      }
+      return true;
+    }, function (e) { toast((e && e.message) || '상담 기록을 남기지 못했습니다', 'bad'); return false; });
+  }
+  function afterNote(sid) {
+    if (window.QuickNote && QuickNote.changed) QuickNote.changed(sid);
+    return reloadNotes().then(function () { if (C && C.sid === sid) renderLeave(); });
   }
   function setLeft(v, msg) {
     var s = student(C.sid), sid = C.sid;
-    if (!s) return;
+    if (!s) return Promise.resolve();
     Store.upsertStudent(Object.assign({}, s, { leftOn: v || '' }));
-    Store.flushNow(Store.KEYS.students).then(function () {
-      if (C && C.sid === sid) { C.studentAt = Store.baseAt('students', sid); leaveOpen = false; renderLeave(); }
+    return Store.flushNow(Store.KEYS.students).then(function () {
+      if (C && C.sid === sid) { C.studentAt = Store.baseAt('students', sid); leaveOpen = false; leaveFill = false; leavePicks = []; renderLeave(); }
       window.dispatchEvent(new CustomEvent('jt:roster-changed'));
       toast(msg, 'good');
     });
   }
   document.addEventListener('click', function (e) {
     if (!C || !e.target.closest) return;
-    if (e.target.closest('#cdLeaveOpen')) { leaveOpen = true; renderLeave(); return; }
+    var rb = e.target.closest('[data-leave-r]');
+    if (rb && rb.closest('#cdLeave')) {
+      var r = rb.dataset.leaveR, i = leavePicks.indexOf(r);
+      if (i === -1) leavePicks.push(r); else leavePicks.splice(i, 1);
+      rb.classList.toggle('is-on', i === -1); rb.setAttribute('aria-pressed', String(i === -1));
+      leaveBtns();
+      return;
+    }
+    if (e.target.closest('#cdLeaveOpen')) { leaveOpen = true; leavePicks = []; renderLeave(); return; }
+    if (e.target.closest('#cdLeaveFill')) { leaveFill = true; leavePicks = []; renderLeave(); return; }
+    if (e.target.closest('#cdLeaveCancel')) { leaveOpen = false; leaveFill = false; leavePicks = []; renderLeave(); return; }
+    var sid = C.sid, s0 = student(sid) || {}, memo = (($('#cdLeaveMemo') || {}).value || '').replace(/\s+/g, ' ').trim().slice(0, 300);
     if (e.target.closest('#cdLeaveOk')) {
       var v = ($('#cdLeaveDate') || {}).value || '';
       if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) { toast('마지막 수업일을 골라 주세요', 'bad'); return; }
-      setLeft(v, (student(C.sid) || {}).name + ' — 퇴원 처리했습니다 (' + Store.dateWithDow(v) + ' 다음 수업부터 빠짐)');
+      if (!leavePicks.length) { toast('퇴원 사유를 하나 이상 골라 주세요', 'bad'); return; }
+      if (leaveBusy) return;
+      var picks = LEAVE_REASONS.filter(function (x) { return leavePicks.indexOf(x) !== -1; });
+      leaveBusy = true; leaveBtns();
+      addLeaveNote({ student_id: sid, note_date: todayIso(), categories: ['퇴원'], body: leaveBody(v, picks, memo), follow_up: false, leave_on: v, leave_reasons: picks }).then(function (ok) {
+        leaveBusy = false;
+        if (!ok) { leaveBtns(); return; }
+        return setLeft(v, s0.name + ' — 퇴원 처리했습니다 (' + Store.dateWithDow(v) + ' 다음 수업부터 빠짐 · 사유: ' + picks.join(', ') + ')').then(function () { return afterNote(sid); });
+      });
       return;
     }
-    if (e.target.closest('#cdUnleave')) setLeft('', (student(C.sid) || {}).name + ' — 다시 다니는 중으로 바꿨습니다');
+    if (e.target.closest('#cdLeaveSave')) {
+      if (!leavePicks.length || leaveBusy || !s0.leftOn) return;
+      var picks2 = LEAVE_REASONS.filter(function (x) { return leavePicks.indexOf(x) !== -1; });
+      leaveBusy = true; leaveBtns();
+      addLeaveNote({ student_id: sid, note_date: todayIso(), categories: ['퇴원'], body: leaveBody(s0.leftOn, picks2, memo), follow_up: false, leave_on: s0.leftOn, leave_reasons: picks2 }).then(function (ok) {
+        leaveBusy = false;
+        if (!ok) { leaveBtns(); return; }
+        leaveFill = false; leavePicks = [];
+        toast(s0.name + ' — 퇴원 사유를 남겼습니다 (' + picks2.join(', ') + ')', 'good');
+        return afterNote(sid);
+      });
+      return;
+    }
+    if (e.target.closest('#cdUnleave')) {
+      if (leaveBusy) return;
+      leaveBusy = true;
+      addLeaveNote({ student_id: sid, note_date: todayIso(), categories: ['재등록'], body: '재등록 · ' + mdOf(todayIso()) + (s0.leftOn ? ' (지난 퇴원 마지막 수업 ' + mdOf(s0.leftOn) + ')' : ''), follow_up: false }).then(function (ok) {
+        leaveBusy = false;
+        /* 기록을 못 남겨도(062 전) 되돌리기는 한다 — 알림은 addNote 가 띄움 */
+        return setLeft('', s0.name + ' — 다시 다니는 중으로 바꿨습니다' + (ok ? ' · 상담 기록 「재등록」' : '')).then(function () { return afterNote(sid); });
+      });
+    }
   });
 
   /* ---------- 다음 상담 때 확인 (맨 위 고정) ---------- */

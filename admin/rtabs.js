@@ -76,6 +76,7 @@
     if (k === 'exams') closeMore(function () { $('#btnExams').click(); });
     if (k === 'settings') closeMore(function () { $('#tdSettingsBtn').click(); });
     if (k === 'staff') closeMore(function () { if (window.Staff) Staff.open(); });
+    if (k === 'leaves') closeMore(function () { if (window.Leaves) Leaves.open(); });          /* 퇴원 기록 (leaves.js · 20261101s) */
     if (k === 'course') closeMore(function () { if (window.Course) Course.openManage(); });
     if (k === 'a2hs') closeMore(function () { if (window.A2HS) A2HS.how('coach'); });
   });
