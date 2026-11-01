@@ -2,7 +2,7 @@
    quicknote.js — 「오늘」 · 레포트 발송 학생 줄에서 바로 상담 적기 (20261031o · migration-042-quick-note)
 
    · 학생 이름 옆 작은 글씨 「마지막 상담 10/15」 · 없으면 「상담 없음」 · 오늘 적었으면 초록 「오늘 상담 ✓」
-   · 줄 오른쪽(휴대폰은 「⋯」 앞) [상담 +] → 그 줄 바로 아래에 칸이 펼쳐진다 (창을 띄우지 않는다 · 한 번에 한 학생)
+   · 줄 오른쪽(휴대폰은 「⋯」 앞) [상담 기록 +](20261101r · 예전 [상담 +]) → 그 줄 바로 아래에 칸이 펼쳐진다 (창을 띄우지 않는다 · 한 번에 한 학생)
        맨 위 「지난 상담」 — 날짜(요일) · 분류 · 적은 사람 · 내용 전체 (따옴표 상자 · 16px)
        「지난번 약속」 — 지난 상담의 「다음에 확인할 것」 · 요일 · 날짜가 있으면 그 뒤 과제 기록 「이번 주 화 ✓ 목 ✕」
        [이전 상담 더 보기] — 그 전 상담들 (최근 → 옛날) · 기록이 없으면 「첫 상담입니다」
@@ -63,7 +63,7 @@
     return '<span class="qn-tag' + cls + '" data-qn-tag="' + esc(sid) + '">' + txt + '</span>';
   }
   function btnHtml(sid, name) {
-    return '<button type="button" class="btn btn--sm qn-btn" data-qn-open="' + esc(sid) + '" aria-expanded="' + (st.open === sid) + '" aria-label="' + esc((name || '') + ' 상담 적기') + '">상담 +</button>';
+    return '<button type="button" class="btn btn--sm qn-btn" data-qn-open="' + esc(sid) + '" aria-expanded="' + (st.open === sid) + '" aria-label="' + esc((name || '') + ' 상담 기록 적기') + '">상담 기록 +</button>';
   }
   function slotHtml(sid) { return st.open === sid ? '<div class="qn-slot" data-qn-slot="' + esc(sid) + '"></div>' : ''; }
   function paintTags() {

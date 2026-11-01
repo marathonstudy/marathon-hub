@@ -3886,3 +3886,46 @@ textarea.aip-text--new:focus { outline: 2px solid #B9AEF0; outline-offset: 1px; 
 .tdc-appband > span { flex: 1 1 220px; }
 .tdc-appdiff { appearance: none; border: 0; background: #FFF1DF; color: #874A0B; border-radius: 6px; padding: 1px 7px; margin-top: 4px; font: inherit; font-size: 11.5px; cursor: pointer; }
 .tdc-appdiff__list { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 4px; font-size: 12px; color: var(--ink-mid); }
+
+/* ---------- 걱정 문자 · 과제 칸 메뉴 (worry.js · today.js · 20261101r) ---------- */
+.td-care3__sms, .td-care3__smsall { flex: 0 0 auto; min-height: 36px; white-space: nowrap; border-color: #C9BEF5; color: #4A33B8; }
+.td-care3__smsall { margin-left: auto; min-height: 32px; }
+.wy-modal { width: min(560px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); }
+.wy-body { display: grid; gap: 10px; }
+.wy-step { margin: 0; font-size: 12px; color: var(--ink-mid); }
+.wy-who { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; font-size: 16px; }
+.wy-ok { color: #1E8A5A; font-weight: 700; font-size: 13px; }
+.wy-why { margin: 0; padding: 6px 10px; border-radius: 8px; background: #F6F3FF; color: #3F2E9E; font-size: 13.5px; font-weight: 600; }
+.wy-dup { margin: 0; padding: 6px 10px; border-radius: 8px; background: #FFF6D6; color: #6B5200; font-size: 13px; }
+.wy-warn, .wy-left { color: #9E1F3B; font-size: 12.5px; margin: 0; }
+.wy-to { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.wy-to__b { appearance: none; font: inherit; min-height: 44px; border: 1.5px solid #D5D0F2; border-radius: 10px; background: #fff; color: var(--ink-deep); font-weight: 700; cursor: pointer; }
+.wy-to__b.is-on { border-color: #6A55D8; background: #F3F0FF; color: #4A33B8; }
+.wy-field { display: grid; gap: 4px; }
+.wy-lab { font-size: 13px; font-weight: 700; color: var(--ink-deep); }
+.wy-ai { font-weight: 500; color: #6A55D8; }
+.wy-text { width: 100%; font-size: 16px; line-height: 1.55; min-height: 120px; }
+.wy-ask { display: flex; gap: 6px; }
+.wy-ask .input { flex: 1 1 auto; min-width: 0; font-size: 16px; }
+.wy-askmsg, .wy-note { margin: 0; font-size: 12px; color: var(--ink-mid); }
+.wy-acts { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; position: sticky; bottom: 0; padding-top: 6px; background: var(--paper, #fff); }
+.wy-acts .btn { min-height: 44px; }
+.wy-acts .btn--primary { flex: 1 1 160px; }
+.hd-menu { display: grid; gap: 8px; }
+.hd-menu__t { margin: 0; font-size: 14px; font-weight: 800; color: var(--ink-deep); }
+.hd-menu__has { font-weight: 500; color: #4A33B8; }
+.hd-menu__big { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.hd-menu__b { min-height: 48px; font-weight: 700; border: 1.5px solid #C9BEF5; color: #4A33B8; background: #fff; }
+.hd-menu__more { appearance: none; border: 0; background: none; padding: 2px 0; font: inherit; font-size: 12px; color: var(--ink-mid); text-align: left; cursor: pointer; justify-self: start; }
+.hd-note { display: grid; gap: 6px; }
+.hd-note__t { width: 100%; font-size: 16px; }
+.hd-note__hint { margin: 0; font-size: 12px; color: var(--ink-mid); }
+.hd-note__err { margin: 0; font-size: 12.5px; color: #9E1F3B; }
+.hd-exask { padding: 8px 10px; border-radius: 8px; background: #FFF1F1; border: 1px solid #F0C4C4; color: #7A1F2B; font-size: 13px; }
+.hd-exask p { margin: 0 0 6px; }
+.hd-dot { position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; border-radius: 50%; background: #6A55D8; }
+@media (max-width: 600px) {
+  .wy-modal { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; border-radius: 0; }
+  .hd-menu__big { grid-template-columns: 1fr; }
+  .td-care3__smsall { margin-left: 0; }
+}

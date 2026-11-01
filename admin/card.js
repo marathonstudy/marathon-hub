@@ -26,8 +26,8 @@
   function isMissing(e) { return /does not exist|Could not find the|schema cache/i.test((e && e.message) || ''); }
 
   /* 과제 독려 · 학습 상담 · 학부모 연락 — 「오늘」 학생 줄 [상담 +] 와 같은 분류 (migration-042-quick-note · 20261031o) */
-  var CATS = ['상담', '과제 독려', '학습 상담', '학부모 연락', '집중', '정서·컨디션', '출결', '학습', '기타'];
-  var CONSULT = ['상담', '과제 독려', '학습 상담', '학부모 연락'];
+  var CATS = ['상담', '과제 독려', '학습 상담', '학부모 연락', '집중', '정서·컨디션', '출결', '학습', '기타', '과제', '걱정 문자'];   /* 과제 · 걱정 문자 (migration-061 · 20261101r) */
+  var CONSULT = ['상담', '과제 독려', '학습 상담', '학부모 연락', '과제', '걱정 문자'];
   function isConsult(n) { return (n.categories || []).some(function (c) { return CONSULT.indexOf(c) !== -1; }); }
   var SUBJ = [['kor', '국어'], ['eng', '영어'], ['math', '수학'], ['inq', '탐구']];
   var COLS = ['kor_raw', 'kor_grade', 'eng_raw', 'eng_grade', 'math_raw', 'math_grade', 'inq_raw', 'inq_grade'];

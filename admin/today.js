@@ -787,7 +787,85 @@
      고친 칸에는 작은 「수정」 — 누르면 「원래 앱: 미제출 → 수정: 정시 제출 · 종이로 제출 · 김OO 10/25 10:12」 · [원래대로]
      이미 공개한 레포트 기간이면 「다시 공개해야 학부모에게 반영됩니다」 · 수정 기록은 지우지 않는다 (원래대로도 한 줄) */
   var fx = { edit: false, st: '', rs: '', other: '', err: '', busy: false };
-  function fxReset() { fx = { edit: false, st: '', rs: '', other: '', err: '', busy: false }; }
+  function fxReset() { fx = { edit: false, st: '', rs: '', other: '', err: '', busy: false, exAsk: false }; }
+  /* 상태 고치기 — 늦게 / 제출 / 면제 (미제출은 지금 미제출이 아닐 때만) · 20261101r */
+  var FIX_SHORT = { late: '늦게', onTime: '제출', exempt: '면제', none: '미제출' };
+  function fixOpts(d) { return ['late', 'onTime', 'exempt'].concat(d && d.hw !== 'none' ? ['none'] : []); }
+
+  /* ---------- 과제 칸 메뉴 (20261101r) — 면제 오해 막기 ----------
+     맨 위 「10/29(목) 과제 · 미제출」 · 큰 버튼 [상담 기록 남기기] [걱정 문자 보내기]
+       상담 기록 — 글 칸 → 저장하면 그 학생 상담 기록(분류 「과제」 · 그 날짜 hw_day) · 과제 상태는 그대로 · 기록이 있는 칸에 작은 점
+       걱정 문자 — worry.js 창을 그 날짜 사유로
+     그 아래 작게 접힌 「상태 고치기 ▾」 안에만 늦게 / 제출 / 면제 (면제는 한 번 더 묻는다) */
+  var hm = { note: false, text: '', err: '', busy: false, more: false };
+  function hmReset() { hm = { note: false, text: '', err: '', busy: false, more: false, d: null }; }
+  var MENU_NAME = { onTime: '정시 제출', late: '늦게 제출', none: '미제출', exempt: '면제', today: '오늘(마감 전)' };
+  function menuHead(d) { return mdw(d.date) + ' 과제 · ' + (MENU_NAME[d.hw] || HW_NAME[d.hw] || ''); }
+  function menuHtml(sid, d, data) {
+    var info = '<p class="hd-pick">' + esc(dayInfo(data, d)) + '</p>';
+    if (d.weekend || d.hw === 'future' || d.hw === 'off' || d.hw === 'new') return info;
+    hm.d = d;
+    var h = '<div class="hd-menu" data-hd-menu="' + esc(d.date) + '"><p class="hd-menu__t">' + esc(menuHead(d)) + (window.Worry && Worry.hasHwNote(sid, d.date) ? ' <small class="hd-menu__has">· 상담 기록 있음</small>' : '') + '</p>' + info +
+      '<div class="hd-menu__big"><button type="button" class="btn hd-menu__b" data-hd-note aria-expanded="' + hm.note + '">상담 기록 남기기</button>' +
+        '<button type="button" class="btn hd-menu__b" data-hd-worry>걱정 문자 보내기</button></div>';
+    if (hm.note) {
+      h += '<div class="hd-note"><textarea class="textarea hd-note__t" id="hdNoteText" rows="3" maxlength="1900" placeholder="예) 전화로 이야기함 — 이번 주 화 · 목 과제 내기로" aria-label="' + esc(menuHead(d) + ' 상담 기록') + '">' + esc(hm.text) + '</textarea>' +
+        '<p class="hd-note__hint">상담 카드에 분류 「과제」 · ' + esc(mdw(d.date)) + '로 남습니다. 과제 상태는 바뀌지 않습니다. 학생 · 학부모에게는 보이지 않습니다.</p>' +
+        (hm.err ? '<p class="hd-note__err" role="alert">' + esc(hm.err) + '</p>' : '') +
+        '<div class="hd-fix__act"><button type="button" class="btn btn--sm btn--primary" data-hd-note-save' + (hm.busy ? ' disabled' : '') + '>' + (hm.busy ? '저장하는 중…' : '저장') + '</button>' +
+        '<button type="button" class="btn btn--sm" data-hd-note-cancel>취소</button></div></div>';
+    }
+    h += '<button type="button" class="hd-menu__more" data-hd-more aria-expanded="' + hm.more + '">상태 고치기 ' + (hm.more ? '▴' : '▾') + '</button>';
+    if (hm.more) h += fixHtml(sid, d);
+    return h + '</div>';
+  }
+  /* 과제 칸 메뉴 — 다른 칸을 누르면 처음으로 · 버튼들 */
+  document.addEventListener('click', function (e) {
+    var t = e.target;
+    if (!t.closest) return;
+    if (t.closest('[data-hd-day]')) { hmReset(); fxReset(); return; }
+    var b = t.closest('[data-hd-note], [data-hd-worry], [data-hd-more], [data-hd-note-save], [data-hd-note-cancel], [data-hd-exok], [data-hd-exno]');
+    if (!b || !det.sid || !det.day) return;
+    e.preventDefault();
+    e.stopPropagation();
+    var sid = det.sid, day = det.day;
+    if (b.hasAttribute('data-hd-note')) {
+      hm.note = !hm.note; hm.err = ''; paintDetail();
+      var ta = document.getElementById('hdNoteText'); if (ta && hm.note) { try { ta.focus({ preventScroll: true }); } catch (x) { ta.focus(); } }
+      return;
+    }
+    if (b.hasAttribute('data-hd-note-cancel')) { hm.note = false; hm.text = ''; hm.err = ''; paintDetail(); return; }
+    if (b.hasAttribute('data-hd-note-save')) {
+      var ta2 = document.getElementById('hdNoteText');
+      if (ta2) hm.text = ta2.value;
+      if (!hm.text.trim()) { hm.err = '내용을 적어 주세요'; paintDetail(); return; }
+      if (!window.Worry) return;
+      var d0 = hm.d && hm.d.date === day ? hm.d : null;
+      hm.busy = true; paintDetail();
+      Worry.saveHwNote(sid, day, d0 ? menuHead(d0) : mdw(day) + ' 과제', hm.text).then(function (res) {
+        hm.busy = false;
+        if (!res.ok) { hm.err = res.message; paintDetail(); return; }
+        hm.note = false; hm.text = ''; hm.err = '';
+        paintDetail();
+        UI.toast(((rowById(sid) || {}).name || '') + ' ' + mdw(day) + ' 과제 상담 기록을 남겼습니다 — 과제 상태는 그대로입니다', 'good');
+      });
+      return;
+    }
+    if (b.hasAttribute('data-hd-worry')) {
+      if (!window.Worry) return;
+      var d1 = hm.d && hm.d.date === day ? hm.d : null, m = missFor(sid), one = mdw(day);
+      var s1 = rowById(sid) || {};
+      Worry.open({ from: 'hw', items: [{ sid: sid, cls: s1.class_name || '', hwDay: day, checks: [],
+        reasons: [{ kind: 'hw', date: day, dates: m && m.indexOf(one) !== -1 ? m : one, label: d1 ? (MENU_NAME[d1.hw] || '미제출') : '미제출' }] }] });
+      return;
+    }
+    if (b.hasAttribute('data-hd-more')) { hm.more = !hm.more; fxReset(); paintDetail(); return; }
+    if (b.hasAttribute('data-hd-exok')) { fx.st = 'exempt'; fx.exAsk = false; fx.err = ''; paintDetail(); return; }
+    if (b.hasAttribute('data-hd-exno')) { fx.exAsk = false; if (fx.st === 'exempt') fx.st = ''; if (fx.rs === '결석으로 면제') fx.rs = ''; paintDetail(); }
+  }, true);
+  document.addEventListener('input', function (e) { if (e.target && e.target.id === 'hdNoteText') hm.text = e.target.value; });
+  window.addEventListener('jt:hwnote', function () { if (det.sid) paintDetail(); });
+
   var FIX_NAME = { onTime: '정시 제출', late: '늦게 제출', none: '미제출', exempt: '면제', off: '과제 없음' };
   var FIX_OPT = { onTime: '정시 제출', late: '늦게 제출', none: '미제출', exempt: '면제(셈에서 뺌)' };
   var FIX_RS = [['앱 오류', '앱 오류'], ['종이로 제출', '종이로 제출'], ['결석으로 면제', '결석으로 면제'], ['기타', '기타 직접 입력']];
@@ -811,13 +889,15 @@
         (x ? '<button type="button" class="btn btn--sm btn--ghost" data-hd-fix="revert"' + (fx.busy ? ' disabled' : '') + '>원래대로</button>' : '') + '</div>';
     } else {
       h += '<div class="hd-fix__form" role="group" aria-label="' + esc(mdw(d.date) + ' 과제 고치기') + '">' +
-        '<p class="hd-fix__q">바꿀 상태</p><div class="hd-fix__opts">' + HwFix.STATUSES.map(function (k) {
-          return '<button type="button" class="hd-fix__o' + (fx.st === k ? ' is-on' : '') + '" data-hd-st="' + k + '" aria-pressed="' + (fx.st === k) + '">' + FIX_OPT[k] + '</button>';
+        '<p class="hd-fix__q">바꿀 상태</p><div class="hd-fix__opts">' + fixOpts(d).map(function (k) {
+          return '<button type="button" class="hd-fix__o' + (fx.st === k ? ' is-on' : '') + '" data-hd-st="' + k + '" aria-pressed="' + (fx.st === k) + '">' + FIX_SHORT[k] + '</button>';
         }).join('') + '</div>' +
-        '<p class="hd-fix__q">사유 <small>(꼭 고르기)</small></p><div class="hd-fix__opts">' + FIX_RS.map(function (r) {
+        (fx.exAsk ? '<div class="hd-exask" role="alertdialog" aria-label="면제 확인"><p>면제는 그날 과제를 세지 않습니다(제출률 · 독려 · 챙길 학생에서 빠짐). 상담 기록만 남기려면 위 [상담 기록 남기기]를 쓰세요.</p>' +
+          '<div class="hd-fix__act"><button type="button" class="btn btn--sm btn--danger" data-hd-exok>그래도 면제</button><button type="button" class="btn btn--sm" data-hd-exno>취소</button></div></div>' : '') +
+        '<p class="hd-fix__q">' + (fx.st === 'exempt' ? '면제 사유(예: 병결)' : '사유') + ' <small>(꼭 고르기)</small></p><div class="hd-fix__opts">' + FIX_RS.map(function (r) {
           return '<button type="button" class="hd-fix__o' + (fx.rs === r[0] ? ' is-on' : '') + '" data-hd-rs="' + esc(r[0]) + '" aria-pressed="' + (fx.rs === r[0]) + '">' + esc(r[1]) + '</button>';
         }).join('') + '</div>' +
-        (fx.rs === '기타' ? '<input class="input hd-fix__other" data-hd-other type="text" maxlength="100" placeholder="사유를 적어 주세요" aria-label="기타 사유" value="' + esc(fx.other) + '">' : '') +
+        (fx.rs === '기타' ? '<input class="input hd-fix__other" data-hd-other type="text" maxlength="100" placeholder="' + (fx.st === 'exempt' ? '예: 병결' : '사유를 적어 주세요') + '" aria-label="' + (fx.st === 'exempt' ? '면제 사유(예: 병결)' : '기타 사유') + '" value="' + esc(fx.other) + '">' : '') +
         '<div class="hd-fix__act"><button type="button" class="btn btn--sm btn--primary" data-hd-fix="save"' + (fxReady() ? '' : ' disabled') + '>' + (fx.busy ? '저장하는 중…' : '저장') + '</button>' +
         '<button type="button" class="btn btn--sm" data-hd-fix="cancel">취소</button></div>' +
         '<p class="hd-fix__hint">' + (fx.err ? '<b role="alert">' + esc(fx.err) + '</b>' : '앱 기록은 그대로 두고 코치룸에 「과제 수정」으로 따로 남깁니다 · 원래 앱: ' + esc(FIX_NAME[was])) + '</p>' +
@@ -843,10 +923,13 @@
     e.preventDefault();
     e.stopPropagation();
     var sid = det.sid, day = det.day;
-    if (b.hasAttribute('data-hd-st')) { fx.st = b.dataset.hdSt; fx.err = ''; paintDetail(); return; }
+    if (b.hasAttribute('data-hd-st')) {
+      if (b.dataset.hdSt === 'exempt' && fx.st !== 'exempt') { fx.exAsk = true; fx.err = ''; paintDetail(); return; }   /* 면제 — 한 번 더 묻는다 (20261101r) */
+      fx.st = b.dataset.hdSt; fx.exAsk = false; fx.err = ''; paintDetail(); return;
+    }
     if (b.hasAttribute('data-hd-rs')) {
       fx.rs = b.dataset.hdRs; fx.err = '';
-      if (fx.rs === '결석으로 면제' && !fx.st) fx.st = 'exempt';
+      if (fx.rs === '결석으로 면제' && !fx.st) fx.exAsk = true;
       paintDetail();
       if (fx.rs === '기타') { var inp = document.querySelector('[data-hd-other]'); if (inp) inp.focus(); }
       return;
@@ -939,16 +1022,17 @@
         return;
       }
       var fxr = window.HwFix ? HwFix.activeOf(sid, d.date) : null;
+      var hnote = !!(window.Worry && Worry.hasHwNote(sid, d.date));        /* 과제 칸 상담 기록 — 작은 점 (20261101r) */
       cells += (d.hw === 'off'
         ? '<span class="hd-c hd-c--off" style="' + col + 'grid-row:2" aria-label="' + esc(mdw(d.date) + ' 과제 없음') + '"></span>'
-        : '<button type="button" class="hd-c hd-c--' + d.hw + (fxr ? ' is-fixed' : '') + (on ? ' is-pick' : '') + '" style="' + col + 'grid-row:2" data-hd-day="' + d.date + '" aria-label="' + esc(mdw(d.date) + ' ' + HW_NAME[d.hw] + (fxr ? ' (수정)' : '')) + '">' + HW_MARK[d.hw] +
-            (fxr ? '<i class="hd-fx" aria-hidden="true">수정</i>' : '') + '</button>') +
+        : '<button type="button" class="hd-c hd-c--' + d.hw + (fxr ? ' is-fixed' : '') + (on ? ' is-pick' : '') + (hnote ? ' has-note' : '') + '" style="' + col + 'grid-row:2" data-hd-day="' + d.date + '" aria-label="' + esc(mdw(d.date) + ' ' + HW_NAME[d.hw] + (fxr ? ' (수정)' : '') + (hnote ? ' · 상담 기록 있음' : '')) + '">' + HW_MARK[d.hw] +
+            (fxr ? '<i class="hd-fx" aria-hidden="true">수정</i>' : '') + (hnote ? '<i class="hd-dot" aria-hidden="true"></i>' : '') + '</button>') +
         '<span class="hd-l hd-l--' + d.lec + '" style="' + col + 'grid-row:3">' + LEC_MARK[d.lec] + '</span>';
     });
     return '<div class="hd-box" data-hd-box="' + esc(sid) + '">' +
       '<div class="hd-head num">' + esc(mdw(w.from) + ' ~ ' + mdw(w.to) + (live ? ' · 진행 중' + (lesson ? ' (' + mdw(lesson) + ' 수업 레포트 기간)' : '') : lesson ? ' · ' + mdw(lesson) + ' 수업 레포트 기준' : '')) + '</div>' +
       '<div class="hd-grid" style="grid-template-columns:2.4em repeat(' + n + ', minmax(0, 1fr))">' + cells + '</div>' +
-      (pick ? '<p class="hd-pick">' + esc(dayInfo(a.data, pick)) + '</p>' + fixHtml(sid, pick) : '') +
+      (pick ? menuHtml(sid, pick, a.data) : '') +
       '<p class="hd-legend">● 정시 제출 △ 늦게 제출 ✕ 미제출 · 빈칸 그날 과제 없음 / ✓ 강의 다 봄 – 안 봄 · 「오늘」 = 밤 12시 마감 전(아직 세지 않음) · 토 · 일은 주중 복습 · 칸을 누르면 그날 과제 · 「수정」 = 조교가 고친 칸</p>' +
       '<div class="hd-foot"><button type="button" class="hd-relink" data-app-relink="' + esc(sid) + '" aria-expanded="' + !!(window.AppLink && AppLink.current() === sid && AppLink.editing()) + '">링크 바꾸기</button>' +
         '<button type="button" class="hd-more" data-pv="parent" data-pv-view="app" data-sid="' + esc(sid) + '">과제 상세 보기 →</button>' +
@@ -1410,12 +1494,17 @@
     var why = rv ? whyOf(r.sid, rv.date, rv.week || weekOfDate(rv.date || DDay.today())) : '';
     return why ? '<small class="td-guess">' + esc(why) + '</small>' : '';
   }
+  /* 걱정 문자 창에 넘길 것 — 사유(숫자 · 날짜)와 보낸 뒤 「확인함」할 것만 (상담 내용은 넘기지 않는다) */
+  function careWorry(r) {
+    return { sid: r.sid, cls: r.cls, reasons: r.reasons.map(function (x) { return { kind: x.kind, date: x.date || '', text: x.text || '' }; }), checks: careChecks(r) };
+  }
   function careChecks(r) { return r.reasons.map(function (x) { return { kind: x.kind, cls: r.cls, date: x.date, sid: r.sid }; }); }
   function careRowHtml(r) {
     return '<li class="td-care3__row" data-care-row="' + esc(r.sid) + '">' +
       '<div class="td-care3__main"><button type="button" class="td-care3__name" data-card="' + esc(r.sid) + '" title="상담 카드 (전화 · 문자)">' + esc(r.name) + '</button>' + guessOf(r) +
         '<span class="td-care3__cls">' + esc(r.cls || '(반 없음)') + '</span>' +
         '<span class="td-care3__whys">' + reasonsHtml(r) + '</span></div>' +
+      '<button type="button" class="btn btn--sm td-care3__sms" data-care-sms1="' + esc(r.sid) + '" data-care-smscls="' + esc(r.cls) + '" data-care-smsold="' + (r.old ? 1 : 0) + '" title="사유에 맞춘 걱정 문자 (받는 사람 · 내용을 보고 보냄)">문자</button>' +   /* 걱정 문자 (worry.js · 20261101r) */
       '<button type="button" class="btn btn--sm btn--ghost td-care3__ok" data-care-ok1="' + esc(r.sid) + '" data-care-old="' + (r.old ? 1 : 0) + '" data-care-cls1="' + esc(r.cls) + '">확인함</button></li>';
   }
   function careHtml(items) {
@@ -1433,6 +1522,7 @@
       order.map(function (c) {
         var list = sortRows(groups[c]);
         return '<div class="td-care3__grp"><div class="td-care3__head"><b>' + esc(c || '(반 없음)') + '</b><span class="muted-note num">' + list.length + '명</span>' +
+          (list.length > 1 ? '<button type="button" class="btn btn--sm td-care3__smsall" data-care-smsall="' + esc(c) + '" title="학생마다 초안을 차례로 보고 고친 뒤 한 번에 보냅니다">' + list.length + '명에게 각각 문자</button>' : '') +
           '<button type="button" class="btn btn--sm btn--ghost td-care3__all" data-care-all="' + esc(c) + '">모두 확인함</button></div>' +
           '<ul class="td-care3__list">' + list.map(careRowHtml).join('') + '</ul></div>';
       }).join('') +
@@ -1815,6 +1905,20 @@
     if (us) { if (window.Skips) Skips.unskip(us.dataset.unskipCls, us.dataset.unskipDate, true); return; }
     var ck = e.target.closest('[data-care-ok], [data-care-x]');
     if (ck) { if (window.Skips) Skips.check(ck.dataset.k, ck.dataset.cls, ck.dataset.date, ck.dataset.sid || ''); return; }
+    /* 챙길 학생 — [문자] · 「n명에게 각각 문자」 → 걱정 문자 창 (worry.js · 20261101r) */
+    var cs1 = e.target.closest('[data-care-sms1]');
+    if (cs1) {
+      var rs1 = (st.careRows || []).filter(function (r) { return r.sid === cs1.dataset.careSms1 && r.cls === cs1.dataset.careSmscls && !!r.old === (cs1.dataset.careSmsold === '1'); })[0];
+      if (rs1 && window.Worry) Worry.open({ items: [careWorry(rs1)], from: 'care' });
+      return;
+    }
+    var csa = e.target.closest('[data-care-smsall]');
+    if (csa) {
+      var ra = (st.careRows || []).filter(function (r) { return !r.old && r.cls === csa.dataset.careSmsall; });
+      ra = ra.slice().sort(function (a, b) { return a.last !== b.last ? (a.last < b.last ? 1 : -1) : byName(a, b); });
+      if (ra.length && window.Worry) Worry.open({ items: ra.map(careWorry), from: 'care' });
+      return;
+    }
     /* 챙길 학생 — 학생 한 줄 [확인함] · 반 [모두 확인함] (20261031z2) */
     var c1 = e.target.closest('[data-care-ok1]');
     if (c1) {
