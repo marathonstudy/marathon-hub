@@ -236,7 +236,8 @@
     loadLogin(true).then(function () {
       id.value = (login.val && login.val.id) || '';
       document.getElementById('mlSitePw').value = '';
-      document.getElementById('mlSitePwHint').textContent = login.missing ? 'migration-036 SQL 을 먼저 실행해 주세요' : login.val && login.val.pw ? '저장됨 · 바꿀 때만 입력' : '';
+      document.getElementById('mlSitePwHint').textContent = login.missing ? 'migration-036 SQL 을 먼저 실행해 주세요' : login.val && login.val.pw ? '바꿀 때만 입력' : '';
+      if (window.SetState) { SetState.mark('mlSiteId', !!(login.val && login.val.id)); SetState.mark('mlSitePw', !!(login.val && login.val.pw)); }   /* 「저장됨」 · 「아직 비어 있음」 (20261102b) */
     });
   }
   var setBtn = document.getElementById('tdSettingsBtn');

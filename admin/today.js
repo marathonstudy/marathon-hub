@@ -366,6 +366,7 @@
       st.appAdmin = v && /^https:\/\/\S+$/.test(String(v.url || '')) ? String(v.url) : '';
       var inp = document.getElementById('tdSetAppAdmin');
       if (inp && document.activeElement !== inp) inp.value = st.appAdmin;
+      if (window.SetState) SetState.mark('tdSetAppAdmin', !!st.appAdmin);   /* 「저장됨」 · 「아직 비어 있음」 (20261102b) */
     }, function () {});
   }
   /* 반 학생들 앱 클래스 — { list: [{ s, title }], rep, counts } (앱 기록을 받은 학생만) */
@@ -517,7 +518,7 @@
     if (t.closest('#tdSetAppAdminSave')) {
       var v = ($('#tdSetAppAdmin').value || '').trim();
       if (v && !/^https:\/\/\S+$/.test(v)) { UI.toast('https:// 로 시작하는 주소를 넣어 주세요', 'bad'); return; }
-      DB.saveSetting('app_admin', { url: v }, UI.whoami ? UI.whoami() : '').then(function () { st.appAdmin = v; UI.toast('마라톤 앱 관리자 주소를 저장했습니다', 'good'); paintAppCls(); }, function (x) { UI.toast((x && x.message) || '저장하지 못했습니다', 'bad'); });
+      DB.saveSetting('app_admin', { url: v }, UI.whoami ? UI.whoami() : '').then(function () { st.appAdmin = v; if (window.SetState) SetState.mark('tdSetAppAdmin', !!v); UI.toast(v ? '마라톤 앱 관리자 주소를 저장했습니다' : '마라톤 앱 관리자 주소를 비웠습니다', 'good'); paintAppCls(); }, function (x) { UI.toast((x && x.message) || '저장하지 못했습니다', 'bad'); });
     }
   });
   document.addEventListener('paste', function (e) {

@@ -816,6 +816,10 @@ delete from public.staff where email = '조교이메일@example.com';
 - 상담 카드 기록에 실제로 받은 사람 「걱정 문자 보냄 · 사유 · 학생 · 학부모1 · 날짜」
 - 반 단위 창(전체 문자 발송 · 독려 · 웰컴)은 그대로
 
+### 5-78. 20261102b — 설정 빈 칸 「예:」 · 「아직 비어 있음」 / 「저장됨」 (SQL · 함수 배포 없음)
+- 「오늘」 설정 창 — 빈 칸의 회색 예시 글이 저장된 값처럼 보여 헷갈렸다 → 예시 글 앞에 「예:」 · 더 연한 색(기울임)
+- 칸 아래 작게 「아직 비어 있음」 / 「✓ 저장됨」(setstate.js · 입력 중인 글이 아니라 저장된 값 기준): 마라톤 앱 관리자 주소 · 카카오채널 링크 · 마라톤 사이트 아이디 · 비밀번호
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

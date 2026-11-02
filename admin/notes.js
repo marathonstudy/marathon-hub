@@ -226,12 +226,14 @@
     if (!inp) return;
     sb().from('app_settings').select('value').eq('key', 'contact').then(function (r) {
       inp.value = (!r.error && r.data && r.data[0] && r.data[0].value && r.data[0].value.kakao) || '';
+      if (window.SetState) SetState.mark('tdSetContact', !!inp.value);   /* 「저장됨」 · 「아직 비어 있음」 (20261102b) */
     }, function () {});
   }
   function saveContact() {
     var v = ($('#tdSetContact').value || '').trim();
     sb().rpc('contact_set', { p_url: v }).then(function (r) {
       if (r.error) { toast(missingFn(r.error) ? 'migration-049 SQL 을 먼저 실행해 주세요' : r.error.message, 'bad'); return; }
+      if (window.SetState) SetState.mark('tdSetContact', !!v);
       toast(v ? '문의 연락처를 저장했습니다 — 러닝노트 레포트 맨 아래 [문의하기]' : '문의 연락처를 비웠습니다 — 문구만 보입니다', 'good');
     });
   }

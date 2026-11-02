@@ -3898,6 +3898,13 @@ textarea.aip-text--new:focus { outline: 2px solid #B9AEF0; outline-offset: 1px; 
 .wy-why { margin: 0; padding: 6px 10px; border-radius: 8px; background: #F6F3FF; color: #3F2E9E; font-size: 13.5px; font-weight: 600; }
 .wy-dup { margin: 0; padding: 6px 10px; border-radius: 8px; background: #FFF6D6; color: #6B5200; font-size: 13px; }
 .wy-warn, .wy-left { color: #9E1F3B; font-size: 12.5px; margin: 0; }
+/* 설정 빈 칸 — 예시 글은 「예:」 · 더 연하게 · 칸 아래 「아직 비어 있음」 / 「저장됨」 (setstate.js · 20261102b) */
+#tdSettingsModal .input::placeholder { color: #B8B5C4; opacity: 1; font-style: italic; }
+.set-state { display: block; margin: 2px 0 0; font-size: 11.5px; font-weight: 600; line-height: 1.4; }
+.set-state.is-empty { color: #8A8799; }
+.set-state.is-saved { color: #1E8A5A; }
+.set-state.is-saved::before { content: "✓ "; }
+
 /* 받는 사람 한 줄씩 체크 (20261102a) */
 .wy-to { display: grid; gap: 6px; margin: 0; padding: 0; border: 0; min-width: 0; }
 .wy-to legend { padding: 0; margin-bottom: 2px; }
