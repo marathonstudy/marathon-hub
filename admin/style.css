@@ -1062,6 +1062,31 @@ body.report-step-write.write-weeks #writeBarWrap { display: none; }
 .tdc-toggle { appearance: none; border: 0; border-top: 1px solid var(--line-soft); background: #FAFAFE; font: inherit; font-size: 13px; font-weight: 700; color: var(--ink-mid);
   text-align: left; cursor: pointer; width: 100%; padding: 7px 12px; }
 .tdc-toggle:hover { background: #F1EFFC; color: #4A34B8; }
+/* 학생 목록 펼치기 · 접기 — 카드 아래 전체 폭 (20261102f) */
+.tdc-expand { appearance: none; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 46px; margin: 0; padding: 6px 12px;
+  border: 0; border-top: 1px solid #E4DEFA; border-radius: 0 0 12px 12px; background: #F3F0FF; font: inherit; font-size: 14.5px; font-weight: 800; color: #4A33B8; cursor: pointer; }
+.tdc-expand:hover { background: #E9E3FF; }
+.tdc-expand:focus-visible { outline: 2px solid #6A55D8; outline-offset: -2px; }
+.tdc-expand__ar { font-size: 20px; line-height: 1; }
+.tdc-toggle--label { cursor: default; }
+.tdc-toggle--label:hover { background: transparent; color: var(--ink-mid); }
+/* 레포트 발송 줄 끝 「최근 레포트 보기 ↗」 · 0명 띠 · 못 불러옴 (20261102f) */
+.tdc-replatest { appearance: none; border: 0; background: none; padding: 4px 2px; margin-left: 4px; font: inherit; font-size: 12px; font-weight: 700; color: #5A3FD0; text-decoration: underline; cursor: pointer; white-space: nowrap; min-height: 32px; }
+.tdc-zero b { color: #9E1F3B; }
+.tdc-zero-unk { margin: 4px 0 0; font-size: 12px; color: var(--ink-light); }
+@media (max-width: 600px) {
+  .tdc-expand { min-height: 48px; font-size: 15px; }
+  .tdc-zero { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .tdc-zero > span { grid-column: 1 / -1; }
+  .tdc-zero .btn { min-height: 40px; }
+  .pv-nav { order: -1; width: 100%; justify-content: space-between; }
+}
+/* 미리보기 ◀ 학생 ▶ */
+.pv-nav { display: inline-flex; align-items: center; gap: 6px; }
+.pv-nav[hidden] { display: none; }
+.pv-nav__b { min-width: 40px; min-height: 36px; font-size: 15px; }
+.pv-nav__n { font-size: 14.5px; }
+.pv-nav__c { font-size: 12px; color: #C9CCEA; }
 .tdc-chips { display: flex; flex-wrap: wrap; gap: 4px; }
 .tdc-chip { appearance: none; font: inherit; font-size: 12.5px; font-weight: 800; padding: 3px 9px; border-radius: 999px; border: 1px solid transparent; cursor: pointer; line-height: 1.3; }
 .tdc-chip--ok   { background: #E3F4EC; color: #1F6E52; border-color: #BFE3D2; }

@@ -21,7 +21,7 @@
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
   var BLOCK = '미리보기에서는 바뀌지 않습니다 (조교 화면)';
-  var cur = { sid: '', role: 'parent', phone: false, mode: 'week', published: false };
+  var cur = { sid: '', role: 'parent', phone: false, mode: 'week', published: false, list: null };
 
   function unwrap(r) {
     if (r.error) throw new Error(/Could not find the function|schema cache/i.test(r.error.message) ? 'migration-015 SQL 을 먼저 실행해 주세요.' : r.error.message);
@@ -220,6 +220,8 @@
     o.innerHTML =
       '<div class="pv-bar">' +
         '<div class="pv-bar__title" id="pvTitle"></div>' +
+        /* 「오늘」 레포트 칩에서 열면 ◀ 학생 이름 ▶ 로 그 수업 레포트를 학생마다 넘겨 본다 (20261102f) */
+        '<div class="pv-nav" id="pvNav" role="group" aria-label="학생 넘기기" hidden><button type="button" class="btn btn--sm pv-nav__b" id="pvPrev" aria-label="이전 학생">◀</button><b class="pv-nav__n" id="pvNavName"></b><span class="pv-nav__c num" id="pvNavCount"></span><button type="button" class="btn btn--sm pv-nav__b" id="pvNext" aria-label="다음 학생">▶</button></div>' +
         '<div class="pv-seg" role="group" aria-label="어느 주를 볼지">' +
           '<button type="button" class="btn btn--sm" data-pvmode="week">이 수업 레포트</button>' +
           '<button type="button" class="btn btn--sm" data-pvmode="live">지금 학부모가 보는 화면</button>' +
@@ -239,6 +241,8 @@
       var m = e.target.closest('[data-pvmode]');
       if (m) { cur.mode = m.dataset.pvmode; bridge.view = ''; bridge.arg = ''; load(); }
       if (e.target.id === 'pvClose') close();
+      var nv = e.target.closest('#pvPrev, #pvNext');
+      if (nv && cur.list) step(nv.id === 'pvNext' ? 1 : -1);
     });
     o.querySelector('#pvPhone').addEventListener('change', function (e) {
       cur.phone = e.target.checked;
@@ -247,8 +251,25 @@
     return o;
   }
 
+  function step(d) {
+    var i = cur.list.indexOf(cur.sid), j = i + d;
+    if (j < 0 || j >= cur.list.length) return;
+    cur.sid = cur.list[j];
+    load();
+  }
+  function paintNav() {
+    var o = build(), nav = o.querySelector('#pvNav');
+    nav.hidden = !(cur.list && cur.list.length > 1);
+    if (nav.hidden) return;
+    var i = cur.list.indexOf(cur.sid), s = student();
+    o.querySelector('#pvNavName').textContent = s ? s.name : '';
+    o.querySelector('#pvNavCount').textContent = (i + 1) + '/' + cur.list.length;
+    o.querySelector('#pvPrev').disabled = i <= 0;
+    o.querySelector('#pvNext').disabled = i >= cur.list.length - 1;
+  }
   function load() {
     var o = build(), s = student();
+    paintNav();
     o.querySelector('#pvTitle').innerHTML = '미리보기 — 조교 화면 · <b>' + esc(s ? s.name : '') + '</b> 학생 · ' +
       (cur.role === 'student' ? '<span class="pv-tag pv-tag--student">학생 링크로 열었을 때</span>' : '<span class="pv-tag pv-tag--parent">학부모 링크로 열었을 때</span>');
     Array.prototype.forEach.call(o.querySelectorAll('[data-pvset]'), function (b) {
@@ -264,8 +285,10 @@
   }
 
   /* view · arg — 처음 열 화면 (주차 현황 [보기] = 'report', 그 주 시작일 · 학생 카드 [과제 상세 보기] = 'app') */
-  function open(sid, role, view, arg) {
+  /* opts.list — 넘겨 볼 학생 id 들 (◀ ▶) */
+  function open(sid, role, view, arg, opts) {
     if (!sid) return;
+    cur.list = opts && opts.list && opts.list.length ? opts.list.slice() : null;
     if (window.Writer && Writer.flush) Writer.flush();
     bridge.view = view || '';
     bridge.arg = arg || '';
@@ -296,8 +319,12 @@
     var holder = b.closest('[data-id]');
     open(b.dataset.sid || (holder && holder.dataset.id), b.dataset.pv, b.dataset.pvView || '');
   }, true);
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && el() && !el().hidden) close(); });
+  document.addEventListener('keydown', function (e) {
+    if (!el() || el().hidden) return;
+    if (e.key === 'Escape') close();
+    else if (cur.list && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !(e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName))) step(e.key === 'ArrowRight' ? 1 : -1);
+  });
 
-  window.Preview = { open: open, close: close };
+  window.Preview = { open: open, close: close, state: function () { return { sid: cur.sid, list: cur.list, role: cur.role, view: bridge.view, arg: bridge.arg }; } };
 
 })();

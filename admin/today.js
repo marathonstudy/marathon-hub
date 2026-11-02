@@ -382,17 +382,76 @@
     var rep = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a] || (b === mem) - (a === mem) || (a < b ? -1 : a > b ? 1 : 0); })[0] || '';
     return { list: list, rep: rep, counts: counts, mem: mem, m: m };
   }
+  /* ---------- 어제 반 전체 과제 제출 0명 (20261102f) ----------
+     평일(공휴일 제외 · holidays.js) 하루 동안 그 반 학생 중 과제를 낸 사람이 한 명도 없으면 다음 날 노란 띠
+       「어제(11/3 화) 반 전체 과제 제출 0명 · 앱 클래스가 바뀌었을 수 있어요. 학생 과제 링크와 핀번호를 확인해 주세요 [앱에서 확인 ↗] [링크 다시 연결] [괜찮아요]」
+     안 띄움 — 주말 · 공휴일 다음 날 · 종강한 반 · 수강 시작 전 학생만 · 셀 학생 3명 미만 · 그날 과제가 아무에게도 없던 날 · 아직 불러오는 중
+     과제 기록을 못 불러온 학생(링크 없음 · 만료 · 실패)이 절반 이상 → 띠 대신 「과제 기록을 못 불러와 확인할 수 없어요」
+     「앱 클래스가 바뀌었어요」 띠와 같은 날이면 하나로 · [괜찮아요] = 그날만 숨김(이 기기) · 다음 평일도 0명이면 다시 */
+  var ZERO_KEY = 'mhub.today.zeroOk';
+  function zeroSeen() { try { return JSON.parse(localStorage.getItem(ZERO_KEY) || '{}') || {}; } catch (e) { return {}; } }
+  function zeroHide(cls, day) { var m = zeroSeen(); m[cls] = day; try { localStorage.setItem(ZERO_KEY, JSON.stringify(m)); } catch (e) {} }
+  function zeroOf(c) {
+    if (!c || c.name === '(반 없음)' || !c.rows || !c.rows.length) return null;
+    var y = Lesson.addDays(DDay.today(), -1);
+    if (window.AppWeek && AppWeek.isWeekend(y)) return null;
+    if (window.Holidays && Holidays.is(y)) return null;
+    if (Store.isArchivedClass(c.name) || (Store.isEnded && Store.isEnded(c.name, y))) return null;
+    var rows = c.rows.filter(function (s) { var so = Store.startOf(stu(s.id)); return !so || so <= y; });
+    if (rows.length < 3) return null;
+    var unknown = 0, loading = 0, sub = 0, hw = 0;
+    rows.forEach(function (s) {
+      if (!s.app || !s.code) { unknown++; return; }
+      var a = app[s.id];
+      if (!a) { loading++; return; }
+      if (a.need || a.failed || !a.data) { unknown++; return; }
+      var cal = (a.data.calendar || []).filter(function (x) { return x && x.date === y; })[0];
+      if (!cal) return;
+      hw++;
+      if (cal.status === 'onTime' || cal.status === 'late') sub++;
+    });
+    if (sub) return null;
+    if (loading) return null;
+    if (unknown * 2 >= rows.length) return { kind: 'unknown', day: y, n: rows.length, unknown: unknown };
+    if (!hw) return null;                                   /* 그날 과제가 아무에게도 없었다 */
+    if (zeroSeen()[c.name] === y) return null;
+    return { kind: 'zero', day: y, n: rows.length };
+  }
+  function zeroDay(y) { return (+y.slice(5, 7)) + '/' + (+y.slice(8, 10)) + ' ' + ['일', '월', '화', '수', '목', '금', '토'][Lesson.dowOf(y)]; }
+  function zeroBtns(k, extra) {
+    return '<button type="button" class="btn btn--sm" data-app-check="' + k + '" title="클래스 이름을 복사하고 앱 관리자를 새 창으로 엽니다">앱에서 확인 ↗</button>' + (extra || '') +
+      '<button type="button" class="btn btn--sm" data-zero-relink="' + k + '">링크 다시 연결</button>' +
+      '<button type="button" class="btn btn--sm btn--ghost" data-zero-ok="' + k + '">괜찮아요</button>';
+  }
+  function zeroHtml(c, z) {
+    if (!z) return '';
+    var k = esc(c.name);
+    if (z.kind === 'unknown') return '<p class="tdc-zero-unk" role="status" title="' + esc('어제(' + zeroDay(z.day) + ') — 학생 ' + z.n + '명 중 ' + z.unknown + '명 과제 기록을 불러오지 못했습니다') + '">과제 기록을 못 불러와 확인할 수 없어요</p>';
+    return '<div class="tdc-appband tdc-zero" role="status"><span>어제(' + esc(zeroDay(z.day)) + ') 반 전체 과제 제출 <b>0명</b> · 앱 클래스가 바뀌었을 수 있어요. 학생 과제 링크와 핀번호를 확인해 주세요</span>' + zeroBtns(k) + '</div>';
+  }
+  function zeroRelink(cls) {
+    var c = (st.clsBy || {})[cls];
+    if (!c || !window.AppLink) return;
+    var need = needIds(c.rows, c.cy);
+    if (need.length) AppLink.open(need);
+    else AppLink.open(c.rows.map(function (s) { return s.id; }), { edit: true });
+  }
   function appClassHtml(c) {
     if (!c || c.name === '(반 없음)' || !c.rows || !c.rows.length) return '';
-    var x = appTitles(c), m = x.m;
-    if (!m.appSql) return '';
+    var x = appTitles(c), m = x.m, z = zeroOf(c);
+    if (!m.appSql) return zeroHtml(c, z);
     /* 처음 — 지금 대표값을 기억만 (띠 없음) */
     if (!x.mem && x.rep && !st.appRemember[c.name]) { st.appRemember[c.name] = 1; rememberApp(c.name, x.rep, true); }
     var diff = x.list.filter(function (y) { return y.title !== x.rep; });
     var away = x.mem ? x.list.filter(function (y) { return y.title !== x.mem; }).length : 0;
     var changed = !!(x.mem && x.rep && x.rep !== x.mem && x.list.length && away * 2 >= x.list.length);
     var k = esc(c.name), h = '';
-    if (changed) {
+    if (changed && z && z.kind === 'zero') {
+      /* 같은 날 두 띠 → 하나로 (20261102f) */
+      h += '<div class="tdc-appband tdc-zero" role="status"><span>어제(' + esc(zeroDay(z.day)) + ') 반 전체 과제 제출 <b>0명</b> · 앱 클래스가 바뀌었어요: <b>' + esc(x.rep) + '</b> · 학생 과제 링크와 핀번호를 확인해 주세요</span>' +
+        zeroBtns(k, '<button type="button" class="btn btn--sm btn--primary" data-pin-edit="' + k + '" data-pin-new="1">핀번호 넣기</button>') + '</div>';
+    } else if (z) h += zeroHtml(c, z);
+    if (changed && !(z && z.kind === 'zero')) {
       h += '<div class="tdc-appband" role="status"><span>앱 클래스가 바뀌었어요: <b>' + esc(x.rep) + '</b> · 핀번호를 확인해 주세요</span>' +
         '<button type="button" class="btn btn--sm" data-app-check="' + k + '" title="클래스 이름을 복사하고 앱 관리자를 새 창으로 엽니다">앱 관리자 열기 ↗</button>' +
         '<button type="button" class="btn btn--sm btn--primary" data-pin-edit="' + k + '" data-pin-new="1">핀번호 넣기</button>' +
@@ -512,6 +571,13 @@
     if ((b = t.closest('[data-pin-all]'))) { if (st.pinAsk) writePins([st.pinAsk.cls].concat(st.pinAsk.others), st.pinAsk.pin); return; }
     if ((b = t.closest('[data-pin-one]'))) { if (st.pinAsk) writePins([st.pinAsk.cls], st.pinAsk.pin); return; }
     if ((b = t.closest('[data-app-check]'))) { appCheck(b.dataset.appCheck); return; }
+    if ((b = t.closest('[data-zero-relink]'))) { zeroRelink(b.dataset.zeroRelink); return; }
+    if ((b = t.closest('[data-zero-ok]'))) {
+      var zc = (st.clsBy || {})[b.dataset.zeroOk], zx = zc ? appTitles(zc) : null;
+      zeroHide(b.dataset.zeroOk, Lesson.addDays(DDay.today(), -1));
+      if (zx && zx.mem && zx.rep && zx.rep !== zx.mem) { rememberApp(zc.name, zx.rep); return; }   /* 합친 띠 — 「그대로」도 같이 */
+      paintAppCls(); return;
+    }
     if ((b = t.closest('[data-app-keep]'))) { var c = (st.clsBy || {})[b.dataset.appKeep]; if (c) rememberApp(c.name, appTitles(c).rep); return; }
     if ((b = t.closest('[data-app-diff]'))) { st.appDiffOpen = st.appDiffOpen === b.dataset.appDiff ? '' : b.dataset.appDiff; paintAppCls(); return; }
     if (t.closest('[data-app-admin-none]')) { UI.toast('더보기 → 설정 「마라톤 앱 관리자 주소」를 먼저 넣어 주세요', 'bad'); return; }
@@ -673,6 +739,19 @@
     var pm = (Store.read && Store.KEYS ? Store.read(Store.KEYS.published, {}) : {})[x.week] || {};
     return c.rows.some(function (s) { return !!pm[s.id]; });
   }
+  /* 가장 최근에 공개된 수업 레포트 (최근 3번 수업 중) */
+  function latestPub(c, chips) {
+    return (chips || []).filter(function (x) { return x.kind !== 'skip' && publishedAny(c, x); }).sort(function (a, b) { return a.date < b.date ? 1 : -1; })[0] || null;
+  }
+  /* 그 수업 레포트를 공개한 학생들 (카드 순서) — 학부모 화면 미리보기 · ◀ 학생 ▶ */
+  function openRep(cls, week) {
+    var c = (st.clsBy || {})[cls];
+    if (!c || !window.Preview) return;
+    var pm = (Store.read && Store.KEYS ? Store.read(Store.KEYS.published, {}) : {})[week] || {};
+    var ids = sortRows(c.rows, c).filter(function (s) { return !!pm[s.id]; }).map(function (s) { return s.id; });
+    if (!ids.length) { UI.toast('공개된 레포트가 없습니다', 'bad'); return; }
+    Preview.open(ids[0], 'parent', 'report', week, { list: ids });
+  }
   function canSkipChip(c, x) { return x.kind === 'wip' && !!window.Skips && !publishedAny(c, x); }
   function chipHtml(c, x) {
     var day = Store.dateWithDow(x.date);
@@ -684,8 +763,10 @@
         (st.skipMenu === mk ? '<button type="button" class="tdc-chip__act" data-rewrite-cls="' + esc(c.name) + '" data-rewrite-date="' + esc(x.date) + '" data-rewrite-week="' + esc(x.week) + '">다시 작성하기</button>' : '') + '</span>';
     }
     var t = x.kind === 'wip' ? day + ' 작성 중' : x.kind === 'part' ? day + ' ' + x.pct + '% · 안 보냄 ' + x.left + '명' : day + ' ' + x.pct + '%';
-    var chip = '<button type="button" class="tdc-chip tdc-chip--' + x.kind + ' num" data-go-send="' + esc(c.name) + '" data-week="' + esc(x.week) + '" title="' +
-      esc(day + ' 수업 레포트 — 보냄 ' + x.sent + '/' + x.n + ' · 누르면 발송 화면') + '">' + esc(t) + '</button>';
+    /* 공개 · 발송된 칩은 누르면 그 수업 레포트를 학부모 화면 그대로 미리보기 (◀ 학생 ▶ · 20261102f) · 「작성 중」은 예전처럼 작성 → 발송 화면 */
+    var view = x.kind !== 'wip' && publishedAny(c, x);
+    var chip = '<button type="button" class="tdc-chip tdc-chip--' + x.kind + ' num" ' + (view ? 'data-rep-view="' + esc(c.name) + '"' : 'data-go-send="' + esc(c.name) + '"') + ' data-week="' + esc(x.week) + '" title="' +
+      esc(day + ' 수업 레포트 — 보냄 ' + x.sent + '/' + x.n + (view ? ' · 누르면 학부모 화면 미리보기' : ' · 누르면 발송 화면')) + '">' + esc(t) + '</button>';
     /* 공개한 레포트인데 그 수업 영상이 아직 없으면 작게 「영상 없음」 (20261101o · 영상을 넣으면 다시 공개 없이 바로 보인다) */
     if (st.vids && publishedAny(c, x) && !st.vids[c.name + '|' + x.week]) chip = '<span class="tdc-chipwrap">' + chip + '<small class="tdc-novid" title="' + esc(day + ' 수업 영상이 아직 없습니다 — 레포트 발송 → 1 작성 → 반 공통에서 넣으면 다시 공개 없이 바로 보입니다') + '">영상 없음</small></span>';
     /* 「작성 중」 칩 바로 오른쪽 [건너뛰기] — 묻지 않고 바로 · 아래 「되돌리기」 5초 (20261101b) */
@@ -1201,9 +1282,15 @@
         ' data-tip="' + esc(tip) + '" aria-expanded="' + (det.sid === s.id && det.from === p.from) + '" aria-label="' + esc(v.done + '/' + v.days + ' · ' + tip + ' · 누르면 날짜별 표') + '">' + v.done + '/' + v.days + '</button>';
     }).join('');
   }
+  /* 학생 목록 펼치기 · 접기 — 카드 아래쪽 전체 폭 버튼 「▼ 학생 11명 펼치기」 / 「▲ 접기」 (연한 보라 · 44px 이상 · 반마다 이 기기에 기억 · 20261102f)
+     펼치면 목록 위에는 머리칸(학생 n명 · 과제 칸 이름)만 · 접기는 아래 버튼 */
   function toggleBar(key, n, open, c) {
-    return '<div class="tdc-togglebar' + (open && c ? ' tdc-grid' : '') + '"><button type="button" class="tdc-toggle" data-toggle aria-expanded="' + open + '"><span class="tg-x">학생 </span>' + n + '명 <span class="tg-x">' + (open ? '접기 ' : '보기 ') + '</span>' + (open ? '▴' : '▾') + '</button>' +
-      (open && c ? headHtml(c) + '<span class="tdc-grid__rest" aria-hidden="true"></span>' : '') + '</div>';
+    if (!open || !c) return '';
+    return '<div class="tdc-togglebar tdc-grid"><span class="tdc-toggle tdc-toggle--label">학생 ' + n + '명</span>' + headHtml(c) + '<span class="tdc-grid__rest" aria-hidden="true"></span></div>';
+  }
+  function expandBtn(key, n, open) {
+    return '<button type="button" class="tdc-expand' + (open ? ' is-open' : '') + '" data-toggle aria-expanded="' + open + '" aria-label="' + esc(key + (open ? ' 학생 목록 접기' : ' 학생 ' + n + '명 펼치기')) + '">' +
+      '<span class="tdc-expand__ar" aria-hidden="true">' + (open ? '▲' : '▼') + '</span><span>' + (open ? '접기' : '학생 ' + n + '명 펼치기') + '</span></button>';
   }
   /* 반 카드 위 「+ 과제 링크 연결 필요 n명」 — 누르면 그 학생들 링크 칸이 차례로 펼쳐진다 (applink.js) */
   function needIds(rows, cy) { return rows.filter(function (s) { var x = appState(s, cy); return x.k === 'need' && x.why !== 'expired'; }).map(function (s) { return s.id; }); }
@@ -1331,7 +1418,9 @@
 
   function linesHtml(c, chips) {
     if (c.name === '(반 없음)' || !c.rows.length) return '';
-    return (chips.length ? '<div class="tdc-line"><span class="tdc-line__t">레포트 발송</span><span class="tdc-chips" aria-label="최근 수업 레포트 발송">' + chips.map(function (x) { return chipHtml(c, x); }).join('') + '</span></div>' : '') +
+    var lat = latestPub(c, chips);
+    return (chips.length ? '<div class="tdc-line"><span class="tdc-line__t">레포트 발송</span><span class="tdc-chips" aria-label="최근 수업 레포트 발송">' + chips.map(function (x) { return chipHtml(c, x); }).join('') + '</span>' +
+        (lat ? '<button type="button" class="tdc-replatest" data-rep-view="' + esc(c.name) + '" data-week="' + esc(lat.week) + '" title="' + esc(Store.dateWithDow(lat.date) + ' 수업 레포트를 학부모 화면으로') + '">최근 레포트 보기 ↗</button>' : '') + '</div>' : '') +
       avgLineHtml(c) +
       (window.RNote ? RNote.cardLine(c.name, c.rows.length) : '');          /* 이번 복습 노트 연 학생 8/11 — 반 전체 숫자만 (20261031l) */
   }
@@ -1590,12 +1679,12 @@
             linesHtml(c, chipsOf(c)) + attHtml(c.name, Course.shortName(c.name)) + '</div>';
         }).join('') +
       '</div><div class="tdc-btns"><button type="button" class="btn btn--sm btn--primary tdc-write" data-write-course="' + esc(ckey) + '">레포트 작성</button></div></div>' +
-      (n ? toggleBar(ckey, n, open, null) : '') +
       /* 과정 — 반마다 수업일이 달라 반별 목록마다 머리칸을 따로 */
       (open ? '<div class="tdc-list">' + cls.map(function (c) {
         return '<div class="tdc-sub"><div class="tdc-sub__t tdc-grid"><span class="tdc-sub__n">' + esc(c.name) + ' · ' + c.rows.length + '명</span>' + headHtml(c) + '<span class="tdc-grid__rest" aria-hidden="true"></span></div>' +
           sortRows(c.rows, c).map(function (s) { return studentRow(s, c); }).join('') + '</div>';
       }).join('') + '</div>' : '') +
+      (n ? expandBtn(co.name, n, open) : '') +
     '</div>';
   }
   function classCardHtml(c) {
@@ -1620,6 +1709,7 @@
       '</div>' +
       (n ? toggleBar(c.name, n, open, c) : '') +
       (open ? arHtml(c.name, rows) + '<div class="tdc-list">' + sortRows(rows, c).map(function (s) { return studentRow(s, c); }).join('') + leftHtml(c.name) + '</div>' : '') +
+      (n ? expandBtn(c.name, n, open) : '') +
     '</div>';
   }
   /* 반 카드 학생 목록 위 「못 불러온 n명 다시 불러오기」 — 작성 화면과 같다 (불러오는 중 3/8 · 다 불러왔습니다 · 이름(이유) · 20261101d) */
@@ -1947,6 +2037,8 @@
     if (ca) { careGo(ca.dataset.care, ca.dataset.careCls, ca.dataset.careWeek, ca.dataset.careSid); return; }
     var wc = e.target.closest('[data-write-course]');
     if (wc) { writeCourse(wc.dataset.writeCourse); return; }
+    var rv = e.target.closest('[data-rep-view]');
+    if (rv) { openRep(rv.dataset.repView, rv.dataset.week); return; }
     var gs = e.target.closest('[data-go-send]');
     if (gs) { goSend(gs.dataset.goSend, gs.dataset.week); return; }
     var sc = e.target.closest('[data-sched]');
