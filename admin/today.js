@@ -1282,16 +1282,24 @@
         ' data-tip="' + esc(tip) + '" aria-expanded="' + (det.sid === s.id && det.from === p.from) + '" aria-label="' + esc(v.done + '/' + v.days + ' · ' + tip + ' · 누르면 날짜별 표') + '">' + v.done + '/' + v.days + '</button>';
     }).join('');
   }
-  /* 학생 목록 펼치기 · 접기 — 카드 아래쪽 전체 폭 버튼 「▼ 학생 11명 펼치기」 / 「▲ 접기」 (연한 보라 · 44px 이상 · 반마다 이 기기에 기억 · 20261102f)
-     펼치면 목록 위에는 머리칸(학생 n명 · 과제 칸 이름)만 · 접기는 아래 버튼 */
+  /* 학생 목록 펼치기 · 접기 — 예전 자리(학생 목록 바로 위 머리줄 왼쪽) · 테두리 있는 작은 알약 「학생 11명 ▾」 / 같은 자리 「접기 ▴」 (20261102g)
+     보라 글자 · 누르는 영역 40px 이상 · 펼치면 머리줄(버튼 · 칸 이름)이 카드 안에서 화면 위에 붙어 따라온다 · 반마다 이 기기에 기억
+     (20261102f 의 카드 아래 전체 폭 버튼은 없앴다) */
   function toggleBar(key, n, open, c) {
-    if (!open || !c) return '';
-    return '<div class="tdc-togglebar tdc-grid"><span class="tdc-toggle tdc-toggle--label">학생 ' + n + '명</span>' + headHtml(c) + '<span class="tdc-grid__rest" aria-hidden="true"></span></div>';
+    var pill = '<span class="tdc-tgcell"><button type="button" class="tdc-pill" data-toggle aria-expanded="' + open + '" aria-label="' + esc(key + (open ? ' 학생 목록 접기' : ' 학생 ' + n + '명 펼치기')) + '">' +
+      (open ? '접기 <span class="tdc-pill__ar" aria-hidden="true">▴</span>' : '학생 ' + n + '명 <span class="tdc-pill__ar" aria-hidden="true">▾</span>') + '</button></span>';
+    return '<div class="tdc-togglebar' + (open ? ' is-sticky' : '') + (open && c ? ' tdc-grid' : '') + '">' + pill +
+      (open && c ? headHtml(c) + '<span class="tdc-grid__rest" aria-hidden="true"></span>' : '') + '</div>';
   }
-  function expandBtn(key, n, open) {
-    return '<button type="button" class="tdc-expand' + (open ? ' is-open' : '') + '" data-toggle aria-expanded="' + open + '" aria-label="' + esc(key + (open ? ' 학생 목록 접기' : ' 학생 ' + n + '명 펼치기')) + '">' +
-      '<span class="tdc-expand__ar" aria-hidden="true">' + (open ? '▲' : '▼') + '</span><span>' + (open ? '접기' : '학생 ' + n + '명 펼치기') + '</span></button>';
+  /* 머리줄이 붙을 높이 — 위 탭 막대 바로 아래 */
+  function stickyTop() {
+    var tb = document.querySelector('.topbar');
+    var h = tb && tb.offsetHeight ? tb.offsetHeight : 0;
+    document.documentElement.style.setProperty('--td-sticky', h + 'px');
   }
+  window.addEventListener('resize', function () { stickyTop(); });
+  setTimeout(stickyTop, 0);
+  document.addEventListener('jt:tab', function () { setTimeout(stickyTop, 0); });
   /* 반 카드 위 「+ 과제 링크 연결 필요 n명」 — 누르면 그 학생들 링크 칸이 차례로 펼쳐진다 (applink.js) */
   function needIds(rows, cy) { return rows.filter(function (s) { var x = appState(s, cy); return x.k === 'need' && x.why !== 'expired'; }).map(function (s) { return s.id; }); }
   function needBtn(ids) {
@@ -1680,11 +1688,11 @@
         }).join('') +
       '</div><div class="tdc-btns"><button type="button" class="btn btn--sm btn--primary tdc-write" data-write-course="' + esc(ckey) + '">레포트 작성</button></div></div>' +
       /* 과정 — 반마다 수업일이 달라 반별 목록마다 머리칸을 따로 */
+      (n ? toggleBar(co.name, n, open, null) : '') +
       (open ? '<div class="tdc-list">' + cls.map(function (c) {
         return '<div class="tdc-sub"><div class="tdc-sub__t tdc-grid"><span class="tdc-sub__n">' + esc(c.name) + ' · ' + c.rows.length + '명</span>' + headHtml(c) + '<span class="tdc-grid__rest" aria-hidden="true"></span></div>' +
           sortRows(c.rows, c).map(function (s) { return studentRow(s, c); }).join('') + '</div>';
       }).join('') + '</div>' : '') +
-      (n ? expandBtn(co.name, n, open) : '') +
     '</div>';
   }
   function classCardHtml(c) {
@@ -1709,7 +1717,6 @@
       '</div>' +
       (n ? toggleBar(c.name, n, open, c) : '') +
       (open ? arHtml(c.name, rows) + '<div class="tdc-list">' + sortRows(rows, c).map(function (s) { return studentRow(s, c); }).join('') + leftHtml(c.name) + '</div>' : '') +
-      (n ? expandBtn(c.name, n, open) : '') +
     '</div>';
   }
   /* 반 카드 학생 목록 위 「못 불러온 n명 다시 불러오기」 — 작성 화면과 같다 (불러오는 중 3/8 · 다 불러왔습니다 · 이름(이유) · 20261101d) */
@@ -2056,6 +2063,16 @@
       /* 펼치면 뒤로가기 기록을 하나 더(뒤로가기 = 접기), 직접 접으면 기록을 고치기만 (nav.js) */
       setTimeout(function () { if (opening) window.dispatchEvent(new CustomEvent('jt:write-nav')); else if (window.Nav) Nav.replace(); }, 0);
       render();
+      stickyTop();
+      /* 접으면 그 반 카드 머리로 (카드 머리가 화면 위로 지나가 있을 때만 · 다른 반으로 튀지 않게 · 20261102g) */
+      if (!opening) {
+        var cd = document.querySelector('#tdBody .tdc-card[data-cls="' + String(name).replace(/["\\]/g, '\\$&') + '"]');
+        var top = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--td-sticky')) || 0;
+        if (cd && cd.getBoundingClientRect().top < top) {
+          try { window.scrollTo({ top: Math.max(0, cd.getBoundingClientRect().top + (window.pageYOffset || 0) - top - 8), behavior: 'smooth' }); }
+          catch (x) { if (cd.scrollIntoView) cd.scrollIntoView({ block: 'start' }); }
+        }
+      }
     }
   });
   /* [새로고침] — 칸을 비우지 않고 다시 받는다 (깜빡이지 않게) */

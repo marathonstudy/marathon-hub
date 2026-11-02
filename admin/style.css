@@ -1062,20 +1062,20 @@ body.report-step-write.write-weeks #writeBarWrap { display: none; }
 .tdc-toggle { appearance: none; border: 0; border-top: 1px solid var(--line-soft); background: #FAFAFE; font: inherit; font-size: 13px; font-weight: 700; color: var(--ink-mid);
   text-align: left; cursor: pointer; width: 100%; padding: 7px 12px; }
 .tdc-toggle:hover { background: #F1EFFC; color: #4A34B8; }
-/* 학생 목록 펼치기 · 접기 — 카드 아래 전체 폭 (20261102f) */
-.tdc-expand { appearance: none; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 46px; margin: 0; padding: 6px 12px;
-  border: 0; border-top: 1px solid #E4DEFA; border-radius: 0 0 12px 12px; background: #F3F0FF; font: inherit; font-size: 14.5px; font-weight: 800; color: #4A33B8; cursor: pointer; }
-.tdc-expand:hover { background: #E9E3FF; }
-.tdc-expand:focus-visible { outline: 2px solid #6A55D8; outline-offset: -2px; }
-.tdc-expand__ar { font-size: 20px; line-height: 1; }
-.tdc-toggle--label { cursor: default; }
-.tdc-toggle--label:hover { background: transparent; color: var(--ink-mid); }
+/* 학생 목록 펼치기 · 접기 — 머리줄 왼쪽 알약 「학생 11명 ▾」 / 「접기 ▴」 · 펼치면 머리줄이 화면 위에 붙어 따라옴 (20261102g) */
+.tdc-tgcell { display: flex; align-items: center; min-width: 0; padding: 4px 0 4px 10px; }
+.tdc-pill { appearance: none; display: inline-flex; align-items: center; gap: 4px; min-height: 40px; padding: 0 14px; border: 1.5px solid #C9BEF5; border-radius: 999px;
+  background: #fff; font: inherit; font-size: 13.5px; font-weight: 800; color: #4A33B8; white-space: nowrap; cursor: pointer; }
+.tdc-pill:hover { background: #F3F0FF; border-color: #A898EC; }
+.tdc-pill:focus-visible { outline: 2px solid #6A55D8; outline-offset: 2px; }
+.tdc-pill__ar { font-size: 15px; line-height: 1; }
+.tdc-togglebar.is-sticky { position: sticky; top: var(--td-sticky, 0px); z-index: 4; box-shadow: 0 1px 0 var(--line-soft), 0 4px 8px -6px rgba(40, 30, 90, .25); }
 /* 레포트 발송 줄 끝 「최근 레포트 보기 ↗」 · 0명 띠 · 못 불러옴 (20261102f) */
 .tdc-replatest { appearance: none; border: 0; background: none; padding: 4px 2px; margin-left: 4px; font: inherit; font-size: 12px; font-weight: 700; color: #5A3FD0; text-decoration: underline; cursor: pointer; white-space: nowrap; min-height: 32px; }
 .tdc-zero b { color: #9E1F3B; }
 .tdc-zero-unk { margin: 4px 0 0; font-size: 12px; color: var(--ink-light); }
 @media (max-width: 600px) {
-  .tdc-expand { min-height: 48px; font-size: 15px; }
+  .tdc-pill { min-height: 42px; padding: 0 12px; }
   .tdc-zero { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
   .tdc-zero > span { grid-column: 1 / -1; }
   .tdc-zero .btn { min-height: 40px; }
@@ -3108,6 +3108,7 @@ td .av--s { margin-right: 6px; }
 .tdc-tri--head { display: contents; }
 .tdc-togglebar.tdc-grid { padding-right: 8px; }
 .tdc-togglebar.tdc-grid .tdc-toggle { grid-column: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tdc-togglebar.tdc-grid .tdc-tgcell { grid-column: 1; padding-left: 10px; }
 .tdc-th { appearance: none; border: 1px solid transparent; background: none; font: inherit; font-size: 11.5px; font-weight: 700; color: var(--ink-mid);
   padding: 4px 2px; border-radius: 7px; cursor: pointer; text-align: center; white-space: nowrap; position: relative; min-width: 0; }
 .tdc-th:hover { background: #F1EFFC; color: #4A34B8; }
