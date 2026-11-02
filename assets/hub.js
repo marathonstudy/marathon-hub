@@ -643,6 +643,12 @@
     if (first) set[first] = 1;
     return Object.keys(set).sort();
   }
+  /* 달력 제목 옆 「수강 시작 10/13」 — 달력에 수강 시작 전 날이 보일 수 있을 때 한 번만 (20261102d) */
+  function calStart(data, months) {
+    var so = data && data.startOn ? String(data.startOn).slice(0, 10) : '';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(so) || !months.length || so <= months[0] + '-01') return '';
+    return ' <span class="awb-cal__start">수강 시작 ' + (+so.slice(5, 7)) + '/' + (+so.slice(8, 10)) + '</span>';
+  }
   function calMonthHtml(id) {
     var b = AWB.list[id];
     if (!b || !b.months.length) return '';
@@ -656,21 +662,26 @@
     for (var dd = 1; dd <= last; dd++) {
       var key = ym + '-' + String(dd).padStart(2, '0'), info = byDay[key];
       var inR = b.range && key >= b.range.from && key <= b.range.to;
+      /* 7일 과제표와 같은 기호 (20261102d) — 날짜 숫자 아래 ● 정시(초록) · △ 늦게(주황) · ✕ 미제출(빨강) · 칸 배경은 아주 연하게
+         과제가 없던 날 · 아직 오지 않은 날 = 빈칸 · 오늘 마감 전 = 「오늘」 · 수강 시작 전 = 흐린 빈칸(「신입생」 글 없음 · 제목 옆에 「수강 시작 10/13」 한 번)
+         토 · 일 = 작게 「주중 복습」 · 그날 앱에 냈으면 ✓ · 「이 레포트 기간」 보라 테두리는 그대로 */
+      var rg = inR ? ' cal-cell--range' : '';
       if (b.data && b.data.startOn && key < b.data.startOn) {
-        cells += '<span class="cal-cell cal-cell--new' + (inR ? ' cal-cell--range' : '') + '" title="' + esc(dd + '일 · 신입생 (수강 시작 전 · 세지 않음)') + '"><b>' + dd + '</b><small>신입생</small></span>';
+        cells += '<span class="cal-cell cal-cell--pre' + rg + '" title="' + esc(dd + '일 · 수강 시작 전 (세지 않음)') + '"><b>' + dd + '</b></span>';
         continue;
       }
+      if (key > t) { cells += '<span class="cal-cell cal-cell--future' + rg + '"><b>' + dd + '</b></span>'; continue; }
       if (AppWeek.isWeekend(key)) {
-        /* 토 · 일 = 늘 「주중 복습」(옅은 색 · 미제출로 치지 않음) · 앱에 제출한 기록이 있으면 ✓ (20261030d) */
-        var wkd = key <= t && ((info && (info.status === 'onTime' || info.status === 'late')) || !!subs[key]);
-        cells += '<span class="cal-cell cal-cell--wk' + (wkd ? ' cal-cell--wkdone' : '') + (inR ? ' cal-cell--range' : '') + '" title="' +
-                 esc(dd + '일 · 주중 복습' + (wkd ? ' · 제출함' : '')) + '"><b>' + dd + '</b><small>주중 복습' + (wkd ? ' ✓' : '') + '</small></span>';
+        var wkd = (info && (info.status === 'onTime' || info.status === 'late')) || !!subs[key];
+        cells += '<span class="cal-cell cal-cell--wk' + (wkd ? ' cal-cell--wkdone' : '') + rg + '" title="' +
+                 esc(dd + '일 · 주중 복습' + (wkd ? ' · 냄' : '')) + '"><b>' + dd + '</b><small>주중 복습' + (wkd ? ' ✓' : '') + '</small></span>';
         continue;
       }
-      /* 오늘 — 밤 12시 마감 전 · 아직 안 냈으면 「미제출」 대신 연하게 (20261031v) */
       var stt = info ? (key === t && info.status === 'none' ? 'today' : info.status) : '';
-      cells += '<span class="cal-cell' + (stt ? ' cal-cell--' + stt : '') + (inR ? ' cal-cell--range' : '') + '"' +
-               (stt ? ' title="' + esc(dd + '일 · ' + CAL_LABEL[stt]) + '"' : '') + '>' + dd + '</span>';
+      var sym = CAL_SYM[stt];
+      cells += '<span class="cal-cell' + (stt ? ' cal-cell--' + stt : ' cal-cell--empty') + rg + '"' +
+               (stt ? ' title="' + esc(dd + '일 · ' + CAL_LABEL[stt]) + '"' : '') + '><b>' + dd + '</b>' +
+               (sym ? '<i class="cal-sym cal-sym--' + stt + '" aria-hidden="true">' + sym + '</i>' : stt === 'today' ? '<small>오늘</small>' : stt === 'exempt' ? '<small>면제</small>' : '') + '</span>';
     }
     return '<div class="cal">' +
         '<div class="cal-nav"><button type="button" class="cal-step" data-awb="' + id + '" data-cal-step="-1" aria-label="이전 달"' + (b.i > 0 ? '' : ' disabled') + '>◀</button>' +
@@ -678,9 +689,10 @@
           '<button type="button" class="cal-step" data-awb="' + id + '" data-cal-step="1" aria-label="다음 달"' + (b.i < b.months.length - 1 ? '' : ' disabled') + '>▶</button></div>' +
         '<div class="cal-grid">' + ['일', '월', '화', '수', '목', '금', '토'].map(function (w) { return '<span class="cal-dow">' + w + '</span>'; }).join('') + cells + '</div>' +
       '</div>' +
-      '<div class="cal-legend"><span><i class="cal-key cal-cell--onTime"></i>정시 제출</span><span><i class="cal-key cal-cell--late"></i>늦게 제출</span><span><i class="cal-key cal-cell--none"></i>미제출</span>' +
-        '<span><i class="cal-key cal-cell--wk"></i>주중 복습(토 · 일)</span>' +
-        (b.range ? '<span><i class="cal-key cal-cell--range"></i>이 레포트 기간</span>' : '') + '</div>';
+      /* 설명 줄 「● 정시 △ 늦게 ✕ 미제출 · 주중 복습(토·일) ✓ 냄 · □ 이 레포트 기간」 (20261102d) */
+      '<div class="cal-legend"><span><i class="cal-sym cal-sym--onTime">●</i> 정시</span> <span><i class="cal-sym cal-sym--late">△</i> 늦게</span> <span><i class="cal-sym cal-sym--none">✕</i> 미제출</span>' +
+        ' <span class="cal-legend__sep">·</span> <span>주중 복습(토·일) <b class="cal-legend__ok">✓</b> 냄</span>' +
+        (b.range ? ' <span class="cal-legend__sep">·</span> <span><i class="cal-key cal-key--range" aria-hidden="true"></i> 이 레포트 기간</span>' : '') + '</div>';
   }
   /* opt: { title, sub, month('YYYY-MM'), pending(진행 중 기간), card(false 면 겉 카드 없이),
            total(전체 누적을 앱 값 대신 · AppWeek.cumulative), range({from,to} 달력에서 강조), first(첫 주 — 지난 기록 없음) } */
@@ -712,7 +724,7 @@
       (opt.sub ? '<p class="awb-sub">' + opt.sub + '</p>' : '') +
       body + (opt.noTotal ? '' : total) +
       (w ? AppWeek.tableHtml(w, { pending: !!opt.pending }) : '') +
-      (months.length && !opt.noCal ? '<div class="awb-cal"><div class="awb-cal__t">🗓️ 날짜별 제출</div><div class="awb-cal__m" data-awb-cal="' + id + '">' + calMonthHtml(id) + '</div></div>' : '');
+      (months.length && !opt.noCal ? '<div class="awb-cal"><div class="awb-cal__t">🗓️ 날짜별 제출' + calStart(data, months) + '</div><div class="awb-cal__m" data-awb-cal="' + id + '">' + calMonthHtml(id) + '</div></div>' : '');
     return opt.card === false ? '<div class="awb" id="' + id + '">' + inner + '</div>' : '<div class="card awb aw-card" id="' + id + '">' + inner + '</div>';
   }
   function periodTitle(label, from, to) { return '과제 요약 · ' + label + ' (' + Lesson.md(from, false) + '~' + Lesson.md(to, false) + ')'; }
@@ -789,7 +801,7 @@
     var total = tt ? '과제 ' + tt.hw + '% · 정시 ' + tt.onTime + '% · 강의 ' + (tt.lec == null ? '—' : tt.lec + '%')
       : '과제 ' + Math.round(Number(s.submissionRate) || 0) + '% · 정시 ' + Math.round(Number(s.onTimeRate) || 0) + '% · 강의 ' + Math.round(Number(s.lectureRate) || 0) + '%';
     return '<div class="card awb aw-card ap-bottom" id="' + id + '"><p class="awb-total">전체 누적(시작일부터): ' + total + '</p>' +
-      (months.length ? '<div class="awb-cal"><div class="awb-cal__t">🗓️ 날짜별 제출</div><div class="awb-cal__m" data-awb-cal="' + id + '">' + calMonthHtml(id) + '</div></div>' : '') + '</div>';
+      (months.length ? '<div class="awb-cal"><div class="awb-cal__t">🗓️ 날짜별 제출' + calStart(d, months) + '</div><div class="awb-cal__m" data-awb-cal="' + id + '">' + calMonthHtml(id) + '</div></div>' : '') + '</div>';
   }
 
   /* 과제 상세 탭의 진행 중 기간 — 가장 최근 공개 레포트 수업일 ~ 다음 수업일 전날 (레포트가 없으면 오늘 기준 다음 수업의 과제 기간) */
@@ -1973,6 +1985,7 @@
   }
 
   var CAL_LABEL = { onTime: '정시 제출', late: '늦게 제출', none: '미제출', exempt: '면제', today: '오늘 — 밤 12시 마감 전' };
+  var CAL_SYM = { onTime: '●', late: '△', none: '✕' };   /* 7일 과제표와 같은 기호 (20261102d) */
 
   function categoriesHtml(list) {
     if (!list.length) return '';

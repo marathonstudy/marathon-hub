@@ -374,13 +374,21 @@ button.nt-file {
   font-weight: 600;
   color: #B9BDD3;
 }
-.cal-cell--onTime { background: var(--grad-strong); color: #fff; font-weight: 800; }
-.cal-cell--late   { background: #F6D9BF; color: #8A5A2E; font-weight: 800; }
-.cal-cell--none   { background: #fff; color: #B9707F; font-weight: 800; box-shadow: inset 0 0 0 2px #EBC6CF; }
+/* 날짜 숫자 아래 기호 — 7일 과제표(.aw-hw--*)와 같은 기호 · 같은 색 · 칸 배경은 아주 연하게 (20261102d) */
+.cal-cell { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; overflow: hidden; padding: 0 1px; text-align: center; }
+.cal-cell > b { font-size: 11.5px; line-height: 1.1; font-weight: 700; }
+.cal-cell > small { font-size: 10.5px; line-height: 1; letter-spacing: -0.06em; word-break: keep-all; font-weight: 700; }
+.cal-sym { font-style: normal; font-size: 16px; line-height: 1; font-weight: 900; }
+.cal-sym--onTime { color: #1E8A5A; } .cal-sym--late { color: #C9711C; font-size: 15px; } .cal-sym--none { color: #D0384F; font-size: 14px; }
+.cal-cell--onTime { background: #F1F9F4; color: var(--ink-mid); }
+.cal-cell--late   { background: #FDF5EC; color: var(--ink-mid); }
+.cal-cell--none   { background: #FDF2F4; color: var(--ink-mid); }
+.cal-cell--empty, .cal-cell--future { background: transparent; color: #B9BDD3; }
+.cal-cell--pre { background: #F5F6F9; color: #CDD0DD; }          /* 수강 시작 전 — 흐린 빈칸 */
 .cal-cell--exempt { background: #F2F2F7; color: #9A9DB3; }          /* 면제 — 셈에서 뺀 날 (20261031j) */
 /* 레포트 「지난 일주일」(D-7 ~ D-1) — 달력은 그대로 두고 그 7일만 테두리로 강조 (20261029h) */
 .cal-cell--range { outline: 2px solid #7858E8; outline-offset: -1px; }
-.cal-cell--range:not(.cal-cell--onTime):not(.cal-cell--late):not(.cal-cell--none) { color: var(--ink-mid); }
+.cal-cell--range:not(.cal-cell--onTime):not(.cal-cell--late):not(.cal-cell--none):not(.cal-cell--pre) { color: var(--ink-mid); }
 .cal-legend {
   display: flex;
   flex-wrap: wrap;
@@ -392,6 +400,11 @@ button.nt-file {
 }
 .cal-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .cal-key { display: inline-block; width: 13px; height: 13px; border-radius: 4px; }
+.cal-key--range { box-shadow: inset 0 0 0 2px #7858E8; }
+.cal-legend .cal-sym { font-size: 14px; } .cal-legend .cal-sym--none { font-size: 12.5px; }
+.cal-legend__sep { color: #C9CCDC; }
+.cal-legend__ok { color: #7B6CC4; font-weight: 800; }
+.awb-cal__start { margin-left: 6px; font-size: 12px; font-weight: 700; color: var(--ink-light); }
 /* 토 · 일 = 주중 복습 — 옅은 색으로 평일 과제 칸과 구분 · 제출 기록이 있으면 ✓ (20261030d) */
 .cal-cell--wk { display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; padding: 0 1px;
   background: #F7F6FB; color: #B6B3C9; font-weight: 600; text-align: center; }
@@ -848,6 +861,7 @@ label.hub-btn { cursor: pointer; text-align: center; }
 .aw-cell[class*="--future"] { color: #C9CCDC; background: #FAFAFD; }
 .aw-cell[class*="--today"] { color: #A3A7BB; background: #FAFAFD; font-size: 11px; font-weight: 700; box-shadow: inset 0 0 0 1px #E3E5EE; }   /* 오늘 — 마감 전 (20261031v) */
 .cal-cell--today { background: #fff; color: #8E92A8; box-shadow: inset 0 0 0 1px #D8DBE6; }
+.cal-cell--today small { color: #8E92A8; }
 .aw-cell[class*="--off"] { background: transparent; }
 .aw-cell.aw-wk { grid-row: span 2; align-self: stretch; height: auto; display: flex; align-items: center; justify-content: center; flex-direction: column;
   font-size: 11px; line-height: 1.15; font-weight: 700; letter-spacing: -0.04em; color: #ADAAC2; background: #F9F8FC; box-shadow: inset 0 0 0 1px #EEEDF5; }
@@ -1212,6 +1226,13 @@ html.rn-lock, html.rn-lock body { overflow: hidden; }
 .aw-sum--new { color: #7A7F98; background: #EEF0F5; }
 .cal-cell--new { display: flex; flex-direction: column; align-items: center; justify-content: center; background: #EEF0F5; color: #8A8FA6; overflow: hidden; padding: 0 1px; }
 .cal-cell--new small { font-size: 9px; font-weight: 700; letter-spacing: -.06em; }
+/* 휴대폰 — 칸이 작아도 기호가 잘 보이게 (20261102d) */
+@media (max-width: 420px) {
+  .cal-grid { gap: 3px; }
+  .cal-cell > b { font-size: 10.5px; }
+  .cal-sym { font-size: 15px; } .cal-sym--late { font-size: 14px; } .cal-sym--none { font-size: 13px; }
+  .cal-cell--wk small, .cal-cell > small { font-size: 9.5px; }
+}
 
 /* 수업 영상 카드 — 어떤 수업이었는지 · 키워드 · 찾기 (20261031t) */
 .vd-info { margin: 2px 0 10px; display: grid; gap: 6px; }
