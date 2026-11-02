@@ -3898,9 +3898,17 @@ textarea.aip-text--new:focus { outline: 2px solid #B9AEF0; outline-offset: 1px; 
 .wy-why { margin: 0; padding: 6px 10px; border-radius: 8px; background: #F6F3FF; color: #3F2E9E; font-size: 13.5px; font-weight: 600; }
 .wy-dup { margin: 0; padding: 6px 10px; border-radius: 8px; background: #FFF6D6; color: #6B5200; font-size: 13px; }
 .wy-warn, .wy-left { color: #9E1F3B; font-size: 12.5px; margin: 0; }
-.wy-to { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-.wy-to__b { appearance: none; font: inherit; min-height: 44px; border: 1.5px solid #D5D0F2; border-radius: 10px; background: #fff; color: var(--ink-deep); font-weight: 700; cursor: pointer; }
-.wy-to__b.is-on { border-color: #6A55D8; background: #F3F0FF; color: #4A33B8; }
+/* 받는 사람 한 줄씩 체크 (20261102a) */
+.wy-to { display: grid; gap: 6px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.wy-to legend { padding: 0; margin-bottom: 2px; }
+.wy-to__r { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; min-height: 44px; padding: 6px 10px; border: 1.5px solid #D5D0F2; border-radius: 10px; background: #fff; color: var(--ink-deep); cursor: pointer; }
+.wy-to__r input { width: 18px; height: 18px; margin: 0 6px 0 0; accent-color: #6A55D8; }
+.wy-to__r.is-on { border-color: #6A55D8; background: #F3F0FF; }
+.wy-to__w { font-weight: 700; }
+.wy-to__r.is-off { opacity: .5; cursor: not-allowed; background: #F6F6F8; }
+.wy-tabs { display: flex; gap: 6px; }
+.wy-tab { appearance: none; font: inherit; min-height: 40px; padding: 0 16px; border: 1.5px solid #D5D0F2; border-radius: 10px; background: #fff; font-weight: 700; color: var(--ink-mid); cursor: pointer; }
+.wy-tab.is-on { border-color: #6A55D8; background: #F3F0FF; color: #4A33B8; }
 .wy-field { display: grid; gap: 4px; }
 .wy-lab { font-size: 13px; font-weight: 700; color: var(--ink-deep); }
 .wy-ai { font-weight: 500; color: #6A55D8; }

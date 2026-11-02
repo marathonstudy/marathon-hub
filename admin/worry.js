@@ -89,14 +89,51 @@
     }).join(' · ');
   }
   function defaultTo(reasons) { return reasons.some(function (r) { return r.kind === 'absent'; }) ? 'parent' : 'student'; }
-  function auds(to) { return to === 'both' ? ['student', 'parent'] : [to]; }
-  var TO_NAME = { student: '학생', parent: '학부모', both: '학생 · 학부모' };
+
+  /* ---------- 받는 사람 한 줄씩 (20261102a) ----------
+     예전 [학생] [학부모] [둘 다] — 「학부모」는 학부모1 · 2 번호 모두에 갔다 (둘 다 = 학생 + 학부모1 + 학부모2)
+     이제 실제 받는 사람을 체크로: ☑ 학생 · 최지민 · 1234 / ☐ 학부모1 · 어머니 · 5678 / ☐ 학부모2 · 9012
+     번호는 뒤 4자리만 · 관계 이름(students.parent_title)은 저장돼 있을 때만 학부모1 줄에 · 번호 없으면 흐리게 「번호 없음」(못 고름)
+     학부모2 번호가 학부모1과 같으면 「학부모1과 같은 번호」(못 고름 · 한 번만 간다) */
+  var WHO = { student: '학생', parent1: '학부모1', parent2: '학부모2' };
+  function people(s) {
+    s = s || {};
+    var d0 = digits(s.studentPhone || s.student_phone), d1 = digits(s.parentPhone || s.parent_phone), d2 = digits(s.parentPhone2 || s.parent_phone2);
+    var rel = String(s.parentTitle || s.parent_title || '').trim();
+    var row = function (t, d, extra) {
+      var ok = mobile(d), same = t === 'parent2' && ok && d === d1 && mobile(d1);
+      return { t: t, who: WHO[t], extra: extra || '', d: ok ? d : '', last4: ok ? d.slice(-4) : '', ok: ok && !same, same: same };
+    };
+    return [row('student', d0, s.name || ''), row('parent1', d1, rel), row('parent2', d2, '')];
+  }
+  /* 기본 체크 — 한 명만: 결석 반복이면 학부모1, 그 밖(과제 · 복습테스트 · 보강 영상 · 자료)은 학생 · 그 번호가 없으면 다음 사람 */
+  function defaultPick(s, reasons) {
+    var order = defaultTo(reasons) === 'parent' ? ['parent1', 'parent2', 'student'] : ['student', 'parent1', 'parent2'];
+    var ps = people(s), pick = {};
+    var first = order.filter(function (t) { return ps.some(function (p) { return p.t === t && p.ok; }); })[0];
+    if (first) pick[first] = true;
+    return pick;
+  }
+  function picked(it) { return ['student', 'parent1', 'parent2'].filter(function (t) { return it.pick && it.pick[t]; }); }
+  /* 고른 사람으로 정해지는 글 — 학생을 고르면 학생용, 학부모(1 · 2)를 고르면 학부모용, 같이 고르면 둘 (탭) */
+  function auds(it) {
+    var p = picked(it), o = [];
+    if (p.indexOf('student') !== -1) o.push('student');
+    if (p.indexOf('parent1') !== -1 || p.indexOf('parent2') !== -1) o.push('parent');
+    return o;
+  }
+  function whoText(list) { return list.map(function (t) { return WHO[t]; }).join(' · '); }
+  /* [보내기] 글 — 「최지민 학부모1에게 보내기」 · 「최지민 학생 · 학부모1에게 보내기」 */
+  function sendWord(s, it) {
+    var p = picked(it);
+    return p.length ? (s && s.name ? s.name + ' ' : '') + whoText(p) + '에게 보내기' : '받는 사람을 골라 주세요';
+  }
 
   /* ---------- 상태 ---------- */
   var st = { items: [], i: 0, from: '', busy: false, sent: null, done: {} };
   function cur() { return st.items[st.i]; }
   function prep(it) {
-    it.to = it.to || defaultTo(it.reasons);
+    it.pick = it.pick || defaultPick(stu(it.sid), it.reasons);
     it.text = it.text || { student: baseDraft('student', it.reasons), parent: baseDraft('parent', it.reasons) };
     it.base = it.base || { student: it.text.student, parent: it.text.parent };
     it.touched = it.touched || {};
@@ -122,7 +159,7 @@
     return t;
   }
   function autoDraft(it) {
-    auds(it.to).forEach(function (a) {
+    auds(it).forEach(function (a) {
       if (it.ai[a] || it.touched[a]) return;
       it.ai[a] = 'busy';
       paint();
@@ -137,7 +174,9 @@
   function askAi() {
     var it = cur(), inp = $('#wyAsk'), req = inp ? inp.value.replace(/\s+/g, ' ').trim() : '';
     if (!it || req.length < 2) return;
-    var list = auds(it.to);
+    var list = auds(it);
+    if (list.length > 1 && it.tab) list = [it.tab];                     /* 탭 두 개면 보고 있는 글만 */
+    if (!list.length) return;
     it.asking = true; paint();
     Promise.all(list.map(function (a) {
       return polish(it.text[a], req + ' (지킬 것: ' + TONE_SHORT[a] + ')').then(function (res) {
@@ -154,11 +193,10 @@
   }
 
   /* ---------- 받는 번호 ---------- */
-  function targets(s, to) {
+  /* 고른 사람 중 번호가 있는 사람만 (같은 번호는 한 번) */
+  function targets(s, it) {
     var out = [], seen = {};
-    var add = function (t, v) { var d = digits(v); if (mobile(d) && !seen[d]) { seen[d] = 1; out.push({ t: t, d: d }); } };
-    if (to === 'student' || to === 'both') add('student', s.studentPhone || s.student_phone);
-    if (to === 'parent' || to === 'both') { add('parent1', s.parentPhone || s.parent_phone); add('parent2', s.parentPhone2 || s.parent_phone2); }
+    people(s).forEach(function (p) { if (it.pick && it.pick[p.t] && p.ok && !seen[p.d]) { seen[p.d] = 1; out.push({ t: p.t, d: p.d }); } });
     return out;
   }
   function fillName(text, s) { return String(text || '').split('{학생이름}').join(s.name || ''); }
@@ -180,7 +218,7 @@
   function sentWho(sid) {
     if (!st.sent) return [];
     var o = [];
-    st.sent.forEach(function (x) { if (x.student_id === sid) { var w = x.target === 'student' ? '학생' : '학부모'; if (o.indexOf(w) === -1) o.push(w); } });
+    st.sent.forEach(function (x) { if (x.student_id === sid) { var w = WHO[x.target] || '학부모'; if (o.indexOf(w) === -1) o.push(w); } });
     return o;
   }
   function bodyHtml() {
@@ -194,12 +232,24 @@
     h += '<p class="wy-why">사유: ' + esc(reasonText(it.reasons)) + '</p>';
     var already = sentWho(it.sid);
     if (already.length) h += '<p class="wy-dup" role="status">오늘 이미 걱정 문자 보냄 (' + esc(already.join(' · ')) + ')</p>';
-    h += '<div class="wy-to" role="group" aria-label="받는 사람">' + ['student', 'parent', 'both'].map(function (k) {
-      return '<button type="button" class="wy-to__b' + (it.to === k ? ' is-on' : '') + '" data-wy-to="' + k + '" aria-pressed="' + (it.to === k) + '">' + (k === 'both' ? '둘 다' : TO_NAME[k]) + '</button>';
-    }).join('') + '</div>';
-    var tg = targets(s, it.to);
-    if (!tg.length) h += '<p class="wy-warn" role="alert">' + esc(TO_NAME[it.to]) + ' 휴대폰 번호가 없습니다</p>';
-    auds(it.to).forEach(function (a) {
+    h += '<fieldset class="wy-to" aria-label="받는 사람"><legend class="wy-lab">받는 사람</legend>' + people(s).map(function (p) {
+      var on = !!(it.pick && it.pick[p.t]) && p.ok;
+      return '<label class="wy-to__r' + (on ? ' is-on' : '') + (p.ok ? '' : ' is-off') + '">' +
+        '<input type="checkbox" data-wy-pick="' + p.t + '"' + (on ? ' checked' : '') + (p.ok ? '' : ' disabled') + '>' +
+        '<span class="wy-to__w">' + p.who + '</span>' + (p.extra ? '<span class="wy-to__x"> · ' + esc(p.extra) + '</span>' : '') +
+        '<span class="wy-to__d num">' + (p.same ? ' · 학부모1과 같은 번호' : p.ok ? ' · ' + p.last4 : ' · 번호 없음') + '</span></label>';
+    }).join('') + '</fieldset>';
+    var tg = targets(s, it), as = auds(it);
+    if (!picked(it).length) h += '<p class="wy-warn" role="alert">받는 사람을 한 명 이상 골라 주세요</p>';
+    else if (!tg.length) h += '<p class="wy-warn" role="alert">고른 사람의 휴대폰 번호가 없습니다</p>';
+    /* 학생 + 학부모를 같이 고르면 「학생용」「학부모용」 탭 두 개 — 각각 고친다 */
+    if (as.length > 1) {
+      if (as.indexOf(it.tab) === -1) it.tab = as[0];
+      h += '<div class="wy-tabs" role="tablist" aria-label="초안">' + as.map(function (a) {
+        return '<button type="button" role="tab" class="wy-tab' + (it.tab === a ? ' is-on' : '') + '" data-wy-tab="' + a + '" aria-selected="' + (it.tab === a) + '">' + (a === 'student' ? '학생용' : '학부모용') + '</button>';
+      }).join('') + '</div>';
+    }
+    (as.length > 1 ? [it.tab] : as).forEach(function (a) {
       var t = it.text[a], lf = leftOf(fillName(t, s));
       h += '<label class="wy-field"><span class="wy-lab">' + (a === 'student' ? '학생에게' : '학부모에게') +
         (it.ai[a] === 'busy' ? ' <small class="wy-ai">AI 초안 쓰는 중…</small>' : it.ai[a] === 'ok' && !it.touched[a] ? ' <small class="wy-ai">AI 초안</small>' : '') + '</span>' +
@@ -212,7 +262,7 @@
     h += '<p class="wy-note">상담 내용 · 약속은 문자에 넣지 않습니다. 보내면 이 사유는 「확인함」이 되고 상담 카드에 「걱정 문자 보냄」이 남습니다.</p>';
     h += '<div class="wy-acts">' +
       (n > 1 ? '<button type="button" class="btn" id="wyPrev"' + (st.i === 0 ? ' disabled' : '') + '>이전</button><button type="button" class="btn" id="wyNext"' + (st.i === n - 1 ? ' disabled' : '') + '>다음</button>' : '') +
-      '<button type="button" class="btn btn--primary" id="wySend"' + (st.busy ? ' disabled' : '') + '>' + (st.busy ? '보내는 중…' : n > 1 ? sendable().length + '명에게 보내기' : '보내기') + '</button></div>';
+      '<button type="button" class="btn btn--primary" id="wySend"' + (st.busy || (n === 1 && !tg.length) ? ' disabled' : '') + '>' + (st.busy ? '보내는 중…' : n > 1 ? sendable().length + '명에게 보내기' : sendWord(s, it)) + '</button></div>';
     return h;
   }
   function paint() {
@@ -256,10 +306,10 @@
   function sendOne(it) {
     var s = stu(it.sid);
     if (!s) return Promise.resolve({ ok: false, sid: it.sid, msg: '학생을 찾지 못했습니다' });
-    var tg = targets(s, it.to);
-    if (!tg.length) return Promise.resolve({ ok: false, sid: it.sid, name: s.name, msg: TO_NAME[it.to] + ' 번호 없음' });
+    var tg = targets(s, it);
+    if (!tg.length) return Promise.resolve({ ok: false, sid: it.sid, name: s.name, msg: picked(it).length ? whoText(picked(it)) + ' 번호 없음' : '받는 사람을 고르지 않았습니다' });
     var jobs = [];
-    auds(it.to).forEach(function (a) {
+    auds(it).forEach(function (a) {
       var mine = tg.filter(function (x) { return a === 'student' ? x.t === 'student' : x.t !== 'student'; });
       if (!mine.length) return;
       var body = fillName(it.text[a], s).trim(), lf = leftOf(body);
@@ -269,17 +319,23 @@
         markWeek: '', label: '걱정 문자', purpose: 'worry', vars: {} }).then(function (r) {
         var oks = r && r.ok ? (r.results || []).filter(function (x) { return x.ok; }) : [];
         var good = r && r.ok && (oks.length || (!r.results && r.sent));
-        return { ok: !!good, aud: a, msg: good ? '' : (r && (r.message || ((r.results || []).filter(function (x) { return !x.ok; })[0] || {}).error)) || '보내지 못했습니다' };
+        /* 실제로 받은 사람 — 결과에 받는 곳(to)이 있으면 그대로, 없으면 보낸 줄 그대로 */
+        var gotT = !good ? [] : r.results ? oks.map(function (x) { return x.to; }) : mine.map(function (x) { return x.t; });
+        return { ok: !!good, aud: a, got: gotT, msg: good ? '' : (r && (r.message || ((r.results || []).filter(function (x) { return !x.ok; })[0] || {}).error)) || '보내지 못했습니다' };
       }));
     });
     return Promise.all(jobs).then(function (rs) {
       var okAud = rs.filter(function (x) { return x.ok; }).map(function (x) { return x.aud; });
+      var got = [];
+      rs.forEach(function (x) { (x.got || []).forEach(function (t) { if (WHO[t] && got.indexOf(t) === -1) got.push(t); }); });
+      got.sort(function (a, b) { return ['student', 'parent1', 'parent2'].indexOf(a) - ['student', 'parent1', 'parent2'].indexOf(b); });
       var bad = rs.filter(function (x) { return !x.ok; });
-      return { ok: okAud.length > 0, sid: it.sid, name: s.name, auds: okAud, msg: bad.map(function (x) { return x.msg; }).join(' · ') };
+      return { ok: okAud.length > 0, sid: it.sid, name: s.name, auds: okAud, got: got, msg: bad.map(function (x) { return x.msg; }).join(' · ') };
     });
   }
   function record(it, res) {
-    var who = res.auds.length > 1 ? '학생 · 학부모' : res.auds[0] === 'parent' ? '학부모' : '학생';
+    /* 상담 카드 기록 — 실제로 받은 사람 (학생 / 학부모1 / 학부모2 · 20261102a) */
+    var who = res.got && res.got.length ? whoText(res.got) : res.auds.length > 1 ? '학생 · 학부모' : res.auds[0] === 'parent' ? '학부모' : '학생';
     var row = { student_id: it.sid, note_date: today(), categories: ['걱정 문자'], follow_up: false,
       body: '걱정 문자 보냄 · ' + reasonText(it.reasons) + ' · ' + who + ' · ' + md(today()) };
     if (it.hwDay) row.hw_day = it.hwDay;
@@ -320,7 +376,7 @@
       });
     };
     if (list.length === 1) { go2(); return; }
-    UI.confirmAsk('걱정 문자 ' + list.length + '명', list.map(function (it) { var s = stu(it.sid) || {}; return '· ' + (s.name || '') + ' — ' + TO_NAME[it.to]; }).join('\n') + '\n\n학생마다 고친 글 그대로 보냅니다.', '보내기').then(function (yes) { if (yes) go2(); });
+    UI.confirmAsk('걱정 문자 ' + list.length + '명', list.map(function (it) { var s = stu(it.sid) || {}; return '· ' + (s.name || '') + ' — ' + (whoText(picked(it)) || '받는 사람 없음'); }).join('\n') + '\n\n학생마다 고친 글 그대로 보냅니다.', '보내기').then(function (yes) { if (yes) go2(); });
   }
 
   /* ---------- 과제 칸 상담 기록 (분류 「과제」 · hw_day) ---------- */
@@ -363,11 +419,23 @@
     if (!m || !m.contains(e.target)) return;
     var t = e.target, b;
     if (t.id === 'wyClose') { if (m.close) m.close(); else m.removeAttribute('open'); return; }
-    if ((b = t.closest('[data-wy-to]'))) { var it = cur(); it.to = b.dataset.wyTo; paint(); autoDraft(it); return; }
+    if ((b = t.closest('[data-wy-tab]'))) { cur().tab = b.dataset.wyTab; paint(); return; }
     if (t.id === 'wyAskGo') { askAi(); return; }
     if (t.id === 'wyPrev') { go(st.i - 1); return; }
     if (t.id === 'wyNext') { go(st.i + 1); return; }
     if (t.id === 'wySend') send();
+  });
+  /* 받는 사람 체크 — 고른 사람에 맞춰 글(학생용 · 학부모용)이 바뀐다 */
+  document.addEventListener('change', function (e) {
+    var t = e.target;
+    if (!t || !t.dataset || !t.dataset.wyPick) return;
+    var it = cur(); if (!it) return;
+    it.pick = it.pick || {};
+    if (t.checked) it.pick[t.dataset.wyPick] = true; else delete it.pick[t.dataset.wyPick];
+    var as = auds(it);
+    if (t.checked) it.tab = t.dataset.wyPick === 'student' ? 'student' : 'parent';
+    if (as.indexOf(it.tab) === -1) it.tab = as[0];
+    paint(); autoDraft(it);
   });
   document.addEventListener('input', function (e) {
     var t = e.target;
@@ -380,7 +448,7 @@
   });
 
   window.Worry = {
-    open: open, baseDraft: baseDraft, defaultTo: defaultTo, reasonText: reasonText, TONE: TONE, BANNED: BANNED,
+    open: open, baseDraft: baseDraft, defaultTo: defaultTo, defaultPick: defaultPick, people: people, reasonText: reasonText, TONE: TONE, BANNED: BANNED,
     hasHwNote: hasHwNote, saveHwNote: saveHwNote, loadHw: loadHw,
     state: function () { return st; }
   };

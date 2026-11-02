@@ -176,9 +176,43 @@
   }
   /* 받는 사람 — 「학부모」는 등록된 학부모 번호(1 · 2) 모두 */
   function targets() {
+    if (oneStu()) return ['student', 'parent1', 'parent2'].filter(function (t) { return st.pick[t]; });
     return st.to === 'parent' ? ['parent1', 'parent2'] : st.to === 'both' ? ['parent1', 'parent2', 'student'] : ['student'];
   }
-  function toWord() { return st.to === 'parent' ? '학부모' : st.to === 'both' ? '학생 · 학부모' : '학생'; }
+  function toWord() {
+    if (oneStu()) return ['student', 'parent1', 'parent2'].filter(function (t) { return st.pick[t]; }).map(function (t) { return PICK_WHO[t]; }).join(' · ') || '받는 사람 없음';
+    return st.to === 'parent' ? '학부모' : st.to === 'both' ? '학생 · 학부모' : '학생';
+  }
+  /* 학생 한 명 [문자] (학생 줄 · 상담 카드 · 20261102a) — [학생][학부모][둘 다] 대신 실제 받는 사람 한 줄씩 체크
+     예전에는 「학부모」 = 학부모1 · 2 번호 모두 · 「둘 다」 = 학생 + 학부모1 + 학부모2 · 반 단위 창은 그대로 */
+  var PICK_WHO = { student: '학생', parent1: '학부모1', parent2: '학부모2' };
+  function oneStu() {
+    if (!st.people) return null;
+    var l = pickedStudents();
+    return l.length === 1 ? l[0] : null;
+  }
+  function peopleOf(s) {
+    if (window.Worry && Worry.people) return Worry.people(s);
+    var d1 = Store.phoneDigits(s.parentPhone || '');
+    return ['student', 'parent1', 'parent2'].map(function (t) {
+      var d = Store.phoneDigits(numberOf(s, t) || ''), ok = mobile(d), same = t === 'parent2' && ok && d === d1;
+      return { t: t, who: PICK_WHO[t], extra: t === 'student' ? s.name || '' : t === 'parent1' ? String(s.parentTitle || '').trim() : '', d: ok ? d : '', last4: ok ? d.slice(-4) : '', ok: ok && !same, same: same };
+    });
+  }
+  function renderPeople() {
+    var s = oneStu(), box = $('#smsPeople'), to = $('#smsToBox');
+    if (to) to.hidden = !!s;
+    if (!box) return;
+    box.hidden = !s;
+    if (!s) { box.innerHTML = ''; return; }
+    box.innerHTML = '<legend class="wy-lab">받는 사람</legend>' + peopleOf(s).map(function (p) {
+      var on = !!st.pick[p.t] && p.ok;
+      return '<label class="wy-to__r' + (on ? ' is-on' : '') + (p.ok ? '' : ' is-off') + '">' +
+        '<input type="checkbox" data-sms-pick="' + p.t + '"' + (on ? ' checked' : '') + (p.ok && !st.done ? '' : ' disabled') + '>' +
+        '<span class="wy-to__w">' + p.who + '</span>' + (p.extra ? '<span class="wy-to__x"> · ' + esc(p.extra) + '</span>' : '') +
+        '<span class="wy-to__d num">' + (p.same ? ' · 학부모1과 같은 번호' : p.ok ? ' · ' + p.last4 : ' · 번호 없음') + '</span></label>';
+    }).join('');
+  }
   /* 지금 받는 사람 기준으로 보낼 번호가 하나라도 있는가 */
   function hasNum(s) { return targets().some(function (t) { return mobile(Store.phoneDigits(numberOf(s, t))); }); }
   /* 이 학생이 보낼 수 있는 줄인가 (체크 · 번호 · 공개 전) */
@@ -443,6 +477,7 @@
     }
     if (!list.length && !q) html = '<p class="panel__hint">위에서 반을 고르거나, 이름으로 찾아 더해 주세요.</p>';
     $('#smsStuList').innerHTML = html;
+    renderPeople();
     $$('[data-smsto]').forEach(function (b) { var on = b.dataset.smsto === st.to; b.classList.toggle('is-on', on); b.setAttribute('aria-pressed', String(on)); b.disabled = st.done; });
     var go = list.filter(sendable).length, noNum = list.filter(function (s) { return !hasNum(s); }).length;
     $('#smsPickedHint').innerHTML = list.length ? '<b>' + go + '명</b>에게 · ' + esc(toWord()) + (noNum ? ' <small class="sms-who-note__mute">번호 없음 ' + noNum + '명</small>' : '') : '';
@@ -544,7 +579,8 @@
     var ok = !st.missing && !st.busy && plan && plan.items.length && $('#smsBody').value.trim() && !adBlock();
     $('#smsSend').disabled = st.done || !ok || plan.items.length > cfg().perSend;
     $('#smsTest').disabled = st.busy || !(plan && plan.items.length && $('#smsBody').value.trim());
-    $('#smsSend').textContent = st.busy ? '보내는 중…' : st.done ? '보냄 완료' : plan && plan.people ? plan.people + '명에게 보내기' : '보내기';
+    var one = oneStu();
+    $('#smsSend').textContent = st.busy ? '보내는 중…' : st.done ? '보냄 완료' : one ? (targets().length ? one.name + ' ' + toWord() + '에게 보내기' : '받는 사람을 골라 주세요') : plan && plan.people ? plan.people + '명에게 보내기' : '보내기';
     $('#smsResend').hidden = !st.done;
     /* 여러 명에게 보낼 때만 「내 번호로도 한 통 받기」 */
     var ch = $('#smsCopyHost');
@@ -934,6 +970,14 @@
     st.notify = opts.notify || null;
     st.to = opts.to === 'parent' || opts.to === 'both' || opts.to === 'student' ? opts.to
       : st.notify || st.from === 'send' ? 'both' : 'student';
+    /* 학생 한 명 [문자] — 받는 사람 한 줄씩 · 기본은 학생 한 명 (번호가 없으면 학부모1 → 학부모2) */
+    st.people = !!opts.single && !opts.to && st.purpose !== 'app' && !st.notify && ids.length === 1 && !(opts.classes || []).length;
+    st.pick = {};
+    if (st.people) {
+      var s1 = active().find(function (x) { return x.id === ids[0]; });
+      var first = s1 ? peopleOf(s1).filter(function (p) { return p.ok; })[0] : null;
+      if (first) st.pick[first.t] = true;
+    }
     $('#smsTitle').textContent = st.notify ? '바뀐 내용 알리기' : st.purpose === 'app' ? '앱 안내 문자' : '문자 보내기';
     $('#smsVarChange').hidden = !st.notify;
     $('#smsBody').value = opts.body || '';
@@ -1699,6 +1743,8 @@
     });
     pane.addEventListener('change', function (e) {
       if (e.target.id === 'tplExStu') { renderTplPreview(); return; }
+      var pk = e.target.closest('[data-sms-pick]');
+      if (pk) { if (pk.checked) st.pick[pk.dataset.smsPick] = true; else delete st.pick[pk.dataset.smsPick]; renderPreview(); return; }
       var rw = e.target.closest('[data-smsrow]');
       if (rw) { if (rw.checked) delete st.off[rw.dataset.smsrow]; else st.off[rw.dataset.smsrow] = true; renderPreview(); return; }
       if (e.target.name === 'smsVia') { st.viaTouched = true; renderPreview(); return; }
