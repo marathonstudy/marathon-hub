@@ -230,7 +230,8 @@
     }, function () {});
   }
   function saveContact() {
-    var v = ($('#tdSetContact').value || '').trim();
+    /* 앞뒤 공백 지움 · http:// → https:// (20261102c) */
+    var v = window.SetState ? SetState.fixInput($('#tdSetContact')) : ($('#tdSetContact').value || '').trim();
     sb().rpc('contact_set', { p_url: v }).then(function (r) {
       if (r.error) { toast(missingFn(r.error) ? 'migration-049 SQL 을 먼저 실행해 주세요' : r.error.message, 'bad'); return; }
       if (window.SetState) SetState.mark('tdSetContact', !!v);

@@ -516,7 +516,8 @@
     if ((b = t.closest('[data-app-diff]'))) { st.appDiffOpen = st.appDiffOpen === b.dataset.appDiff ? '' : b.dataset.appDiff; paintAppCls(); return; }
     if (t.closest('[data-app-admin-none]')) { UI.toast('더보기 → 설정 「마라톤 앱 관리자 주소」를 먼저 넣어 주세요', 'bad'); return; }
     if (t.closest('#tdSetAppAdminSave')) {
-      var v = ($('#tdSetAppAdmin').value || '').trim();
+      /* 앞뒤 공백 지움 · http:// → https:// (20261102c) */
+      var v = window.SetState ? SetState.fixInput($('#tdSetAppAdmin')) : ($('#tdSetAppAdmin').value || '').trim();
       if (v && !/^https:\/\/\S+$/.test(v)) { UI.toast('https:// 로 시작하는 주소를 넣어 주세요', 'bad'); return; }
       DB.saveSetting('app_admin', { url: v }, UI.whoami ? UI.whoami() : '').then(function () { st.appAdmin = v; if (window.SetState) SetState.mark('tdSetAppAdmin', !!v); UI.toast(v ? '마라톤 앱 관리자 주소를 저장했습니다' : '마라톤 앱 관리자 주소를 비웠습니다', 'good'); paintAppCls(); }, function (x) { UI.toast((x && x.message) || '저장하지 못했습니다', 'bad'); });
     }

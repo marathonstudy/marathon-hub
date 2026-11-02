@@ -820,6 +820,9 @@ delete from public.staff where email = '조교이메일@example.com';
 - 「오늘」 설정 창 — 빈 칸의 회색 예시 글이 저장된 값처럼 보여 헷갈렸다 → 예시 글 앞에 「예:」 · 더 연한 색(기울임)
 - 칸 아래 작게 「아직 비어 있음」 / 「✓ 저장됨」(setstate.js · 입력 중인 글이 아니라 저장된 값 기준): 마라톤 앱 관리자 주소 · 카카오채널 링크 · 마라톤 사이트 아이디 · 비밀번호
 
+### 5-79. 20261102c — 설정 링크 칸 http:// → https:// (SQL · 함수 배포 없음)
+- 마라톤 앱 관리자 주소 · 카카오채널 링크 · 앱 설치 링크(문자 발송 → 연결 상태) — 저장할 때 앞뒤 공백(줄바꿈 · 전각 공백 포함)을 지우고, http:// 로 넣으면 오류 없이 https:// 로 바꿔 저장 · 칸에도 고친 값(SetState.url)
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

@@ -1517,7 +1517,9 @@
     });
   }
   function saveAppLinks() {
-    sb().rpc('sms_app_links_set', { p_android: $('#connAndroid').value.trim(), p_ios: $('#connIos').value.trim() }).then(function (r) {
+    /* 앞뒤 공백 지움 · http:// → https:// (20261102c) */
+    var fx = function (el) { return window.SetState ? SetState.fixInput(el) : el.value.trim(); };
+    sb().rpc('sms_app_links_set', { p_android: fx($('#connAndroid')), p_ios: fx($('#connIos')) }).then(function (r) {
       if (r.error) { toast(isMissing(r.error) ? 'migration-040 SQL 을 먼저 실행해 주세요' : r.error.message, 'bad'); return; }
       st.cfg = Object.assign({}, DEF, st.cfg || {}, r.data || {});
       toast('앱 설치 링크를 저장했습니다', 'good');

@@ -16,5 +16,13 @@
     el.classList.toggle('is-saved', !!saved);
     el.classList.toggle('is-empty', !saved);
   }
-  window.SetState = { mark: mark };
+  /* 링크 칸 (20261102c) — 앞뒤 공백(줄바꿈 · 전각 공백 포함)을 지우고, http:// 로 넣으면 오류 없이 https:// 로 바꿔 저장한다
+     SetState.url('  http://pf.kakao.com/_x/chat ') → 'https://pf.kakao.com/_x/chat' · 빈 값은 그대로 빈 값 */
+  function url(v) {
+    var s = String(v == null ? '' : v).replace(/^[\s\u00a0\u3000\ufeff]+|[\s\u00a0\u3000\ufeff]+$/g, '');
+    return s.replace(/^http:\/\//i, 'https://').replace(/^https:\/\//i, 'https://');
+  }
+  /* 칸 값을 고쳐 넣고 고친 값을 돌려준다 */
+  function fixInput(el) { if (!el) return ''; var v = url(el.value); if (el.value !== v) el.value = v; return v; }
+  window.SetState = { mark: mark, url: url, fixInput: fixInput };
 })();
