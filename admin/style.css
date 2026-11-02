@@ -1138,7 +1138,8 @@ body.report-step-write.write-weeks #writeBarWrap { display: none; }
 .wkv-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 .wkv-row {
   display: grid;
-  grid-template-columns: 150px 108px minmax(0, 1fr) auto;
+  /* 상태 칩 칸은 글자만큼(고정 폭 없음) — 「공개 26/27 · 발송 26/27」이 옆 숫자 줄과 겹치지 않게 (20261102e) */
+  grid-template-columns: minmax(120px, 160px) max-content minmax(0, 1fr) auto;
   grid-template-areas: "wk st body act";
   gap: 6px 14px;
   align-items: center;
@@ -1173,10 +1174,29 @@ body.report-step-write.write-weeks #writeBarWrap { display: none; }
 .wkv-st--empty { background: #EEF0F7; color: var(--ink-light); }
 .wkv-miss { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
 .wkv-miss__i { padding: 1px 7px; border-radius: 999px; font-size: 11.5px; font-weight: 700; background: #FDECEF; color: #B03A55; }
+/* 빠진 학생 펼치기 (20261102e) */
+.wkv-why-b { appearance: none; border: 0; font: inherit; cursor: pointer; }
+button.wkv-st { font-size: 12.5px; font-weight: 700; }
+button.wkv-miss__i { font-size: 11.5px; font-weight: 700; }
+.wkv-why-b:hover { filter: brightness(.96); text-decoration: underline; }
+.wkv-why-b__c { font-size: 10px; }
+.wkv-why { margin: -4px 0 0; padding: 8px 12px; border: 1px solid #E4DEFA; border-top: 0; border-radius: 0 0 12px 12px; background: #FBFAFF; }
+.wkv-why__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.wkv-why__r { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-height: 34px; font-size: 13px; }
+.wkv-why__n { appearance: none; border: 0; background: none; padding: 2px 0; font: inherit; font-weight: 800; color: #4A33B8; text-decoration: underline; cursor: pointer; }
+.wkv-why__t { color: var(--ink-mid); min-width: 0; overflow-wrap: anywhere; }
+.wkv-why__r--fail .wkv-why__t, .wkv-why__r--left .wkv-why__t, .wkv-why__r--phone .wkv-why__t { color: #B03A55; font-weight: 600; }
+.wkv-why__r--out .wkv-why__t { color: var(--ink-light); }
+.wkv-why__re { margin-left: auto; min-height: 32px; }
+.wkv-why__hint { margin: 0; font-size: 12.5px; color: var(--ink-light); }
 .wkv-more { display: block; width: 100%; margin-top: 10px; }
 /* 휴대폰 — 한 주를 두 줄 카드로 (위: 주차 · 상태 · 보기 / 아래: 내용 · 숫자 · 빠진 것) */
 @media (max-width: 720px) {
-  .wkv-row { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "wk st act" "body body body"; gap: 6px 8px; }
+  /* 좁은 화면 — 칩은 이름 아래 줄로 · 숫자 줄은 줄바꿈 (겹침 없음 · 20261102e) */
+  .wkv-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "wk act" "st st" "body body"; gap: 6px 8px; }
+  .wkv-status { min-width: 0; }
+  .wkv-st { white-space: normal; }
+  .wkv-lesson { white-space: normal; }
   .wkv-head .btn--primary { width: 100%; }
 }
 

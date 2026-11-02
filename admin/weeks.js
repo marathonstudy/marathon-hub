@@ -15,7 +15,7 @@
   var $ = UI.$;
   var SHOW = 8;
   var DOW = ['일', '월', '화', '수', '목', '금', '토'];
-  var st = { cls: '', data: null, more: false, run: 0, err: '' };
+  var st = { cls: '', data: null, more: false, run: 0, err: '', why: {}, whyData: {} };
 
   function esc(v) {
     return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -41,7 +41,7 @@
     st.cls = cls;
     st.err = '';
     if (window.Course && Course.isKey(cls)) { renderCourse(); return Promise.resolve(); }
-    if (!st.data || st.data.class !== cls) { st.data = null; st.more = false; }
+    if (!st.data || st.data.class !== cls) { st.data = null; st.more = false; st.why = {}; st.whyData = {}; }
     render();
     if (!cls) return Promise.resolve();
     return SB.client.rpc('staff_class_weeks', { p_class: cls }).then(function (r) {
@@ -87,7 +87,8 @@
   function statusHtml(w, total) {
     if (total > 0 && w.sent >= total) return '<span class="wkv-st wkv-st--sent">보냄</span>';
     /* 공개 · 발송 두 단계만 (「작성 중」 구분은 없앴다 · 20261030a) */
-    if (w.published > 0) return '<span class="wkv-st wkv-st--doing">공개 <b class="num">' + w.published + '/' + total + '</b> · 발송 <b class="num">' + (w.sent || 0) + '/' + total + '</b></span>';
+    /* 누르면 공개 · 발송이 안 된 학생 이름과 이유를 바로 아래에 (20261102e) */
+    if (w.published > 0) return '<button type="button" class="wkv-st wkv-st--doing wkv-why-b" data-wkv-why="' + esc(w.open_start) + '" aria-expanded="' + !!st.why[w.open_start] + '" title="공개 · 발송이 안 된 학생 보기">공개 <b class="num">' + w.published + '/' + total + '</b> · 발송 <b class="num">' + (w.sent || 0) + '/' + total + '</b> <span class="wkv-why-b__c" aria-hidden="true">' + (st.why[w.open_start] ? '▴' : '▾') + '</span></button>';
     return '<span class="wkv-st wkv-st--empty">공개 전</span>';
   }
 
@@ -100,7 +101,8 @@
     if (!w.lesson) out.push('수업 내용 없음');
     if (!w.videos.n) out.push('영상 없음');
     if (!w.files.required && !w.files.optional) out.push('과제 파일 없음');      /* 수기 과제 이름(hw_names)은 이제 안 셈 · 20261029g */
-    if (w.week_start < d.this_week && d.total > 0 && w.sent < d.total) out.push('미제출 레포트 ' + (d.total - w.sent));
+    /* 학생 과제 미제출이 아니라 레포트를 아직 보내지 못한 학생 수 (전체 − 발송 · 20261102e 예전 「미제출 레포트 n」) */
+    if (w.week_start < d.this_week && d.total > 0 && w.sent < d.total) out.push({ why: true, text: '레포트 발송 안 됨 ' + (d.total - w.sent) + '명' });
     return out;
   }
 
@@ -142,7 +144,10 @@
           '<span>영상 <b class="num">' + v.n + '</b>' + (parts ? ' <span class="wkv-muted">' + parts + '</span>' : '') + '</span>' +
           (isNext ? '' : '<span>출석 <b class="num">' + w.attend + '/' + total + '</b></span><span>' + rvText + '</span>') +
         '</div>' +
-        (miss.length ? '<div class="wkv-miss">' + miss.map(function (m) { return '<span class="wkv-miss__i">' + esc(m) + '</span>'; }).join('') + '</div>' : '') +
+        (miss.length ? '<div class="wkv-miss">' + miss.map(function (m) {
+          return m && m.why ? '<button type="button" class="wkv-miss__i wkv-why-b" data-wkv-why="' + esc(w.open_start) + '" aria-expanded="' + !!st.why[w.open_start] + '" title="누가 왜 빠졌는지 보기">' + esc(m.text) + ' ' + (st.why[w.open_start] ? '▴' : '▾') + '</button>'
+            : '<span class="wkv-miss__i">' + esc(m) + '</span>';
+        }).join('') + '</div>' : '') +
       '</div>' +
       '<div class="wkv-act">' +
         (skipped ? '<button class="btn btn--sm btn--ghost wkv-skip" type="button" data-wunskip="' + esc(lessonDay) + '" title="건너뛰기를 되돌립니다">되돌리기</button>'
@@ -174,8 +179,94 @@
     var shown = st.more ? d.weeks : d.weeks.slice(0, SHOW);
     var rest = d.weeks.length - shown.length;
     h.innerHTML = head +
-      '<div class="wkv-list">' + shown.map(function (w) { return rowHtml(w, d, sched); }).join('') + '</div>' +
+      '<div class="wkv-list">' + shown.map(function (w) { return rowHtml(w, d, sched) + (st.why[w.open_start] ? whyHtml(w) : ''); }).join('') + '</div>' +
       (rest > 0 ? '<button class="btn wkv-more" type="button" id="wkvMore">이전 주 더 보기 (' + rest + '주)</button>' : '');
+  }
+
+  /* ============================================================
+     빠진 학생 — 「공개 n/전체 · 발송 n/전체」 · 「레포트 발송 안 됨 n명」을 누르면 (20261102e)
+       전체 = 그 반 다니는 학생(퇴원 처리 안 한 학생 · 수강 시작 전 신입생도 들어 있다 — staff_class_weeks 와 같은 기준)
+       공개 = 그 주 공개된 레포트가 있는 학생 · 발송 = 그 주 「보냄」(sent) 기록이 있는 학생(레포트 안내 문자 성공 · 카톡)
+       이유 — 수강 시작 전 · 퇴원(대상 제외) / 레포트 작성 전 · 작성 중(공개 안 함) / 번호 없음 / 문자 발송 실패(사유) · 바뀌지 않은 칸 / 보내는 중 · 아직 안 보냄
+       이름 → 그 주 작성 화면의 그 학생 카드 · 발송 실패 → [다시 보내기](문자 발송 화면 · 그 학생 · 그 주 레포트 안내)
+     ============================================================ */
+  function weekOf(open) { return (st.data && st.data.weeks || []).find(function (x) { return x.open_start === open; }) || null; }
+  function lessonDayOf(w) {
+    var L = st.data ? Lesson.of(schedOf(st.data), w.open_start) : null;
+    return L && L.date && !L.canceled ? L.date : w.week_start;
+  }
+  function phonesOf(s) {
+    var ok = function (v) { return /^01[016789]\d{7,8}$/.test(Store.phoneDigits(v || '')); };
+    return ok(s.studentPhone) || ok(s.parentPhone) || ok(s.parentPhone2);
+  }
+  function toggleWhy(open) {
+    if (st.why[open]) { delete st.why[open]; render(); return; }
+    st.why[open] = true;
+    var w = weekOf(open);
+    if (w && !(st.whyData[open] && st.whyData[open].rows)) { st.whyData[open] = { loading: true }; loadWhy(w); }
+    render();
+  }
+  function loadWhy(w) {
+    var open = w.open_start, mon = w.week_start, to = Lesson.addDays(mon, 6), cls = st.cls, day = lessonDayOf(w);
+    var list = (Store.getStudents() || []).filter(function (s) { return s.className === cls && !s.archived; });
+    var ids = list.map(function (s) { return s.id; });
+    if (!ids.length) { st.whyData[open] = { rows: [] }; render(); return Promise.resolve(); }
+    var q = function (p) { return Promise.resolve(p).then(function (r) { return r && !r.error ? r.data || [] : null; }, function () { return null; }); };
+    var c = SB.client;
+    return Promise.all([
+      q(c.from('published').select('student_id,week_start,visible').gte('week_start', mon).lte('week_start', to).in('student_id', ids)),
+      q(c.from('sent').select('student_id,week_start').gte('week_start', mon).lte('week_start', to).in('student_id', ids)),
+      q(c.from('entries').select('student_id,week_start,comment,attend_status').gte('week_start', mon).lte('week_start', to).in('student_id', ids)),
+      q(c.from('sms_log').select('student_id,target,status,error,mark_week,created_at,test').gte('mark_week', mon).lte('mark_week', to).in('student_id', ids).order('created_at', { ascending: false }))
+    ]).then(function (res) {
+      if (st.cls !== cls) return;
+      var pub = {}, snt = {}, ent = {}, log = {};
+      (res[0] || []).forEach(function (r) { if (r.visible !== false) pub[r.student_id] = 1; });
+      (res[1] || []).forEach(function (r) { snt[r.student_id] = 1; });
+      (res[2] || []).forEach(function (r) { if (String(r.comment || '').trim() || r.attend_status) ent[r.student_id] = 1; });
+      (res[3] || []).forEach(function (r) { if (!r.test && !log[r.student_id]) log[r.student_id] = r; });     /* 가장 최근 한 줄 */
+      var rows = [];
+      list.slice().sort(function (a, b) { return (a.name || '').localeCompare(b.name || '', 'ko'); }).forEach(function (s) {
+        if (pub[s.id] && snt[s.id]) return;
+        var r = { sid: s.id, name: s.name || '', why: '', kind: '' };
+        if (s.startOn && s.startOn > day) { r.why = '수강 시작 전(' + Lesson.md(s.startOn, false) + ' 시작) · 대상 제외'; r.kind = 'out'; }
+        else if (s.leftOn && s.leftOn < day) { r.why = '퇴원(마지막 수업 ' + Lesson.md(s.leftOn, false) + ') · 대상 제외'; r.kind = 'out'; }
+        else if (!pub[s.id]) { r.why = ent[s.id] ? '작성 중(공개 안 함)' : '레포트 작성 전'; r.kind = 'write'; }
+        else if (!phonesOf(s)) { r.why = '번호 없음(학생 · 학부모)'; r.kind = 'phone'; }
+        else if (log[s.id] && log[s.id].status === 'fail') {
+          var er = String(log[s.id].error || '').trim();
+          if (/바뀌지 않은 칸/.test(er)) { r.why = '바뀌지 않은 칸이 있어 보내지 않음'; r.kind = 'left'; }
+          else { r.why = '문자 발송 실패(' + (er ? er.slice(0, 40) : '이유 모름') + ')'; r.kind = 'fail'; }
+        }
+        else if (log[s.id] && log[s.id].status === 'pending') { r.why = '보내는 중'; r.kind = 'wait'; }
+        else { r.why = '공개함 · 아직 안 보냄'; r.kind = 'unsent'; }
+        rows.push(r);
+      });
+      st.whyData[open] = { rows: rows, err: res.some(function (x) { return x === null; }) };
+      render();
+    });
+  }
+  function whyHtml(w) {
+    var open = w.open_start, d = st.whyData[open] || { loading: true };
+    var body = d.loading ? '<p class="wkv-why__hint">불러오는 중…</p>'
+      : !d.rows.length ? '<p class="wkv-why__hint">빠진 학생이 없습니다' + (d.err ? ' (일부 기록을 불러오지 못했습니다)' : '') + '.</p>'
+      : '<ul class="wkv-why__list">' + d.rows.map(function (r) {
+          return '<li class="wkv-why__r wkv-why__r--' + r.kind + '">' +
+            '<button type="button" class="wkv-why__n" data-wkv-open="' + esc(r.sid) + '" title="이 학생 레포트 작성 화면 열기">' + esc(r.name) + '</button>' +
+            '<span class="wkv-why__t">' + esc(r.why) + '</span>' +
+            (r.kind === 'fail' || r.kind === 'unsent' ? '<button type="button" class="btn btn--sm wkv-why__re" data-wkv-resend="' + esc(r.sid) + '">' + (r.kind === 'fail' ? '다시 보내기' : '보내기') + '</button>' : '') +
+            '</li>';
+        }).join('') + '</ul>' + (d.err ? '<p class="wkv-why__hint">일부 기록을 불러오지 못해 이유가 정확하지 않을 수 있습니다.</p>' : '');
+    return '<div class="wkv-why" data-why-for="' + esc(open) + '" role="region" aria-label="공개 · 발송이 안 된 학생">' + body + '</div>';
+  }
+  function openStudent(open, sid) {
+    Promise.resolve(Writer.openWeek(open)).then(function () { setTimeout(function () { if (Writer.goEntry) Writer.goEntry(sid); }, 60); });
+  }
+  /* [다시 보내기] — 문자 발송 화면을 그 학생 · 그 주 레포트 안내로 (보내기 전 받는 사람 · 글을 한 번 더 본다) */
+  function resend(open, sid) {
+    var w = weekOf(open);
+    if (!window.Sms || !Sms.open || !w) return;
+    Sms.open({ students: [sid], week: w.open_start, from: 'send', to: 'both' });
   }
 
   function thisWeekStart() {
@@ -201,6 +292,13 @@
     var us = e.target.closest('[data-wunskip]');
     if (us) { if (window.Skips) Skips.unskip(st.cls, us.dataset.wunskip, true); return; }
     if (e.target.closest('#wkvMore')) { st.more = true; render(); return; }
+    var wy = e.target.closest('[data-wkv-why]');
+    if (wy) { toggleWhy(wy.dataset.wkvWhy); return; }
+    var wo = e.target.closest('[data-wkv-open]');
+    if (wo) { var box = wo.closest('[data-why-for]'); openStudent(box.dataset.whyFor, wo.dataset.wkvOpen); return; }
+    var rs = e.target.closest('[data-wkv-resend]');
+    if (rs) { resend(rs.closest('[data-why-for]').dataset.whyFor, rs.dataset.wkvResend); return; }
+    if (e.target.closest('.wkv-why')) return;
     var v = e.target.closest('[data-wv]');
     if (v) {
       if (!v.disabled && v.dataset.sid && window.Preview) Preview.open(v.dataset.sid, 'parent', 'report', v.dataset.wv);

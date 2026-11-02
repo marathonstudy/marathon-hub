@@ -2073,6 +2073,7 @@
     mode: function () { return mode; },
     setMode: setMode,
     openWeek: openWeek,
+    goEntry: goEntry,   /* 레포트 발송 목록 빠진 학생 이름 → 그 학생 카드 (20261102e) */
     openWeeks: openWeeks,
     autoOpen: autoOpen,
     autoNote: function () { return autoNote ? { cls: autoNote.cls, week: autoNote.week, text: autoNote.text } : null; },
