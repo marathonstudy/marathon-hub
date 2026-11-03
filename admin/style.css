@@ -3051,10 +3051,11 @@ td .av--s { margin-right: 6px; }
 /* ---------- 과제 칩 → 기간 · 날짜별 표 (today.js · 20261031f) ---------- */
 .tdc-app--btn { appearance: none; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; position: relative; }
 .tdc-app--btn:hover, .tdc-app--btn[aria-expanded="true"] { filter: brightness(.95); box-shadow: 0 0 0 2px rgba(90,63,208,.18); }
-@media (hover: hover) {
-  .tdc-app--btn[data-tip]:hover::after { content: attr(data-tip); position: absolute; left: 0; bottom: calc(100% + 5px);
-    white-space: nowrap; background: #2C3566; color: #fff; font-size: 12px; font-weight: 600; padding: 4px 8px; border-radius: 6px; z-index: 30; pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,.18); }
-}
+/* 설명 상자 — 화면 맨 위층 한 장 (tip.js · 20261103a) · 카드 · 머리줄에 가리지 않음 · 위 자리 모자라면 아래 · 화면 끝 안 잘림 */
+.tip-layer { position: fixed; left: 0; top: 0; z-index: 2147483000; max-width: 320px; width: max-content; box-sizing: border-box; padding: 5px 9px; border-radius: 7px;
+  background: #2C3566; color: #fff; font-size: 12.5px; font-weight: 600; line-height: 1.45; white-space: normal; overflow-wrap: anywhere; word-break: keep-all;
+  pointer-events: none; box-shadow: 0 3px 10px rgba(0,0,0,.2); }
+.tip-layer[hidden] { display: none; }
 .hd-box { flex: 1 1 100%; min-width: 0; margin: 6px 0 4px; padding: 10px; border: 1px solid #DCDFEA; border-radius: 12px; background: #fff; display: grid; gap: 6px; }
 .snd-row .hd-box { margin: 0 0 8px; }
 .hd-tr > td { padding: 0 6px 8px; }
@@ -3126,10 +3127,6 @@ button.tdc-tc { appearance: none; font: inherit; font-size: 12.5px; font-weight:
 .tdc-sub__t.tdc-grid { margin: 6px 0 2px; }
 .tdc-sub__n { grid-column: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tdc-grid__rest { min-height: 1px; }
-@media (hover: hover) {
-  .tdc-th[data-tip]:hover::after { content: attr(data-tip); position: absolute; left: 0; bottom: calc(100% + 5px); white-space: nowrap; background: #2C3566; color: #fff;
-    font-size: 12px; font-weight: 600; padding: 4px 8px; border-radius: 6px; z-index: 30; pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,.18); }
-}
 /* 반 카드 오른쪽 위 「과제 10:35 기준 · 새로고침」 */
 .td-appstamp { display: flex; justify-content: flex-end; align-items: center; gap: 2px; margin: -4px 0 6px; font-size: 12px; color: var(--ink-light); }
 .td-appstamp__b { appearance: none; border: 0; background: none; font: inherit; font-size: 12px; font-weight: 700; color: #5A3FD0; cursor: pointer; padding: 2px; }
