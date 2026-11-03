@@ -32,7 +32,7 @@
       if (tests.some(function (t) { return t.name === rvName; })) return;
       if (rv.status === 'absent') tests.push({ name: rvName, kind: 'review', absent: String(rv.reason_label || '').trim() || '미응시' });
       else if (rv.status === 'missing') tests.push({ name: rvName, kind: 'review', absent: '미응시' });
-      else tests.push({ name: rvName, score: clampPct(rv.score), correct: rv.correct, total: rv.q_count, kind: 'review' });
+      else tests.push(Object.assign({ name: rvName, score: clampPct(rv.score), correct: rv.correct, total: rv.q_count, kind: 'review' }, rv.alt ? { alt: true } : {}));   /* 반 전체 대체 시험 — 「17 / 20 · 85점」 (migration-063) */
     });
 
     /* 수업일 · 과제 기간 (반 수업 요일을 정했을 때만 · migration-011). 예전 레포트에는 없다 */

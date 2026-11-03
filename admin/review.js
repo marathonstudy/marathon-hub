@@ -21,6 +21,12 @@
    · [지금 제출 현황]: 교실 화면용 — 이름 옆에 시험별 제출 여부만 (점수는 아예 불러오지 않는다)
    · [시험별 평균]: 반 단위, 최근 시험들의 평균 점수 — 낸 점수 그대로 (코치룸에서만)
    · [지난 시험지 사진 정리] — 점수는 남기고 사진만 지운다
+   · 표의 시험 이름 머리를 누르면 메뉴 (20261103b · migration-063): [이번 주 다른 시험으로 바꾸기] [이번 주 이 시험 빼기]
+     바꾸기 = 대체 시험 이름 · 전체 문항 수(선택) → [적용] — 이번 수업에만 반 전체가 그 시험으로 (서버 review_alt_set)
+       원래 시험에 점수를 낸 학생이 있으면 「n명이 원래 시험 점수가 있어요. 그대로 둘까요?」 · 결석은 결석 그대로
+       점수 안 넣은 학생은 「대체 · 점수 입력 전」(칸에서 바로 [점수 입력]) · 레포트에는 「대체 시험 응시 · 파이널 모의고사」
+       적용 뒤 5초 「반 전체를 파이널 모의고사로 바꿨어요 · 되돌리기」 · 대체 시험 머리 메뉴 [원래 시험으로 되돌리기]
+     학생 한 명만 대체는 그 학생 칸 [미응시] → 「대체 시험」(예전 이름 「다른 시험으로 대체」)
    ============================================================ */
 
 (function () {
@@ -37,7 +43,8 @@
   var NEED_SQL = 'migration-025 SQL 을 먼저 실행해 주세요 (README 5-22).';
   var NEED_028 = '미응시는 migration-028 SQL 을 먼저 실행해 주세요 (README 5-25).';
   /* 미응시 사유 — 서버(migration-028)와 같은 이름 · 메모는 대체 · 기타에만 */
-  var REASONS = [['absent', '결석'], ['late', '지각'], ['counsel', '상담 중'], ['replaced', '다른 시험으로 대체'], ['other', '기타']];
+  var REASONS = [['absent', '결석'], ['late', '지각'], ['counsel', '상담 중'], ['replaced', '대체 시험'], ['other', '기타']];   /* 「대체 시험」 — 예전 「다른 시험으로 대체」 (20261103b) */
+  var NEED_063 = '반 전체 대체는 migration-063 SQL 을 먼저 실행해 주세요 (README 5-85).';
   /* 작성 화면에서 고른 미응시(사유 없음) · 응시(점수는 아직) — migration-048 */
   var EXTRA = { none: '미응시', taken: '응시' };
   function reasonLabel(k) { var r = REASONS.filter(function (x) { return x[0] === k; })[0]; return r ? r[1] : EXTRA[k] || ''; }
@@ -45,7 +52,7 @@
   var BUCKET = 'review-photos';
   var SHRINK = { maxSide: 1280, target: 150 * 1024 };
 
-  var st = { cls: '', week: '', mon: '', key: '', data: null, missing: false, role: '', edit: null, live: null, liveTimer: null };
+  var st = { cls: '', week: '', mon: '', key: '', data: null, missing: false, role: '', edit: null, live: null, liveTimer: null, menu: '', alt: null, undo: null };
 
   function monday(iso) {
     if (!iso) return '';
@@ -129,7 +136,7 @@
       (st.course ? ' · <span class="rv-course">과정 모든 반에 같은 시험 · 마감 ' + esc(st.course.members.map(function (m) { return Course.shortName(m.cls) + ' ' + Lesson.md(m.date); }).join(' · ')) + ' 밤 12시</span>'
         : ' · 마감 ' + esc(Lesson.md(String(day).slice(0, 10))) + ' 밤 12시') +
       (on.length ? ' <span class="muted-note rv-count">' + on.map(function (t) { return esc(countText(t, rows)); }).join(' · ') + '</span>' : '') +
-      all.filter(function (t) { return t.off; }).map(function (t) {
+      all.filter(function (t) { return t.off && !t.alt_to; }).map(function (t) {
         return ' <span class="rv-off">' + esc(t.test_name) + ' 이번 주 안 봄 · <button type="button" class="link-btn" data-rv="on" data-tid="' + esc(t.id) + '">되돌리기</button></span>';
       }).join('');
     tools.innerHTML = '<button class="btn btn--sm" type="button" data-rv="add">+ 시험 추가 (이번 주만)</button>' +
@@ -138,22 +145,63 @@
 
     if (!on.length) { host.innerHTML = '<p class="panel__hint">이번 주 시험을 모두 껐습니다.</p>'; return; }
     if (!rows.length) { host.innerHTML = '<p class="panel__hint">이 반에 다니는 학생이 없습니다.</p>'; return; }
-    host.innerHTML = '<div class="roster-scroll"><table class="roster tb-table rv-table"><thead><tr>' +
-      '<th>학생</th>' + on.map(function (t) { return '<th>' + esc(label(t)) + '</th>'; }).join('') + '<th>사진</th></tr></thead><tbody>' +
+    host.innerHTML = undoHtml() + altFormHtml() + '<div class="roster-scroll"><table class="roster tb-table rv-table"><thead><tr>' +
+      '<th>학생</th>' + on.map(function (t) { return '<th class="rv-thc">' + thHtml(t) + '</th>'; }).join('') + '<th>사진</th></tr></thead><tbody>' +
       rows.map(function (x) { return rowHtml(x, on); }).join('') + '</tbody></table></div>';
   }
 
   /* 「복습 TEST 제출 9 · 미응시 1 / 11」 (미응시가 없으면 「복습 TEST 제출 9 / 11」) */
   function countText(t, rows) {
     var sub = rows.filter(function (x) { return x.subs && x.subs[t.id]; }).length;
-    var ab = rows.filter(function (x) { return absentOf(x, t); }).length;
-    return t.test_name + ' 제출 ' + sub + (ab ? ' · 미응시 ' + ab : '') + ' / ' + rows.length;
+    /* 「대체 시험」(한 명 대체)은 미응시로 세지 않는다 (20261103b) */
+    var ab = rows.filter(function (x) { var a = absentOf(x, t); return a && a.reason !== 'replaced'; }).length;
+    var rp = rows.filter(function (x) { var a = absentOf(x, t); return a && a.reason === 'replaced'; }).length;
+    if (isAlt(t)) {
+      var wait = rows.filter(function (x) { return altWait(x, t); }).length, kept = rows.filter(function (x) { return keptOf(x, t); }).length;
+      return t.test_name + '(대체) 점수 ' + sub + (wait ? ' · 입력 전 ' + wait : '') + (kept ? ' · 원래 점수 ' + kept : '') + (ab ? ' · 결석 등 ' + ab : '') + ' / ' + rows.length;
+    }
+    return t.test_name + ' 제출 ' + sub + (ab ? ' · 미응시 ' + ab : '') + (rp ? ' · 대체 시험 ' + rp : '') + ' / ' + rows.length;
+  }
+  /* 반 전체 대체 (migration-063) — alt_of: 대체한 원래 시험 · 원래 점수를 그대로 둔 학생(keep_orig) · 점수 입력 전 */
+  function isAlt(t) { return !!(t && t.alt_of); }
+  function origOf(t) { return t && t.alt_of ? testOf(t.alt_of) : null; }
+  function keptOf(x, t) { var s = isAlt(t) && x && x.subs ? x.subs[t.alt_of] : null; return s && s.keep_orig ? s : null; }
+  function altWait(x, t) { return isAlt(t) && !(x && x.subs && x.subs[t.id]) && !absentOf(x, t) && !keptOf(x, t); }
+  /* 시험 이름 머리 — 누르면 메뉴 [이번 주 다른 시험으로 바꾸기] [이번 주 이 시험 빼기] · 대체 시험은 [원래 시험으로 되돌리기] */
+  function thHtml(t) {
+    var open = st.menu === t.id, o = origOf(t), n = subCount(t);
+    var b = function (act, txt, dis, note) { return '<button type="button" class="rv-thmenu__b" role="menuitem" data-rv="' + act + '" data-tid="' + esc(t.id) + '"' + (dis ? ' disabled' : '') + '>' + txt + (note ? ' <small>' + note + '</small>' : '') + '</button>'; };
+    return '<button type="button" class="rv-th' + (o ? ' is-alt' : '') + '" data-rv="thmenu" data-tid="' + esc(t.id) + '" aria-haspopup="menu" aria-expanded="' + open + '">' +
+        '<span class="rv-th__n">' + esc(label(t)) + '</span><span class="rv-th__ar" aria-hidden="true">▾</span></button>' +
+      (o ? '<span class="rv-th__alt">대체 · 원래 ' + esc(o.test_name) + '</span>' : '') +
+      (open ? '<div class="rv-thmenu" role="menu" aria-label="' + esc(label(t)) + '">' +
+        (o ? b('alt-undo', '원래 시험으로 되돌리기', false, subCount(t) ? '대체 점수 ' + subCount(t) + '명 있음' : '')
+           : b('alt-open', '이번 주 다른 시험으로 바꾸기') + b('skip-one', '이번 주 이 시험 빼기', !!n, n ? '제출 ' + n + '명 있음 · 뺄 수 없음' : '')) +
+      '</div>' : '');
+  }
+  function altFormHtml() {
+    var a = st.alt, t = a && testOf(a.tid);
+    if (!t) return '';
+    return '<div class="rv-altform" role="group" aria-label="이번 주 다른 시험으로 바꾸기">' +
+      '<div class="rv-altform__head"><b>' + esc(label(t)) + ' → 이번 주 다른 시험으로 바꾸기</b> <span class="muted-note">이번 수업에만 · 반 전체가 바뀝니다 · 결석은 결석 그대로</span></div>' +
+      '<div class="rv-altform__in">' +
+        '<label class="field"><span class="field__label">대체 시험 이름</span><input class="input" type="text" maxlength="20" data-rv-altname value="' + esc(a.name) + '" placeholder="예: 파이널 모의고사"></label>' +
+        '<label class="field"><span class="field__label">전체 문항 수 (선택)</span><input class="input input--num" type="number" min="1" max="100" inputmode="numeric" data-rv-altq value="' + esc(a.q) + '" placeholder="예: 20"></label>' +
+      '</div>' +
+      '<div class="wk-edit__btns"><button class="btn btn--sm btn--primary" type="button" data-rv="alt-apply">적용</button>' +
+        '<button class="btn btn--sm btn--ghost" type="button" data-rv="alt-cancel">취소</button></div>' +
+    '</div>';
+  }
+  function undoHtml() {
+    if (!st.undo) return '';
+    return '<div class="rv-undo" role="status">반 전체를 ' + esc(st.undo.name) + '로 바꿨어요 · <button type="button" class="link-btn" data-rv="alt-undo-now">되돌리기</button></div>';
   }
   function absentOf(x, t) { return (x && !(x.subs && x.subs[t.id]) && x.absent && x.absent[t.id]) || null; }
   /* 「미응시 · 결석」 · 사유 없이 고른 미응시는 「미응시」 · 응시(점수 없음)는 「응시 · 점수 없음」 */
   function absText(ab) {
     if (!ab) return '';
     if (ab.reason === 'taken') return '응시 · 점수 없음';
+    if (ab.reason === 'replaced') return '대체 시험';                 /* 한 명 대체 — 미응시라고 쓰지 않는다 (20261103b) */
     var l = ab.label || reasonLabel(ab.reason);
     return l && l !== '미응시' ? '미응시 · ' + l : '미응시';
   }
@@ -179,6 +227,14 @@
   function cellHtml(x, t) {
     var s = x.subs && x.subs[t.id];
     var ab = absentOf(x, t);
+    /* 반 전체 대체 — 원래 점수를 그대로 둔 학생 · 점수 입력 전 (칸에서 바로 [점수 입력]) */
+    if (isAlt(t)) {
+      var kp = keptOf(x, t);
+      if (kp) return '<td class="rv-cell is-kept"><div class="num rv-cell__score">' + esc(scoreText(kp)) + '</div><div class="muted-note">원래 시험(' + esc((origOf(t) || {}).test_name || '') + ') 점수 그대로</div></td>';
+      if (altWait(x, t)) return '<td class="rv-cell is-altwait"><div><span class="rv-st rv-st--alt">대체 · 점수 입력 전</span></div>' +
+        '<div class="tb-acts"><button class="btn btn--sm" type="button" data-rv="entry" data-tid="' + esc(t.id) + '">점수 입력</button>' +
+        '<button class="btn btn--sm btn--ghost" type="button" data-rv="absent" data-tid="' + esc(t.id) + '">결석 · 사유</button></div></td>';
+    }
     /* 미응시 — 회색 「미응시 · 결석」(누르면 사유 바꾸기 · 미응시 취소) · 메모는 여기(코치룸)에서만 */
     if (ab) {
       return '<td class="rv-cell is-absent">' +
@@ -283,14 +339,19 @@
     var t = b.dataset.tid ? testOf(b.dataset.tid) : null;
     var s = x && t && x.subs ? x.subs[t.id] : null;
 
+    if (act !== 'thmenu' && st.menu) st.menu = '';
+    if (act === 'thmenu' && t) { st.menu = st.menu === t.id ? '' : t.id; draw(); return; }
+    if (act === 'skip-one' && t) { draw(); skipAsk(t, 0); return; }
+    if (act === 'alt-open' && t) { st.alt = { tid: t.id, name: '', q: '' }; draw(); var ai = document.querySelector('#rvTable [data-rv-altname]'); if (ai) try { ai.focus(); } catch (er) {} return; }
+    if (act === 'alt-cancel') { st.alt = null; draw(); return; }
+    if (act === 'alt-apply') { applyAlt(); return; }
+    if (act === 'alt-undo' && t) { draw(); undoAlt(t.id); return; }
+    if (act === 'alt-undo-now' && st.undo) { undoAlt(st.undo.id); return; }
     if (act === 'skip') { openSkip(); return; }
     if (act === 'skip-pick' && t) {
       $('#rvSkipModal').close();
       /* 창이 닫힌 뒤 확인 창 (뒤로가기 기록이 꼬이지 않게 · nav.js) */
-      setTimeout(function () {
-        UI.confirmAsk('이번 주 시험 빼기', label(t) + '를 이번 주 시험에서 뺄까요? 학생 화면에서도 사라집니다.', '빼기')
-          .then(function (yes) { if (yes) call('review_test_set', { p_test: t.id, p_off: true }, label(t) + '를 이번 주 시험에서 뺐습니다'); });
-      }, 60);
+      skipAsk(t, 60);
       return;
     }
     if (act === 'on' && t) call('review_test_set', { p_test: t.id, p_off: false }, label(t) + '를 다시 넣었습니다');
@@ -301,7 +362,7 @@
     }
     if (act === 'clean') cleanPhotos();
     if (act === 'edit' && s) { st.edit = { sid: x.student_id, tid: t.id, mode: 'edit', q: String(s.q_count), w: String(wrongN(s)), blobs: [] }; draw(); focusEditor(); }
-    if (act === 'entry' && x && t) { st.edit = { sid: x.student_id, tid: t.id, mode: 'entry', q: '', w: '', blobs: [] }; draw(); focusEditor(); }
+    if (act === 'entry' && x && t) { st.edit = { sid: x.student_id, tid: t.id, mode: 'entry', q: isAlt(t) ? String(t.q_count || '') : '', w: '', blobs: [] }; draw(); focusEditor(); }
     if (act === 'absent' && x && t) {
       var ab = absentOf(x, t);
       st.edit = { sid: x.student_id, tids: [t.id], mode: 'absent', all: false, reason: ab ? ab.reason : '', memo: ab ? ab.memo || '' : '', had: !!ab };
@@ -322,12 +383,50 @@
     if (act === 'photo' && x) showPhotos(photosOf(x));
   }
 
+  /* 창이 닫힌 뒤 확인 창 (뒤로가기 기록이 꼬이지 않게 · nav.js) */
+  function skipAsk(t, delay) {
+    setTimeout(function () {
+      UI.confirmAsk('이번 주 시험 빼기', label(t) + '를 이번 주 시험에서 뺄까요? 학생 화면에서도 사라집니다.', '빼기')
+        .then(function (yes) { if (yes) call('review_test_set', { p_test: t.id, p_off: true }, label(t) + '를 이번 주 시험에서 뺐습니다'); });
+    }, delay);
+  }
+  /* 이번 주 다른 시험으로 바꾸기 — 반 전체 · 이번 수업만 (migration-063 review_alt_set) */
+  function applyAlt() {
+    var a = st.alt, t = a && testOf(a.tid);
+    if (!t) return Promise.resolve();
+    var nm = String(a.name || '').trim(), q = String(a.q == null ? '' : a.q).trim();
+    if (!nm) { toast('대체 시험 이름을 적어 주세요 (예: 파이널 모의고사)', 'bad'); return Promise.resolve(); }
+    if (nm.length > 20) { toast('대체 시험 이름은 20자까지입니다', 'bad'); return Promise.resolve(); }
+    if (q && (!/^\d+$/.test(q) || +q < 1 || +q > 100)) { toast('전체 문항 수는 1 ~ 100 으로 적어 주세요 (비워 두어도 됩니다)', 'bad'); return Promise.resolve(); }
+    var n = subCount(t);
+    var ask = n ? UI.confirmAsk('원래 시험 점수', n + '명이 원래 시험 점수가 있어요. 그대로 둘까요?', '그대로 두기', '대체 시험으로 바꾸기') : Promise.resolve(false);
+    return ask.then(function (keep) {
+      return sb().rpc('review_alt_set', { p_test: t.id, p_name: nm, p_q: q ? +q : null, p_keep: !!keep }).then(function (r) {
+        if (r.error) { toast(isMissing(r.error) ? NEED_063 : r.error.message, 'bad'); return; }
+        st.alt = null; st.menu = '';
+        var id = r.data && r.data.test && r.data.test.id;
+        st.undo = { id: id, name: nm };
+        setTimeout(function () { if (st.undo && st.undo.id === id) { st.undo = null; draw(); } }, 5000);   /* 「되돌리기」는 5초 */
+        window.dispatchEvent(new CustomEvent('jt:review-changed', { detail: { cls: st.cls, week: st.mon } }));
+        return load();
+      });
+    });
+  }
+  function undoAlt(id) {
+    return sb().rpc('review_alt_clear', { p_alt: id }).then(function (r) {
+      if (r.error) { toast(isMissing(r.error) ? NEED_063 : r.error.message, 'bad'); return; }
+      st.undo = null;
+      toast('원래 시험으로 되돌렸습니다', 'good');
+      window.dispatchEvent(new CustomEvent('jt:review-changed', { detail: { cls: st.cls, week: st.mon } }));
+      return load();
+    });
+  }
   /* 이번 주 시험 빼기 — 보는 시험 목록에서 고른다. 제출이 있으면 뺄 수 없다 (서버 review_test_set 도 막는다) */
   function subCount(t) {
     return ((st.data && st.data.rows) || []).filter(function (x) { return x.subs && x.subs[t.id]; }).length;
   }
   function openSkip() {
-    var on = onTests();
+    var on = onTests().filter(function (t) { return !isAlt(t); });
     if (!on.length) return;
     $('#rvSkipList').innerHTML = on.map(function (t) {
       var n = subCount(t);
@@ -342,6 +441,8 @@
   function focusEditor() { var i = document.querySelector('#rvTable [data-rv-eq]'); if (i) try { i.focus(); } catch (er) {} }
 
   function onInput(e) {
+    if (st.alt && e.target.hasAttribute('data-rv-altname')) { st.alt.name = e.target.value; return; }
+    if (st.alt && e.target.hasAttribute('data-rv-altq')) { st.alt.q = e.target.value; return; }
     if (!st.edit) return;
     if (e.target.hasAttribute('data-rv-memo')) { st.edit.memo = e.target.value; return; }
     if (e.target.hasAttribute('data-rv-eq')) st.edit.q = e.target.value;
@@ -551,6 +652,10 @@
 
   function bind() {
     if (!$('#rvSub')) return;
+    document.addEventListener('click', function (e) {
+      if (st.menu && !(e.target.closest && e.target.closest('.rv-thc'))) { st.menu = ''; draw(); }
+    });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && st.menu) { st.menu = ''; draw(); } });
     $('#rvSub').addEventListener('click', onClick);
     $('#rvSkipList').addEventListener('click', onClick);
     $('#rvSkipClose').addEventListener('click', function () { $('#rvSkipModal').close(); });
@@ -592,11 +697,13 @@
     var x = rowOf(sid);
     var subs = (x && x.subs) || {};
     var anySub = on.some(function (t) { return subs[t.id]; });
-    if (!anySub && !on.some(function (t) { return absentOf(x, t); })) return '아직 제출 안 함';
+    if (!anySub && !on.some(function (t) { return absentOf(x, t) || altWait(x, t) || keptOf(x, t); })) return '아직 제출 안 함';
     /* 미응시 — 「복습 TEST 미응시(결석)」 (migration-028) */
     var parts = on.map(function (t) {
-      var s = subs[t.id], ab = absentOf(x, t);
-      if (!s) return t.test_name + (!ab ? ' 미제출' : ab.reason === 'taken' ? ' 응시(점수 없음)' : ab.reason === 'none' ? ' 미응시' : ' 미응시(' + (ab.label || reasonLabel(ab.reason)) + ')');
+      var s = subs[t.id], ab = absentOf(x, t), kp = keptOf(x, t);
+      if (kp) return ((origOf(t) || {}).test_name || '') + ' ' + kp.correct + '/' + kp.q_count;
+      if (altWait(x, t)) return t.test_name + ' 대체 · 점수 입력 전';
+      if (!s) return t.test_name + (!ab ? ' 미제출' : ab.reason === 'taken' ? ' 응시(점수 없음)' : ab.reason === 'replaced' ? ' 대체 시험' : ab.reason === 'none' ? ' 미응시' : ' 미응시(' + (ab.label || reasonLabel(ab.reason)) + ')');
       return t.test_name + ' ' + s.correct + '/' + s.q_count;
     });
     return parts.join(' · ');
@@ -622,7 +729,7 @@
     var rows = st.data.rows || [];
     return onTests().map(function (t) {
       var f = { 시험: t.test_name, 제출: rows.filter(function (x) { return x.subs && x.subs[t.id]; }).length, 전체: rows.length };
-      var ab = rows.filter(function (x) { return absentOf(x, t); }).length;
+      var ab = rows.filter(function (x) { var a = absentOf(x, t); return a && a.reason !== 'replaced'; }).length;
       if (ab) f.미응시 = ab;
       return f;
     });
@@ -633,7 +740,7 @@
     var x = rowOf(sid) || {}, subs = x.subs || {};
     return onTests().map(function (t) {
       var ab = absentOf(x, t);
-      return { 시험: t.test_name, 제출: subs[t.id] ? '냄' : ab ? '미응시(' + (ab.label || reasonLabel(ab.reason)) + ')' : '안 냄' };
+      return { 시험: t.test_name, 제출: subs[t.id] || keptOf(x, t) ? '냄' : altWait(x, t) ? '대체 시험 응시' : ab ? (ab.reason === 'replaced' ? '대체 시험' : '미응시(' + (ab.label || reasonLabel(ab.reason)) + ')') : '안 냄' };
     });
   }
 
@@ -646,8 +753,10 @@
   var splitOpen = {};
   function stateOf(x, t, closed) {
     if (x && x.subs && x.subs[t.id]) return 'sub';
+    if (keptOf(x, t)) return 'sub';
+    if (altWait(x, t)) return 'taken';
     var ab = absentOf(x, t);
-    if (ab) return ab.reason === 'absent' ? 'absent' : ab.reason === 'taken' ? 'taken' : 'missing';
+    if (ab) return ab.reason === 'absent' ? 'absent' : ab.reason === 'taken' || ab.reason === 'replaced' ? 'taken' : 'missing';
     return closed ? 'missing' : 'pending';
   }
   function statusOf(cls, week, sid) {

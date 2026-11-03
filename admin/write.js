@@ -963,7 +963,7 @@
     /* 과정 화면 — 반마다 그 반 시험 (불러 둔 점수로) */
     if (line == null && isCourse(currentClass)) {
       var rows = Store.reviewsOf(id, draft.weekStart);
-      line = rows.length ? rows.map(function (x) { return (x.label || x.test_name || '복습 TEST').replace(/^\d+\/\d+\([^)]*\)\s*/, '') + ' ' + (x.status === 'absent' || x.status === 'missing' ? '미응시' : x.correct != null ? x.correct + '/' + x.q_count : '제출'); }).join(' · ') : '아직 제출 안 함';
+      line = rows.length ? rows.map(function (x) { return (x.label || x.test_name || '복습 TEST').replace(/^\d+\/\d+\([^)]*\)\s*/, '') + ' ' + (x.status === 'absent' && /^대체 시험/.test(x.reason_label || '') ? x.reason_label : x.status === 'absent' || x.status === 'missing' ? '미응시' : x.correct != null ? x.correct + '/' + x.q_count : '제출'); }).join(' · ') : '아직 제출 안 함';
     }
     host.textContent = line == null ? '불러오는 중…' : line;
     host.classList.toggle('is-none', line === '아직 제출 안 함');

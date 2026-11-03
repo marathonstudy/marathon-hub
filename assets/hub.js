@@ -886,13 +886,13 @@
     tests.forEach(function (t) {
       if (!t || t.kind !== 'review' || t.submitted || t.absent || t.score == null) return;
       var n = stripDay(t.name);
-      if (n && !has(n)) got.push({ name: n, score: Number(t.score), correct: t.correct, q: t.total, diff: null });
+      if (n && !has(n)) got.push({ name: n, score: Number(t.score), correct: t.correct, q: t.total, diff: null, alt: !!t.alt });
     });
     var live = Array.isArray(RVW[mon]) ? RVW[mon] : null;
     (live || []).forEach(function (x) {
       if (!x || has(x.test_name)) return;
       if (x.status === 'absent') abs.push({ name: x.test_name, reason: x.reason_label || '' });
-      else if (x.correct != null && x.q_count != null) got.push({ name: x.test_name, score: null, correct: x.correct, q: x.q_count, diff: null });
+      else if (x.correct != null && x.q_count != null) got.push({ name: x.test_name, score: x.alt ? x.score : null, correct: x.correct, q: x.q_count, diff: null, alt: !!x.alt });
       else done.push(x.test_name);         /* 030 전 서버 — 맞은 수가 안 오면 「제출 완료」 */
     });
     tests.forEach(function (t) {
@@ -906,7 +906,7 @@
     var dot = '<span class="tw-dot"> · </span>';
     return '<span class="tw-rvs">' + got.map(function (x) {
       var df = x.diff;
-      return '<span>' + esc(x.name) + ' <b class="num">' + (x.q != null && x.correct != null ? esc(x.correct) + '/' + esc(x.q) : esc(x.score) + '점') + '</b>' +
+      return '<span>' + esc(x.name) + ' <b class="num">' + (x.q != null && x.correct != null ? esc(x.correct) + '/' + esc(x.q) + (x.alt && x.score != null ? ' · ' + esc(x.score) + '점' : '') : esc(x.score) + '점') + '</b>' +
         (df > 0 ? ' <span class="tw-up num">▲' + df + '</span>' : df < 0 ? ' <span class="tw-down num">▼' + (-df) + '</span>' : '') + '</span>';
     }).concat(done.map(function (n) {
       return '<span>' + esc(n) + ' <b class="tw-ok">제출 완료</b></span>';

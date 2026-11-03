@@ -259,7 +259,7 @@
       return '<div class="test-item">' +
                '<div class="test-header">' +
                  '<span class="test-name">' + esc(t.name) + '</span>' +
-                 '<span class="test-score-text num">' + (t.correct != null && t.total != null ? (+t.correct) + ' / ' + (+t.total) : score + '<small>점</small>') + '</span>' +
+                 '<span class="test-score-text num">' + (t.correct != null && t.total != null ? (+t.correct) + ' / ' + (+t.total) + (t.alt ? ' · ' + score + '<small>점</small>' : '') : score + '<small>점</small>') + '</span>' +
                '</div>' +
                '<div class="progress-bar"><div class="progress-fill" data-width="' + score + '"></div></div>' +
              '</div>';
@@ -271,6 +271,7 @@
   function absentText(reason) {
     var r = String(reason === true ? '' : reason || '').trim();
     if (r === '응시') return '응시';
+    if (/^대체 시험/.test(r)) return r;          /* 「대체 시험」 · 「대체 시험 응시 · 파이널 모의고사」 — 미응시라고 쓰지 않는다 (migration-063) */
     return r && r !== '미응시' ? '미응시 · ' + r : '미응시';
   }
 

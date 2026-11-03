@@ -2678,6 +2678,32 @@ body:not(.report-step-write) #classPanel { display: none; }
 .td-todo__none { margin: 2px 0; font-size: 13.5px; color: #35806A; font-weight: 700; }
 .tdc-n { margin-left: 2px; }
 
+/* 복습테스트 — 시험 이름 머리 메뉴 · 반 전체 다른 시험으로 바꾸기 (review.js · 20261103b) */
+.rv-thc { vertical-align: top; min-width: 150px; }
+.rv-th { appearance: none; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; max-width: 100%; padding: 4px 10px; border: 1.5px solid #D9D3F5; border-radius: 10px;
+  background: #fff; font: inherit; font-size: 13.5px; font-weight: 800; color: var(--ink-deep); text-align: left; cursor: pointer; }
+.rv-th:hover, .rv-th[aria-expanded="true"] { background: #F3F0FF; border-color: #A898EC; }
+.rv-th:focus-visible { outline: 2px solid #6A55D8; outline-offset: 2px; }
+.rv-th.is-alt { border-color: #B9A6F2; background: #F7F4FF; }
+.rv-th__ar { color: #6A55D8; font-size: 13px; }
+.rv-th__alt { display: block; margin-top: 3px; font-size: 12px; font-weight: 700; color: #5A3FD0; }
+.rv-thmenu { display: grid; gap: 4px; margin-top: 6px; padding: 6px; border: 1px solid #DCDFEA; border-radius: 10px; background: #fff; box-shadow: 0 4px 12px rgba(40, 30, 90, .12); }
+.rv-thmenu__b { appearance: none; min-height: 40px; padding: 6px 10px; border: 0; border-radius: 8px; background: #F6F5FB; font: inherit; font-size: 13.5px; font-weight: 700; color: #4A33B8; text-align: left; cursor: pointer; }
+.rv-thmenu__b:hover:not(:disabled) { background: #ECE7FF; }
+.rv-thmenu__b:disabled { color: var(--ink-light); cursor: default; }
+.rv-thmenu__b small { display: block; font-weight: 600; color: var(--ink-light); }
+.rv-altform { display: grid; gap: 8px; margin: 0 0 10px; padding: 12px; border: 1.5px solid #C9BEF5; border-radius: 12px; background: #FAF8FF; }
+.rv-altform__in { display: flex; flex-wrap: wrap; gap: 8px 12px; }
+.rv-altform__in .field { flex: 1 1 180px; margin: 0; }
+.rv-undo { margin: 0 0 10px; padding: 8px 12px; border-radius: 10px; background: #2C3566; color: #fff; font-size: 14px; font-weight: 700; }
+.rv-undo .link-btn { color: #CFC5FF; font-weight: 800; }
+.rv-st--alt { background: #F1ECFF; color: #4A33B8; }
+.rv-cell.is-kept .muted-note { color: #5A3FD0; }
+@media (max-width: 600px) {
+  .rv-thc { min-width: 132px; }
+  .rv-th { min-height: 44px; width: 100%; font-size: 14px; }
+  .rv-thmenu__b { min-height: 44px; font-size: 14.5px; }
+}
 /* 복습테스트 — 이번 주 시험 빼기 (review.js · 20261029g) */
 .rv-off { display: inline-flex; align-items: baseline; gap: 4px; margin-left: 6px; padding: 1px 8px; border-radius: 999px; background: #F3F1F8; color: var(--ink-mid); font-size: 12.5px; }
 .link-btn { border: 0; background: none; padding: 0; color: #5B42D6; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
