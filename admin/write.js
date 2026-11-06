@@ -1357,6 +1357,7 @@
     renderSnipBar();
     $('#commentWarn').classList.remove('is-on');
     commentModal.showModal();
+    if (window.AiPolish) AiPolish.refresh('commentAi');
     setTimeout(function () { $('#commentText').focus(); }, 40);
   }
 
@@ -1952,8 +1953,8 @@
 
   /* 레포트 발송 → 2 공개이 목록을 만들기 전에 마지막 입력까지 저장해 둔다 */
   /* ============================================================
-     「AI로 다듬기」 · 「AI로 초안 쓰기」 (aipolish.js · text-polish · 20261029g)
-       반 공통 코멘트 · 학생 코멘트(코멘트 창) — 다듬기 + 초안 · 수업 내용(차시 줄 묶음) — 다듬기
+     코멘트 「AI에게 부탁하기」 · 수업 내용 「AI로 다듬기」 (aipolish.js · text-polish · 20261029g · 20261106d)
+       반 공통 코멘트 · 학생 코멘트(코멘트 창) — 칸 하나 · 부탁하기 · 수업 내용(차시 줄 묶음) — 다듬기
        글 칸은 다시 그릴 때 새로 만들어지므로(setFresh · freshCommentText) 읽기 · 쓰기를 함수로 준다
        초안 자료는 화면에 이미 있는 것만 — 수업 내용 · 과제 수행 · 복습테스트 제출 여부(점수 없음) · 자료 이름 · 출결 · 집중도.
        학생 이름 · 전화번호 · 금액 · 상담 내용은 넣지 않는다
@@ -2008,15 +2009,15 @@
   if (window.AiPolish) {
     /* 반 공통 코멘트 */
     AiPolish.attach($('#commonComment'), {
-      kind: 'comment', id: 'commonAi', host: $('#commonAiHost'),
+      kind: 'comment', id: 'commonAi', host: $('#commonAiHost'), ask: true, field: function () { return $('#commonComment'); },
       get: function () { return $('#commonComment').value; },
       set: function (v) { var el = $('#commonComment'); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); },
       draft: function () { return Promise.resolve(classDraftFacts()); },
       scope: aiScope
     });
-    /* 코멘트 창 — 반 공통(크게 쓰기) 또는 학생 한 명. 학생 창에서 반 공통을 쓰는 중이면 빈 칸으로 보고 초안을 바로 넣는다 */
+    /* 코멘트 창 — 반 공통(크게 쓰기) 또는 학생 한 명. 학생 창에서 반 공통을 쓰는 중이면 빈 칸으로 보고 새로 쓴다 */
     AiPolish.attach($('#commentText'), {
-      kind: 'comment', id: 'commentAi', host: $('#commentAiHost'),
+      kind: 'comment', id: 'commentAi', host: $('#commentAiHost'), ask: true, field: function () { return $('#commentText'); },
       get: function () { return $('#commentText').value; },
       set: function (v) { var el = $('#commentText'); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); },
       isEmpty: function () { return !$('#commentText').value.trim() || (!commentIsClass && !commentOwnMode); },

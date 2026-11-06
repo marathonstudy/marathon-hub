@@ -10,6 +10,9 @@
 //    action 'revise'         — 「AI에게 고쳐 달라고 하기」 (20261031p) — 지금 글(text · 손으로 고친 것 포함)을 요청(request · 2~300자)대로 고친다.
 //                             처음부터 새로 쓰지 않는다. facts(빼 달라는 자료는 화면이 이미 뺐다) · orig(원래 글)는 참고만.
 //                             자리표시 · 링크는 지금 글 그대로, 숫자 · 날짜 · 요일은 지금 글 · 자료 · 원래 글에 있는 것만
+//    ask: true (20261106d · 코멘트 칸 「AI에게 부탁하기」) — draft + request(부탁대로 새로 쓰기) · revise.
+//                             부탁 문장에 쓴 날짜 · 숫자 · 링크는 쓸 수 있다(모든 revise 공통). 자료에 없는 숫자 · 요일은 막지 않고 「확인할 것」으로 알린다 (글이 칸에 바로 들어가 사람이 본다)
+//    실패하면 why(시간 초과 · 키 · 크레딧 · 검사 …)를 돌려주고 함수 로그에 남긴다 (글 · 이름은 남기지 않는다)
 //  「확인할 것」(check) — 초안에 넣은 숫자 · 날짜가 자료와 다를 수 있는 것처럼 정말 확인할 것만 최대 2개 (「공개해도 되는지」 같은 일반 당부는 거른다)
 //    1) 부른 사람의 로그인 토큰으로 DB 함수 polish_begin → 직원인지 · 이번 달 상한(기본 500회)이 남았는지 서버가 확인
 //    2) Claude(Haiku 5.5)에 글(또는 자료)만 보낸다. 학생 이름 · 전화번호는 보내지 않는다 (#{이름} 같은 자리표시 그대로)
@@ -121,7 +124,8 @@ const DRAFT_SYSTEM = [
   "",
   "규칙",
   RULES,
-  "- 자료에 없는 내용(사건 · 칭찬 거리 · 성적 · 일정)은 쓰지 않는다. 시험 점수 숫자, 금액, 상담 내용은 넣지 않는다.",
+  "- 선생님 부탁(<request>)이 있으면 가장 먼저 따른다. 부탁에 적힌 날짜 · 일정 · 내용은 자료에 없어도 그대로 쓴다. 자료는 부탁에 어울리는 만큼만 참고한다.",
+  "- 부탁에도 없고 자료에 없는 내용(사건 · 칭찬 거리 · 성적 · 일정)은 쓰지 않는다. 시험 점수 숫자, 금액, 상담 내용은 넣지 않는다.",
   "- 학생 이름은 쓰지 않는다 (「이번 주」 「한 주 동안」처럼 쓴다).",
   "- 자료가 부족해 쓰기 어려운 부분은 지어내지 말고 check 에 「확인할 것」으로 짧게 적는다.",
   CHECK_RULE,
@@ -175,7 +179,7 @@ const lineCount = (t: string) => t.split("\n").filter((x) => x.trim()).length;
 
 /* 받은 글 검사 — 고칠 수 있는 것(**, 이모지)은 지우고, 사실 · 자리표시 · 링크가 바뀐 글은 돌려주지 않는다.
    orig 는 원래 글(다듬기) 또는 자료 글(초안). 초안은 자리표시 · 링크 · 숫자가 자료 안의 것이면 된다 */
-export function checkPolished(orig: string, out: string, opt: { draft?: boolean; lines?: boolean; base?: string } = {}): { ok: boolean; text: string; why: string; missing: string[] } {
+export function checkPolished(orig: string, out: string, opt: { draft?: boolean; lines?: boolean; base?: string; soft?: boolean } = {}): { ok: boolean; text: string; why: string; missing: string[]; added?: string[] } {
   let text = out.replace(/\*\*/g, "").replace(/__/g, "").replace(/^[ \t]*#{1,6}[ \t]+/gm, "").replace(EMOJI, "")
     .replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
   if (!text) return { ok: false, text, why: "empty", missing: [] };
@@ -190,14 +194,17 @@ export function checkPolished(orig: string, out: string, opt: { draft?: boolean;
   if (ut.some((u) => !uo.has(u))) return { ok: false, text, why: "links", missing: [] };
   if (!opt.draft && Array.from(opt.base != null ? new Set(urlsOf(opt.base)) : uo).some((u) => !ut.includes(u))) return { ok: false, text, why: "links", missing: [] };
   const no = new Set(numsOf(orig));
-  if (numsOf(text).some((n) => !no.has(n))) return { ok: false, text, why: "numbers", missing: [] };
+  const newNums = numsOf(text).filter((n) => !no.has(n));
+  if (newNums.length && !opt.soft) return { ok: false, text, why: "numbers", missing: [] };
   const dowo = new Set(dowsOf(orig));
-  if (dowsOf(text).some((d) => !dowo.has(d))) return { ok: false, text, why: "dow", missing: [] };
+  const newDows = dowsOf(text).filter((d) => !dowo.has(d));
+  if (newDows.length && !opt.soft) return { ok: false, text, why: "dow", missing: [] };
   for (const w of ["(광고)", "수신거부"]) if (text.includes(w) && !orig.includes(w)) return { ok: false, text, why: "ad", missing: [] };
   if (opt.lines && lineCount(text) !== lineCount(opt.base ?? orig)) return { ok: false, text, why: "lines", missing: [] };
   const nt = new Set(numsOf(text));
   const missing = opt.draft || opt.base != null ? [] : Array.from(no).filter((n) => !nt.has(n));
-  return { ok: true, text: text.slice(0, MAX_LONG * 2), why: "", missing };
+  const added = Array.from(new Set([...newNums, ...newDows.map((d) => d + "요일")]));
+  return { ok: true, text: text.slice(0, MAX_LONG * 2), why: "", missing, added };
 }
 
 /* 초안 자료 → 글 (학생 이름 · 번호는 화면이 넣지 않는다. 혹시 들어와도 전화번호 꼴은 지운다) */
@@ -214,6 +221,7 @@ async function polish(req: Request, cors: Record<string, string>) {
   const body: Any = await req.json().catch(() => ({}));
   const draft = body.action === "draft";
   const revise = body.action === "revise";
+  const ask = body.ask === true;
   /* 반 기본 요청 (migration-043) · 고쳐 달라는 요청 · 칸에 있던 글 · 원래 글 */
   const always: string[] = (Array.isArray(body.requests) ? body.requests : []).map((x: unknown) => String(x ?? "").replace(/\s+/g, " ").trim().slice(0, MAX_REQ)).filter((x: string) => x.length >= 2).slice(0, 8);
   const request = String(body.request ?? "").replace(/\r\n?/g, "\n").trim();
@@ -227,39 +235,44 @@ async function polish(req: Request, cors: Record<string, string>) {
   const max = kind === "notice" || kind === "general" ? MAX_LONG : MAX_CHARS;
   let source = text;
   if (draft) {
-    source = factsText(body.facts);
+    if (request.length > MAX_REQ) return json({ ok: false, reason: "input", message: `부탁은 ${MAX_REQ}자까지 쓸 수 있습니다 (지금 ${request.length}자).` }, cors, 400);
+    source = factsText(body.facts) + (request ? "\n" + request : "");
     if (source.length < 3) return json({ ok: false, reason: "input", message: "초안을 쓸 자료가 없습니다." }, cors, 400);
   } else if (revise) {
     if (!text) return json({ ok: false, reason: "input", message: "고칠 글이 없습니다." }, cors, 400);
     if (text.length > MAX_LONG) return json({ ok: false, reason: "input", message: `글이 너무 깁니다 (${text.length}자). ${MAX_LONG}자까지 고칠 수 있습니다.` }, cors, 400);
     if (request.length < 2) return json({ ok: false, reason: "input", message: "어떻게 고칠지 적어 주세요 (2자 이상)." }, cors, 400);
     if (request.length > MAX_REQ) return json({ ok: false, reason: "input", message: `요청은 ${MAX_REQ}자까지 쓸 수 있습니다 (지금 ${request.length}자).` }, cors, 400);
-    source = [text, orig, body.facts ? factsText(body.facts) : ""].filter(Boolean).join("\n");
+    source = [text, orig, body.facts ? factsText(body.facts) : "", request].filter(Boolean).join("\n");
   } else {
     if (!text) return json({ ok: false, reason: "input", message: "다듬을 내용을 먼저 써 주세요." }, cors, 400);
     if (text.length > max) return json({ ok: false, reason: "input", message: `내용이 너무 깁니다 (${text.length}자). ${max}자까지 다듬을 수 있습니다.` }, cors, 400);
   }
 
   const key = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
-  if (!key) return json({ ok: false, reason: "nokey", message: SORRY, detail: "Claude 키가 아직 설정되지 않았습니다." }, cors, 200);
+  if (!key) console.error("text-polish fail", "nokey");
+  if (!key) return json({ ok: false, reason: "nokey", why: "nokey", message: SORRY, detail: "Claude 키가 아직 설정되지 않았습니다." }, cors, 200);
 
   /* 1) 직원 확인 · 월 상한 */
   let begin: Any;
   try {
     begin = await rpcAs(auth, apikey, "polish_begin", { p_chars: source.length, p_length: draft ? "draft" : revise ? "revise" : length });
   } catch (e) {
-    return json({ ok: false, reason: "auth", message: String((e as Error).message || e) }, cors, 403);
+    console.error("text-polish fail", "auth", String((e as Error).message || e).slice(0, 200));
+    return json({ ok: false, reason: "auth", why: "auth", message: String((e as Error).message || e) }, cors, 403);
   }
   if (!begin?.ok) {
-    return json({ ok: false, reason: "cap", message: SORRY, detail: `이번 달 다듬기 상한(${begin?.cap}회)을 모두 썼습니다.`, used: begin?.used, cap: begin?.cap }, cors, 200);
+    console.error("text-polish fail", "cap", begin?.used, begin?.cap);
+    return json({ ok: false, reason: "cap", why: "cap", message: SORRY, detail: `이번 달 다듬기 상한(${begin?.cap}회)을 모두 썼습니다.`, used: begin?.used, cap: begin?.cap }, cors, 200);
   }
 
   const finish = (args: Record<string, unknown>) =>
     rpcAs(auth, apikey, "polish_finish", { p_usage: begin.usage_id, p_ok: false, p_model: MODEL, p_in: 0, p_out: 0, p_cost: 0, p_error: "", ...args })
       .catch(() => null);
-  const fail = async (why: string, usage: Record<string, unknown> = {}) => {
+  const fail = async (why: string, usage: Record<string, unknown> = {}, detail = "") => {
+    console.error("text-polish fail", draft ? "draft" : revise ? "revise" : "polish", why, detail.slice(0, 300));
     const f = await finish({ ...usage, p_error: why });
-    return json({ ok: false, reason: "claude", message: SORRY, used: f?.used ?? begin.used - 1, cap: begin.cap }, cors, 200);
+    return json({ ok: false, reason: "claude", why, message: SORRY, used: f?.used ?? begin.used - 1, cap: begin.cap }, cors, 200);
   };
 
   /* 2) Claude — 글(또는 자료)만 */
@@ -268,7 +281,8 @@ async function polish(req: Request, cors: Record<string, string>) {
     const guide = target === "class"
       ? "반 공통 코멘트 초안을 4~6문장으로 쓴다. 「이번 주에 배운 것 → 다음 주까지 할 것」 순서로. 수업 내용 · 앱 과제 수행 · 복습테스트 제출 현황 · 배부 자료 이름을 근거로."
       : "학생 개별 코멘트 초안을 2~3문장으로 쓴다. 출결 · 집중도 · 앱 과제 수행 · 복습테스트 제출 여부 · 지난 기간과 비교한 흐름을 근거로. 반 공통 코멘트(classComment)와 겹치는 말은 쓰지 않는다.";
-    user = `${guide}\n\n<facts>\n${source}\n</facts>` + alwaysBlock + (kept ? `\n\n<kept>\n${kept}\n</kept>` : "");
+    user = (request ? `선생님 부탁을 가장 먼저 따라 쓴다. 분량도 부탁을 따르고, 부탁에 없으면 아래 기준으로.\n\n<request>\n${request}\n</request>\n\n` : "") +
+      `${guide}\n\n<facts>\n${factsText(body.facts)}\n</facts>` + alwaysBlock + (kept ? `\n\n<kept>\n${kept}\n</kept>` : "");
   } else if (revise) {
     user = `종류: ${KINDS[kind]}\n\n<request>\n${request}\n</request>` + alwaysBlock +
       `\n\n<current>\n${text}\n</current>` + (orig ? `\n\n<original>\n${orig}\n</original>` : "") +
@@ -289,12 +303,14 @@ async function polish(req: Request, cors: Record<string, string>) {
     } as Any);
   } catch (e) {
     let why = "connect";
-    if (e instanceof Anthropic.AuthenticationError) why = "auth-key";
+    const emsg = String((e as Any)?.message ?? "");
+    if ((e as Any)?.name === "APIConnectionTimeoutError" || /timed? ?out/i.test(emsg)) why = "timeout";
+    else if (e instanceof Anthropic.AuthenticationError) why = "auth-key";
     else if (e instanceof Anthropic.PermissionDeniedError) why = "permission";
     else if (e instanceof Anthropic.RateLimitError) why = "rate-limit";
-    else if (e instanceof Anthropic.BadRequestError) why = "bad-request";
-    else if (e instanceof Anthropic.APIError) why = `api ${(e as Any).status}`;
-    return await fail(why);
+    else if (e instanceof Anthropic.BadRequestError) why = /credit balance/i.test(emsg) ? "credit" : "bad-request";
+    else if (e instanceof Anthropic.APIError) why = (e as Any).status === 529 ? "overload" : `api ${(e as Any).status}`;
+    return await fail(why, {}, emsg);
   }
 
   const inTok = Number(res?.usage?.input_tokens) || 0;
@@ -312,11 +328,12 @@ async function polish(req: Request, cors: Record<string, string>) {
   if (!parsed || typeof parsed.text !== "string") return await fail("empty", usage);
 
   /* 3) 검사 — 자리표시 · 링크 · 숫자 · 요일 · 광고 표시 · (수업 내용) 줄 수 */
-  const c = checkPolished(draft && kept ? source + "\n" + kept : source, parsed.text, { draft, lines: !draft && kind === "lessons", base: revise ? text : undefined });
+  const c = checkPolished(draft && kept ? source + "\n" + kept : source, parsed.text, { draft, lines: !draft && kind === "lessons", base: revise ? text : undefined, soft: ask });
   if (!c.ok) return await fail("check " + c.why, usage);
 
   /* 확인할 것 — 빠진 숫자 · 단문 넘침이 먼저, AI 가 적은 것은 일반 당부를 거르고 · 모두 합쳐 2개까지 */
   const extra: string[] = c.missing.map((n) => `원래 글의 「${n}」이(가) 빠졌어요. 꼭 필요하면 다시 넣어 주세요.`);
+  if (c.added && c.added.length) extra.push(`자료 · 부탁에 없는 「${c.added.slice(0, 4).join(" · ")}」이(가) 들어갔어요. 맞는지 확인해 주세요.`);
   const b = bytes(c.text);
   if (!draft && !revise && kind === "sms" && length === "short" && b > 90 && !(parsed.check || []).some((x: unknown) => /90바이트/.test(String(x)))) extra.push(`90바이트(단문) 안에 다 담지 못했어요 — ${b}바이트`);
   const check = cleanChecks(parsed.check, extra);
@@ -334,7 +351,7 @@ Deno.serve(async (req) => {
   try {
     return await polish(req, cors);
   } catch (e) {
-    console.error("text-polish", (e as Error)?.name || "error");
-    return json({ ok: false, reason: "server", message: SORRY }, cors, 500);
+    console.error("text-polish fail", "server", (e as Error)?.name || "error", String((e as Error)?.message ?? "").slice(0, 300));
+    return json({ ok: false, reason: "server", why: "server", message: SORRY }, cors, 500);
   }
 });

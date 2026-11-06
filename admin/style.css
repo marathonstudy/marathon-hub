@@ -4130,3 +4130,22 @@ textarea.aip-text--new:focus { outline: 2px solid #B9AEF0; outline-offset: 1px; 
 }
 /* 종강 · 마지막 레포트 남음 — 반 카드 이름 옆 (today.js · 20261106c) */
 .tdc-endleft { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 999px; background: #FFF1DF; color: #874A0B; font-size: 12px; font-weight: 800; white-space: nowrap; }
+/* 코멘트 칸 하나 · AI에게 부탁하기 (aipolish.js · 20261106d) */
+.aip-bar--ask { margin: 2px 0 4px; }
+.aip-askbox { margin-top: 6px; display: grid; gap: 4px; }
+.aip-askbox > .aip-msg, .aip-askbox > .aip-note { margin: 0; }
+.aip-check--fold { margin: 0; padding: 2px 8px; border: 1px solid #F3D9A6; border-radius: 8px; background: #FFF9EE; font-size: 12px; }
+.aip-check--fold[hidden] { display: none; }
+.aip-check--fold > summary { min-height: 26px; line-height: 26px; cursor: pointer; font-weight: 800; color: #874A0B; }
+.aip-quick--ask { gap: 4px; }
+.aip-quick--ask .aip-q { min-height: 28px; padding: 2px 9px; font-size: 12px; }
+.aip-askline { display: grid; gap: 2px; min-width: 0; }
+.aip-askline__t { font-size: 12.5px; font-weight: 800; color: #4A34B8; }
+.aip-askline__row { display: flex; gap: 6px; min-width: 0; }
+.aip-askline .aip-req { flex: 1 1 auto; min-width: 0; min-height: 38px; font-size: 14px; }
+.aip-askline .aip-req::placeholder { font-size: 12.5px; }
+.aip-send { flex: none; min-height: 38px; }
+@media (max-width: 600px) {
+  .aip-quick--ask .aip-q { min-height: 34px; }
+  .aip-askline .aip-req { font-size: 16px; }
+}
