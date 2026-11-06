@@ -1143,10 +1143,10 @@
       } else row.insertAdjacentHTML('beforeend', html);
     });
   }
-  /* 휴대폰(480px 이하) — 반 카드 학생 이름을 누르면 과제 상세 (가장 최근 레포트 기간 칸과 같음 · 상담 카드는 ⋯ 메뉴) ·
+  /* 휴대폰(600px 이하) — 반 카드 학생 이름을 누르면 과제 상세 (가장 최근 레포트 기간 칸과 같음 · 상담 카드는 ⋯ 메뉴) ·
      열 과제 기간이 없는 학생(링크 없음 · 못 불러옴)은 예전처럼 상담 카드 · 컴퓨터는 그대로 상담 카드 (20261106a) */
   function phoneNameCell(t) {
-    if (!window.matchMedia || !matchMedia('(max-width: 480px)').matches) return null;
+    if (!window.matchMedia || !matchMedia('(max-width: 600px)').matches) return null;
     var nm = t.closest('.tdc-st .roster__name-btn');
     if (!nm) return null;
     var cells = Array.prototype.slice.call(nm.closest('.tdc-st').querySelectorAll('.tdc-tc[data-app-detail]'));
@@ -1288,7 +1288,7 @@
       return tl(perLabel(p)) + triCell(s, p, perVal(s, p), p.live ? ' is-live' : '');
     }).join('');
   }
-  /* 휴대폰(480px 이하) — 칸 위에 아주 작게 기간 이름 (컴퓨터는 머리칸이 있어 숨김 · 20261106a) */
+  /* 휴대폰(600px 이하) — 칸 위에 아주 작게 기간 이름 (컴퓨터는 머리칸이 있어 숨김 · 20261106a · 600px 20261106b) */
   function tl(t) { return '<span class="tdc-tl num" aria-hidden="true">' + esc(t) + '</span>'; }
   function triCell(s, p, v, live) {
       if (!v || v.k === 'pre') return '<span class="tdc-tc tdc-tc--muted' + live + '" title="' + esc(perTip(p)) + '">시작 전</span>';
@@ -1455,7 +1455,7 @@
     var id = esc(s.id);
     var btns = '<button type="button" class="btn btn--sm" data-card="' + id + '">상담 카드</button>' +
       '<button type="button" class="btn btn--sm" data-sms-sid="' + id + '">문자</button>';
-    /* [상담 기록 +] (quicknote.js · 20261031o) — 휴대폰(480px 이하)은 버튼을 모두 숨기고 「⋯」 메뉴 안으로 (20261106a) */
+    /* [상담 기록 +] (quicknote.js · 20261031o) — 휴대폰(600px 이하)은 버튼을 모두 숨기고 「⋯」 메뉴 안으로 (20261106a) */
     return '<div class="tdc-st__acts">' + btns + (window.QuickNote ? QuickNote.btnHtml(s.id, s.name) : '') +
       '<details class="tdc-more"><summary class="btn btn--sm tdc-more__b" aria-label="' + esc(s.name) + ' 더 보기">⋯</summary><div class="tdc-more__menu">' + btns + (window.QuickNote ? QuickNote.btnHtml(s.id, s.name) : '') +
         (window.AppLink && AppLink.openHtml ? AppLink.openHtml(s.id, { noAdd: true, cls: 'btn btn--sm' }) : '') + '</div></details></div>';

@@ -883,6 +883,9 @@ delete from public.staff where email = '조교이메일@example.com';
 - 레포트 발송 → 3 발송: 이름이 「라마바사…」로 줄던 것 → 이름 그대로 · 버튼이 다음 줄로. 1 작성 · 2 공개는 재 보니 넘침 없어 그대로
 - PC · 481px 이상 「오늘」: 요소 위치 전부 예전과 같음(481 · 600 · 720 · 1024 · 1280px 비교) · 화면 시험 12개(375 · 412px)
 
+### 5-87. 20261106b — 휴대폰 학생 목록 기준 480 → 600px (SQL · 함수 배포 없음)
+- 5-86 의 세 줄 카드 · 이름 → 과제 상세 · 칸 좁히기 · 위쪽 보라 띠를 접는 폰 · 작은 태블릿(481~600px)까지 — 481~550px 에서 줄이 카드보다 넓어 페이지가 밀리던 것 · 601px 이상 그대로
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

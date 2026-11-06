@@ -4048,13 +4048,13 @@ textarea.aip-text--new:focus { outline: 2px solid #B9AEF0; outline-offset: 1px; 
 }
 
 /* ============================================================
-   20261106a — 휴대폰(480px 이하) 「오늘」 학생 줄을 세 줄짜리 작은 카드로
+   20261106a — 휴대폰(600px 이하 · 20261106b 에서 480 → 600) 「오늘」 학생 줄을 세 줄짜리 작은 카드로
    원인: 391px 이상에서 격자가 고정 폭(이름 11.5em + 92px 칸 3개)이라 줄이 카드보다 넓었고,
          오늘 수업 반 카드는 펼치면 overflow: visible 이라 넘친 줄이 카드 보라 테두리를 가로질렀다.
-   1줄 이름 · 신입 · 상담 없음 · [⋯] / 2줄 기간 이름 / 3줄 세 칸. PC(481px 이상)는 그대로.
+   1줄 이름 · 신입 · 상담 없음 · [⋯] / 2줄 기간 이름 / 3줄 세 칸. PC(601px 이상)는 그대로.
    ============================================================ */
 .tdc-tl { display: none; }
-@media (max-width: 480px) {
+@media (max-width: 600px) {
   /* 카드 테두리 — 오늘 수업 · 내 반 표시는 보라 세로줄 대신 카드 위쪽 띠 */
   .tdc-card.is-today, .tdc-card.is-mine { box-shadow: none; border-color: var(--line); border-top: 3px solid var(--indigo); }
   .tdc-card { min-width: 0; }
