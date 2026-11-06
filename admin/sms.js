@@ -1377,11 +1377,14 @@
           var cls = (x.classes || []).slice(0, 3).join(', ') + ((x.classes || []).length > 3 ? ' 외 ' + ((x.classes || []).length - 3) : '');
           return '<li><button type="button" class="sms-batch' + (x.fail ? ' has-fail' : '') + '" data-batch="' + i + '">' +
               '<span class="sms-batch__main"><span class="num">' + esc(fmtAt(x.at)) + '</span> · ' + (cls ? esc(cls) + ' ' : '') + esc(name) + ' · <span class="num">' + x.n + '</span>건 · 성공 <span class="num">' + x.ok + '</span>' + (x.fail ? ' · <b class="sms-batch__bad">실패 ' + x.fail + '</b>' : '') + '</span>' +
-              '<span class="sms-batch__sub muted-note">' + (x.via === 'kakao' ? '알림톡' : '문자') + (x.test ? ' · 내 번호 확인용' : '') + ' · ' + esc(x.by_name || '') + '</span>' +
+              '<span class="sms-batch__sub muted-note">' + (x.via === 'kakao' ? '알림톡' : '문자') + (x.test ? ' · 내 번호 확인용' : '') + ' · ' + esc(x.by_name || '') + copyTag(x.copy) + '</span>' +
             '</button></li>';
         }).join('') + '</ul>';
     });
   }
+  /* 사본을 보냈는지 (migration-064 · 20261106g) */
+  var COPY_TAG = { sent: ['사본 보냄', 'sms-copytag--ok'], fail: ['사본 실패', 'sms-copytag--bad'], wait: ['사본 곧 보냄', ''], digest: ['사본 저녁 9시', ''], none: ['사본 없음(번호 없음)', ''] };
+  function copyTag(c) { var v = COPY_TAG[c]; return v ? ' · <span class="sms-copytag ' + v[1] + '">' + v[0] + '</span>' : ''; }
   /* 040 전 — 예전처럼 한 건씩 */
   function findLogFlat(host) {
     return sb().rpc('sms_log_search', Object.assign(logArgs(), { p_limit: 300 })).then(function (r) {
@@ -1478,7 +1481,7 @@
       '<div class="conn-card conn-card--' + (c ? (mmax - month > 0 ? 'ok' : 'bad') : 'warn') + '"><div class="conn-card__k">이번 달 남은 건수</div><div class="conn-card__v" id="connMonth">' + (c ? '<span class="num">' + Math.max(0, mmax - month).toLocaleString() + '</span>건' : '—') + '</div><div class="conn-card__s">' + (c ? '이번 달 ' + month.toLocaleString() + '건 보냄 · 한 달 최대 ' + mmax.toLocaleString() + '건 · 오늘 ' + (c.today || 0) + ' / ' + c.dailyMax : 'migration-023 · 040 SQL 을 실행하면 보입니다') + '</div></div>' +
       '</div>' +
       '<div class="conn-row">' +
-        '<label class="field"><span class="field__label">내 시험 번호 <span class="field__opt">나만 보입니다 · [나에게 시험 발송]이 이 번호로</span></span>' +
+        '<label class="field"><span class="field__label">내 시험 번호 <span class="field__opt">나만 보입니다 · [나에게 시험 발송]이 이 번호로 · 원장 계정의 이 번호로 모든 발송 사본이 갑니다</span></span>' +
           '<input class="input" id="connTestPhone" type="tel" inputmode="numeric" autocomplete="off" placeholder="' + esc(phone || '010-1234-5678') + '"></label>' +
         '<button class="btn btn--sm" type="button" id="connTestSave">내 번호 저장</button>' +
         '<span class="field__hint" id="connTestNow">' + (phone ? '지금: <span class="num">' + esc(phone) + '</span> (빈 칸으로 저장하면 지웁니다)' : '아직 없습니다') + '</span>' +
@@ -1489,6 +1492,7 @@
         '<button class="btn btn--sm" type="button" id="connTestKakao"' + (kk && kk.ready ? '' : ' disabled title="카톡 알림톡이 연동되면 쓸 수 있습니다"') + '>카톡 한 통</button>' +
         '<span class="field__hint" id="connTestMsg" role="status"></span>' +
       '</div>' +
+      '<div class="conn-row" id="connCopy" hidden></div>' +
       '<div class="extra-head" style="margin-top:16px"><span class="extra-head__title">마라톤 앱 설치 링크</span></div>' +
       (c ? '<div class="conn-row conn-row--app">' +
           '<label class="field"><span class="field__label">안드로이드 (구글 플레이)</span><input class="input" id="connAndroid" type="url" autocomplete="off" spellcheck="false" placeholder="https://play.google.com/store/apps/details?id=…" value="' + esc(c.androidUrl || '') + '"></label>' +
@@ -1497,6 +1501,26 @@
         '</div><p class="field__hint">앱 안내 문자의 #{앱 설치 링크}에 들어갑니다' + (appLinks(c) ? '' : ' · 지금은 비어 있어 앱 안내 문자를 보낼 수 없습니다') + '.</p>'
         : '<p class="panel__hint">migration-040 SQL 을 실행하면 넣을 수 있습니다.</p>');
   }
+  /* 발송 사본 — 원장 시험 번호로 · 자동 발송은 저녁 9시에 모아 받기 (migration-064 · 20261106g) */
+  function paintCopy() {
+    var el = $('#connCopy');
+    if (!el) return;
+    sb().rpc('sms_copy_status').then(function (r) {
+      if (r.error || !r.data) { el.hidden = true; return; }
+      el.hidden = false;
+      el.innerHTML = '<span class="field__label">발송 사본</span>' +
+        '<span class="field__hint" id="connCopyNow">' + (r.data.on ? '모든 발송의 사본이 원장 시험 번호로 갑니다 (한 번 보낼 때 1통 · 「[사본]」)' : '원장 계정의 시험 번호가 비어 있어 사본을 보내지 않습니다') + '</span>' +
+        '<label class="checkbox"><input type="checkbox" id="connCopyDigest"' + (r.data.digest ? ' checked' : '') + '> 자동 발송 사본은 하루 한 번 저녁 9시에 모아서 받기</label>';
+    }, function () { el.hidden = true; });
+  }
+  document.addEventListener('change', function (e) {
+    if (!e.target || e.target.id !== 'connCopyDigest') return;
+    var on = e.target.checked;
+    sb().rpc('sms_copy_digest_set', { p_on: on }).then(function (r) {
+      if (r.error) { e.target.checked = !on; toast(r.error.message, 'bad'); return; }
+      toast(on ? '자동 발송 사본을 저녁 9시에 모아서 받습니다' : '자동 발송 사본을 바로 받습니다', 'good');
+    });
+  });
   function loadConn() {
     var host = $('#smsConn');
     host.innerHTML = '<p class="panel__hint">연결 상태를 확인하는 중…</p>';
@@ -1504,6 +1528,7 @@
     return Promise.all([invoke({ action: 'status' }), loadKakao(), loadCfg().then(function () { return st.cfg; }), kc]).then(function (res) {
       st.smsStatus = res[0];
       host.innerHTML = connHtml(res[0], res[1], res[2], res[3]);
+      paintCopy();
       if (res[0] && res[0].ok && res[0].sender) { st.sender = Store.phoneFormat ? Store.phoneFormat(res[0].sender) : res[0].sender; $('#smsFrom').textContent = '보내는 번호: ' + st.sender; }
       loadSettings(res[0]);
       if (window.Kakao && Kakao.loadSettings) Kakao.loadSettings();

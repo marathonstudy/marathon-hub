@@ -11,6 +11,8 @@
 //  수업 전 예고 — 같은 매분 실행에서 pre_remind_due → 앱 기록으로 밀린 과제 → pre_remind_prepare (학생 본인 · 같은 날 한 번 · 아래 preRemind)
 //  보낸 기록 — 문자 발송 → 보낸 기록에 「필기 알림(학생)」 「필기 알림(운영진)」 「수업 전 예고」 (번호는 뒤 4자리만)
 //
+//  사본 — 매분 copy_due → 묶음마다 1통 → 원장 시험 번호로 → copy_record (migration-064 · 20261106g).
+//         모든 발송의 사본을 여기 한 곳에서 보낸다. 사본이 실패해도 원래 발송에는 영향이 없다. 064 전이면 조용히 넘어간다.
 //  키 — sms-send 와 같은 솔라피 Secrets(SOLAPI_API_KEY · SOLAPI_API_SECRET · SOLAPI_SENDER).
 //       DB 는 Supabase 가 함수에 기본으로 주는 SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY 로 (이 함수 안에서만). 새로 넣을 키는 없다.
 //
@@ -111,8 +113,46 @@ async function sendRows(all: Any[], record = "note_remind_record") {
   }
   blocked.forEach((r) => results.push({ log_id: r.log_id, ok: false, error: leftMsg(leftOf(r.text)), message_id: "" }));
   await rpc(record, { p_results: results }).catch(() => {});
+  await rpc("msg_copy_note", { p_rows: all.map((r) => ({ log_id: r.log_id, text: r.text, name: r.name })) }).catch(() => {});
   const sent = results.filter((x) => x.ok).length;
   return { sent, failed: results.length - sent, blocked: blocked.length };
+}
+
+/* 사본 — 보낼 때가 된 것을 한 번에 (모든 발송 · sms-send · kakao-send 포함) */
+async function copyFlush(now: string) {
+  const due: Any = await rpc("copy_due", { p_now: now });
+  const list: Any[] = due?.messages || [];
+  if (!list.length || !due?.to) return { copies: 0 };
+  const from = env("SOLAPI_SENDER").replace(/\D/g, "");
+  const results: Any[] = list.map((m) => ({ id: m.id, ok: true, error: "", message_id: "" }));
+  try {
+    const res = await fetch(SOLAPI, {
+      method: "POST",
+      headers: { Authorization: await solapiAuth(env("SOLAPI_API_KEY"), env("SOLAPI_API_SECRET")), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: list.map((m) => ({ to: String(due.to), from, text: String(m.text || ""), type: m.kind === "LMS" ? "LMS" : "SMS", customFields: { copy: String(m.id) } })),
+        allowDuplicates: true, showMessageList: true,
+      }),
+    });
+    const out: Any = await res.json().catch(() => null);
+    if (!res.ok) {
+      const why = (out && (out.errorMessage || out.message || out.errorCode)) || `솔라피 오류 (${res.status})`;
+      results.forEach((x) => { x.ok = false; x.error = String(why).slice(0, 200); });
+    } else {
+      const failed = new Map<string, string>();
+      (out?.failedMessageList || []).forEach((f: Any) => { const id = f?.customFields?.copy; if (id) failed.set(String(id), `${f.statusCode || ""} ${f.statusMessage || ""}`.trim() || "접수 실패"); });
+      const ids = new Map<string, string>();
+      (out?.messageList || []).forEach((m: Any) => { if (m?.customFields?.copy) ids.set(String(m.customFields.copy), String(m.messageId || "")); });
+      results.forEach((x) => {
+        if (failed.has(String(x.id))) { x.ok = false; x.error = failed.get(String(x.id)); }
+        x.message_id = ids.get(String(x.id)) || "";
+      });
+    }
+  } catch {
+    results.forEach((x) => { x.ok = false; x.error = "솔라피에 연결하지 못했습니다."; });
+  }
+  await rpc("copy_record", { p_results: results }).catch((e) => console.error("copy_record", String((e as Error).message || e).slice(0, 160)));
+  return { copies: list.length, copyFailed: results.filter((x) => !x.ok).length };
 }
 
 /* ============================================================
@@ -262,7 +302,10 @@ async function handle(req: Request, cors: Record<string, string>) {
     /* 수업 전 예고 — 056 을 아직 안 돌렸거나 오류가 나도 필기 문자는 그대로 */
     let pre: Any = null;
     try { pre = await preRemind(now); } catch (e) { pre = { error: String((e as Error).message || e).slice(0, 160) }; }
-    return json({ ok: true, day: prep?.day, rows: rows.length, ...r, pre }, cors);
+    /* 사본 — 064 를 아직 안 돌렸거나 오류가 나도 다른 일은 그대로 */
+    let copy: Any = null;
+    try { copy = await copyFlush(now); } catch (e) { copy = { error: String((e as Error).message || e).slice(0, 160) }; }
+    return json({ ok: true, day: prep?.day, rows: rows.length, ...r, pre, copy }, cors);
   }
 
   /* 2) 「지금 다시 보내기」 — 로그인한 운영진 */

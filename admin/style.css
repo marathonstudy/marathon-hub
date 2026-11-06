@@ -4149,3 +4149,6 @@ textarea.aip-text--new:focus { outline: 2px solid #B9AEF0; outline-offset: 1px; 
   .aip-quick--ask .aip-q { min-height: 34px; }
   .aip-askline .aip-req { font-size: 16px; }
 }
+/* 보낸 기록 — 사본을 보냈는지 (sms.js · 20261106g) */
+.sms-copytag--ok { color: #135C3B; font-weight: 700; }
+.sms-copytag--bad { color: #9E1F3B; font-weight: 700; }

@@ -9,7 +9,8 @@
 //                        vars({ 학생 id: { code: 입장코드, first: 첫수업일 } }) }   (label · purpose · vars 는 migration-040 · first 는 052)
 //                      화면은 학생 id 와 보낼 곳만 보낸다. 번호 · 링크 코드는 부른 직원의 로그인으로 DB 함수 sms_prepare 가 찾는다
 //                      (같은 번호는 한 번만 · 한 번 · 하루 상한 · 광고 문구). 보낸 결과는 sms_record 로 기록(번호는 뒤 4자리만).
-//    action "test"   — 같은 내용을 첫 사람 것으로 바꿔, 설정에 넣은 내 시험 번호에 한 건만.
+//    action "test"   — 같은 내용을 첫 사람 것으로 바꿔, 설정에 넣은 내 시험 번호에 한 건만. 맨 앞 「[테스트] 」 (사본 「[사본] 」과 구분 · 20261106g)
+//  사본 — 보낸 뒤 msg_copy_note 로 첫 사람 글을 맡긴다. 보내는 일은 note-remind 가 매분 한 곳에서 (migration-064 · 원래 발송과 따로)
 //  솔라피는 「접수」 결과만 바로 알려 준다 (실제 도착 여부는 솔라피 콘솔의 발송 내역에서 본다).
 //
 //  키 — Supabase 대시보드 → Edge Functions → Secrets 에만 넣는다 (알림톡과 같은 값). 이 파일 · 저장소 · 화면에는 어떤 키도 없다.
@@ -158,7 +159,11 @@ async function handle(req: Request, cors: Record<string, string>) {
   }
   const skipped = (prep?.skipped || []).map((s: Any) => ({ student_id: s.student_id, name: s.name, to: s.to, reason: s.reason, label: REASON[s.reason] || s.reason }));
   if (!prep?.ok) return json({ ok: false, reason: prep?.reason || "prepare", message: prep?.message || "보낼 수 없습니다.", skipped }, cors, 200);
-  const all: Any[] = prep.rows || [];
+  const all: Any[] = (prep.rows || []).map((r: Any) => {
+    if (action !== "test") return r;
+    const tx = "[테스트] " + String(r.text || "");
+    return { ...r, text: tx, kind: bytes(tx) > 90 ? "LMS" : r.kind };
+  });
   /* 바뀌지 않은 칸이 남은 줄은 보내지 않는다 (20261101m) */
   const blocked: Any[] = all.filter((r) => leftOf(r.text).length);
   const rows: Any[] = all.filter((r) => !leftOf(r.text).length);
@@ -204,12 +209,21 @@ async function handle(req: Request, cors: Record<string, string>) {
 
   /* 3) 기록 (번호는 기록에 뒤 4자리만 — DB 가 처음부터 뒤 4자리만 받았다) */
   await rpcAs(auth, apikey, "sms_record", { p_results: results.map(({ log_id, ok, error, message_id }) => ({ log_id, ok, error, message_id })) }).catch(() => {});
+  /* 사본 — 글만 맡긴다 (실패해도 원래 발송과 상관없다) */
+  if (action !== "test") await rpcAs(auth, apikey, "msg_copy_note", { p_rows: all.map((r) => ({ log_id: r.log_id, text: r.text, name: r.name })) }).catch(() => {});
   const sent = results.filter((x) => x.ok).length;
   return json({
     ok: true, test: action === "test", sent, failed: results.length - sent, skipped,
     lms: rows.filter((r) => r.kind === "LMS").length, blocked: blocked.length,
     results: results.map((x) => ({ student_id: x.student_id, to: x.to, name: x.name, ok: x.ok, error: x.error })),
   }, cors);
+}
+
+/* 문자 바이트 — 한글 등은 2, 영문 · 숫자는 1 */
+function bytes(t: string): number {
+  let n = 0;
+  for (let i = 0; i < t.length; i++) { const c = t.charCodeAt(i); n += (c > 0 && c < 128) ? 1 : 2; }
+  return n;
 }
 
 /* 바뀌지 않은 칸 — 보내기 직전 글에 {밀린날짜} · #{링크} 같은 칸이 남아 있으면 그 사람에게는 보내지 않는다 (20261101m)
