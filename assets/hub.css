@@ -1292,3 +1292,17 @@ html.rn-lock, html.rn-lock body { overflow: hidden; }
 /* 정답 3/4 75% — 퍼센트는 작게 (hub.js · 20261106e) */
 .ap-day__r, .app-recent__rate { white-space: nowrap; font-size: 13px; }
 .ap-day__r small, .app-recent__rate small { font-size: 11.5px; font-weight: 600; color: var(--ink-light, #8A90AC); }
+/* 과제 파트 칩 — 독서 · 문학 두 색 · 영역별 정답률 막대와 같은 색 (hub.js · 20261106f) */
+.ap-part { flex: none; display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 999px; font-size: 12.5px; font-weight: 800; line-height: 1.5; white-space: nowrap; }
+.ap-part--read { background: #EAE6FB; color: #4A34B8; }
+.ap-part--lit { background: #FCE6EC; color: #A32A4E; }
+.progress-fill.is-read { background: #6A55D8; }
+.progress-fill.is-lit { background: #D14F76; }
+.app-recent__row--part { display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; }
+.app-recent__top { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
+.app-recent__tag { margin-left: auto; }
+.app-recent__sub { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; font-weight: 500; color: var(--ink-mid); }
+.ap-day__parts { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 3px 5px; min-width: 0; }
+.ap-day__sep { color: var(--ink-light); }
+.ap-day > summary { flex-wrap: wrap; row-gap: 4px; position: relative; padding-right: 20px; }
+.ap-day > summary::after { position: absolute; right: 2px; top: 11px; margin-left: 0; }

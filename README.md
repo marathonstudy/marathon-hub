@@ -907,6 +907,11 @@ delete from public.staff where email = '조교이메일@example.com';
 - app-report: 앱이 맞힌 수 · 문제 수 항목을 보내면 넘김 (이름이 다르면 코치룸 미리보기 「앱이 보내는 항목 이름」을 보고 CORRECT_KEYS · TOTAL_KEYS 에 추가)
 - 코치룸: 같은 칸은 학부모 화면 미리보기뿐(같은 코드) · 레포트 과제 칸 · 기간 요약 · 영역별은 이미 「정답률」 글자가 있어 그대로
 
+### 5-91. 20261106f — 러닝노트 과제 상세 파트 칩 (SQL · 함수 배포 없음)
+- 지문 줄: [과학기술] 정답 3/4 75% … 정시 / 아래 줄에 지문 제목 작게 · 날짜 줄: 과제 하나면 「[과학기술] · 정답 3/4」 · 여럿이면 파트 이름만(정답률은 지문 줄)
+- 파트 = 과제 이름 앞 「독서-」 「문학-」을 뗀 앱 이름 그대로 (AppWeek.partOf) · 앞부분이 없어도 아는 이름(현대시 · 과학기술 …)은 뗌 · 모르면 칩 없이 예전 한 줄 · 「독서 A」 「화작」 같은 이름은 칩 없음
+- 칩 색 독서 보라 · 문학 분홍 두 가지 · 아래 「영역별 정답률」 막대도 같은 색(모르는 영역은 예전 색) · 코치룸 학부모 화면 미리보기도 같은 코드
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

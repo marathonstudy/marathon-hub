@@ -1996,10 +1996,12 @@
                    (c.count ? '<span class="test-badge">' + c.count + '회</span>' : '') + '</span>' +
                  '<span class="test-score-text num">' + c.rate + ' <small>%</small></span>' +
                '</div>' +
-               '<div class="progress-bar"><div class="progress-fill" data-width="' + c.rate + '"></div></div>' +
+               '<div class="progress-bar"><div class="progress-fill' + genreCls(c.name) + '" data-width="' + c.rate + '"></div></div>' +
              '</div>';
     }).join('');
   }
+  /* 독서 · 문학 두 색 — 지문 칩과 영역별 막대가 같이 쓴다 (20261106f) */
+  function genreCls(name) { var g = window.AppWeek && AppWeek.genreOf ? AppWeek.genreOf(name) : ''; return g ? ' is-' + g : ''; }
 
   /* ============================================================
      과제 상세 — 앱이 주는 세부 기록을 모두 (20261030a). 레포트는 큰 흐름만, 여기는 자세히.
@@ -2072,6 +2074,17 @@
     }
     return rateText(null, null, rateAvg(items));
   }
+  /* 파트 칩 · 날짜 줄 (20261106f) */
+  function partOfItem(h) { return window.AppWeek && AppWeek.partOf ? AppWeek.partOf(h && h.title) : null; }
+  function chipHtml(p) { return '<span class="ap-part ap-part--' + p.genre + '">' + esc(p.part) + '</span>'; }
+  /* 하나면 「과학기술 · 정답 3/4」 · 여럿이면 파트 이름만 (정답률은 지문 줄) · 파트를 모르면 '' (예전처럼) */
+  function dayPartHtml(items) {
+    var ps = items.map(partOfItem).filter(Boolean);
+    if (!ps.length) return '';
+    if (items.length === 1) { var r = dayRateHtml(items); return '<span class="ap-day__parts">' + chipHtml(ps[0]) + (r ? '<span class="ap-day__sep" aria-hidden="true">·</span><span class="ap-day__r num">' + r + '</span>' : '') + '</span>'; }
+    var seen = {};
+    return '<span class="ap-day__parts">' + ps.filter(function (p) { if (seen[p.part]) return false; seen[p.part] = 1; return true; }).map(chipHtml).join('') + '</span>';
+  }
   function itemRateHtml(h) { var r = rateOf(h); return r ? rateText(r.c, r.n, r.pct) : ''; }
   function rateAvg(items) {
     var r = items.filter(function (h) { return h.correctRate != null; }).map(function (h) { return Number(h.correctRate); });
@@ -2127,20 +2140,25 @@
     return '<div class="card ap-days"><h2 class="card-title">📅 날짜별 과제<span class="card-note">' + (nWeek ? '과제 ' + nWeek + '일' : '') + '</span></h2>' +
       list.map(function (x, i) {
         /* 머리줄 「10/29(목) · 정시 · 정답 3/4 75%」(문제 수를 모르면 「정답률 75%」) — 과제 날짜 칸 · 정시 기준은 과제 요약과 같다 · 개수는 하루 2개 이상일 때만 (20261031y) */
-        var st = AP_ST[x.status] || AP_ST.none, dr = dayRateHtml(x.items), L = x.lecture;
+        var st = AP_ST[x.status] || AP_ST.none, dr = dayRateHtml(x.items), dp = dayPartHtml(x.items), L = x.lecture;
         return '<details class="ap-day' + (x.weekend ? ' ap-day--wk' : '') + '"' + (i === openAt ? ' open' : '') + '><summary>' +
             '<span class="ap-day__d num">' + esc(Lesson.md(x.date)) + '</span>' +
-            '<span class="' + st[1] + '">' + st[0] + '</span>' +
-            (dr ? '<span class="ap-day__r num">' + dr + '</span>' : '') +
+            dp + '<span class="' + st[1] + '">' + st[0] + '</span>' +
+            (dr && !dp ? '<span class="ap-day__r num">' + dr + '</span>' : '') +
             (x.items.length >= 2 ? '<span class="ap-muted">과제 ' + x.items.length + '개</span>' : '') +
           '</summary><div class="ap-day__body">' +
             (L && L.videosTotal ? '<p class="ap-lec">▶ 강의 ' + (L.videosDone >= L.videosTotal ? '다 봄' : '안 봄') + '</p>' : '') +
             (x.items.length ? '<ul class="app-recent">' + x.items.map(function (h) {
               var late = AppWeek.lateOf ? AppWeek.lateOf(h, x.date) : !!h.late, sub = AppWeek.kstDay ? AppWeek.kstDay(h.submittedAt) : String(h.submittedAt || '').slice(0, 10);
+              var tag = late ? '<span class="app-tag app-tag--late">늦게' + (isDay(sub) ? ' · ' + esc(Lesson.md(sub, false)) + ' 제출' : '') + '</span>' : '<span class="app-tag">정시</span>';
+              var rate = itemRateHtml(h) ? '<span class="app-recent__rate num">' + itemRateHtml(h) + '</span>' : '';
+              /* 파트를 알면 — [과학기술] 정답 3/4 … 정시 / 아래 줄에 지문 제목 작게 (20261106f) · 모르면 예전 한 줄 */
+              var pt = partOfItem(h);
+              if (pt) return '<li class="app-recent__row app-recent__row--part"><span class="app-recent__top">' + chipHtml(pt) + rate + '<span class="app-recent__tag">' + tag + '</span></span>' +
+                (pt.rest ? '<span class="app-recent__sub" title="' + esc(pt.rest) + '">' + esc(pt.rest) + '</span>' : '') + '</li>';
               return '<li class="app-recent__row">' +
                 '<span class="app-recent__title">' + esc(AppWeek.cleanTitle ? AppWeek.cleanTitle(h.title || '과제') : (h.title || '과제')) + '</span>' +
-                (late ? '<span class="app-tag app-tag--late">늦게' + (isDay(sub) ? ' · ' + esc(Lesson.md(sub, false)) + ' 제출' : '') + '</span>' : '<span class="app-tag">정시</span>') +
-                (itemRateHtml(h) ? '<span class="app-recent__rate num">' + itemRateHtml(h) + '</span>' : '') +
+                tag + rate +
               '</li>';
             }).join('') + '</ul>' : '<p class="ap-muted">' + (x.weekend ? '토 · 일은 주중 복습 날입니다 (제출 수에 넣지 않아요)' : x.status === 'exempt' ? '면제한 날입니다 (제출 수에 넣지 않아요)' : x.status === 'today' ? '오늘은 밤 12시 마감 전이에요 (아직 세지 않아요)' : x.status === 'none' ? '제출한 과제가 없습니다' : '과제 기록이 없습니다') + '</p>') +
           '</div></details>';

@@ -78,6 +78,24 @@
   function cleanTitle(t) {
     return String(t || '').replace(/^\s*\[[^\]]{1,12}\]\s*/, '').replace(new RegExp('\\s*' + TITLE_DATE.source + '\\s*', 'g'), ' ').replace(/\s+/g, ' ').trim() || String(t || '').trim();
   }
+  /* 과제 이름에서 파트 떼기 (20261106f) — 「독서-과학기술"해시 함수는…"」 → { part: '과학기술', genre: 'read', rest: '"해시 함수는…"' }
+     앱이 준 이름을 그대로 쓴다 (앞의 독서- · 문학- 만 뗀다) · 앞부분이 없어도 이름만 보고 아는 파트(「현대시 …」)는 뗀다 · 모르면 null (칩 없이 예전처럼) */
+  var READ_PARTS = ['인문예술', '인문', '예술', '사회문화', '사회', '문화', '과학기술', '과학', '기술', '주제통합'];
+  var LIT_PARTS = ['현대시가', '현대시', '고전시가', '고전시', '현대소설', '고전소설', '수필', '극'];
+  function genreOf(name) {
+    var n = String(name || '').trim(), m = /^(독서|문학)\s*[-–—]/.exec(n);
+    if (m) return m[1] === '독서' ? 'read' : 'lit';
+    if (READ_PARTS.indexOf(n) !== -1) return 'read';
+    if (LIT_PARTS.indexOf(n) !== -1) return 'lit';
+    return '';
+  }
+  function partOf(title) {
+    var t = cleanTitle(title), m = /^(독서|문학)\s*[-–—]\s*([^\s"'“‘「『(…·,:]{1,12})\s*(.*)$/.exec(t);
+    if (m) return { part: m[2], genre: m[1] === '독서' ? 'read' : 'lit', rest: m[3].trim() };
+    m = /^([가-힣]{1,4})(?:\s+(.*)|\s*(["'“‘「『].*))?$/.exec(t);
+    if (m && genreOf(m[1])) return { part: m[1], genre: genreOf(m[1]), rest: (m[2] || m[3] || '').trim() };
+    return null;
+  }
   function orderDays(data) {
     var by = {};
     ((data && data.calendar) || []).forEach(function (c) { if (c && c.order && valid(c.date)) by[c.order] = c.date; });
@@ -319,6 +337,6 @@
   global.AppWeek = { compute: compute, tableHtml: tableHtml, hwRate: hwRate, tone: tone, LEGEND: LEGEND, HW_MARK: HW_MARK, HW_TIP: HW_TIP,
                      lastWeek: lastWeek, startOf: startOf, cumulative: cumulative, forLesson: forLesson,
                      isWeekend: isWeekend, subDaysOf: subDaysOf, withFix: withFix,
-                     normalize: normalize, hwDateOf: hwDateOf, orderDays: orderDays, lateOf: lateOf, cleanTitle: cleanTitle, kstDay: kstDay, titleDate: titleDate };
+                     normalize: normalize, hwDateOf: hwDateOf, orderDays: orderDays, lateOf: lateOf, cleanTitle: cleanTitle, partOf: partOf, genreOf: genreOf, kstDay: kstDay, titleDate: titleDate };
 
 })(window);
