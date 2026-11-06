@@ -25,6 +25,9 @@ preview/
 tools/
 *.local.md
 
+# 인수인계 메모 (공개하지 않음)
+.local/
+
 # OS · 편집기
 .DS_Store
 Thumbs.db
