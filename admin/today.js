@@ -1114,7 +1114,7 @@
     });
     return '<div class="hd-box" data-hd-box="' + esc(sid) + '">' +
       '<div class="hd-head num">' + esc(mdw(w.from) + ' ~ ' + mdw(w.to) + (live ? ' · 진행 중' + (lesson ? ' (' + mdw(lesson) + ' 수업 레포트 기간)' : '') : lesson ? ' · ' + mdw(lesson) + ' 수업 레포트 기준' : '')) + '</div>' +
-      '<div class="hd-grid" style="grid-template-columns:2.4em repeat(' + n + ', minmax(0, 1fr))">' + cells + '</div>' +
+      '<div class="hd-grid" style="--hd-n:' + n + ';grid-template-columns:2.4em repeat(' + n + ', minmax(0, 1fr))">' + cells + '</div>' +
       (pick ? menuHtml(sid, pick, a.data) : '') +
       '<p class="hd-legend">● 정시 제출 △ 늦게 제출 ✕ 미제출 · 빈칸 그날 과제 없음 / ✓ 강의 다 봄 – 안 봄 · 「오늘」 = 밤 12시 마감 전(아직 세지 않음) · 토 · 일은 주중 복습 · 칸을 누르면 그날 과제 · 「수정」 = 조교가 고친 칸</p>' +
       '<div class="hd-foot"><button type="button" class="hd-relink" data-app-relink="' + esc(sid) + '" aria-expanded="' + !!(window.AppLink && AppLink.current() === sid && AppLink.editing()) + '">링크 바꾸기</button>' +
@@ -1143,13 +1143,25 @@
       } else row.insertAdjacentHTML('beforeend', html);
     });
   }
+  /* 휴대폰(480px 이하) — 반 카드 학생 이름을 누르면 과제 상세 (가장 최근 레포트 기간 칸과 같음 · 상담 카드는 ⋯ 메뉴) ·
+     열 과제 기간이 없는 학생(링크 없음 · 못 불러옴)은 예전처럼 상담 카드 · 컴퓨터는 그대로 상담 카드 (20261106a) */
+  function phoneNameCell(t) {
+    if (!window.matchMedia || !matchMedia('(max-width: 480px)').matches) return null;
+    var nm = t.closest('.tdc-st .roster__name-btn');
+    if (!nm) return null;
+    var cells = Array.prototype.slice.call(nm.closest('.tdc-st').querySelectorAll('.tdc-tc[data-app-detail]'));
+    var past = cells.filter(function (x) { return x.dataset.appLive !== '1'; });
+    return past[past.length - 1] || cells[0] || null;
+  }
   document.addEventListener('click', function (e) {
     var b = e.target.closest && e.target.closest('[data-app-detail], [data-hd-day]');
+    var byName = false;
+    if (!b && e.target.closest) { b = phoneNameCell(e.target); byName = !!b; }
     if (!b) return;
     e.preventDefault();
     e.stopPropagation();
     if (b.hasAttribute('data-hd-day')) { det.day = det.day === b.dataset.hdDay ? '' : b.dataset.hdDay; fxReset(); paintDetail(); return; }
-    var same = det.sid === b.dataset.appDetail && det.from === b.dataset.appFrom;
+    var same = det.sid === b.dataset.appDetail && (byName || det.from === b.dataset.appFrom);
     fxReset();
     det = same ? closedDet() : { sid: b.dataset.appDetail, from: b.dataset.appFrom, to: b.dataset.appTo, lesson: b.dataset.appLesson || '', live: b.dataset.appLive === '1', day: '' };
     paintDetail();
@@ -1272,15 +1284,19 @@
     if (!c.per.recent && !c.per.now) return span('<span class="tdc-app tdc-app--none">과제 · 첫 수업 뒤부터 보임</span>');
     return PKEYS.map(function (k) {
       var p = c.per[k];
-      if (!p) return '<span class="tdc-tc tdc-tc--empty" aria-hidden="true"></span>';
-      var v = perVal(s, p), live = p.live ? ' is-live' : '';
+      if (!p) return tl('') + '<span class="tdc-tc tdc-tc--empty" aria-hidden="true"></span>';
+      return tl(perLabel(p)) + triCell(s, p, perVal(s, p), p.live ? ' is-live' : '');
+    }).join('');
+  }
+  /* 휴대폰(480px 이하) — 칸 위에 아주 작게 기간 이름 (컴퓨터는 머리칸이 있어 숨김 · 20261106a) */
+  function tl(t) { return '<span class="tdc-tl num" aria-hidden="true">' + esc(t) + '</span>'; }
+  function triCell(s, p, v, live) {
       if (!v || v.k === 'pre') return '<span class="tdc-tc tdc-tc--muted' + live + '" title="' + esc(perTip(p)) + '">시작 전</span>';
       if (v.k === 'new') return '<span class="tdc-tc tdc-tc--muted tdc-tc--new' + live + '" title="' + esc(perTip(p) + ' — 신입생 (수강 시작 전 · 세지 않음)') + '">신입생</span>';
       if (v.k === 'none') return '<span class="tdc-tc tdc-tc--muted' + live + '" title="' + esc(perTip(p) + ' — 앱 과제 없음') + '">없음</span>';
       var tip = mdw(v.from) + ' ~ ' + mdw(v.to) + ' · 평일 ' + v.days + '일 중 ' + v.done + '일 제출' + (p.live ? ' (진행 중 · 오늘은 내면 셈)' : '');
       return '<button type="button" class="tdc-tc tdc-app--btn tdc-app--' + hwTone(v.done, v.days) + live + ' num" data-app-detail="' + esc(s.id) + '" data-app-from="' + esc(p.from) + '" data-app-to="' + esc(p.to) + '" data-app-lesson="' + esc(p.lesson || '') + '"' + (p.live ? ' data-app-live="1"' : '') +
         ' data-tip="' + esc(tip) + '" aria-expanded="' + (det.sid === s.id && det.from === p.from) + '" aria-label="' + esc(v.done + '/' + v.days + ' · ' + tip + ' · 누르면 날짜별 표') + '">' + v.done + '/' + v.days + '</button>';
-    }).join('');
   }
   /* 학생 목록 펼치기 · 접기 — 예전 자리(학생 목록 바로 위 머리줄 왼쪽) · 테두리 있는 작은 알약 「학생 11명 ▾」 / 같은 자리 「접기 ▴」 (20261102g)
      보라 글자 · 누르는 영역 40px 이상 · 펼치면 머리줄(버튼 · 칸 이름)이 카드 안에서 화면 위에 붙어 따라온다 · 반마다 이 기기에 기억
@@ -1439,9 +1455,9 @@
     var id = esc(s.id);
     var btns = '<button type="button" class="btn btn--sm" data-card="' + id + '">상담 카드</button>' +
       '<button type="button" class="btn btn--sm" data-sms-sid="' + id + '">문자</button>';
-    /* [상담 +] — 휴대폰에서도 「⋯」 앞에 그대로 (quicknote.js · 20261031o) */
+    /* [상담 기록 +] (quicknote.js · 20261031o) — 휴대폰(480px 이하)은 버튼을 모두 숨기고 「⋯」 메뉴 안으로 (20261106a) */
     return '<div class="tdc-st__acts">' + btns + (window.QuickNote ? QuickNote.btnHtml(s.id, s.name) : '') +
-      '<details class="tdc-more"><summary class="btn btn--sm tdc-more__b" aria-label="' + esc(s.name) + ' 더 보기">⋯</summary><div class="tdc-more__menu">' + btns +
+      '<details class="tdc-more"><summary class="btn btn--sm tdc-more__b" aria-label="' + esc(s.name) + ' 더 보기">⋯</summary><div class="tdc-more__menu">' + btns + (window.QuickNote ? QuickNote.btnHtml(s.id, s.name) : '') +
         (window.AppLink && AppLink.openHtml ? AppLink.openHtml(s.id, { noAdd: true, cls: 'btn btn--sm' }) : '') + '</div></details></div>';
   }
   /* 「신입」 — 수강 시작한 지 2주가 안 된 학생 (20261031q) */
@@ -2211,7 +2227,7 @@
     Array.prototype.forEach.call(document.querySelectorAll('details.tdc-more[open]'), function (d) {
       if (d !== mine || e.target.closest('.tdc-more__menu button')) d.open = false;
     });
-  });
+  }, true);   /* 먼저 받기 — [상담 기록 +] · 과제 칸은 먼저 받아 멈추므로 뒤에서 받으면 메뉴가 안 닫힌다 (20261106a) */
   /* 건너뛰기 · 확인함 (skips.js) · 과제 링크 칸을 펼치거나 접으면 (applink.js) 다시 그린다 */
   window.addEventListener('jt:skips', function () { if (st.data && !$('#appRoot').hidden) render(); });
   window.addEventListener('jt:applink-ui', function () { if (st.data && !$('#appRoot').hidden) render(); });
