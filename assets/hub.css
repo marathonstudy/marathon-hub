@@ -1289,3 +1289,6 @@ html.rn-lock, html.rn-lock body { overflow: hidden; }
 /* 영상이 아직 없는 수업 (20261101o) — 연하게 한 줄 */
 .rw-videos--none .card-title { color: var(--ink-soft, #8A8FA6); }
 .rw-novid { margin: 0; font-size: 13.5px; color: #9A9EB3; }
+/* 정답 3/4 75% — 퍼센트는 작게 (hub.js · 20261106e) */
+.ap-day__r, .app-recent__rate { white-space: nowrap; font-size: 13px; }
+.ap-day__r small, .app-recent__rate small { font-size: 11.5px; font-weight: 600; color: var(--ink-light, #8A90AC); }

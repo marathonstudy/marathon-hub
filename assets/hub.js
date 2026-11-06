@@ -2054,6 +2054,25 @@
     var m = /T(\d{2}):(\d{2})/.exec(String(iso || ''));
     return m ? m[1] + ':' + m[2] : '';
   }
+  /* 정답률 표기 (20261106e) — 진행률로 오해하지 않게. 맞힌 수 · 문제 수를 앱이 주면 「정답 3/4 75%」, 모르면 「정답률 75%」
+     (75% 에서 3/4 를 짐작하지 않는다 — 6/8 일 수도 있다) */
+  function rateOf(h) {
+    var c = h && h.correct, n = h && h.total;
+    if (typeof c === 'number' && typeof n === 'number' && n > 0 && c >= 0 && c <= n) return { c: c, n: n, pct: h.correctRate != null ? Number(h.correctRate) : Math.round(c / n * 100) };
+    return h && h.correctRate != null ? { pct: Number(h.correctRate) } : null;
+  }
+  function rateText(c, n, pct) { return c != null ? '정답 ' + c + '/' + n + ' <small>' + pct + '%</small>' : '정답률 ' + pct + '%'; }
+  /* 날짜 줄 — 그날 과제가 모두 문제 수를 알면 합쳐서, 아니면 평균 정답률 */
+  function dayRateHtml(items) {
+    var rs = items.map(rateOf).filter(Boolean);
+    if (!rs.length) return '';
+    if (rs.every(function (r) { return r.c != null; })) {
+      var c = rs.reduce(function (a, r) { return a + r.c; }, 0), n = rs.reduce(function (a, r) { return a + r.n; }, 0);
+      return rateText(c, n, Math.round(c / n * 100));
+    }
+    return rateText(null, null, rateAvg(items));
+  }
+  function itemRateHtml(h) { var r = rateOf(h); return r ? rateText(r.c, r.n, r.pct) : ''; }
   function rateAvg(items) {
     var r = items.filter(function (h) { return h.correctRate != null; }).map(function (h) { return Number(h.correctRate); });
     return r.length ? Math.round(r.reduce(function (a, b) { return a + b; }, 0) / r.length) : null;
@@ -2107,12 +2126,12 @@
     var openAt = Math.max(0, list.findIndex(function (x) { return !x.weekend || x.items.length; }));
     return '<div class="card ap-days"><h2 class="card-title">📅 날짜별 과제<span class="card-note">' + (nWeek ? '과제 ' + nWeek + '일' : '') + '</span></h2>' +
       list.map(function (x, i) {
-        /* 머리줄 「10/29(목) · 정시 · 67%」 — 과제 날짜 칸 · 정시 기준은 과제 요약과 같다 · 개수는 하루 2개 이상일 때만 (20261031y) */
-        var st = AP_ST[x.status] || AP_ST.none, avg = rateAvg(x.items), L = x.lecture;
+        /* 머리줄 「10/29(목) · 정시 · 정답 3/4 75%」(문제 수를 모르면 「정답률 75%」) — 과제 날짜 칸 · 정시 기준은 과제 요약과 같다 · 개수는 하루 2개 이상일 때만 (20261031y) */
+        var st = AP_ST[x.status] || AP_ST.none, dr = dayRateHtml(x.items), L = x.lecture;
         return '<details class="ap-day' + (x.weekend ? ' ap-day--wk' : '') + '"' + (i === openAt ? ' open' : '') + '><summary>' +
             '<span class="ap-day__d num">' + esc(Lesson.md(x.date)) + '</span>' +
             '<span class="' + st[1] + '">' + st[0] + '</span>' +
-            (avg == null ? '' : '<span class="ap-day__r num">' + avg + '%</span>') +
+            (dr ? '<span class="ap-day__r num">' + dr + '</span>' : '') +
             (x.items.length >= 2 ? '<span class="ap-muted">과제 ' + x.items.length + '개</span>' : '') +
           '</summary><div class="ap-day__body">' +
             (L && L.videosTotal ? '<p class="ap-lec">▶ 강의 ' + (L.videosDone >= L.videosTotal ? '다 봄' : '안 봄') + '</p>' : '') +
@@ -2121,7 +2140,7 @@
               return '<li class="app-recent__row">' +
                 '<span class="app-recent__title">' + esc(AppWeek.cleanTitle ? AppWeek.cleanTitle(h.title || '과제') : (h.title || '과제')) + '</span>' +
                 (late ? '<span class="app-tag app-tag--late">늦게' + (isDay(sub) ? ' · ' + esc(Lesson.md(sub, false)) + ' 제출' : '') + '</span>' : '<span class="app-tag">정시</span>') +
-                (h.correctRate == null ? '' : '<span class="app-recent__rate num">' + h.correctRate + '%</span>') +
+                (itemRateHtml(h) ? '<span class="app-recent__rate num">' + itemRateHtml(h) + '</span>' : '') +
               '</li>';
             }).join('') + '</ul>' : '<p class="ap-muted">' + (x.weekend ? '토 · 일은 주중 복습 날입니다 (제출 수에 넣지 않아요)' : x.status === 'exempt' ? '면제한 날입니다 (제출 수에 넣지 않아요)' : x.status === 'today' ? '오늘은 밤 12시 마감 전이에요 (아직 세지 않아요)' : x.status === 'none' ? '제출한 과제가 없습니다' : '과제 기록이 없습니다') + '</p>') +
           '</div></details>';

@@ -93,6 +93,22 @@ function shapeOf(src: Any) {
   };
 }
 
+/* 맞힌 수 · 문제 수 — 앱이 줄 때만 (이름은 코치룸 미리보기 「앱이 보내는 항목 이름」에서 확인 · 20261106e) */
+function countOf(h: Any, names: string[]): number | null {
+  for (const k of names) {
+    const v = h?.[k];
+    if (typeof v === "number" && Number.isInteger(v) && v >= 0) return v;
+    if (typeof v === "string" && /^\d{1,4}$/.test(v)) return Number(v);
+  }
+  return null;
+}
+const CORRECT_KEYS = ["correctCount", "correctAnswerCount", "correctAnswers", "correctNum", "correct"];
+const TOTAL_KEYS = ["totalQuestions", "questionCount", "totalQuestionCount", "problemCount", "quizCount", "totalCount"];
+function countsOf(h: Any): { correct?: number; total?: number } {
+  const c = countOf(h, CORRECT_KEYS), n = countOf(h, TOTAL_KEYS);
+  return c != null && n != null && n > 0 && c <= n ? { correct: c, total: n } : {};
+}
+
 /* 앱에 등록된 학생 이름 — 흔한 자리를 차례로 (없으면 '') */
 function whoOf(src: Any): string {
   const c = [src?.studentName, src?.userName, src?.student?.name, src?.studentInfo?.name, src?.user?.name,
@@ -118,6 +134,7 @@ function pick(src: Any) {
       submittedAt: String(h?.submittedAt ?? ""),
       late: !!h?.isLate,
       correctRate: h?.correctRate == null ? null : Math.round(num(h.correctRate)),
+      ...countsOf(h),
     }));
 
   return {

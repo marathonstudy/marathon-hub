@@ -901,6 +901,12 @@ delete from public.staff where email = '조교이메일@example.com';
 - 실패: 「AI 응답이 늦어요. 잠시 뒤 다시 눌러 주세요 (이유)」 · 칸 글 · 부탁 문장 그대로 · 브라우저 콘솔에 자세히 · 화면 70초 기다림
 - 공지 · 문자 · 수업 내용 칸은 예전대로
 
+### 5-90. 20261106e — 러닝노트 날짜별 과제 퍼센트를 정답률로 분명하게 (SQL 없음 · app-report 다시 배포하면 문제 수까지)
+- 그 퍼센트 = 앱의 정답률(correctRate) · 날짜 줄은 그날 과제 평균 · 진행률 · 제출률이 아님
+- 날짜 줄 · 지문 줄: 맞힌 수 · 문제 수를 알면 「정답 3/4 75%」(75%는 작게) · 모르면 「정답률 75%」 · 퍼센트에서 개수를 짐작하지 않음 · 날짜 줄은 모두 알 때만 합산
+- app-report: 앱이 맞힌 수 · 문제 수 항목을 보내면 넘김 (이름이 다르면 코치룸 미리보기 「앱이 보내는 항목 이름」을 보고 CORRECT_KEYS · TOTAL_KEYS 에 추가)
+- 코치룸: 같은 칸은 학부모 화면 미리보기뿐(같은 코드) · 레포트 과제 칸 · 기간 요약 · 영역별은 이미 「정답률」 글자가 있어 그대로
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.
