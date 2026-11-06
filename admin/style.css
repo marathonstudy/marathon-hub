@@ -4128,3 +4128,5 @@ textarea.aip-text--new:focus { outline: 2px solid #B9AEF0; outline-offset: 1px; 
   .roster .hd-tr > td::before { content: none; }
   .roster .hd-tr > td .hd-box { margin: 0; }
 }
+/* 종강 · 마지막 레포트 남음 — 반 카드 이름 옆 (today.js · 20261106c) */
+.tdc-endleft { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 999px; background: #FFF1DF; color: #874A0B; font-size: 12px; font-weight: 800; white-space: nowrap; }

@@ -279,8 +279,10 @@
       courses = courses.filter(mineC).concat(courses.filter(function (co) { return !mineC(co); }));
     }
     /* 종강한 반 (migration-049 · 20261031w) — 맨 뒤 「종강 n」 안에 접어 둔다 (고르면 지난 레포트 그대로 열림) */
-    var ended = classes.filter(function (c) { return Store.isEnded(c.name); });
-    var live = classes.filter(function (c) { return !Store.isEnded(c.name); });
+    /* 마지막 레포트가 남은 반은 다른 반과 함께 (today.js · 20261106c) */
+    var isFolded = function (c) { return Store.isEnded(c.name) && !(window.Today && Today.endedLeft && Today.endedLeft(c.name)); };
+    var ended = classes.filter(isFolded);
+    var live = classes.filter(function (c) { return !isFolded(c); });
     if (!classes.some(function (c) { return c.name === currentClass; }) && !(isCourse(currentClass) && Course.byKey(currentClass))) {
       currentClass = (live[0] || classes[0]).name;
     }

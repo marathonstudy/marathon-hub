@@ -1245,7 +1245,7 @@
 
   /* ---------- 수업 시각 · 종강 (migration-049 · 20261031w) ----------
      metaOf(반) = { start, end, endOn, staff, remind, min } (없으면 null) · isEnded(반, 날) = 종강일이 그날보다 앞
-     종강한 반은 「오늘」 · 필기 알림 · 레포트 발송 대상 · 챙길 학생에서 빠지고, 반 고르기에서는 「종강」으로 접힌다.
+     종강일 다음 날부터 필기 알림 · 수업 전 문자 · 챙길 학생에서 빠진다. 「오늘」 · 레포트 발송 대상 · 반 고르기는 마지막 수업 레포트를 보내거나 건너뛴 뒤에 빠진다 (today.js · 20261106c).
      지난 레포트 · 기록 · 학생 · 학부모 러닝노트는 그대로 */
   function metaOf(cls) { return (read(KEYS.classMeta, {}) || {})[String(cls || '').trim()] || null; }
   function isEnded(cls, day) {

@@ -112,12 +112,25 @@
     if (d && d.students) { st.allStudents = d.students; d.students = activeOnly(d.students); }
     return d;
   }
-  /* 종강한 반(종강일이 지남 · migration-049) 학생은 「오늘」 · 챙길 학생 · 발송 차례에서 뺀다 (기록 · 러닝노트는 그대로) */
+  /* 종강한 반 (20261106c) — 종강일이 지나고 마지막 수업 레포트까지 보내거나 건너뛴 뒤에 「오늘」 · 발송 차례에서 뺀다 (기록 · 러닝노트는 그대로)
+     그 전까지는 다른 반처럼 할 일 · 배지 · 발송 차례 · 반 카드(「종강 · 마지막 레포트 남음」)에 나온다.
+     Store.isEnded(날짜 기준)는 그대로 — 챙길 학생은 종강일 다음 날부터 빠진다. 필기 · 수업 전 자동 문자는 서버(end_on >= 오늘)가 따로 멈춘다 */
   function activeOnly(list) {
     var by = {};
     Store.getStudents().forEach(function (s) { by[s.id] = s; });
-    return (list || []).filter(function (s) { var x = by[s.id]; return (!x || Store.isActiveOn(x)) && !Store.isEnded(s.class_name); });
+    var act = (list || []).filter(function (s) { var x = by[s.id]; return !x || Store.isActiveOn(x); });
+    return act.filter(function (s) { return !classGone(s.class_name, act); });
   }
+  /* 마지막 수업 레포트 칩 — 다 보냈거나 건너뛰었거나 보낼 학생 · 수업이 없으면 null */
+  function lastReportLeft(cls, rows) {
+    var d = recentLessons(cls, 1)[0];
+    if (!d) return null;
+    var mine = (rows || st.allStudents || []).filter(function (s) { return (s.class_name || '') === cls; });
+    if (!mine.length) return null;
+    var x = chipOf({ name: cls, rows: mine }, d);
+    return x.kind === 'part' || x.kind === 'none' ? x : null;
+  }
+  function classGone(cls, rows) { return !!cls && Store.isEnded(cls) && !lastReportLeft(cls, rows); }
 
   /* ---------- 과제 기록 불러오기 (20261031g) ----------
      예전: 학생마다 app-report 를 따로(6명씩) → 32명이면 약 6초 · 다시 열어도 처음부터
@@ -625,16 +638,17 @@
              grace: isNaN(g) ? 2 : Math.max(0, Math.min(14, g)) };
   }
 
+  function endOnOf(cls) { var m = Store.metaOf ? Store.metaOf(cls) : null; return (m && m.endOn) || ''; }
   /* 다음 수업일 — 오늘 포함, 휴강 주는 건너뛴다 (주 2회 반은 가까운 요일) · 요일을 안 정했으면 null */
   function nextLesson(cls) {
     var s = Store.schedOf(cls);
     if (!s || !window.Lesson) return null;
-    var today = DDay.today();
+    var today = DDay.today(), endOn = endOnOf(cls);
     var mon = Lesson.addDays(today, -((Lesson.dowOf(today) + 6) % 7));
     for (var k = 0; k < 10; k++) {
       var L = Lesson.of(s, Lesson.addDays(mon, 7 * k));
       if (!L || L.canceled) continue;
-      var days = (L.days && L.days.length ? L.days : [L.date]).filter(function (d) { return d && d >= today; }).sort();
+      var days = (L.days && L.days.length ? L.days : [L.date]).filter(function (d) { return d && d >= today && (!endOn || d <= endOn); }).sort();
       if (days.length) return { date: days[0], dday: Math.round((Date.parse(days[0]) - Date.parse(today)) / 86400000) };
     }
     return null;
@@ -649,13 +663,13 @@
   function lessonDates(cls) {
     var s = Store.schedOf(cls);
     if (!s || !window.Lesson) return null;
-    var today = DDay.today();
+    var today = DDay.today(), endOn = endOnOf(cls);
     var mon = Lesson.addDays(today, -((Lesson.dowOf(today) + 6) % 7));
     var out = [];
     for (var k = -14; k <= 10; k++) {
       var L = Lesson.of(s, Lesson.addDays(mon, 7 * k));
       if (!L || L.canceled) continue;
-      (L.days && L.days.length ? L.days : [L.date]).forEach(function (d) { if (d && out.indexOf(d) === -1) out.push(d); });
+      (L.days && L.days.length ? L.days : [L.date]).forEach(function (d) { if (d && (!endOn || d <= endOn) && out.indexOf(d) === -1) out.push(d); });
     }
     return out.sort();
   }
@@ -690,7 +704,7 @@
     d.students.forEach(function (s) { var k = s.class_name || '(반 없음)'; (by[k] = by[k] || { name: k, academy: s.academy || '', rows: [] }).rows.push(s); });
     Store.getClasses().forEach(function (c) { if (!by[c.name]) by[c.name] = { name: c.name, academy: '', rows: [] }; });
     return Object.keys(by).map(function (k) { return by[k]; })
-      .filter(function (c) { return !Store.isArchivedClass(c.name) && !Store.isEnded(c.name); })
+      .filter(function (c) { return !Store.isArchivedClass(c.name) && !classGone(c.name); })
       .map(function (c) { var no = c.name === '(반 없음)'; c.next = no ? null : nextLesson(c.name); c.cy = no ? null : cycleOf(c.name); c.per = no ? null : periodsOf(c.name); return c; })
       .sort(function (x, y) {
         if (!!x.next !== !!y.next) return x.next ? -1 : 1;               /* 수업일 미정은 맨 아래 */
@@ -1182,7 +1196,7 @@
     var rep = function (L) { if (!L) return null; var x = AppWeek.lastWeek(L); return { from: x.from, to: x.to, lesson: L, live: false }; };
     return {
       prev: rep(L0), recent: rep(L1),
-      now: L1 ? { from: L1, to: N ? Lesson.addDays(N, -1) : Lesson.addDays(L1, 6), lesson: N, live: true } : null
+      now: L1 && !Store.isEnded(cls) ? { from: L1, to: N ? Lesson.addDays(N, -1) : Lesson.addDays(L1, 6), lesson: N, live: true } : null
     };
   }
   var PKEYS = ['prev', 'recent', 'now'];
@@ -1419,6 +1433,7 @@
     return '오늘 ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ' 보냄 ' + n + '명';
   }
   function nudgeHtml(c) {
+    if (Store.isEnded(c.name)) return '';                 /* 종강 — 낼 과제가 없다 (20261106c) */
     var v = nudgeOf(c);
     if (!v || !v.judged) return '';
     if (nudgeSent === null) setTimeout(loadNudgeSent, 0);
@@ -1660,6 +1675,7 @@
      반마다 한 줄 「목동 · 수업일 10/24(토) · 수업까지 D-1! · 최근 발송 칩 3개」 · 펼치면 반별 학생 목록 */
   var DOWS = ['일', '월', '화', '수', '목', '금', '토'];
   function classWhen(c) {
+    if (Store.isEnded(c.name)) return '<span class="tdc-endleft">종강 · 마지막 레포트 남음</span>';
     var nx = c.next;
     if (!nx) return c.name === '(반 없음)' ? '' : '<button type="button" class="btn btn--sm tdc-sched" data-sched="' + esc(c.name) + '">수업일 미정 · 수업 요일 정하기</button>';
     return '<span class="tdc-when"><span class="tdc-when__d">수업일 ' + esc(Store.dateWithDow(nx.date)) + '</span>' +
@@ -1714,17 +1730,17 @@
   function classCardHtml(c) {
     var rows = c.rows, n = rows.length, nx = c.next;
     var chips = chipsOf(c);
-    var open = !!st.open[c.name];
-    return '<div class="tdc-card' + (open ? ' is-open' : '') + (nx && nx.dday === 0 ? ' is-today' : '') + (window.Course && Course.mine(c.name) ? ' is-mine' : '') + '" data-cls="' + esc(c.name) + '">' +
+    var open = !!st.open[c.name], endedNow = Store.isEnded(c.name);
+    return '<div class="tdc-card' + (endedNow ? ' tdc-card--endleft' : '') + (open ? ' is-open' : '') + (nx && nx.dday === 0 ? ' is-today' : '') + (window.Course && Course.mine(c.name) ? ' is-mine' : '') + '" data-cls="' + esc(c.name) + '">' +
       '<div class="tdc-head">' +
         '<div class="tdc-main">' +
           '<div class="tdc-title"><span class="tdc-name">' + esc(c.name) + '</span>' + (c.academy ? '<span class="muted-note">' + esc(c.academy) + '</span>' : '') +
-            '<span class="muted-note num tdc-n">' + n + '명</span>' + needBtn(needIds(rows, c.cy)) + skipAllHtml(c, chips) + '</div>' +
+            '<span class="muted-note num tdc-n">' + n + '명</span>' + (endedNow ? classWhen(c) : '') + needBtn(needIds(rows, c.cy)) + skipAllHtml(c, chips) + '</div>' +
           linesHtml(c, chips) +
-          classWhen(c) +
+          (endedNow ? '' : classWhen(c)) +
           attHtml(c.name, '') +
-          (window.Notes ? Notes.cardHtml(c) : '') +          /* 수업 시각 [바꾸기] · 필기 미제출(끝나기 n분 전부터) (notes.js · 20261101f) */
-          (c.name === '(반 없음)' ? '' : '<div class="tdc-appbox" data-appcls="' + esc(c.name) + '">' + appClassHtml(c) + '</div>') +   /* 앱 클래스 · 핀번호 (20261101p) */
+          (window.Notes && !endedNow ? Notes.cardHtml(c) : '') +          /* 수업 시각 [바꾸기] · 필기 미제출(끝나기 n분 전부터) (notes.js · 20261101f) */
+          (c.name === '(반 없음)' || endedNow ? '' : '<div class="tdc-appbox" data-appcls="' + esc(c.name) + '">' + appClassHtml(c) + '</div>') +   /* 앱 클래스 · 핀번호 (20261101p) */
         '</div>' +
         '<div class="tdc-btns">' +
           (c.name === '(반 없음)' || !n ? '' : '<button type="button" class="btn btn--sm tdc-sms" data-sms-cls="' + esc(c.name) + '" aria-label="' + esc(c.name) + ' 전체 문자 발송">전체 문자 발송</button>') +
@@ -1791,17 +1807,20 @@
 
   /* 종강한 반 — 맨 아래 접힌 한 줄 (이름만 · 지난 레포트 · 기록은 그대로) */
   function endedHtml() {
-    var ended = Store.getClasses().filter(function (c) { return Store.isEnded(c.name); });
+    var ended = Store.getClasses().filter(function (c) { return classGone(c.name); });
     if (!ended.length) return '';
     return '<details class="tdc-ended"><summary>종강 ' + ended.length + '개 반</summary><p class="muted-note">' +
       ended.map(function (c) { var m = Store.metaOf(c.name); return esc(c.name) + (m && m.endOn ? ' (' + md(m.endOn) + ' 종강)' : ''); }).join(' · ') +
-      ' — 「오늘」 · 필기 알림 · 레포트 발송 대상 · 챙길 학생에서 빠집니다. 지난 레포트와 러닝노트는 그대로입니다.</p></details>';
+      ' — 「오늘」 · 필기 알림 · 레포트 발송 대상 · 챙길 학생에서 빠집니다. 지난 레포트와 러닝노트는 그대로이고, 레포트 발송 → 반 고르기 「종강」에서 계속 볼 수 있습니다.</p></details>';
   }
 
   function render() {
     var d = st.data;
     if (!d) return;
+    /* 보내거나 건너뛰면 그 자리에서 종강 반이 접힌다 (20261106c) */
+    if (st.allStudents) d.students = activeOnly(st.allStudents);
     var classes = classList(d);
+    st.classes = classes;
     st.cyBy = {}; st.clsBy = {};
     classes.forEach(function (c) { st.cyBy[c.name] = c.cy; st.clsBy[c.name] = c; });
     var unsent = unsentOf(classes);
@@ -1926,6 +1945,8 @@
   }
 
   window.Today = {
+    /* 종강했지만 마지막 레포트가 남은 반 — 반 고르기에서 접지 않는다 (write.js · 20261106c) */
+    endedLeft: function (cls) { return !!st.data && !!st.allStudents && Store.isEnded(cls) && !classGone(cls); },
     missFor: missFor,
     appFailed: failedIds,
     appWhy: whyText,
