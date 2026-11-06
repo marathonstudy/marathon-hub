@@ -7,6 +7,7 @@
    · 15초 안에 답이 없으면 실패로 본다 → 화면은 「과제 기록 못 불러옴 · 다시 시도」
    · 앱 서버는 학생마다 따로 응답해서(한꺼번에 받는 주소가 없다) 여러 명을 부른다 — 20261101d 부터 4명씩 한 묶음, 묶음은 하나씩 차례로
      (예전: 반 4개를 동시에 · 함수 안에서 8명씩 → 앱 서버에 한꺼번에 30여 건 → 시간 초과 · 「못 불러옴」이 여러 명 한꺼번에)
+   · 20261106h — 저장본(hub_app_record · migration-065)을 먼저 본다 · 없을 때만 앱에서 직접 (학부모 화면 미리보기 · 레포트)
    ============================================================ */
 
 (function (global) {
@@ -24,9 +25,26 @@
     var c = cache[code];
     if (!force && c && Date.now() - c.at < TTL) return Promise.resolve(c.res);
     if (!force && flying[code]) return flying[code];
+    var p = (force ? Promise.resolve(null) : stored(code)).then(function (res) {
+      if (res) { delete flying[code]; if (res.ok) cache[code] = { at: Date.now(), res: res }; return res; }
+      return live(code);
+    });
+    flying[code] = p;
+    return p;
+  }
+  /* 저장본 — 없거나 오래됐거나 065 전이면 null */
+  function stored(code) {
+    var c = global.SB && global.SB.client;
+    if (!c || !c.rpc) return Promise.resolve(null);
+    return Promise.resolve(c.rpc('hub_app_record', { p_code: code })).then(function (r) {
+      var d = r && !r.error ? r.data : null;
+      return d && (d.ok ? d.data : d.reason) ? d : null;
+    }, function () { return null; });
+  }
+  function live(code) {
     var ctl = global.AbortController ? new AbortController() : null;
     var timer = setTimeout(function () { if (ctl) ctl.abort(); }, TIMEOUT);
-    var p = Promise.race([
+    return Promise.race([
       fetch(url(code), { headers: { apikey: CONFIG.supabase.key }, signal: ctl ? ctl.signal : undefined })
         .then(function (r) { return r.json().catch(function () { return { ok: false, reason: 'http' + r.status }; }); }),
       new Promise(function (res) { setTimeout(function () { res({ ok: false, reason: 'timeout' }); }, TIMEOUT + 50); })
@@ -38,8 +56,6 @@
       if (res.ok) cache[code] = { at: Date.now(), res: res };
       return res;
     });
-    flying[code] = p;
-    return p;
   }
   /* 반 단위로 한 번에 (?codes= · 30명까지 · 20261031g) — 「오늘」 첫 화면용 가벼운 기록 { 코드: res }
      함수가 아직 예전 것(codes 를 모름)이면 한 명씩 부르는 것으로 돌아간다 (6명씩 동시에) */

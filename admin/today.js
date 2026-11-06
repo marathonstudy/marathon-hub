@@ -7,7 +7,7 @@
        칩: 100% 초록 · 1~99% 주황 「64% · 안 보냄 4명」 · 0% 빨강 · 수업 당일 회색 「작성 중」 — 누르면 그 수업 발송 화면
        수업일이 없으면 [수업일 미정 · 수업 요일 정하기] → 그 반 작성 화면의 수업 요일 칸
      「학생 11명 보기 ▾」 — 누르면 전원 (펼친 반은 이 기기에 기억). 학생 줄 = 이름 · 「과제 n/5일」 · 상담 카드 · 문자 · 미리보기 둘
-   · 과제는 바깥 앱 서버 자료라 화면이 뜬 뒤 app-report 함수로 6명씩 동시에 불러오고, 한 명 받을 때마다 그 학생 칸을 바로 채운다 (appfetch.js · 미리보기와 같은 기록을 같이 씀).
+   · 과제는 서버가 미리 받아 둔 저장본(app_records · app-sync · 20261106h)을 읽는다 · 저장본이 없을 때만 예전처럼 app-report 함수로 (appfetch.js · 미리보기와 같은 기록을 같이 씀).
      그 반 지난 수업(L) 전 일주일 L-7 ~ L-1 의 평일 중 제출한 날 (토 · 일 주중 복습은 세지 않는다 · 러닝노트 레포트와 같은 AppWeek).
      불러온 값은 30분 동안 이 화면 메모리에만 둔다(브라우저에 저장하지 않는다).
    · 탭 배지 — 「오늘」 · 「레포트 발송」 모두 발송 안 한 레포트 학생 수 (수업 당일은 빼고). 금액은 이 화면에 넣지 않는다.
@@ -56,13 +56,17 @@
     st.loading = true;
     st.last = Date.now();
     if (!st.data) $('#tdBody').innerHTML = '<p class="panel__hint">불러오는 중…</p>';
-    Promise.all([sb().rpc('coach_today'), DB.getSettingRow('dashboard').catch(function () { return null; }), loadRecentSent(), loadCare(), loadFails(), loadAppAdmin()]).then(function (res) {
+    Promise.all([sb().rpc('coach_today'), DB.getSettingRow('dashboard').catch(function () { return null; }), loadRecentSent(), loadCare(), loadFails(), loadAppAdmin(), fetchStore()]).then(function (res) {
       var r = res[0];
       st.loading = false;
       if (r.error) throw new Error(r.error.message);
       st.dash = (res[1] && res[1].value) || {};
       st.data = prepare(r.data);
       st.classes = classList(st.data);
+      /* 저장본이 있으면 그것만 — 앱 서버에 묻지 않는다 (20261106h) */
+      var saved = res[6], firstStore = !STORE.on && !!saved && saved.some(function (x) { return x.lite; });
+      if (firstStore) { STORE.on = true; try { localStorage.removeItem(CACHE_KEY); } catch (e0) {} }
+      if (STORE.on) applyStore(saved || [], firstStore);
       render();
       loadApp();
       window.dispatchEvent(new CustomEvent('jt:today'));       /* 레포트 발송 — 반 고르기 「안 보냄 n」 · 지금 보낼 차례 (write.js · weeks.js · 20261031h) */
@@ -138,7 +142,10 @@
            받은 기록은 이 기기에 10분 동안 기억(mhub.appCache · 최근 70일만) → 10분 안에 다시 열면 바로 보이고, 뒤에서 조용히 새로 받아 바뀐 칸만 고친다
            「오늘」을 보고 있는 동안 5분마다 다시 받는다(다른 탭 · 다른 창이면 멈춤) · 반 카드 오른쪽 위 「과제 10:35 기준 · 새로고침」
            다시 받는 동안에는 칸만 바꾼다(깜빡이거나 줄 순서가 바뀌지 않게) · 처음 받을 때만 「과제 기록 불러오는 중 3/11」
-     [다시 시도] · 링크를 새로 넣은 학생 한 명은 예전처럼 학생 하나로 (appfetch.js · 미리보기와 같은 기록) */
+     [다시 시도] · 링크를 새로 넣은 학생 한 명은 예전처럼 학생 하나로 (appfetch.js · 미리보기와 같은 기록)
+     20261106h — 서버가 미리 받아 저장(app_records · app-sync · migration-065) → 화면은 저장본만 읽는다 (아래 STORE).
+                 앱 서버에는 묻지 않는다 · 「과제 기록 10분 전 기준」 · 반 카드 · 학생 줄 [새로고침]은 그 반 · 그 학생만 서버가 다시 받아 저장.
+                 저장 표가 아직 없거나 비어 있을 때만(065 전 · 첫 예약 전) 아래 예전 길 */
   var CACHE_KEY = 'mhub.appCache', CACHE_TTL = 10 * 60 * 1000, REFRESH_MS = 5 * 60 * 1000, KEEP_DAYS = 70;
   var appMeta = { at: 0, shown: 0, busy: false, cacheRead: false };     /* at = 마지막으로 새로 받은 때 · shown = 지금 보이는 기록의 때(기억한 것이면 그때) */
   var appProg = { done: 0, total: 0, start: 0, timer: null };
@@ -241,7 +248,110 @@
     setTimeout(paintAvg, 0);
   }
   function liveList() { return st.data ? st.data.students.filter(function (s) { return s.app && s.code; }) : []; }
+  /* ---------- 저장본 (20261106h) ---------- */
+  var STORE = { on: false, since: '', busy: {}, rows: {} };
+  var COLS = 'student_id,lite,fetched_at,fail_reason,fail_count,updated_at';
+  function fetchStore(ids) {
+    if (!sb() || !sb().from) return Promise.resolve(null);
+    var q;
+    try {
+      q = sb().from('app_records').select(COLS);
+      if (ids) q = q.in('student_id', ids);
+      else if (STORE.since) q = q.gt('updated_at', STORE.since);
+    } catch (e) { return Promise.resolve(null); }
+    return Promise.resolve(q).then(function (r) { return r && !r.error && Array.isArray(r.data) ? r.data : null; }, function () { return null; });
+  }
+  function storeEntry(r) {
+    var why = (r && r.fail_reason) || '', at = r && r.fetched_at ? Date.parse(r.fetched_at) : 0;
+    if (why === 'expired' || why === 'nolink') return { ok: false, need: true, reason: why, data: null, at: at };
+    if (r && r.lite) return { ok: true, data: trimData(r.lite), at: at, why: why };
+    return { ok: false, failed: true, reason: why || 'notyet', data: null, at: at };
+  }
+  /* 저장본을 칸에 — 받은 줄만 · 과제 수정은 읽을 때 위에 덮는다 (저장본은 안 바꾼다) */
+  function applyStore(rows, first) {
+    (rows || []).forEach(function (r) {
+      STORE.rows[r.student_id] = r;
+      if (r.updated_at && r.updated_at > STORE.since) STORE.since = r.updated_at;
+    });
+    var changed = [];
+    liveList().forEach(function (s) {
+      var r = STORE.rows[s.id];
+      if (!first && !(rows || []).some(function (x) { return x.student_id === s.id; }) && app[s.id]) return;
+      var e = storeEntry(r), old = app[s.id];
+      e.raw = e.data; e.data = fixed(s.id, e.raw);
+      app[s.id] = e;
+      if (!sameEntry(old, e)) changed.push(s.id);
+    });
+    appMeta.at = Date.now();
+    return changed;
+  }
+  /* 기록의 기준 시각 — 진행 중인 반에서 가장 오래된 것 */
+  function storeOldest() {
+    var t = 0, tt = 0;
+    liveList().forEach(function (s) {
+      var a = app[s.id];
+      if (!a || !a.at) return;
+      if (!Store.isEnded(s.class_name) && (!t || a.at < t)) t = a.at;
+      if (!tt || a.at < tt) tt = a.at;
+    });
+    return t || tt;
+  }
+  function agoText(ms) {
+    var m = Math.floor(Math.max(0, Date.now() - ms) / 60000);
+    return m < 1 ? '방금' : m < 60 ? m + '분 전' : m < 1440 ? Math.floor(m / 60) + '시간 전' : Math.floor(m / 1440) + '일 전';
+  }
+  /* 다시 읽기 — 바뀐 줄만 받아 그 칸만 고친다 */
+  function reloadStore(ids) {
+    return fetchStore(ids).then(function (rows) {
+      if (!rows) return [];
+      var ch = applyStore(rows, false);
+      ch.forEach(paintApp);
+      if (ch.length) paintAvg();
+      paintStamp();
+      if (ch.length) window.dispatchEvent(new CustomEvent('jt:app', { detail: { done: true } }));
+      return ch;
+    });
+  }
+  /* [새로고침] — 그 반 · 그 학생만 서버가 다시 받아 저장 */
+  function syncApp(key, body, ids) {
+    if (STORE.busy[key]) return Promise.resolve(null);
+    STORE.busy[key] = true;
+    paintRefresh();
+    var fns = sb() && sb().functions;
+    return Promise.resolve(fns && fns.invoke ? fns.invoke('app-sync', { body: Object.assign({ action: 'refresh' }, body) }) : { error: { message: 'no' } }).then(function (r) {
+      return r && !r.error && r.data ? r.data : { ok: false, message: (r && r.error && r.error.message) || '' };
+    }, function () { return { ok: false }; }).then(function (res) {
+      return reloadStore(ids).then(function () {
+        delete STORE.busy[key];
+        paintRefresh();
+        if (!res.ok) { console.warn('[과제 새로고침] 실패', res); toast('과제 기록을 다시 받지 못했습니다' + (res.message && res.reason !== 'error' ? ' — ' + res.message : ''), 'bad'); }
+        else if (res.failed) toast('과제 기록 ' + res.saved + '명 받음 · ' + res.failed + '명 못 받음 (다음 차례에 다시 받습니다)', 'bad');
+        else toast('과제 기록을 다시 받았습니다' + (res.saved > 1 ? ' (' + res.saved + '명)' : ''), 'good');
+        return res;
+      });
+    });
+  }
+  function refreshBtn(attr, val, label) {
+    return STORE.on ? '<button type="button" class="tdc-refresh" ' + attr + '="' + esc(val) + '"' + (STORE.busy[attr + val] ? ' disabled' : '') + ' aria-label="' + esc(label) + '" title="' + esc(label) + '">' + (STORE.busy[attr + val] ? '받는 중…' : '새로고침') + '</button>' : '';
+  }
+  function paintRefresh() {
+    Array.prototype.forEach.call(document.querySelectorAll('#tdBody .tdc-refresh'), function (b) {
+      var attr = b.hasAttribute('data-app-refresh-cls') ? 'data-app-refresh-cls' : 'data-app-refresh-sid', on = !!STORE.busy[attr + b.getAttribute(attr)];
+      b.disabled = on; b.textContent = on ? '받는 중…' : '새로고침';
+    });
+  }
   function loadApp(only, force) {
+    if (STORE.on) {
+      if (only) {
+        var one0 = rowById(only);
+        return one0 ? syncApp('data-app-refresh-sid' + only, { students: [only] }, [only]) : undefined;
+      }
+      reloadStore();
+      return;
+    }
+    liveLoad(only, force);
+  }
+  function liveLoad(only, force) {
     var d = st.data;
     if (!d) return;
     var all = liveList();
@@ -310,7 +420,7 @@
   }
   /* 5분마다 — 「오늘」이 보일 때만 (다른 탭 · 숨긴 창이면 멈춤) */
   function todayVisible() { var p = $('#panel-today'); return !document.hidden && !$('#appRoot').hidden && !!p && !p.hidden; }
-  function autoRefresh() { if (st.data && todayVisible() && !appMeta.busy && Date.now() - appMeta.at >= REFRESH_MS) loadApp(null, true); }
+  function autoRefresh() { if (STORE.on) paintStamp(); if (st.data && todayVisible() && !appMeta.busy && Date.now() - appMeta.at >= REFRESH_MS) loadApp(null, true); }
   setInterval(autoRefresh, 30000);
   document.addEventListener('visibilitychange', autoRefresh);
 
@@ -321,6 +431,11 @@
     if (!el) return;
     if (!liveList().length) { el.hidden = true; return; }
     el.hidden = false;
+    if (STORE.on) {
+      var old = storeOldest();
+      el.innerHTML = '<span class="td-appstamp__t num">' + (old ? '과제 기록 ' + agoText(old) + ' 기준' : '과제 기록 받기 전') + '</span>';
+      return;
+    }
     var t = appMeta.shown ? new Date(appMeta.shown) : null;
     el.innerHTML = (appMeta.busy ? '<span class="td-appstamp__t">과제 받는 중…</span>'
       : '<span class="td-appstamp__t num">' + (t ? '과제 ' + String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0') + ' 기준' : '과제') + '</span>') +
@@ -1375,7 +1490,7 @@
       if (a0.fail) ex.push('못 불러온 ' + a0.fail + '명');
       if (ex.length) body += '<span class="tdc-line__note">(' + ex.join(' · ') + ' 제외)</span>';
     }
-    return '<div class="tdc-line tdc-line--app" data-cls="' + esc(c.name) + '"><span class="tdc-line__t">과제 평균</span>' + body + '</div>';
+    return '<div class="tdc-line tdc-line--app" data-cls="' + esc(c.name) + '"><span class="tdc-line__t">과제 평균</span>' + body + refreshBtn('data-app-refresh-cls', c.name, c.name + ' 과제 기록 새로고침') + '</div>';
   }
   /* ---------- 과제 독려 (20261101g · 20261101h · welcome.js · migration-054 · 055) ----------
      대상 = 「지난 수업 이후」 — 직전 주(가장 최근 수업 L1 의 레포트 기간 D-7 ~ D-1 · 「10/24~30」 칩)와
@@ -1471,8 +1586,8 @@
     var btns = '<button type="button" class="btn btn--sm" data-card="' + id + '">상담 카드</button>' +
       '<button type="button" class="btn btn--sm" data-sms-sid="' + id + '">문자</button>';
     /* [상담 기록 +] (quicknote.js · 20261031o) — 휴대폰(600px 이하)은 버튼을 모두 숨기고 「⋯」 메뉴 안으로 (20261106a) */
-    return '<div class="tdc-st__acts">' + btns + (window.QuickNote ? QuickNote.btnHtml(s.id, s.name) : '') +
-      '<details class="tdc-more"><summary class="btn btn--sm tdc-more__b" aria-label="' + esc(s.name) + ' 더 보기">⋯</summary><div class="tdc-more__menu">' + btns + (window.QuickNote ? QuickNote.btnHtml(s.id, s.name) : '') +
+    return '<div class="tdc-st__acts">' + btns + (window.QuickNote ? QuickNote.btnHtml(s.id, s.name) : '') + refreshBtn('data-app-refresh-sid', s.id, s.name + ' 과제 기록 새로고침') +
+      '<details class="tdc-more"><summary class="btn btn--sm tdc-more__b" aria-label="' + esc(s.name) + ' 더 보기">⋯</summary><div class="tdc-more__menu">' + btns + (window.QuickNote ? QuickNote.btnHtml(s.id, s.name) : '') + refreshBtn('data-app-refresh-sid', s.id, s.name + ' 과제 기록 새로고침') +
         (window.AppLink && AppLink.openHtml ? AppLink.openHtml(s.id, { noAdd: true, cls: 'btn btn--sm' }) : '') + '</div></details></div>';
   }
   /* 「신입」 — 수강 시작한 지 2주가 안 된 학생 (20261031q) */
@@ -1904,7 +2019,7 @@
      못 불러옴(failed)인 학생만 한꺼번에 · 6명씩 동시에 · 하나 끝날 때마다 onProg(끝난 수, 전체)
      끝나면 그래도 안 되는 학생 [{ id, name, why }] — why = 짐작한 이유 (링크 없음 · 링크 만료 · 앱 응답 없음 · 인터넷 연결 · 앱 서버 오류 …) */
   var WHY = { nolink: '링크 없음', nohub: '학부모 링크 없음', expired: '링크 만료', timeout: '앱 응답 없음', network: '인터넷 연결 확인',
-              upstream: '앱 서버 오류', lookup: '앱 서버 오류', invalid: '링크 형식 확인', config: '서버 설정 확인', busy: '앱 서버 바쁨' };
+              upstream: '앱 서버 오류', lookup: '앱 서버 오류', invalid: '링크 형식 확인', config: '서버 설정 확인', busy: '앱 서버 바쁨', notyet: '아직 받기 전' };
   function whyText(sid) {
     var s = rowById(sid), a = app[sid];
     if (!s) return '명단 확인';
@@ -1919,6 +2034,13 @@
   function retryMany(ids, onProg) {
     var rows = failedIds(ids).map(rowById), total = rows.length, done = 0, i = 0;
     if (!total) return Promise.resolve([]);
+    if (STORE.on) {
+      var want = rows.map(function (s) { return s.id; });
+      return syncApp('many' + want.join(), { students: want }, want).then(function () {
+        if (onProg) try { onProg(total, total); } catch (e) {}
+        return rows.filter(function (s) { var a = app[s.id]; return !a || !a.ok; }).map(function (s) { return { id: s.id, name: s.name, why: whyText(s.id) }; });
+      });
+    }
     function next() {
       if (i >= rows.length) return Promise.resolve();
       var s = rows[i++];
@@ -2014,6 +2136,15 @@
     if (e.target.closest('.al-box')) return;                 /* 과제 링크 칸 (applink.js) */
     var rt = e.target.closest('[data-app-retry]');
     if (rt) { loadApp(rt.dataset.appRetry); return; }
+    /* 반 · 학생 [새로고침] (20261106h) */
+    var rfs = e.target.closest('[data-app-refresh-sid]');
+    if (rfs) { e.stopPropagation(); loadApp(rfs.dataset.appRefreshSid); return; }
+    var rfc = e.target.closest('[data-app-refresh-cls]');
+    if (rfc) {
+      var cc0 = (st.clsBy || {})[rfc.dataset.appRefreshCls];
+      if (cc0) syncApp('data-app-refresh-cls' + cc0.name, { class: cc0.name }, cc0.rows.map(function (s) { return s.id; }));
+      return;
+    }
     var arb = e.target.closest('[data-ar-cls]');
     if (arb) { arRetry(arb.dataset.arCls); return; }
     var ng = e.target.closest('[data-nudge]');

@@ -4152,3 +4152,9 @@ textarea.aip-text--new:focus { outline: 2px solid #B9AEF0; outline-offset: 1px; 
 /* 보낸 기록 — 사본을 보냈는지 (sms.js · 20261106g) */
 .sms-copytag--ok { color: #135C3B; font-weight: 700; }
 .sms-copytag--bad { color: #9E1F3B; font-weight: 700; }
+/* 과제 기록 [새로고침] — 반 카드 · 학생 줄 작게 (today.js · 20261106h) */
+.tdc-refresh { appearance: none; border: 0; background: none; padding: 2px 4px; margin-left: 4px; font: inherit; font-size: 11.5px; font-weight: 700; color: #5A3FD0; text-decoration: underline; cursor: pointer; white-space: nowrap; min-height: 26px; }
+.tdc-refresh:disabled { color: var(--ink-light); text-decoration: none; cursor: default; }
+.tdc-st__acts > .tdc-refresh { align-self: center; }
+.tdc-more__menu .tdc-refresh { min-height: 40px; margin: 0; text-align: left; text-decoration: none; padding: 4px 10px; font-size: 13px; }
+@media (max-width: 600px) { .tdc-st.tdc-grid .tdc-st__acts > .tdc-refresh { display: none; } .tdc-line--app .tdc-refresh { min-height: 34px; } }

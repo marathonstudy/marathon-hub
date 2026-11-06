@@ -55,6 +55,12 @@
   var APP_TIMEOUT = 15000;
   function appReport(code) {
     if (PV) return PV.app();
+    /* 저장본을 먼저 (서버가 미리 받아 둔 것 · migration-065 · 20261106h) — 없을 때만 앱에서 직접 */
+    return Promise.resolve().then(function () { return rpc('hub_app_record', { p_code: code }); }).then(function (d) {
+      return d && (d.ok ? d.data : d.reason) ? d : appLive(code);
+    }, function () { return appLive(code); });
+  }
+  function appLive(code) {
     var url = CFG.supabase.url + '/functions/v1/' + CFG.appFunction + '?code=' + encodeURIComponent(code);
     return Promise.race([
       fetch(url, { headers: { 'apikey': CFG.supabase.key } })

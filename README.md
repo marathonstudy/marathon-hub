@@ -87,6 +87,7 @@ supabase/
   migration-012-lesson-summary.sql  AI 수업 요약 — 초안 · 확정본 · 사용 기록 · 월 상한 · 「수업 영상(전체)」 칸
   functions/lesson-summary/index.ts 자막 → Claude(Sonnet 5.5) 요약 Edge Function (직원만 · 키는 Secrets 에만)
   migration-013-review-test.sql     복습테스트 — 회차 자동 생성 · 학생 제출 · 조교 확인 · 기록 · 시험지 사진 보관함
+  functions/app-sync/index.ts       과제 기록을 서버가 미리 받아 app_records 에 저장 (5분마다 · [새로고침] · migration-065 · 066)
   functions/review-test/index.ts    복습테스트 학생 제출 Edge Function (개인 링크 · 수업일 당일 · 마감 확인)
   migration-014-draft-safety.sql    작성 글 안전장치 — 크게 줄면 · 10분마다 · 다른 글로 바뀔 때 이전 글을 서버에 보관
   migration-015-student-link.sql    학생 링크 · 학부모 링크 나누기 · 전환 기간 스위치 · 직원 미리보기 함수
@@ -922,6 +923,17 @@ delete from public.staff where email = '조교이메일@example.com';
 - 시험 발송: 문자는 맨 앞 「[테스트]」 · 알림톡 시험은 템플릿 고정이라 앞머리를 붙일 수 없음 · 사본 없음
 - 설정: 문자 발송 → 연결 상태 「자동 발송 사본은 하루 한 번 저녁 9시에 모아서 받기」 (기본 바로) · 보낸 기록 줄에 사본 보냄 · 사본 실패 · 사본 곧 보냄 · 사본 저녁 9시 · 사본 없음(번호 없음)
 - 사본 건수는 솔라피 비용이 들지만 하루 · 한 달 상한에는 세지 않음 · 글은 보내면 지움(3일 지나도 지움)
+
+### 5-93. 20261106h — 과제 기록 저장본 (migration-065 · 함수 app-sync · migration-066)
+1. SQL Editor → `supabase/migration-065-app-records.sql` → Run (064 다음)
+2. Edge Functions → Deploy a new function → Via Editor → 이름 `app-sync` → `supabase/functions/app-sync/index.ts` → Deploy → **Verify JWT 끄기**
+3. SQL Editor → `supabase/migration-066-app-sync-cron.sql` → Run (5분마다 · 050 의 열쇠를 같이 씀)
+- 예전: 「오늘」을 열 때마다 브라우저 → app-report → 앱 서버 (4명씩 차례로 · 학생마다 요청 2번). 지금: 서버가 미리 받아 app_records 에 저장 → 화면은 저장본만
+- 받을 차례: 진행 중인 반(이번 주 수업 있음) 30분 · 종강 · 이번 주 수업 없는 반 하루 · 밤 1~6시 쉼 · 5분마다 60명까지 · 3명씩 0.3초 쉬며 · 실패는 5 · 10 · 20 · 30분 뒤 · 링크 만료는 하루 뒤 · 있던 기록은 둠
+- 화면: 「과제 기록 10분 전 기준」 · 반 카드 [새로고침](그 반만) · 학생 줄 [새로고침](휴대폰은 ⋯ 안 · 그 학생만) · 「과제 기록 불러오는 중 0/11」 없음
+- 러닝노트 · 레포트 · 미리보기: hub_app_record(개인 링크 코드 · 그 학생 것만) 먼저 · 없거나 이틀이 넘으면 앱에서 직접 · 링크를 바꾸면 그 학생 저장본을 지움
+- 과제 수정(hw_fixes)은 따로 — 자동 갱신은 app_records 만 바꾸고 화면이 읽을 때 위에 덮는다
+- 저장 표가 없거나 비어 있으면(065 전 · 첫 예약 전) 예전 길로 동작 · 수업 전 예고 문자는 지금처럼 보낼 때 앱에서 직접 받음
 
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
