@@ -92,6 +92,8 @@
       st.vids = m;
     }, function () { st.vids = null; });
   }
+  /* 「영상 연결하기」로 넣으면 — 그 반 그 주는 영상 있음 (표시는 vidlink.js 가 바로 지운다) */
+  window.addEventListener('jt:video-linked', function (e) { var d = e.detail || {}; if (st.vids && d.cls) st.vids[d.cls + '|' + d.week] = (st.vids[d.cls + '|' + d.week] || 0) + 1; });
   function loadRecentSent() {
     var from = Lesson.addDays(DDay.today(), -42);
     loadVids(from);
@@ -896,8 +898,9 @@
     var view = x.kind !== 'wip' && publishedAny(c, x);
     var chip = '<button type="button" class="tdc-chip tdc-chip--' + x.kind + ' num" ' + (view ? 'data-rep-view="' + esc(c.name) + '"' : 'data-go-send="' + esc(c.name) + '"') + ' data-week="' + esc(x.week) + '" title="' +
       esc(day + ' 수업 레포트 — 보냄 ' + x.sent + '/' + x.n + (view ? ' · 누르면 학부모 화면 미리보기' : ' · 누르면 발송 화면')) + '">' + esc(t) + '</button>';
-    /* 공개한 레포트인데 그 수업 영상이 아직 없으면 작게 「영상 없음」 (20261101o · 영상을 넣으면 다시 공개 없이 바로 보인다) */
-    if (st.vids && publishedAny(c, x) && !st.vids[c.name + '|' + x.week]) chip = '<span class="tdc-chipwrap">' + chip + '<small class="tdc-novid" title="' + esc(day + ' 수업 영상이 아직 없습니다 — 레포트 발송 → 1 작성 → 반 공통에서 넣으면 다시 공개 없이 바로 보입니다') + '">영상 없음</small></span>';
+    /* 공개한 레포트인데 그 수업 영상이 아직 없으면 작게 「영상 없음」 (20261101o · 영상을 넣으면 다시 공개 없이 바로 보인다)
+       누르면 「영상 연결하기」 창 (vidlink.js · 20261107a) */
+    if (st.vids && publishedAny(c, x) && !st.vids[c.name + '|' + x.week]) chip = '<span class="tdc-chipwrap">' + chip + '<button type="button" class="tdc-novid" data-vidlink-cls="' + esc(c.name) + '" data-vidlink-week="' + esc(x.week) + '" data-vidlink-gone title="' + esc(day + ' 수업 영상이 아직 없습니다 — 누르면 「영상 연결하기」 (넣으면 다시 공개 없이 바로 보입니다)') + '">영상 없음</button></span>';
     /* 「작성 중」 칩 바로 오른쪽 [건너뛰기] — 묻지 않고 바로 · 아래 「되돌리기」 5초 (20261101b) */
     return canSkipChip(c, x) ? '<span class="tdc-chipwrap">' + chip + '<button type="button" class="tdc-chip__skip" data-skipq-cls="' + esc(c.name) + '" data-skipq-date="' + esc(x.date) + '" aria-label="' + esc(day + ' 레포트 건너뛰기') + '">건너뛰기</button></span>' : chip;
   }

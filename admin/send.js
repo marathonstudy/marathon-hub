@@ -317,6 +317,9 @@
             '<span class="class-head__caret" aria-hidden="true">▾</span></span>' +
           '<span class="snd-count num">공개 ' + g.pub + '/' + n + ' · 보냄 ' + g.sent + '/' + n + '</span>' +
         '</button>' +
+        /* 공개했는데 그 수업 영상이 없으면 「영상 없음」 — 누르면 「영상 연결하기」 (vidlink.js · 20261107a) */
+        (g.pub && g.name !== NOCLS && state.vids && state.vids.week === state.week && !state.vids.m[g.name] && window.VidLink
+          ? '<div class="snd-novid"><button type="button" class="tdc-novid" data-vidlink-cls="' + esc(g.name) + '" data-vidlink-week="' + esc(state.week) + '" data-vidlink-gone title="수업 영상이 아직 없습니다 — 누르면 「영상 연결하기」 (문자는 다시 보내지 않습니다)">영상 없음</button></div>' : '') +
         (open ? '<div class="snd-body">' + body + '</div>' : '') +
       '</section>';
   }
@@ -657,10 +660,26 @@
      불러오기
      ============================================================ */
 
+  /* 그 주 반 전체 수업 영상이 있는 반 (「영상 없음」 · 20261107a) */
+  state.vids = null;
+  function loadVids(week, run) {
+    var c = window.SB && SB.client;
+    if (!c || !week) return;
+    Promise.resolve(c.from('lesson_videos').select('class_name,student_ids').eq('week_start', week)).then(function (r) {
+      if (run !== state.run || !r || r.error) return;
+      var m = {};
+      (r.data || []).forEach(function (v) { if (!(v.student_ids || []).length) m[(v.class_name || '').trim()] = 1; });
+      state.vids = { week: week, m: m };
+      if (state.loaded) render();
+    }, function () {});
+  }
+  window.addEventListener('jt:video-linked', function (e) { var d = e.detail || {}; if (state.vids && state.vids.week === d.week) state.vids.m[d.cls] = 1; });
+
   function loadWeek() {
     var run = ++state.run;
     if (!state.week) { state.loaded = true; render(); return Promise.resolve(); }
 
+    loadVids(state.week, run);
     return DB.weekSendData(state.week).then(function (d) {
       if (run !== state.run) return;
       if (state.loadedWeek !== state.week) { state.defOpen = {}; state.loadedWeek = state.week; }

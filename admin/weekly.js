@@ -285,9 +285,16 @@
     setTimeout(function () { window.dispatchEvent(new CustomEvent('jt:videos-changed')); }, 0);
     var host = $('#wkVideos');
     if (!host) return;
+    /* [🔗 영상 연결하기] — 다른 반에 넣은 영상 · 같은 수업 영상에서 고르기 (vidlink.js · 20261107a) */
+    var lk = $('#btnWkLinkVideo');
+    if (lk) {
+      lk.hidden = !st.cls || !st.week || st.missing || !window.VidLink;
+      lk.dataset.vidlinkCls = st.cls; lk.dataset.vidlinkWeek = st.week;
+    }
     if (st.missing) { host.innerHTML = '<p class="panel__hint">' + NEED_SQL + '</p>'; return; }
     if (!st.videos.length) {
-      host.innerHTML = '<p class="panel__hint">아직 없습니다. [+ 영상 추가]로 유튜브 링크를 넣으면 러닝노트 · 반 공지에 버튼으로 나갑니다.</p>';
+      host.innerHTML = '<p class="panel__hint wk-novid">아직 없습니다. [+ 영상 추가]로 유튜브 링크를 넣으면 러닝노트 · 반 공지에 버튼으로 나갑니다.' +
+        (st.cls && st.week && window.VidLink ? ' <button type="button" class="tdc-novid wk-novid__btn" data-vidlink-cls="' + esc(st.cls) + '" data-vidlink-week="' + esc(st.week) + '">영상 없음 · 연결하기</button>' : '') + '</p>';
       return;
     }
     var studs = classStudents(st.cls);
