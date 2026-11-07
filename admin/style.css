@@ -4208,3 +4208,20 @@ dialog.vl-modal[open] { display: flex; flex-direction: column; overflow: hidden;
 .wc-grp__t { font-size: 14px; font-weight: 800; color: var(--ink-deep); margin-bottom: 6px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
 .wc-grp__t .muted-note { font-weight: 400; }
 .wc-pr-on { margin-bottom: 6px; }
+
+/* 과제 현황 문자(운영진) — 「오늘」 반 카드 한 줄 · 미리보기 창 (hwstat.js · 20261108a) */
+.tdc-hws { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 4px 0 0; }
+.tdc-hws__t { font-size: 12.5px; font-weight: 600; color: var(--ink-light); min-width: 0; }
+.tdc-hws__t.is-sent { color: var(--ink-mid); }
+.hws-modal { max-width: 560px; }
+.hws-text { white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere; font: inherit; font-size: 13.5px; line-height: 1.6; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin: 0 0 10px; max-height: 50vh; overflow: auto; }
+.hws-part { font-size: 12px; font-weight: 700; color: var(--ink-light); margin: 0 0 4px; }
+.hws-sent { font-size: 13px; font-weight: 700; color: var(--ink-mid); margin: 0 0 8px; }
+.hws-sub { font-size: 14px; font-weight: 800; margin: 12px 0 6px; }
+.hws-people { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.hws-person { border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-size: 13px; }
+.hws-person.is-off { opacity: .6; }
+.op-hws { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; margin: 0 0 12px; }
+.op-hws__t { font-weight: 800; font-size: 14px; }
+.op-hws .input { width: 72px; }
+.op-hwsbtn.is-on { border-color: var(--indigo); color: var(--indigo); }

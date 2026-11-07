@@ -1888,6 +1888,7 @@
           (endedNow ? '' : classWhen(c)) +
           attHtml(c.name, '') +
           (window.Notes && !endedNow ? Notes.cardHtml(c) : '') +          /* 수업 시각 [바꾸기] · 필기 미제출(끝나기 n분 전부터) (notes.js · 20261101f) */
+          (window.HwStat && !endedNow ? HwStat.cardHtml(c) : '') +        /* 과제 현황 문자(운영진) 보냄 · [미리보기] [지금 운영진에게 보내기] (hwstat.js · 20261108a) */
           (c.name === '(반 없음)' || endedNow ? '' : '<div class="tdc-appbox" data-appcls="' + esc(c.name) + '">' + appClassHtml(c) + '</div>') +   /* 앱 클래스 · 핀번호 (20261101p) */
         '</div>' +
         '<div class="tdc-btns">' +
@@ -2000,6 +2001,7 @@
       endedHtml();
     paintDetail();
     if (window.Notes) setTimeout(Notes.paint, 0);
+    if (window.HwStat) setTimeout(HwStat.paint, 0);
     if (window.Staff && Staff.paintToday) setTimeout(Staff.paintToday, 0);
     paintStamp();
     if (window.QuickNote) QuickNote.mount();

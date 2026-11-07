@@ -8,6 +8,8 @@
    · 맨 위 「승인 대기 n명」 · 사람마다 [승인] [거절] — 사용 중인 운영진 누구나 (20261031z) · 승인한 사람은 목록에 「○○ 승인」
      「오늘」 맨 위에도 운영진 모두에게 「새 조교 승인 대기: 이름(뒤 4자리) [승인] [거절]」 — 그 자리에서 바로 누른다
      [사용 중지] · [다시 사용]은 지금처럼 원장 계정만
+   · 「수업 전 과제 현황 받기」 켜짐/꺼짐 — 사람마다 (기본 켜짐 · 나 자신 · 원장은 누구나 · staff_hwstat_set · migration-069 · 20261108a)
+     번호가 없으면 「번호 없음」 (원장 = 내 시험 번호 · 조교 = 로그인 번호) · 맨 위 「상담 기준 60%」 (hw_status_cut_set · 운영진 누구나)
    ============================================================ */
 
 (function () {
@@ -68,7 +70,7 @@
     var list = data.staff || [];
     $('#staffDesc').textContent = list.filter(function (s) { return s.active; }).length + '명 사용 중' +
       (data.owner ? ' · 사용 중지하면 그 사람은 바로 못 들어오고, 쓴 기록은 그대로 남습니다.' : '');
-    host.innerHTML = pendingHtml() + '<div class="op-list">' + list.map(function (s) {
+    host.innerHTML = pendingHtml() + hwsHead() + '<div class="op-list">' + list.map(function (s) {
       var me = s.email === data.me;
       var acts = !data.owner ? '' : me ? '<span class="muted-note">나</span>'
         : s.active ? '<button class="btn btn--sm btn--danger" type="button" data-op="off">사용 중지</button>'
@@ -82,13 +84,54 @@
             ' · 처음 들어온 날 ' + esc(fmt(s.created_at)) + ' · 마지막 접속 ' + esc(fmtDT(s.last_seen_at)) +
             (s.approved_by ? ' · ' + esc(s.approved_by) + ' 승인' : '') +
             (s.active ? '' : '<br>' + esc(s.disabled_by || '') + ' · ' + esc(fmtDT(s.disabled_at)) + ' 에 중지') + '</div>' +
+          (s.active ? hwsRow(s, me) : '') +
         '</div>' +
         (acts ? '<div class="op-row__acts">' + acts + '</div>' : '') +
       '</div>';
     }).join('') + '</div>';
   }
 
+  /* 수업 전 과제 현황 (migration-069) — 069 전이면 칸이 없어 아무것도 안 보인다 */
+  function hwsHead() {
+    if (!data || data.hwCut == null) return '';
+    return '<div class="op-hws"><span class="op-hws__t">수업 전 과제 현황 문자</span><span class="muted-note">수업 20분 전 · 운영진에게만 · 학생 완료율 명단</span>' +
+      '<label class="tdc-tedit__f tdc-tedit__f--min"><span>상담 기준</span><input type="number" class="input" id="opHwsCut" inputmode="numeric" min="1" max="100" value="' + esc(data.hwCut) + '"><span>% 미만</span></label>' +
+      '<button class="btn btn--sm" type="button" id="opHwsCutSave">저장</button></div>';
+  }
+  function hwsRow(s, me) {
+    if (!data || data.hwCut == null || s.hwStatus == null) return '';
+    var can = me || data.owner, on = s.hwStatus !== false;
+    var lbl = '수업 전 과제 현황 받기 ' + (on ? '켜짐' : '꺼짐');
+    return '<div class="op-row__hws">' + (can
+      ? '<button class="btn btn--sm op-hwsbtn' + (on ? ' is-on' : '') + '" type="button" data-hws-on="' + (on ? '0' : '1') + '" aria-pressed="' + on + '">' + esc(lbl) + '</button>'
+      : '<span class="muted-note">' + esc(lbl) + '</span>') +
+      (on && !s.smsPhone ? ' <small class="muted-note">번호 없음' + (s.role === 'teacher' ? ' — 문자 발송 → 연결 상태에 내 시험 번호를 넣어 주세요' : '') + '</small>' : '') + '</div>';
+  }
   $('#staffList').addEventListener('click', function (e) {
+    if (e.target.closest('#opHwsCutSave')) {
+      var v = parseInt(($('#opHwsCut') || {}).value, 10);
+      if (!(v >= 1 && v <= 100)) { toast('상담 기준은 1~100% 로 정해 주세요', 'bad'); return; }
+      sb().rpc('hw_status_cut_set', { p_cut: v }).then(function (r) {
+        if (r.error) { toast(r.error.message, 'bad'); return; }
+        toast('상담 기준을 ' + v + '% 로 저장했습니다 — 다음 과제 현황 문자부터', 'good');
+        data.hwCut = v;
+      });
+      return;
+    }
+    var hb = e.target.closest('[data-hws-on]');
+    if (hb && data) {
+      var em = hb.closest('[data-email]').dataset.email, on = hb.dataset.hwsOn === '1';
+      hb.disabled = true;
+      sb().rpc('staff_hwstat_set', { p_email: em, p_on: on }).then(function (r) {
+        hb.disabled = false;
+        if (r.error) { toast(r.error.message, 'bad'); return; }
+        toast('수업 전 과제 현황 받기를 ' + (on ? '켰습니다' : '껐습니다'), 'good');
+        var s = (data.staff || []).find(function (x) { return x.email === em; });
+        if (s) s.hwStatus = on;
+        render();
+      });
+      return;
+    }
     var b = e.target.closest('[data-op]');
     if (!b || !data) return;
     var email = b.closest('[data-email]').dataset.email;

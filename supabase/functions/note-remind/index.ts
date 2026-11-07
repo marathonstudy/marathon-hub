@@ -10,6 +10,9 @@
 //    2) 코치룸 「지금 다시 보내기」 — { action: "now", class } · 로그인한 운영진 토큰으로 note_manual_prepare (그 반 안 낸 학생만)
 //  수업 전 예고 — 같은 매분 실행에서 pre_remind_due → 앱 기록으로 밀린 과제 → pre_remind_prepare (학생 본인 · 같은 날 한 번 · 아래 preRemind)
 //  보낸 기록 — 문자 발송 → 보낸 기록에 「필기 알림(학생)」 「필기 알림(운영진)」 「수업 전 예고」 (번호는 뒤 4자리만)
+//  과제 현황 (migration-069 · 20261108a) — 같은 매분 실행에서 수업 20분 전 반마다 운영진에게 명단 한 통(넘치면 나눔)
+//    hw_status_due → 과제 기록 저장본(app_records · 없으면 앱에서 직접)으로 학생마다 제출 수 · 전체 수 → hw_status_prepare → 솔라피 → hw_status_record
+//    운영진만 받는다(학생 · 학부모 없음) · 사본 없음 · 「오늘」 [미리보기] { action: "hwstat", class, dry: true } · [지금 운영진에게 보내기] { action: "hwstat", class }
 //
 //  사본 — 매분 copy_due → 묶음마다 1통 → 원장 시험 번호로 → copy_record (migration-064 · 20261106g).
 //         모든 발송의 사본을 여기 한 곳에서 보낸다. 사본이 실패해도 원래 발송에는 영향이 없다. 064 전이면 조용히 넘어간다.
@@ -79,7 +82,7 @@ export function leftOf(text: string): string[] {
 export const leftMsg = (left: string[]) => "바뀌지 않은 칸이 있어 보내지 않음: " + left.join(" ");
 
 /* rows → 솔라피 → 결과 기록 (바뀌지 않은 칸이 남은 줄은 보내지 않고 실패로 · 20261101m) */
-async function sendRows(all: Any[], record = "note_remind_record") {
+async function sendRows(all: Any[], record = "note_remind_record", copy = true) {
   if (!all.length) return { sent: 0, failed: 0 };
   const blocked = all.filter((r) => leftOf(r.text).length);
   const rows = all.filter((r) => !leftOf(r.text).length);
@@ -113,7 +116,7 @@ async function sendRows(all: Any[], record = "note_remind_record") {
   }
   blocked.forEach((r) => results.push({ log_id: r.log_id, ok: false, error: leftMsg(leftOf(r.text)), message_id: "" }));
   await rpc(record, { p_results: results }).catch(() => {});
-  await rpc("msg_copy_note", { p_rows: all.map((r) => ({ log_id: r.log_id, text: r.text, name: r.name })) }).catch(() => {});
+  if (copy) await rpc("msg_copy_note", { p_rows: all.map((r) => ({ log_id: r.log_id, text: r.text, name: r.name })) }).catch(() => {});
   const sent = results.filter((x) => x.ok).length;
   return { sent, failed: results.length - sent, blocked: blocked.length };
 }
@@ -281,6 +284,50 @@ async function preRemind(now: string) {
   return { rows: rows.length, ...r, unknown };
 }
 
+/* ============================================================
+   과제 현황 (migration-069 · 20261108a) — 수업 20분 전 운영진에게 그 반 학생 완료율 명단
+     기간 · 셈은 수업 전 예고와 같다 (D-7 ~ D-1 · hwCount · 늦게 낸 것은 냄 · 면제 · 과제 수정값 · 수강 시작일)
+     저장본(rec · app-sync 가 받아 둔 lite)이 있으면 그것으로 · 없으면 앱에서 직접 · 그래도 없으면 「앱 기록 없음」
+   ============================================================ */
+export async function hwItems(due: Any, fetcher: (share: string) => Promise<Any> = fetchApp): Promise<Record<string, Any[]>> {
+  const day = String(due?.day || "");
+  const out: Record<string, Any[]> = {};
+  for (const c of due?.classes || []) {
+    const list: Any[] = c.students || [];
+    if (!list.length) continue;
+    const items: Any[] = [];
+    for (let i = 0; i < list.length; i += 3) {
+      await Promise.all(list.slice(i, i + 3).map(async (s: Any) => {
+        let data: Any = s.rec && Array.isArray(s.rec.calendar) ? { calendar: s.rec.calendar, history: Array.isArray(s.rec.history) ? s.rec.history : [] } : null;
+        if (!data && s.share && /^[A-Za-z0-9_-]{8,128}$/.test(s.share)) data = await fetcher(s.share);
+        if (!data) { items.push({ id: s.id, known: false, done: 0, total: 0 }); return; }
+        const n = hwCount(data, s.fix || {}, s.startOn || "", addDays(day, -7), addDays(day, -1));
+        items.push({ id: s.id, known: true, done: n.done, total: n.total });
+      }));
+    }
+    out[c.name] = items;
+  }
+  return out;
+}
+async function hwStatus(now: string) {
+  const due: Any = await rpc("hw_status_due", { p_now: now });
+  if (!(due?.classes || []).length) return { rows: 0 };
+  const items = await hwItems(due);
+  if (!Object.keys(items).length) return { rows: 0 };
+  const prep: Any = await rpc("hw_status_prepare", { p_now: now, p_items: items });
+  const rows: Any[] = prep?.rows || [];
+  const r = await sendRows(rows, "hw_status_record", false);
+  return { rows: rows.length, ...r };
+}
+/* 로그인 토큰의 이메일 — 운영진 확인(is_staff)을 DB 가 토큰으로 한 뒤에만 쓴다 */
+function jwtEmail(auth: string): string {
+  try {
+    const p = auth.replace(/^Bearer\s+/i, "").split(".")[1] || "";
+    const j = JSON.parse(atob(p.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((p.length + 3) % 4)));
+    return String(j?.email || "").toLowerCase().slice(0, 200);
+  } catch { return ""; }
+}
+
 async function handle(req: Request, cors: Record<string, string>) {
   if (!env("SUPABASE_URL") || !env("SUPABASE_SERVICE_ROLE_KEY")) return json({ ok: false, reason: "error", message: "서버 설정을 읽지 못했습니다." }, cors);
   const body: Any = await req.json().catch(() => ({}));
@@ -299,20 +346,45 @@ async function handle(req: Request, cors: Record<string, string>) {
     const prep: Any = await rpc("note_remind_prepare", { p_now: now, p_site: SITE });
     const rows: Any[] = prep?.rows || [];
     const r = await sendRows(rows);
+    /* 과제 현황 — 069 를 아직 안 돌렸거나 오류가 나도 다른 일은 그대로 */
+    let hws: Any = null;
+    try { hws = await hwStatus(now); } catch (e) { hws = { error: String((e as Error).message || e).slice(0, 160) }; }
     /* 수업 전 예고 — 056 을 아직 안 돌렸거나 오류가 나도 필기 문자는 그대로 */
     let pre: Any = null;
     try { pre = await preRemind(now); } catch (e) { pre = { error: String((e as Error).message || e).slice(0, 160) }; }
     /* 사본 — 064 를 아직 안 돌렸거나 오류가 나도 다른 일은 그대로 */
     let copy: Any = null;
     try { copy = await copyFlush(now); } catch (e) { copy = { error: String((e as Error).message || e).slice(0, 160) }; }
-    return json({ ok: true, day: prep?.day, rows: rows.length, ...r, pre, copy }, cors);
+    return json({ ok: true, day: prep?.day, rows: rows.length, ...r, hws, pre, copy }, cors);
   }
 
   /* 2) 「지금 다시 보내기」 — 로그인한 운영진 */
   const auth = req.headers.get("authorization") ?? "";
   const apikey = req.headers.get("apikey") ?? "";
-  if (body.action !== "now") return json({ ok: false, reason: "input" }, cors, 400);
+  if (body.action !== "now" && body.action !== "hwstat") return json({ ok: false, reason: "input" }, cors, 400);
   if (!/^Bearer\s+\S+/.test(auth) || !apikey) return json({ ok: false, reason: "login", message: "코치룸에 다시 로그인해 주세요." }, cors, 401);
+  /* 과제 현황 [미리보기] · [지금 운영진에게 보내기] — 운영진만 · 그 반 · 오늘 수업이 있는 반 */
+  if (body.action === "hwstat") {
+    let staff = false;
+    try { staff = (await rpc("is_staff", {}, auth, apikey)) === true; } catch { staff = false; }
+    if (!staff) return json({ ok: false, reason: "auth", message: "운영진 계정으로 다시 로그인해 주세요." }, cors, 403);
+    const dry = body.dry === true;
+    if (!dry && missing.length) return json({ ok: false, reason: "nokeys", missing, message: "문자 키가 아직 다 들어가지 않았습니다 (" + missing.join(", ") + ")." }, cors);
+    const now = new Date().toISOString();
+    const cls = String(body.class ?? "").slice(0, 60);
+    let one: Any;
+    try { one = await rpc("hw_status_class", { p_now: now, p_class: cls }); } catch (e) {
+      return json({ ok: false, reason: "nosql", message: "migration-069 SQL 을 먼저 실행해 주세요 — " + String((e as Error).message || e).slice(0, 120) }, cors);
+    }
+    if (!one?.ok) return json({ ok: false, reason: one?.reason || "class", message: one?.message || "보낼 수 없는 반입니다." }, cors);
+    const items = await hwItems(one);
+    if (!items[cls]) return json({ ok: false, reason: "empty", message: "이 반에 학생이 없습니다." }, cors);
+    const prep: Any = await rpc("hw_status_prepare", { p_now: now, p_items: items, p_class: cls, p_by: jwtEmail(auth), p_dry: dry });
+    if (dry) return json({ ok: true, preview: (prep?.previews || [])[0] || null }, cors);
+    const rows: Any[] = prep?.rows || [];
+    const r = await sendRows(rows, "hw_status_record", false);
+    return json({ ok: true, rows: rows.length, ...r }, cors);
+  }
   if (missing.length) return json({ ok: false, reason: "nokeys", missing, message: "문자 키가 아직 다 들어가지 않았습니다 (" + missing.join(", ") + ")." }, cors);
   let prep: Any;
   try {
