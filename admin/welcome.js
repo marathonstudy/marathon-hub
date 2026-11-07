@@ -9,7 +9,12 @@
      · 엑셀 · CSV: 다 넣은 뒤 「새로 넣은 n명에게 웰컴 문자 보낼까요? [보내기] [나중에]」 (Welcome.askAfterImport)
      · 다시 보내기: 상담 카드 [웰컴·앱 설치 안내 다시 보내기] · 명단 반 이름 옆 [반 전체에 웰컴 안내]
        (받는 사람 학생 / 학부모 / 둘 다 · 반 전체면 「아직 앱 링크 연결 안 된 학생만」 기본 켜짐)
-   과제 독려 (20261101g · migration-054) — 「오늘」 반 카드 「과제 평균」 줄 「진행 중」 옆 [안 낸 학생 n명에게 독려 문자] (today.js)
+   과제 문자 (20261107c · migration-068) — 「오늘」 반 카드 [과제 문자 · 독려 19 · 칭찬 3] (today.js) · 창은 「독려」 「칭찬」 두 묶음
+     · 칭찬 — 그 주 지금까지 나온 과제를 모두 낸 학생(늦게 낸 것 포함 · 면제는 개수에서 뺌 · 0개면 없음) · 학생 본인에게만
+       「자주 쓰는 문구」의 「과제 칭찬(학생)」 · {전체수}는 학생마다 · 묶음 전체 끄기(기본 켜짐) · 학생마다 체크로 빼기
+       오늘 이미 칭찬 받은 학생(직접 보낸 칭찬 · 수업 전 예고 모두 제출)은 빼고 「오늘 이미 칭찬 받음 n명 제외」 (sms_praised_today)
+       보낸 기록에 「과제 칭찬」(목적 praise) · 사본은 독려와 한 통 (068)
+   과제 독려 (20261101g · migration-054) — 「오늘」 반 카드 「과제 평균」 줄 「진행 중」 옆 버튼 (today.js)
      · 받는 사람 목록(이름 · 지난 수업 이후 밀린 날짜 모두 「10/27(월) 10/28(화) 10/30(목)」 · 체크를 빼면 제외 · 20261101h) · 「학생에게」 기본 켜짐 · 「학부모에게도」 기본 꺼짐
      · 「자주 쓰는 문구」의 「과제 독려(학생)」 · 「과제 독려(학부모)」 · {밀린날짜}는 학생마다 채워서 같은 글끼리 묶어 보낸다 (함수는 그대로)
    공통
@@ -38,8 +43,10 @@
   var KIND = {
     entry: { title: '입구 문자 보내기', label: '입구 안내', tpl: ['입구 안내'] },
     welcome: { title: '웰컴·앱 설치 안내', label: '웰컴 안내', tpl: ['신입생 웰컴(학생)', '신입생 웰컴(학부모)'] },
-    nudge: { title: '과제 독려 문자', label: '과제 독려', tpl: ['과제 독려(학생)', '과제 독려(학부모)'] }
+    nudge: { title: '과제 문자', label: '과제 독려', tpl: ['과제 독려(학생)', '과제 독려(학부모)'] }
   };
+  /* 과제 칭찬 기본 글 (migration-068 과 같다) */
+  var PRAISE_ST = '[마라톤국어] {학생이름} 학생, 이번 주 지금까지 나온 과제 {전체수}개를 모두 제출했어요! 매일 루틴을 지켜 내느라 정말 수고했어요. 이 루틴 그대로 이어가 봐요!';
   /* 「이번 주」라고 쓰지 않는다 — 직전 주 날짜도 들어간다 (migration-055 와 같다 · 20261101h) */
   var NUDGE_ST = '[마라톤국어] {학생이름} 학생, 지난 수업 이후 과제 {밀린날짜}이 아직 제출 안 됐어요. 오늘 안에 마라톤 앱에서 제출해 주세요!';
   var NUDGE_PA = '[마라톤국어] {학생이름} 학생의 지난 수업 이후 과제 중 {밀린날짜}이 아직 제출되지 않았습니다. 확인 부탁드립니다.';
@@ -102,7 +109,9 @@
   /* {밀린날짜} — 과제 독려 (학생마다 「10/27(화)·10/29(목)」) · 모르면 칸을 그대로 둔다 → 보내지 않음 (20261101m) */
   function missOf(s) { return (st && st.miss && st.miss[s.id]) || '{밀린날짜}'; }
   /* 함수에 넘기는 글 — {밀린날짜}만 여기서 채운다 (나머지 칸은 서버가) */
-  function outBody(x) { return bodyFor(x.t).split('{밀린날짜}').join(missOf(x.s)); }
+  function outBody(x) { return x.pr ? prBody(x.s) : bodyFor(x.t).split('{밀린날짜}').join(missOf(x.s)); }
+  /* 칭찬 — {전체수}만 여기서 채운다 (나머지 칸은 서버가) */
+  function prBody(s) { return String(st.pr.body).split('{전체수}').join(String((st.pr.total || {})[s.id] || '{전체수}')); }
   function bytes(t) { return window.Sms && Sms.bytes ? Sms.bytes(t) : t.length * 2; }
 
   /* ---------- 불러오기 ---------- */
@@ -121,13 +130,17 @@
     return Promise.all([
       base,
       rpc('sms_sent_today', { p_purpose: kind }),
-      kind === 'entry' ? rpc('student_logged_ids') : Promise.resolve({ data: [] })
+      kind === 'entry' ? rpc('student_logged_ids') : Promise.resolve({ data: [] }),
+      /* 오늘 이미 칭찬 받은 학생 (068) — 없으면 직접 보낸 칭찬만 */
+      kind === 'nudge' ? rpc('sms_praised_today').then(function (r) { return r.missing ? rpc('sms_sent_today', { p_purpose: 'praise' }) : r; }) : Promise.resolve({ data: [] })
     ]).then(function (a) {
+      var praised = {};
+      ((a[3] && a[3].data) || []).forEach(function (x) { if (x.student_id) praised[x.student_id] = x.how || 'manual'; });
       var sent = {};
       ((a[1].data) || []).forEach(function (x) { sent[x.student_id + '|' + x.target] = x.at; });
       var logged = {};
       ((a[2].data) || []).forEach(function (id) { logged[id] = true; });
-      ctx = { links: a[0].links || '', codes: a[0].codes || {}, templates: a[0].templates || [], sent: sent, logged: logged, missing: !!(a[1].missing || a[2].missing), smsMissing: !!a[0].missing };
+      ctx = { links: a[0].links || '', codes: a[0].codes || {}, templates: a[0].templates || [], sent: sent, logged: logged, praised: praised, missing: !!(a[1].missing || a[2].missing), smsMissing: !!a[0].missing };
       return ctx;
     });
   }
@@ -187,19 +200,19 @@
   function sendItems(items) {
     var groups = {}, order = [];
     items.forEach(function (x) {
-      var b = outBody(x);
+      var b = (x.pr ? 'P' : 'N') + '\n' + outBody(x);
       if (!groups[b]) { groups[b] = []; order.push(b); }
       groups[b].push(x);
     });
     var all = { ok: true, sent: 0, failed: 0, results: [], skipped: [], message: '' };
-    return order.reduce(function (p, body) {
+    return order.reduce(function (p, key) {
       return p.then(function () {
         if (!all.ok) return null;
-        var g = groups[body], vars = {};
+        var g = groups[key], vars = {}, body = key.slice(2), pr = key.charAt(0) === 'P';
         g.forEach(function (x) { var v = {}, c = codeOf(x.s), f = firstOf(x.s); if (c) v.code = c; if (f) v.first = f; if (v.code || v.first) vars[x.s.id] = v; });
         return Sms.invoke({
           action: 'send', body: body, items: g.map(function (x) { return { student_id: x.s.id, to: x.t }; }),
-          ad: false, lessons: {}, siblings: true, markWeek: '', label: KIND[st.kind].label, purpose: st.kind, vars: vars
+          ad: false, lessons: {}, siblings: true, markWeek: '', label: pr ? '과제 칭찬' : KIND[st.kind].label, purpose: pr ? 'praise' : st.kind, vars: vars
         }).then(function (r) {
           if (!r || !r.ok) { all.ok = all.sent > 0; all.message = (r && r.message) || '보내지 못했습니다.'; all.failed += g.length; g.forEach(function (x) { all.results.push({ student_id: x.s.id, to: x.t, name: x.s.name, ok: false, error: all.message }); }); return; }
           all.sent += r.sent || 0; all.failed += r.failed || 0;
@@ -237,7 +250,8 @@
       kind: o.kind, ids: o.ids || null, single: !!o.single, classes: {}, cls: o.cls || '',
       to: o.kind === 'entry' ? 'student' : (o.to || 'both'), onlyNew: true, onlyNoApp: o.kind === 'welcome' && !!o.cls,
       again: false, code: o.code || '', bodySt: '', bodyPa: '', busy: false, res: null, loading: true,
-      miss: o.miss || null, off: {}, toSt: true, toPa: false
+      miss: o.miss || null, off: {}, toSt: true, toPa: false,
+      pr: o.kind === 'nudge' ? { ids: o.praise || [], total: o.total || {}, on: true, off: {}, body: '' } : null
     };
     if (o.kind === 'nudge') st.to = 'student';
     if (o.cls) st.classes[o.cls] = true;
@@ -246,7 +260,7 @@
     if (!modal().open) modal().showModal();
     return load(o.kind).then(function () {
       if (o.kind === 'entry') st.bodySt = tplBody('입구 안내', ENTRY_BODY);
-      else if (o.kind === 'nudge') { st.bodySt = tplBody('과제 독려(학생)', NUDGE_ST); st.bodyPa = tplBody('과제 독려(학부모)', NUDGE_PA); }
+      else if (o.kind === 'nudge') { st.bodySt = tplBody('과제 독려(학생)', NUDGE_ST); st.bodyPa = tplBody('과제 독려(학부모)', NUDGE_PA); st.pr.body = tplBody('과제 칭찬(학생)', PRAISE_ST); }
       else { st.bodySt = tplBody('신입생 웰컴(학생)', WEL_ST); st.bodyPa = tplBody('신입생 웰컴(학부모)', WEL_PA); }
       st.loading = false;
       paint();
@@ -311,14 +325,86 @@
     if (ctx.smsMissing) return 'migration-023 · 040 SQL 을 실행하고 sms-send 를 배포해야 문자를 보낼 수 있습니다.';
     if (ctx.missing) return 'migration-052 SQL 을 먼저 실행해 주세요 (입구 · 웰컴 문자 칸 · 「오늘 이미 보냄」).';
     var ts = targetsOf(st.to);
+    if (st.kind === 'nudge' && !st.ids.length) return st.pr && st.pr.on && !String(st.pr.body).trim() ? '칭찬 문구를 적어 주세요.' : '';
     if (!ts.length) return '받는 사람(학생에게 · 학부모에게도)을 하나 이상 골라 주세요.';
+    if (st.kind === 'nudge' && st.pr && st.pr.on && st.pr.ids.length && !String(st.pr.body).trim()) return '칭찬 문구를 적어 주세요.';
     var bodies = [ts.indexOf('student') !== -1 ? st.bodySt : '', ts.indexOf('parent1') !== -1 ? st.bodyPa : ''].filter(function (b) { return b !== ''; });
     if (bodies.some(function (b) { return !String(b).trim(); })) return '문구를 적어 주세요.';
     if (bodies.some(needApp) && !ctx.links) return '「문자 발송 → 연결 상태」에서 앱 설치 링크를 먼저 넣어 주세요.';
     return '';
   }
+  /* ---------- 과제 문자 — 칭찬 묶음 ---------- */
+  function planPraise() {
+    var out = { items: [], noPhone: [], praised: [], left: [], people: 0, lms: 0 };
+    if (!st.pr) return out;
+    st.pr.ids.map(byId).filter(Boolean).forEach(function (s) {
+      if (ctx.praised && ctx.praised[s.id]) { out.praised.push(s); return; }
+      if (!st.pr.on || st.pr.off[s.id]) return;
+      var d = digits(s.studentPhone);
+      if (!mobile(d)) { out.noPhone.push({ s: s, what: '학생', none: true }); return; }
+      var text = fill(prBody(s), s), b = bytes(text), lf = leftOf(text);
+      if (lf.length) { out.left.push({ s: s, t: 'student', left: lf }); return; }
+      out.items.push({ s: s, t: 'student', d: d, text: text, bytes: b, kind: b <= 90 ? 'SMS' : 'LMS', pr: true });
+    });
+    out.people = out.items.length;
+    out.lms = out.items.filter(function (x) { return x.kind === 'LMS'; }).length;
+    return out;
+  }
+  /* 묶음 미리보기 — 독려는 예전과 같은 id(wcPreview) · 칭찬은 wcPreviewPr */
+  function pvHtml(ex, label, id) {
+    return '<div class="sms-pv wc-pv"><div class="sms-pv__head">' + esc(label) + ' 미리보기 — ' + esc(ex.s.name) + ' · ' + (ex.t === 'student' ? '학생 본인' : '학부모') + ' <span class="num">…' + esc(ex.d.slice(-4)) + '</span> ' +
+      '<span class="sms-kind sms-kind--' + ex.kind + '">' + (ex.kind === 'SMS' ? '단문' : '장문') + ' ' + ex.bytes + '바이트</span></div><pre class="sms-pv__text" id="' + id + '">' + esc(ex.text) + '</pre></div>';
+  }
+  function paintHw() {
+    var p = plan(chosen()), q = planPraise(), block = blockOf();
+    var nN = st.ids.length, pN = st.pr.ids.length;
+    var html = '';
+    if (nN) {
+      html += '<section class="wc-sec wc-grp" data-wc-grp="nudge"><h3 class="wc-grp__t">독려 <b class="num">' + nN + '</b>명 <small class="muted-note">안 낸 과제가 있는 학생</small></h3>' +
+        toHtml() + whoHtml() + bodyHtml() + (p.items[0] ? pvHtml(p.items[0], '독려', 'wcPreview') : '<p class="panel__hint">독려를 보낼 사람이 없습니다.</p>') + '</section>';
+    }
+    if (pN) {
+      html += '<section class="wc-sec wc-grp" data-wc-grp="praise"><h3 class="wc-grp__t">칭찬 <b class="num">' + pN + '</b>명 <small class="muted-note">이번 주 지금까지 나온 과제를 모두 냄 · 학생 본인에게</small></h3>' +
+        '<label class="check-line wc-pr-on"><input type="checkbox" id="wcPrOn"' + (st.pr.on ? ' checked' : '') + '> <span>칭찬 문자도 같이 보내기</span></label>';
+      if (st.pr.on) {
+        html += '<ul class="wc-picks" aria-label="칭찬 받는 학생">' + st.pr.ids.map(byId).filter(Boolean).map(function (s) {
+          var done = ctx.praised && ctx.praised[s.id], off = st.pr.off[s.id] || done;
+          return '<li><label class="wc-pick' + (off ? ' is-off' : '') + '"><input type="checkbox" data-wc-proff="' + esc(s.id) + '"' + (off ? '' : ' checked') + (done ? ' disabled' : '') + '>' +
+            '<span class="wc-pick__n">' + esc(s.name) + '</span><span class="wc-pick__d num">' + esc((st.pr.total[s.id] || 0) + '개 모두') + '</span>' +
+            (done ? '<small class="wc-pick__tag">오늘 이미 칭찬 받음</small>' : '') + (!mobile(digits(s.studentPhone)) ? '<small class="wc-pick__tag is-mute">번호 없음</small>' : '') + '</label></li>';
+        }).join('') + '</ul>';
+        if (q.praised.length) html += '<p class="wc-note" id="wcPrDone">오늘 이미 칭찬 받음 ' + q.praised.length + '명 제외</p>';
+        html += '<label class="field wc-text"><span class="field__label">칭찬 문구</span><textarea class="input" id="wcBodyPr" rows="4">' + esc(st.pr.body) + '</textarea></label>' +
+          '<p class="field__hint">{전체수}는 학생마다 그 주 지금까지 나온 과제 수 · 기본 문구는 「과제 칭찬(학생)」 (위 [문구 관리에 저장]으로 함께 저장)</p>' +
+          (q.items[0] ? pvHtml(q.items[0], '칭찬', 'wcPreviewPr') : '<p class="panel__hint">칭찬을 보낼 사람이 없습니다.</p>');
+      }
+      html += '</section>';
+    }
+    var people = p.people + q.people, n = p.items.length + q.items.length, lms = p.lms + q.lms;
+    html += '<p class="wc-sum"><b class="num">' + people + '</b>명 · 문자 <b class="num">' + n + '</b>건' + (lms ? ' (장문 ' + lms + ')' : '') +
+      (nN ? ' · 독려 <b class="num">' + p.people + '</b>' : '') + (pN ? ' · 칭찬 <b class="num">' + q.people + '</b>' : '') +
+      (p.noPhone.length + q.noPhone.length ? ' · 번호 없음 <b class="num">' + (p.noPhone.length + q.noPhone.length) + '</b>명' : '') + (p.dup.length ? ' · 오늘 이미 보냄 <b class="num">' + p.dup.length + '</b>건 (뺌)' : '') + '</p>';
+    var dn = st.again ? p.items.filter(function (x) { return x.again; }).length : p.dup.length;
+    if (dn) html += '<label class="check-line wc-again"><input type="checkbox" id="wcAgain"' + (st.again ? ' checked' : '') + '> <span>오늘 이미 보낸 독려 ' + dn + '건도 다시 보내기</span></label>';
+    var left = p.left.concat(q.left);
+    if (left.length) {
+      var lk = [], ln = [];
+      left.forEach(function (x) { if (ln.indexOf(x.s.name) === -1) ln.push(x.s.name); x.left.forEach(function (k) { if (lk.indexOf(k) === -1) lk.push(k); }); });
+      html += '<p class="cp-warn" id="wcLeft">⚠ 바뀌지 않은 칸이 있어 ' + ln.length + '명에게는 보내지 않습니다: <b>' + esc(lk.join(' ')) + '</b> (' + esc(ln.slice(0, 8).join(' · ')) + (ln.length > 8 ? ' 외 ' + (ln.length - 8) + '명' : '') + ')</p>';
+    }
+    if (block) html += '<p class="cp-warn" id="wcBlock">' + esc(block) + '</p>';
+    if (st.res) html += '<p class="wc-res ' + (st.res.failed || !st.res.ok ? 'is-bad' : 'is-ok') + '" id="wcResult">' + esc(st.resText) + '</p>';
+    html += '<div class="wc-foot"><button type="button" class="btn" id="wcCancel">닫기</button>' +
+      '<button type="button" class="btn btn--primary" id="wcSend"' + (!n || block || st.busy ? ' disabled' : '') + '>' + (st.busy ? '보내는 중…' : people + '명에게 보내기') + '</button></div>';
+    var focus = document.activeElement && document.activeElement.id, pos = focus && document.activeElement.selectionStart;
+    $('#wcBody').innerHTML = html;
+    if (focus && $('#' + focus)) { var el = $('#' + focus); el.focus(); try { if (pos != null && el.setSelectionRange) el.setSelectionRange(pos, pos); } catch (e) {} }
+    st.plan = { items: p.items.concat(q.items), people: people, lms: lms, noPhone: p.noPhone.concat(q.noPhone), dup: p.dup, left: left, nudge: p, praise: q };
+  }
+
   function paint() {
     if (!st || st.loading) return;
+    if (st.kind === 'nudge') { paintHw(); return; }
     var list = chosen(), p = plan(list), block = blockOf();
     var ex = p.items[0];
     var html = '<section class="wc-sec">' + whoHtml() + toHtml() + filterHtml() + '</section>' +
@@ -355,11 +441,12 @@
     var p = st.plan;
     if (!p || !p.items.length || st.busy) return;
     var desc = p.people + '명에게 보냅니다 — 문자 ' + p.items.length + '건' + (p.lms ? ' (장문 ' + p.lms + ')' : '') + '.' +
+      (p.praise ? ' 독려 ' + p.nudge.people + '명 · 칭찬 ' + p.praise.people + '명.' + (p.praise.praised.length ? ' 오늘 이미 칭찬 받은 ' + p.praise.praised.length + '명은 뺍니다.' : '') : '') +
       (p.noPhone.length ? ' 번호 없음 ' + p.noPhone.length + '명은 뺍니다.' : '') +
       (p.dup.length ? ' 오늘 이미 보낸 ' + p.dup.length + '건은 뺍니다.' : '') +
       (p.items.some(function (x) { return x.again; }) ? ' 오늘 이미 보낸 사람에게 한 번 더 보냅니다.' : '') +
       (p.left.length ? ' ⚠ 바뀌지 않은 칸이 있어 ' + uniq(p.left) + '명에게는 보내지 않습니다.' : '') +
-      ' 보낸 기록에 「' + KIND[st.kind].label + '」으로 남습니다.';
+      ' 보낸 기록에 「' + KIND[st.kind].label + '」' + (p.praise && p.praise.people ? ' · 「과제 칭찬」' : '') + '으로 남습니다.';
     UI.confirmAsk(KIND[st.kind].title, desc, '보내기').then(function (yes) {
       if (!yes) return;
       st.busy = true; paint();
@@ -418,6 +505,7 @@
     };
     if (ts.indexOf('student') !== -1 || st.kind === 'entry') jobs.push(put(titles[0], st.bodySt));
     if (titles[1] && ts.indexOf('parent1') !== -1) jobs.push(put(titles[1], st.bodyPa));
+    if (st.kind === 'nudge' && st.pr && st.pr.ids.length && st.pr.on) jobs.push(put('과제 칭찬(학생)', st.pr.body));
     return Promise.all(jobs).then(function () {
       toast('문구 관리에 저장했습니다 — 다음부터 이 글이 기본입니다', 'good');
       return load(st.kind);
@@ -432,7 +520,7 @@
     todayMemo[kind] = { at: Date.now(), p: p };
     return p;
   }
-  window.addEventListener('jt:welcome-sent', function (e) { var k = e.detail && e.detail.kind; if (k) delete todayMemo[k]; else todayMemo = {}; });
+  window.addEventListener('jt:welcome-sent', function (e) { var k = e.detail && e.detail.kind; if (k) { delete todayMemo[k]; if (k === 'nudge') delete todayMemo.praise; } else todayMemo = {}; });
 
   /* 상담 카드 「웰컴 안내 보냄 10/30」 */
   function lastSent(sid) {
@@ -467,13 +555,16 @@
         st.to = st.toSt && st.toPa ? 'both' : st.toSt ? 'student' : st.toPa ? 'parent' : 'none';
         paint(); return;
       }
-      if (t.hasAttribute('data-wc-off')) { var sid = t.getAttribute('data-wc-off'); if (t.checked) delete st.off[sid]; else st.off[sid] = true; paint(); }
+      if (t.hasAttribute('data-wc-off')) { var sid = t.getAttribute('data-wc-off'); if (t.checked) delete st.off[sid]; else st.off[sid] = true; paint(); return; }
+      if (t.id === 'wcPrOn') { st.pr.on = t.checked; paint(); return; }
+      if (t.hasAttribute('data-wc-proff')) { var pid = t.getAttribute('data-wc-proff'); if (t.checked) delete st.pr.off[pid]; else st.pr.off[pid] = true; paint(); }
     });
     var tm = null;
     m.addEventListener('input', function (e) {
       if (!st) return;
       if (e.target.id === 'wcBodySt') st.bodySt = e.target.value;
       else if (e.target.id === 'wcBodyPa') st.bodyPa = e.target.value;
+      else if (e.target.id === 'wcBodyPr' && st.pr) st.pr.body = e.target.value;
       else return;
       clearTimeout(tm); tm = setTimeout(paint, 200);
     });
@@ -491,7 +582,16 @@
     openEntry: function () { return openDialog({ kind: 'entry' }); },
     open: function (o) { o = o || {}; return openDialog({ kind: 'welcome', ids: o.students || null, single: (o.students || []).length === 1, cls: o.cls || '', to: o.to || 'both' }); },
     /* 과제 독려 — o = { students: [id], miss: { id: '10/31(금) 10/30(목)' } } (today.js) */
-    nudge: function (o) { return openDialog({ kind: 'nudge', ids: o.students || [], miss: o.miss || {} }); },
+    nudge: function (o) { return openDialog({ kind: 'nudge', ids: o.students || [], miss: o.miss || {}, praise: o.praise || [], total: o.total || {} }); },
+    /* 오늘 이미 칭찬 받은 학생 id (반 카드 칭찬 수 · 30초 기억) */
+    praisedToday: function () {
+      var m = todayMemo.praise;
+      if (m && Date.now() - m.at < 30000) return m.p;
+      var p = rpc('sms_praised_today').then(function (r) { return r.missing ? rpc('sms_sent_today', { p_purpose: 'praise' }) : r; })
+        .then(function (r) { return r.missing ? [] : (r.data || []).map(function (x) { return x.student_id; }); }, function () { return []; });
+      todayMemo.praise = { at: Date.now(), p: p };
+      return p;
+    },
     sentToday: sentToday,
     sendNow: sendNow, askAfterImport: askAfterImport, lastSent: lastSent,
     fill: function (body, s) { return fill(body, s); }, defaults: { entry: ENTRY_BODY, student: WEL_ST, parent: WEL_PA }

@@ -3813,7 +3813,8 @@ textarea.aip-text--new:focus { outline: 2px solid #B9AEF0; outline-offset: 1px; 
 /* ============================================================
    과제 독려 (today.js · welcome.js · 20261101g) — 「진행 중」 칩 오른쪽 · 휴대폰에서는 줄바꿈 (잘리지 않게)
    ============================================================ */
-.tdc-nudge { min-height: 30px; padding: 3px 10px; font-size: 12.5px; font-weight: 800; border: 1.5px solid #E7A33C; background: #FFF6E8; color: #8A4B00; white-space: normal; text-align: left; max-width: 100%; }
+.tdc-nudge { min-height: 30px; padding: 3px 10px; font-size: 12.5px; font-weight: 800; border: 1.5px solid #E7A33C; background: #FFF6E8; color: #8A4B00; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; max-width: 100%; }   /* 「과제 문자 · 독려 19 · 칭찬 3」 한 줄 (20261107c) */
+.tdc-nudge-box { display: contents; }
 .tdc-nudge-ok { font-size: 12.5px; font-weight: 700; color: var(--ink-light); }
 .tdc-nudge-ok.is-warn { color: #8A4B00; }
 .tdc-nudge__nophone, .tdc-nudge__sent { font-size: 11.5px; color: var(--ink-light); white-space: nowrap; }
@@ -3830,7 +3831,7 @@ textarea.aip-text--new:focus { outline: 2px solid #B9AEF0; outline-offset: 1px; 
 .cd-pvbar { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px 6px; }
 .cd-pvbar .btn { min-height: 36px; }
 @media (max-width: 600px) {
-  .tdc-nudge { width: 100%; min-height: 40px; }
+  .tdc-nudge { width: 100%; min-height: 40px; text-align: center; }
   .cd-pvbar .btn { flex: 1; min-height: 40px; }
 }
 
@@ -4199,3 +4200,11 @@ dialog.vl-modal[open] { display: flex; flex-direction: column; overflow: hidden;
 .tpl-pre__sent { margin-top: 10px; display: grid; gap: 4px; }
 .tpl-pre__sentrow { display: flex; gap: 6px; }
 .tpl-pre__sentrow .input { flex: 1 1 auto; min-width: 0; }
+
+/* 과제 문자 창 — 독려 · 칭찬 두 묶음 (20261107c) */
+.wc-grp { border: 1px solid var(--line-soft); border-radius: 12px; padding: 10px 12px; }
+.wc-grp + .wc-grp { margin-top: 10px; }
+.wc-grp[data-wc-grp="praise"] { border-color: #BFE3CB; background: #F6FCF8; }
+.wc-grp__t { font-size: 14px; font-weight: 800; color: var(--ink-deep); margin-bottom: 6px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.wc-grp__t .muted-note { font-weight: 400; }
+.wc-pr-on { margin-bottom: 6px; }

@@ -1501,28 +1501,37 @@
        두 칸은 학생 줄 칩과 똑같이 센다 (perVal · AppWeek) — 칩 「3/5」면 밀린 날 2개
        오늘 과제는 마감 전이라 세지 않는다 (AppWeek 「오늘」 · 냈으면 센다) · 퇴원 · 결석 처리와 무관하게 앱 과제 기록으로만
        링크가 없거나 못 불러온 학생은 판단할 수 없어 뺀다 · 학생 번호가 없으면 「번호 없음 n명」
-     「진행 중」 칩 오른쪽 [안 낸 학생 n명에게 독려 문자] · 정말 0명이면 연하게 「밀린 과제 없음 👍」 · 옆에 작게 「오늘 10:20 보냄 4명」 */
+     「진행 중」 칩 오른쪽 [과제 문자 · 독려 19 · 칭찬 3] (20261107c) — 칭찬 = 그 주 지금까지 나온 과제를 모두 낸 학생(늦게 낸 것 포함 · 면제는 뺌 · 0개면 없음)
+       칭찬 0명이면 「과제 문자 · 독려 19」 · 독려 0명이면 「과제 문자 · 칭찬 3」 · 둘 다 0이면 버튼 없음 · 오늘 이미 칭찬 받은 학생은 칭찬 수에서 뺀다
+     정말 0명이면 연하게 「밀린 과제 없음 👍」 · 옆에 작게 「오늘 10:20 보냄 4명」 */
   function nudgeOf(c) {
     if (!c || !c.per || !window.AppWeek) return null;
     var t0 = DDay.today();
     var ps = [c.per.recent, c.per.now].filter(function (p) { return p && (p.live ? (p.to < t0 ? p.to : t0) : p.to) >= p.from; });
     if (!ps.length) return null;
-    var out = { ids: [], miss: {}, seen: {}, phone: 0, noPhone: 0, judged: 0 };
+    var out = { ids: [], miss: {}, seen: {}, phone: 0, noPhone: 0, judged: 0, praise: [], total: {} };
     c.rows.forEach(function (s) {
       var a = app[s.id];
       if (!a || !a.ok || !a.data) return;
-      var seen = false, ds = [];
+      var seen = false, ds = [], dn = {};
       ps.forEach(function (p) {
         var w = AppWeek.compute(a.data, p.from, p.live && p.to > t0 ? t0 : p.to, t0);
         if (!w) return;
         seen = true;
-        w.days.forEach(function (x) { if (!x.weekend && x.hw === 'none' && x.date < t0 && ds.indexOf(x.date) === -1) ds.push(x.date); });
+        w.days.forEach(function (x) {
+          if (!x.weekend && x.hw === 'none' && x.date < t0 && ds.indexOf(x.date) === -1) ds.push(x.date);
+          if (!x.weekend && (x.hw === 'onTime' || x.hw === 'late') && x.date <= t0) dn[x.date] = 1;     /* 낸 과제 (늦게 포함 · 면제 · 과제 없는 날은 안 셈) */
+        });
       });
       if (!seen) return;
       out.judged++;
       out.seen[s.id] = 1;
       ds.sort();
-      if (!ds.length) return;
+      if (!ds.length) {
+        var tot = Object.keys(dn).length, y = stu(s.id) || s;
+        if (tot && Store.phoneDigits(y.studentPhone || y.student_phone || '').length >= 10) { out.praise.push(s.id); out.total[s.id] = tot; }
+        return;
+      }
       out.ids.push(s.id);
       out.miss[s.id] = ds.map(mdw).join('·');                 /* 「10/27(화)·10/29(목)」 (20261101m) */
       var x = stu(s.id) || s;
@@ -1531,6 +1540,17 @@
     return out;
   }
   var nudgeSent = null;            /* 오늘 보낸 과제 독려 [{ student_id, target, at }] */
+  var praised = null;              /* 오늘 이미 칭찬 받은 학생 { id: 1 } (20261107c) */
+  function loadPraised() {
+    if (!window.Welcome || !Welcome.praisedToday) return;
+    Welcome.praisedToday().then(function (ids) {
+      var m = {}; (ids || []).forEach(function (id) { m[id] = 1; });
+      var changed = JSON.stringify(m) !== JSON.stringify(praised || {}) || praised === null;
+      praised = m;
+      if (changed) Array.prototype.forEach.call(document.querySelectorAll('[data-nudge-box]'), function (el) { var c = (st.clsBy || {})[el.dataset.nudgeBox]; if (c) el.innerHTML = nudgeInner(c); });
+    });
+  }
+  function praiseLeft(v) { return v.praise.filter(function (id) { return !(praised && praised[id]); }); }
   function loadNudgeSent() {
     if (!window.Welcome || !Welcome.sentToday) return;
     Welcome.sentToday('nudge').then(function (list) {
@@ -1555,22 +1575,32 @@
     var v = nudgeOf(c);
     if (!v || !v.judged) return '';
     if (nudgeSent === null) setTimeout(loadNudgeSent, 0);
+    if (praised === null) setTimeout(loadPraised, 0);
+    return '<span class="tdc-nudge-box" data-nudge-box="' + esc(c.name) + '">' + nudgeInner(c, v) + '</span>';
+  }
+  /* 「과제 문자 · 독려 19 · 칭찬 3」 — 칭찬 0 · 독려 0 이면 그 칸을 뺀다 · 둘 다 0 이면 버튼 없음 (20261107c) */
+  function nudgeLabel(dN, pN) { return '과제 문자' + (dN ? ' · 독려 ' + dN : '') + (pN ? ' · 칭찬 ' + pN : ''); }
+  function nudgeInner(c, v) {
+    v = v || nudgeOf(c);
+    if (!v) return '';
     var sent = '<small class="tdc-nudge__sent num" data-nudge-sent="' + esc(c.name) + '">' + sentText(c.name) + '</small>';
-    if (!v.ids.length) return '<span class="tdc-nudge-ok" title="지난 수업 이후 마감이 지난 과제를 모두 냈습니다">밀린 과제 없음 👍</span>' + sent;
-    return (v.phone ? '<button type="button" class="btn btn--sm tdc-nudge" data-nudge="' + esc(c.name) + '">안 낸 학생 ' + v.phone + '명에게 독려 문자</button>'
-                    : '<span class="tdc-nudge-ok is-warn">안 낸 학생 ' + v.ids.length + '명</span>') +
+    var dN = v.phone, pN = praiseLeft(v).length;
+    var btn = dN || pN ? '<button type="button" class="btn btn--sm tdc-nudge num" data-nudge="' + esc(c.name) + '" aria-label="' + esc('과제 문자 — 독려 ' + dN + '명 · 칭찬 ' + pN + '명') + '">' + esc(nudgeLabel(dN, pN)) + '</button>' : '';
+    if (!v.ids.length) return btn + (btn ? '' : '<span class="tdc-nudge-ok" title="지난 수업 이후 마감이 지난 과제를 모두 냈습니다">밀린 과제 없음 👍</span>') + sent;
+    return btn + (dN ? '' : '<span class="tdc-nudge-ok is-warn">안 낸 학생 ' + v.ids.length + '명</span>') +
       (v.noPhone ? '<small class="tdc-nudge__nophone num">번호 없음 ' + v.noPhone + '명</small>' : '') + sent;
   }
   function openNudge(cls) {
     var c = (st.clsBy || {})[cls];
     var v = nudgeOf(c);
-    if (!v || !v.ids.length || !window.Welcome) return;
-    Welcome.nudge({ students: v.ids, miss: v.miss });
+    if (!v || (!v.ids.length && !v.praise.length) || !window.Welcome) return;
+    Welcome.nudge({ students: v.ids, miss: v.miss, praise: v.praise, total: v.total });
   }
   window.addEventListener('jt:welcome-sent', function (e) {
     if (e.detail && e.detail.kind !== 'nudge') return;
     nudgeSent = null;
     loadNudgeSent();
+    loadPraised();
   });
 
   function linesHtml(c, chips) {
