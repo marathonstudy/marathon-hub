@@ -683,18 +683,17 @@
   /* 「자주 쓰는 문구」 목록 — 이름 · 첫 줄 · [고치기] [복사해서 새로 만들기] [삭제] · ⠿ 끌어서 순서 (휴대폰은 ▲ ▼) */
   function firstLine(b) { return String(b || '').split('\n').map(function (x) { return x.trim(); }).filter(Boolean)[0] || ''; }
   /* ---------- 수업 전 예고 문구 (20261101l · migration-058) ----------
-     네 문구를 나란히 — 이름 · 언제 가는지 · 글 · 우리 반 학생 한 명 기준 미리보기 · [고치기]
+     두 문구를 나란히 (20261107b · migration-067) — 이름 · 언제 가는지 · 글 · 우리 반 학생 한 명 기준 미리보기 · [고치기]
      미리보기 숫자는 예시 (실제로는 수업 3시간 전에 함수가 학생마다 앱 기록으로 센다)
-       다 냄 5/5 · 일부 냄 5개 중 3개(밀린 2) · 많이 밀림 5개 중 1개(밀린 4) · 과제 없음 0 */
+       미제출 5개 중 3개(밀린 2) · 모두 제출 5/5 · 이번 주 과제가 0개면 보내지 않는다 */
   var PRE = [
-    { title: '수업 전 예고(다 냄)', when: '이번 주 과제를 모두 냄', done: 5, total: 5, miss: 0 },
-    { title: '수업 전 예고(일부 냄)', when: '절반 이상 냄', done: 3, total: 5, miss: 2 },
-    { title: '수업 전 예고(많이 밀림)', when: '절반 미만 냄', done: 1, total: 5, miss: 4 },
-    { title: '수업 전 예고(과제 없음)', when: '과제가 없던 주', done: 0, total: 0, miss: 0 }
+    { title: '수업 전 예고(미제출)', label: '미제출', when: '안 낸 과제가 있음', done: 3, total: 5, miss: 2 },
+    { title: '수업 전 예고(다 냄)', label: '모두 제출', when: '이번 주 과제를 모두 냄(늦게 낸 것 포함 · 반마다 끌 수 있음)', done: 5, total: 5, miss: 0 }
   ];
   /* SQL _pre_text2 와 같다 — {오늘수업}이 비면 둘러싼 괄호까지 뺀다 */
   function preFill(body, v) {
     var t = String(body || '');
+    t = t.split('{기대문장}').join(v.sent == null ? '' : v.sent);
     t = v.title ? t.split('{오늘수업}').join(v.title) : t.replace(/\s*[(\[「『<]?\{오늘수업\}[)\]」』>]?/g, '');
     t = t.replace(/  +/g, ' ').trim();
     [['{학생이름}', v.name], ['#{이름}', v.name], ['{반이름}', v.cls], ['#{반}', v.cls], ['{수업시각}', v.time], ['{밀린날짜}', v.miss], ['{제출수}', String(v.done)], ['{전체수}', String(v.total)]]
@@ -715,18 +714,31 @@
     var rows = PRE.map(function (p) { return { p: p, t: st.templates.find(function (t) { return (t.title || '').trim() === p.title; }) }; });
     if (st.missing || !rows.some(function (r) { return r.t; })) { host.hidden = true; host.innerHTML = ''; return; }
     var x = preSample();
+    /* 두 문자에 같이 들어가는 한 문장 {기대문장} (migration-067 · 20261107b) — 여기 한 칸만 고치면 둘 다 바뀐다 */
+    var sentT = st.templates.find(function (t) { return (t.title || '').trim() === PRE_SENT; });
+    var sent = sentT ? String(sentT.body || '').trim() : PRE_SENT_DEF;
     host.hidden = false;
-    host.innerHTML = '<div class="tpl-pre__head"><b>수업 전 예고 문자</b><span class="panel__hint">수업 시작 전(기본 3시간 전) 학생 본인에게 · 이번 주 과제 제출 수에 따라 넷 중 하나 · 미리보기: ' + esc(x.name) + ' 학생' + (x.cls ? ' · ' + esc(x.cls) : '') + ' ' + esc(x.time) + ' (숫자는 예시)</span></div>' +
+    host.innerHTML = '<div class="tpl-pre__head"><b>수업 전 예고 문자</b><span class="panel__hint">수업 시작 전(기본 3시간 전) 학생 본인에게 · 안 낸 과제가 있으면 미제출 · 모두 냈으면 칭찬 · 이번 주 과제가 0개면 보내지 않음 · 미리보기: ' + esc(x.name) + ' 학생' + (x.cls ? ' · ' + esc(x.cls) : '') + ' ' + esc(x.time) + ' (숫자는 예시)</span></div>' +
       '<div class="tpl-pre__grid">' + rows.map(function (r) {
         var body = r.t ? r.t.body : '';
-        var pv = r.t ? preFill(body, { name: x.name, cls: x.cls, time: x.time, done: r.p.done, total: r.p.total, miss: x.days.slice(5 - r.p.miss).join(' '), title: '' }) : '';
+        var pv = r.t ? preFill(body, { sent: sent, name: x.name, cls: x.cls, time: x.time, done: r.p.done, total: r.p.total, miss: x.days.slice(5 - r.p.miss).join(' '), title: '' }) : '';
         return '<div class="tpl-pre__card">' +
-          '<div class="tpl-pre__top"><b>' + esc(r.p.title.replace('수업 전 예고', '').replace(/[()]/g, '')) + '</b><span class="tpl-pre__when">' + esc(r.p.when) + '</span></div>' +
+          '<div class="tpl-pre__top"><b>' + esc(r.p.label) + '</b><span class="tpl-pre__when">' + esc(r.p.when) + '</span></div>' +
           (r.t ? '<pre class="tpl-pre__body">' + esc(body) + '</pre><div class="tpl-pre__pv"><span class="tpl-pre__lbl">미리보기</span><pre class="sms-pv__text">' + esc(pv) + '</pre></div>' +
                  '<button class="btn btn--sm" type="button" data-pre-edit="' + esc(r.t.id) + '">고치기</button>'
-               : '<p class="panel__hint">「' + esc(r.p.title) + '」 문구가 없습니다 — migration-058 SQL 을 실행해 주세요.</p>') +
+               : '<p class="panel__hint">「' + esc(r.p.title) + '」 문구가 없습니다 — migration-067 SQL 을 실행해 주세요.</p>') +
         '</div>';
-      }).join('') + '</div>';
+      }).join('') + '</div>' +
+      '<div class="tpl-pre__sent"><label class="field__label" for="tplPreSent">두 문자에 같이 들어가는 한 문장 <code>{기대문장}</code></label>' +
+        '<div class="tpl-pre__sentrow"><input class="input" id="tplPreSent" maxlength="80" value="' + esc(sent) + '" placeholder="비우면 그 자리는 빠집니다">' +
+        '<button class="btn btn--sm btn--primary" type="button" data-pre-sent-save>저장</button></div>' +
+        '<span class="muted-note">여기를 고치면 미제출 · 모두 제출 문자에 같이 바뀝니다</span></div>';
+  }
+  var PRE_SENT = '수업 전 예고(공통 한 문장)', PRE_SENT_DEF = '오늘 수업 열심히 준비해 뒀으니 기대해 주세요!';
+  function savePreSent() {
+    var v = ($('#tplPreSent').value || '').replace(/\s+/g, ' ').trim();
+    var t = st.templates.find(function (x) { return (x.title || '').trim() === PRE_SENT; });
+    return upsertTemplate(t ? t.id : null, PRE_SENT, v || ' ');
   }
 
   function renderTplList() {
@@ -1821,7 +1833,10 @@
     /* 끌어서 순서 바꾸기 */
     var drag = null;
     /* 수업 전 예고 문구 [고치기] (20261101l) */
-    $('#tplPre').addEventListener('click', function (e) { var b = e.target.closest('[data-pre-edit]'); if (b) openTplEdit(b.dataset.preEdit); });
+    $('#tplPre').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-pre-edit]'); if (b) openTplEdit(b.dataset.preEdit);
+      if (e.target.closest('[data-pre-sent-save]')) savePreSent();
+    });
     $('#tplList').addEventListener('dragstart', function (e) {
       var li = e.target.closest('[data-tid]'); if (!li) return;
       drag = li.dataset.tid; li.classList.add('is-drag');
