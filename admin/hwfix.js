@@ -3,6 +3,7 @@
 
    앱 기록은 바꾸지 않는다. 고친 값은 코치룸 DB(hw_fixes)에 「과제 수정」 한 줄로 따로 남긴다
      (학생 · 날짜 · 바꾼 상태 · 사유 · 고친 사람 · 시각 — 사람 · 시각은 서버가 채운다)
+   사유는 고르지 않아도 된다(074 · 20261108f) · 누르면 먼저 화면에 덮고 저장한다
    그 학생 · 그 날짜의 가장 마지막 줄이 지금 값 · 「원래대로」도 한 줄(app)로 남긴다 — 기록은 지우지 않는다
    화면은 앱 기록 위에 덮어서 센다 (AppWeek.withFix) — 「오늘」 과제 칩 · 7칸 표 · 과제 평균 · 정렬 · AI 초안 · 미리보기
      앱에서 다시 받아 와도 덮는 값은 그대로다 (앱 기록과 따로 두므로)
@@ -19,6 +20,7 @@
   var STATUSES = ['onTime', 'late', 'none', 'exempt'];
   var REASONS = ['앱 오류', '종이로 제출', '결석으로 면제', '기타'];
   var MISSING = '과제 수정 저장 칸이 아직 없습니다 — Supabase SQL Editor 에서 migration-038-hw-fix.sql 을 먼저 실행해 주세요';
+  var NO074 = '사유 없이 바꾸려면 Supabase SQL Editor 에서 migration-074-hw-direct.sql 을 먼저 실행해 주세요';
 
   /* by[학생][날짜] = [기록 줄 (오래된 것부터)] */
   var st = { by: {}, sql: true, loaded: false, cut: {} };
@@ -56,27 +58,40 @@
   }
   function apply(sid, data) { return data && window.AppWeek && AppWeek.withFix ? AppWeek.withFix(data, mapOf(sid)) : data; }
 
-  /* 「김OO 10/25 10:12」 */
+  /* 「김민서 · 11/8 15:10」 (20261108f) */
   function stamp(x) {
     var t = x && x.fixed_at ? new Date(x.fixed_at) : null;
     var when = t && !isNaN(t) ? (t.getMonth() + 1) + '/' + t.getDate() + ' ' + String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0') : '';
-    return [x && x.fixed_name, when].filter(Boolean).join(' ');
+    return [x && x.fixed_name, when].filter(Boolean).join(' · ');
   }
 
+  /* 먼저 화면에 덮고(기다리지 않음 · 20261108f) 저장 — 실패하면 그 줄을 빼고 다시 그린다 */
+  var tmpId = 0;
   function add(sid, day, status, reason, appStatus) {
     if (!st.sql) return Promise.resolve({ ok: false, message: MISSING });
+    var m = st.by[sid] = st.by[sid] || {}, tmp = { id: 'tmp' + (++tmpId), student_id: sid, day: day, status: status, reason: reason || '', app_status: appStatus || '', fixed_name: '', fixed_at: new Date().toISOString(), tmp: true };
+    (m[day] = m[day] || []).push(tmp);
+    window.dispatchEvent(new CustomEvent('jt:hwfix'));
+    function drop() {
+      var l = (st.by[sid] || {})[day] || [], i = l.indexOf(tmp);
+      if (i !== -1) { l.splice(i, 1); window.dispatchEvent(new CustomEvent('jt:hwfix')); }
+    }
     return sb().from('hw_fixes').insert({ student_id: sid, day: day, status: status, reason: reason || '', app_status: appStatus || '' }).then(function (r) {
-      if (r.error) { if (isMissing(r.error)) st.sql = false; return { ok: false, message: isMissing(r.error) ? MISSING : r.error.message }; }
+      if (r.error) {
+        drop();
+        if (isMissing(r.error)) st.sql = false;
+        return { ok: false, message: isMissing(r.error) ? MISSING : /hw_fixes_reason/.test(r.error.message || '') ? NO074 : r.error.message };
+      }
       return load().then(function () {
         window.dispatchEvent(new CustomEvent('jt:remote', { detail: { table: 'hw_fixes', local: true } }));
         return { ok: true };
       });
-    }, function (e) { return { ok: false, message: (e && e.message) || '저장하지 못했습니다' }; });
+    }, function (e) { drop(); return { ok: false, message: (e && e.message) || '저장하지 못했습니다' }; });
   }
+  /* 사유는 고르지 않아도 된다 (20261108f · migration-074) */
   function save(sid, day, status, reason, appStatus) {
     if (STATUSES.indexOf(status) === -1) return Promise.resolve({ ok: false, message: '바꿀 상태를 골라 주세요' });
-    if (!String(reason || '').trim()) return Promise.resolve({ ok: false, message: '사유를 골라 주세요' });
-    return add(sid, day, status, String(reason).trim().slice(0, 200), appStatus);
+    return add(sid, day, status, String(reason || '').trim().slice(0, 200), appStatus);
   }
   function revert(sid, day, appStatus) { return add(sid, day, 'app', '', appStatus); }
 

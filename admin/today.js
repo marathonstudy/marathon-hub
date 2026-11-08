@@ -997,23 +997,23 @@
   var det = { sid: '', from: '', to: '', lesson: '', live: false, day: '' };
   function closedDet() { return { sid: '', from: '', to: '', lesson: '', live: false, day: '' }; }
 
-  /* ---------- 과제 수정 — 7칸 표에서 칸을 누르면 그날 과제 아래 [고치기] (hwfix.js · 20261031j) ----------
-     정시 제출 · 늦게 제출 · 미제출 · 면제(셈에서 뺌) 중 하나 + 사유(앱 오류 · 종이로 제출 · 결석으로 면제 · 기타 직접 입력)를 꼭 고른다
-     고친 칸에는 작은 「수정」 — 누르면 「원래 앱: 미제출 → 수정: 정시 제출 · 종이로 제출 · 김OO 10/25 10:12」 · [원래대로]
-     이미 공개한 레포트 기간이면 「다시 공개해야 학부모에게 반영됩니다」 · 수정 기록은 지우지 않는다 (원래대로도 한 줄) */
-  var fx = { edit: false, st: '', rs: '', other: '', err: '', busy: false };
-  function fxReset() { fx = { edit: false, st: '', rs: '', other: '', err: '', busy: false, exAsk: false }; }
-  /* 상태 고치기 — 늦게 / 제출 / 면제 (미제출은 지금 미제출이 아닐 때만) · 20261101r */
-  var FIX_SHORT = { late: '늦게', onTime: '제출', exempt: '면제', none: '미제출' };
-  function fixOpts(d) { return ['late', 'onTime', 'exempt'].concat(d && d.hw !== 'none' ? ['none'] : []); }
+  /* ---------- 과제 칸 → 바로 상태 바꾸기 (20261108f · hwfix.js · migration-074) ----------
+     칸을 누르면 과제 이름 줄 바로 아래 큰 버튼 네 개 [○ 제출] [△ 늦게 제출] [✕ 미제출] [면제] (지금 상태는 진하게)
+       누르면 바로 저장 · 표 칸도 바로 바뀐다 (기다리지 않고 먼저 덮는다 · 실패하면 되돌린다) · 면제는 한 번 더 묻는다
+       바꾼 뒤 작게 「사유(선택): 종이로 제출 / 앱 오류 / 기타 직접 입력」 — 안 골라도 저장된다 · 면제는 「면제 사유(선택 · 예: 병결)」
+       바꾼 칸에는 작은 「직접」 · 상세 「김민서 · 11/8 15:10 바꿈 · 종이로 제출 · [원래대로]」(원래대로 = 앱 기록으로)
+     앱 기록은 그대로 두고 코치룸에 「과제 수정」 한 줄로 따로 남긴다 — 앱 자동 갱신이 덮어쓰지 않는다 · 수정 기록은 지우지 않는다
+     이미 공개한 레포트 기간이면 「다시 공개해야 학부모에게 반영됩니다」 · 조교도 바꿀 수 있다 */
+  var fx = { exAsk: false, other: '', otherOpen: false, err: '', busy: false };
+  function fxReset() { fx = { exAsk: false, other: '', otherOpen: false, err: '', busy: false }; }
+  var ST4 = [['onTime', '○ 제출'], ['late', '△ 늦게 제출'], ['none', '✕ 미제출'], ['exempt', '면제']];
 
-  /* ---------- 과제 칸 메뉴 (20261101r) — 면제 오해 막기 ----------
-     맨 위 「10/29(목) 과제 · 미제출」 · 큰 버튼 [상담 기록 남기기] [걱정 문자 보내기]
+  /* ---------- 과제 칸 메뉴 (20261101r · 20261108f) ----------
+     맨 위 「10/29(목) 과제 · 미제출」 · 과제 이름 줄 · 상태 버튼 네 개 · 큰 버튼 [상담 기록 남기기] [걱정 문자 보내기]
        상담 기록 — 글 칸 → 저장하면 그 학생 상담 기록(분류 「과제」 · 그 날짜 hw_day) · 과제 상태는 그대로 · 기록이 있는 칸에 작은 점
-       걱정 문자 — worry.js 창을 그 날짜 사유로
-     그 아래 작게 접힌 「상태 고치기 ▾」 안에만 늦게 / 제출 / 면제 (면제는 한 번 더 묻는다) */
-  var hm = { note: false, text: '', err: '', busy: false, more: false };
-  function hmReset() { hm = { note: false, text: '', err: '', busy: false, more: false, d: null }; }
+       걱정 문자 — worry.js 창을 그 날짜 사유로 */
+  var hm = { note: false, text: '', err: '', busy: false };
+  function hmReset() { hm = { note: false, text: '', err: '', busy: false, d: null }; }
   var MENU_NAME = { onTime: '정시 제출', late: '늦게 제출', none: '미제출', exempt: '면제', today: '오늘(마감 전)' };
   function menuHead(d) { return mdw(d.date) + ' 과제 · ' + (MENU_NAME[d.hw] || HW_NAME[d.hw] || ''); }
   function menuHtml(sid, d, data) {
@@ -1021,6 +1021,7 @@
     if (d.weekend || d.hw === 'future' || d.hw === 'off' || d.hw === 'new') return info;
     hm.d = d;
     var h = '<div class="hd-menu" data-hd-menu="' + esc(d.date) + '"><p class="hd-menu__t">' + esc(menuHead(d)) + (window.Worry && Worry.hasHwNote(sid, d.date) ? ' <small class="hd-menu__has">· 상담 기록 있음</small>' : '') + '</p>' + info +
+      fixHtml(sid, d) +
       '<div class="hd-menu__big"><button type="button" class="btn hd-menu__b" data-hd-note aria-expanded="' + hm.note + '">상담 기록 남기기</button>' +
         '<button type="button" class="btn hd-menu__b" data-hd-worry>걱정 문자 보내기</button></div>';
     if (hm.note) {
@@ -1030,8 +1031,6 @@
         '<div class="hd-fix__act"><button type="button" class="btn btn--sm btn--primary" data-hd-note-save' + (hm.busy ? ' disabled' : '') + '>' + (hm.busy ? '저장하는 중…' : '저장') + '</button>' +
         '<button type="button" class="btn btn--sm" data-hd-note-cancel>취소</button></div></div>';
     }
-    h += '<button type="button" class="hd-menu__more" data-hd-more aria-expanded="' + hm.more + '">상태 고치기 ' + (hm.more ? '▴' : '▾') + '</button>';
-    if (hm.more) h += fixHtml(sid, d);
     return h + '</div>';
   }
   /* 과제 칸 메뉴 — 다른 칸을 누르면 처음으로 · 버튼들 */
@@ -1039,7 +1038,7 @@
     var t = e.target;
     if (!t.closest) return;
     if (t.closest('[data-hd-day]')) { hmReset(); fxReset(); return; }
-    var b = t.closest('[data-hd-note], [data-hd-worry], [data-hd-more], [data-hd-note-save], [data-hd-note-cancel], [data-hd-exok], [data-hd-exno]');
+    var b = t.closest('[data-hd-note], [data-hd-worry], [data-hd-note-save], [data-hd-note-cancel]');
     if (!b || !det.sid || !det.day) return;
     e.preventDefault();
     e.stopPropagation();
@@ -1072,55 +1071,52 @@
       var s1 = rowById(sid) || {};
       Worry.open({ from: 'hw', items: [{ sid: sid, cls: s1.class_name || '', hwDay: day, checks: [],
         reasons: [{ kind: 'hw', date: day, dates: m && m.indexOf(one) !== -1 ? m : one, label: d1 ? (MENU_NAME[d1.hw] || '미제출') : '미제출' }] }] });
-      return;
     }
-    if (b.hasAttribute('data-hd-more')) { hm.more = !hm.more; fxReset(); paintDetail(); return; }
-    if (b.hasAttribute('data-hd-exok')) { fx.st = 'exempt'; fx.exAsk = false; fx.err = ''; paintDetail(); return; }
-    if (b.hasAttribute('data-hd-exno')) { fx.exAsk = false; if (fx.st === 'exempt') fx.st = ''; if (fx.rs === '결석으로 면제') fx.rs = ''; paintDetail(); }
   }, true);
   document.addEventListener('input', function (e) { if (e.target && e.target.id === 'hdNoteText') hm.text = e.target.value; });
   window.addEventListener('jt:hwnote', function () { if (det.sid) paintDetail(); });
 
   var FIX_NAME = { onTime: '정시 제출', late: '늦게 제출', none: '미제출', exempt: '면제', off: '과제 없음' };
-  var FIX_OPT = { onTime: '정시 제출', late: '늦게 제출', none: '미제출', exempt: '면제(셈에서 뺌)' };
-  var FIX_RS = [['앱 오류', '앱 오류'], ['종이로 제출', '종이로 제출'], ['결석으로 면제', '결석으로 면제'], ['기타', '기타 직접 입력']];
+  /* 사유(선택) — 면제는 「결석으로 면제」 · 「기타」(예: 병결) */
+  var FIX_RS = [['종이로 제출', '종이로 제출'], ['앱 오류', '앱 오류'], ['기타', '기타 직접 입력']];
+  var FIX_RS_EX = [['결석으로 면제', '결석으로 면제'], ['기타', '기타 직접 입력']];
   /* 앱이 준 그날 상태 (고치기 전 · onTime | late | none | off) */
   function appStatusOf(sid, day) {
     var a = app[sid], c = a && a.raw ? (a.raw.calendar || []).find(function (x) { return x && x.date === day; }) : null;
     return !c ? 'off' : c.status === 'onTime' || c.status === 'late' ? c.status : 'none';
   }
-  function fxReason() { return fx.rs === '기타' ? fx.other.trim() : fx.rs; }
-  function fxReady() { return !!fx.st && !!fxReason() && !fx.busy; }
   function fixHtml(sid, d) {
     if (!window.HwFix || d.weekend || d.hw === 'future' || d.hw === 'off') return '';
     var x = HwFix.activeOf(sid, d.date), rows = HwFix.rowsOf(sid, d.date), was = appStatusOf(sid, d.date);
     var cut = HwFix.cutKnown(sid);
     if (cut === null) HwFix.cutOf(sid).then(function (v) { if (v && det.sid === sid && det.day === d.date) paintDetail(); });
     var pub = !!cut && d.date <= cut;
-    var h = '<div class="hd-fix">';
-    if (x) h += '<p class="hd-fix__was"><i class="hd-fx">수정</i> 원래 앱: ' + esc(FIX_NAME[was]) + ' → 수정: ' + esc(FIX_NAME[x.status]) + ' · ' + esc(x.reason) + (HwFix.stamp(x) ? ' · ' + esc(HwFix.stamp(x)) : '') + '</p>';
-    if (!fx.edit) {
-      h += '<div class="hd-fix__act"><button type="button" class="btn btn--sm" data-hd-fix="open">' + (x ? '다시 고치기' : '고치기') + '</button>' +
-        (x ? '<button type="button" class="btn btn--sm btn--ghost" data-hd-fix="revert"' + (fx.busy ? ' disabled' : '') + '>원래대로</button>' : '') + '</div>';
-    } else {
-      h += '<div class="hd-fix__form" role="group" aria-label="' + esc(mdw(d.date) + ' 과제 고치기') + '">' +
-        '<p class="hd-fix__q">바꿀 상태</p><div class="hd-fix__opts">' + fixOpts(d).map(function (k) {
-          return '<button type="button" class="hd-fix__o' + (fx.st === k ? ' is-on' : '') + '" data-hd-st="' + k + '" aria-pressed="' + (fx.st === k) + '">' + FIX_SHORT[k] + '</button>';
-        }).join('') + '</div>' +
-        (fx.exAsk ? '<div class="hd-exask" role="alertdialog" aria-label="면제 확인"><p>면제는 그날 과제를 세지 않습니다(제출률 · 독려 · 챙길 학생에서 빠짐). 상담 기록만 남기려면 위 [상담 기록 남기기]를 쓰세요.</p>' +
-          '<div class="hd-fix__act"><button type="button" class="btn btn--sm btn--danger" data-hd-exok>그래도 면제</button><button type="button" class="btn btn--sm" data-hd-exno>취소</button></div></div>' : '') +
-        '<p class="hd-fix__q">' + (fx.st === 'exempt' ? '면제 사유(예: 병결)' : '사유') + ' <small>(꼭 고르기)</small></p><div class="hd-fix__opts">' + FIX_RS.map(function (r) {
-          return '<button type="button" class="hd-fix__o' + (fx.rs === r[0] ? ' is-on' : '') + '" data-hd-rs="' + esc(r[0]) + '" aria-pressed="' + (fx.rs === r[0]) + '">' + esc(r[1]) + '</button>';
-        }).join('') + '</div>' +
-        (fx.rs === '기타' ? '<input class="input hd-fix__other" data-hd-other type="text" maxlength="100" placeholder="' + (fx.st === 'exempt' ? '예: 병결' : '사유를 적어 주세요') + '" aria-label="' + (fx.st === 'exempt' ? '면제 사유(예: 병결)' : '기타 사유') + '" value="' + esc(fx.other) + '">' : '') +
-        '<div class="hd-fix__act"><button type="button" class="btn btn--sm btn--primary" data-hd-fix="save"' + (fxReady() ? '' : ' disabled') + '>' + (fx.busy ? '저장하는 중…' : '저장') + '</button>' +
-        '<button type="button" class="btn btn--sm" data-hd-fix="cancel">취소</button></div>' +
-        '<p class="hd-fix__hint">' + (fx.err ? '<b role="alert">' + esc(fx.err) + '</b>' : '앱 기록은 그대로 두고 코치룸에 「과제 수정」으로 따로 남깁니다 · 원래 앱: ' + esc(FIX_NAME[was])) + '</p>' +
-      '</div>';
+    var cur = x ? x.status : d.hw;
+    var h = '<div class="hd-st4" role="group" aria-label="' + esc(mdw(d.date) + ' 과제 상태 바꾸기') + '">' + ST4.map(function (o) {
+      return '<button type="button" class="hd-st4__b hd-st4__b--' + o[0] + (cur === o[0] ? ' is-on' : '') + '" data-hd-set="' + o[0] + '" aria-pressed="' + (cur === o[0]) + '"' + (fx.busy ? ' disabled' : '') + '>' + esc(o[1]) + '</button>';
+    }).join('') + '</div>';
+    if (fx.exAsk) h += '<div class="hd-exask" role="alertdialog" aria-label="면제 확인"><p>면제는 그날 과제를 세지 않습니다(제출률 · 독려 · 챙길 학생에서 빠짐). 상담 기록만 남기려면 아래 [상담 기록 남기기]를 쓰세요.</p>' +
+      '<div class="hd-fix__act"><button type="button" class="btn btn--sm btn--danger" data-hd-exok>그래도 면제</button><button type="button" class="btn btn--sm" data-hd-exno>취소</button></div></div>';
+    if (fx.err) h += '<p class="hd-fix__hint"><b role="alert">' + esc(fx.err) + '</b></p>';
+    if (!x && !pub && !rows.length) return h;
+    h += '<div class="hd-fix">';
+    if (x) {
+      var who = HwFix.stamp(x);
+      h += '<p class="hd-fix__was"><i class="hd-fx">직접</i> ' + esc(who ? who + ' 바꿈' : '방금 바꿈') + (x.reason ? ' · ' + esc(x.reason) : '') +
+        ' · <button type="button" class="link-btn hd-fix__revert" data-hd-fix="revert"' + (fx.busy ? ' disabled' : '') + '>원래대로</button></p>' +
+        '<p class="hd-fix__hint">원래 앱 기록: ' + esc(FIX_NAME[was]) + ' · [원래대로]를 누르면 앱 기록으로 돌아갑니다</p>';
+      var ex = x.status === 'exempt', list = ex ? FIX_RS_EX : FIX_RS;
+      var isOther = fx.otherOpen || (!!x.reason && !list.some(function (r) { return r[0] === x.reason; }));
+      h += '<p class="hd-fix__q">' + (ex ? '면제 사유(예: 병결)' : '사유') + ' <small>(선택 · 안 골라도 저장됨)</small></p><div class="hd-fix__opts hd-fix__opts--rs">' + list.map(function (r) {
+        var on = r[0] === '기타' ? isOther : x.reason === r[0];
+        return '<button type="button" class="hd-fix__o' + (on ? ' is-on' : '') + '" data-hd-rs="' + esc(r[0]) + '" aria-pressed="' + on + '"' + (fx.busy ? ' disabled' : '') + '>' + esc(r[1]) + '</button>';
+      }).join('') + '</div>';
+      if (fx.otherOpen) h += '<div class="hd-fix__otherrow"><input class="input hd-fix__other" data-hd-other type="text" maxlength="100" placeholder="' + (ex ? '예: 병결' : '사유를 적어 주세요') + '" aria-label="' + (ex ? '면제 사유(예: 병결)' : '기타 사유') + '" value="' + esc(fx.other) + '">' +
+        '<button type="button" class="btn btn--sm btn--primary" data-hd-fix="other"' + (fx.other.trim() && !fx.busy ? '' : ' disabled') + '>저장</button></div>';
     }
-    if (pub && (x || fx.edit)) h += '<p class="hd-fix__pub">이미 공개한 레포트 기간입니다 — 고치면 다시 공개해야 학부모에게 반영됩니다</p>';
+    if (pub) h += '<p class="hd-fix__pub">이미 공개한 레포트 기간입니다 — 바꾸면 다시 공개해야 학부모에게 반영됩니다</p>';
     if (rows.length) h += '<details class="hd-fix__log"><summary>수정 기록 ' + rows.length + '건</summary><ol>' + rows.slice().reverse().map(function (r) {
-      return '<li>' + (r.status === 'app' ? '원래대로(앱 값)' : esc(FIX_NAME[r.status]) + ' · ' + esc(r.reason)) + (HwFix.stamp(r) ? ' · ' + esc(HwFix.stamp(r)) : '') + '</li>';
+      return '<li>' + (r.status === 'app' ? '원래대로(앱 값)' : esc(FIX_NAME[r.status]) + (r.reason ? ' · ' + esc(r.reason) : '')) + (HwFix.stamp(r) ? ' · ' + esc(HwFix.stamp(r)) : '') + '</li>';
     }).join('') + '</ol></details>';
     return h + '</div>';
   }
@@ -1128,49 +1124,75 @@
     fx.busy = false;
     if (!res || !res.ok) { fx.err = (res && res.message) || '저장하지 못했습니다'; paintDetail(); return; }
     var cut = HwFix.cutKnown(sid);
-    fxReset();
+    fx.err = '';
     paintDetail();
-    if (window.UI && UI.toast) UI.toast(msg + (cut && day <= cut ? ' · 이미 공개한 레포트 기간이라 다시 공개해야 학부모에게 반영됩니다' : ''), 'good');
+    if (msg && window.UI && UI.toast) UI.toast(msg + (cut && day <= cut ? ' · 이미 공개한 레포트 기간이라 다시 공개해야 학부모에게 반영됩니다' : ''), 'good');
+  }
+  function setStatus(sid, day, to, reason) {
+    var was = appStatusOf(sid, day);
+    fx.busy = true; fx.exAsk = false; fx.err = '';
+    /* HwFix.save 가 먼저 화면에 덮고(jt:hwfix → 다시 그림) 저장한다 */
+    var p = HwFix.save(sid, day, to, reason || '', was);
+    paintDetail();
+    return p;
   }
   document.addEventListener('click', function (e) {
-    var b = e.target.closest && e.target.closest('[data-hd-fix], [data-hd-st], [data-hd-rs]');
+    var b = e.target.closest && e.target.closest('[data-hd-set], [data-hd-fix], [data-hd-rs], [data-hd-exok], [data-hd-exno]');
     if (!b || !det.sid || !det.day || !window.HwFix) return;
     e.preventDefault();
     e.stopPropagation();
-    var sid = det.sid, day = det.day;
-    if (b.hasAttribute('data-hd-st')) {
-      if (b.dataset.hdSt === 'exempt' && fx.st !== 'exempt') { fx.exAsk = true; fx.err = ''; paintDetail(); return; }   /* 면제 — 한 번 더 묻는다 (20261101r) */
-      fx.st = b.dataset.hdSt; fx.exAsk = false; fx.err = ''; paintDetail(); return;
+    if (b.disabled) return;
+    var sid = det.sid, day = det.day, x = HwFix.activeOf(sid, day);
+    if (b.hasAttribute('data-hd-exno')) { fx.exAsk = false; paintDetail(); return; }
+    if (b.hasAttribute('data-hd-set') || b.hasAttribute('data-hd-exok')) {
+      var to = b.hasAttribute('data-hd-exok') ? 'exempt' : b.dataset.hdSet;
+      var d0 = hm.d && hm.d.date === day ? hm.d : null, cur = x ? x.status : d0 ? d0.hw : '';
+      if (to === cur) { fx.exAsk = false; paintDetail(); return; }                                  /* 이미 그 상태 */
+      if (to === 'exempt' && !b.hasAttribute('data-hd-exok')) { fx.exAsk = true; fx.err = ''; paintDetail(); return; }   /* 면제 — 한 번 더 묻는다 */
+      fx.otherOpen = false; fx.other = '';
+      setStatus(sid, day, to, '').then(function (res) { fxDone(res, mdw(day) + ' 과제를 「' + FIX_NAME[to] + '」로 바꿨습니다', sid, day); });
+      return;
     }
     if (b.hasAttribute('data-hd-rs')) {
-      fx.rs = b.dataset.hdRs; fx.err = '';
-      if (fx.rs === '결석으로 면제' && !fx.st) fx.exAsk = true;
-      paintDetail();
-      if (fx.rs === '기타') { var inp = document.querySelector('[data-hd-other]'); if (inp) inp.focus(); }
+      if (!x) return;
+      var rs = b.dataset.hdRs;
+      if (rs === '기타') {
+        fx.otherOpen = !fx.otherOpen; if (fx.otherOpen && !fx.other && x.reason && FIX_RS.concat(FIX_RS_EX).every(function (r) { return r[0] !== x.reason; })) fx.other = x.reason;
+        paintDetail();
+        var inp = document.querySelector('[data-hd-other]'); if (inp) inp.focus();
+        return;
+      }
+      if (x.reason === rs) return;
+      fx.otherOpen = false;
+      setStatus(sid, day, x.status, rs).then(function (res) { fxDone(res, mdw(day) + ' 사유 「' + rs + '」를 남겼습니다', sid, day); });
       return;
     }
     var act = b.dataset.hdFix;
-    if (act === 'open') { fxReset(); fx.edit = true; paintDetail(); return; }
-    if (act === 'cancel') { fxReset(); paintDetail(); return; }
-    if (act === 'save') {
-      if (!fxReady()) { fx.err = !fx.st ? '바꿀 상태를 골라 주세요' : '사유를 골라 주세요'; paintDetail(); return; }
-      var was = appStatusOf(sid, day);
-      if (fx.st === was && !HwFix.activeOf(sid, day)) { fx.err = '앱 기록과 같습니다 — 다른 상태를 골라 주세요'; paintDetail(); return; }
-      var to = fx.st;
-      fx.busy = true; paintDetail();
-      HwFix.save(sid, day, to, fxReason(), was).then(function (res) { fxDone(res, mdw(day) + ' 과제를 「' + FIX_NAME[to] + '」로 고쳤습니다', sid, day); });
+    if (act === 'other') {
+      var v = fx.other.trim();
+      if (!x || !v) return;
+      fx.otherOpen = false;
+      setStatus(sid, day, x.status, v).then(function (res) { fxDone(res, mdw(day) + ' 사유 「' + v + '」를 남겼습니다', sid, day); });
       return;
     }
     if (act === 'revert') {
-      fx.busy = true; paintDetail();
-      HwFix.revert(sid, day, appStatusOf(sid, day)).then(function (res) { fxDone(res, mdw(day) + ' 과제를 원래 앱 기록(' + FIX_NAME[appStatusOf(sid, day)] + ')으로 되돌렸습니다', sid, day); });
+      var w0 = appStatusOf(sid, day);
+      fx.busy = true; fx.otherOpen = false;
+      var pr = HwFix.revert(sid, day, w0);
+      paintDetail();
+      pr.then(function (res) { fxDone(res, mdw(day) + ' 과제를 원래 앱 기록(' + FIX_NAME[w0] + ')으로 되돌렸습니다', sid, day); });
     }
   }, true);
   document.addEventListener('input', function (e) {
     var t = e.target;
     if (!t || !t.hasAttribute || !t.hasAttribute('data-hd-other')) return;
     fx.other = t.value;
-    Array.prototype.forEach.call(document.querySelectorAll('[data-hd-fix="save"]'), function (b) { b.disabled = !fxReady(); });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-hd-fix="other"]'), function (b) { b.disabled = !fx.other.trim() || fx.busy; });
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' || !e.target || !e.target.hasAttribute || !e.target.hasAttribute('data-hd-other')) return;
+    e.preventDefault();
+    var b = document.querySelector('[data-hd-fix="other"]'); if (b && !b.disabled) b.click();
   });
   /* 수정값이 바뀌면 (이 화면 · 다른 직원) — 덮은 값을 다시 만들고 과제 칸 · 평균을 다시 */
   window.addEventListener('jt:hwfix', function () {
@@ -1240,15 +1262,15 @@
       var hnote = !!(window.Worry && Worry.hasHwNote(sid, d.date));        /* 과제 칸 상담 기록 — 작은 점 (20261101r) */
       cells += (d.hw === 'off'
         ? '<span class="hd-c hd-c--off" style="' + col + 'grid-row:2" aria-label="' + esc(mdw(d.date) + ' 과제 없음') + '"></span>'
-        : '<button type="button" class="hd-c hd-c--' + d.hw + (fxr ? ' is-fixed' : '') + (on ? ' is-pick' : '') + (hnote ? ' has-note' : '') + '" style="' + col + 'grid-row:2" data-hd-day="' + d.date + '" aria-label="' + esc(mdw(d.date) + ' ' + HW_NAME[d.hw] + (fxr ? ' (수정)' : '') + (hnote ? ' · 상담 기록 있음' : '')) + '">' + HW_MARK[d.hw] +
-            (fxr ? '<i class="hd-fx" aria-hidden="true">수정</i>' : '') + (hnote ? '<i class="hd-dot" aria-hidden="true"></i>' : '') + '</button>') +
+        : '<button type="button" class="hd-c hd-c--' + d.hw + (fxr ? ' is-fixed' : '') + (on ? ' is-pick' : '') + (hnote ? ' has-note' : '') + '" style="' + col + 'grid-row:2" data-hd-day="' + d.date + '" aria-label="' + esc(mdw(d.date) + ' ' + HW_NAME[d.hw] + (fxr ? ' (직접 바꿈)' : '') + (hnote ? ' · 상담 기록 있음' : '')) + '">' + HW_MARK[d.hw] +
+            (fxr ? '<i class="hd-fx" aria-hidden="true">직접</i>' : '') + (hnote ? '<i class="hd-dot" aria-hidden="true"></i>' : '') + '</button>') +
         '<span class="hd-l hd-l--' + d.lec + '" style="' + col + 'grid-row:3">' + LEC_MARK[d.lec] + '</span>';
     });
     return '<div class="hd-box" data-hd-box="' + esc(sid) + '">' +
       '<div class="hd-head num">' + esc(mdw(w.from) + ' ~ ' + mdw(w.to) + (live ? ' · 진행 중' + (lesson ? ' (' + mdw(lesson) + ' 수업 레포트 기간)' : '') : lesson ? ' · ' + mdw(lesson) + ' 수업 레포트 기준' : '')) + '</div>' +
       '<div class="hd-grid" style="--hd-n:' + n + ';grid-template-columns:2.4em repeat(' + n + ', minmax(0, 1fr))">' + cells + '</div>' +
       (pick ? menuHtml(sid, pick, a.data) : '') +
-      '<p class="hd-legend">● 정시 제출 △ 늦게 제출 ✕ 미제출 · 빈칸 그날 과제 없음 / ✓ 강의 다 봄 – 안 봄 · 「오늘」 = 밤 12시 마감 전(아직 세지 않음) · 토 · 일은 주중 복습 · 칸을 누르면 그날 과제 · 「수정」 = 조교가 고친 칸</p>' +
+      '<p class="hd-legend">● 정시 제출 △ 늦게 제출 ✕ 미제출 · 빈칸 그날 과제 없음 / ✓ 강의 다 봄 – 안 봄 · 「오늘」 = 밤 12시 마감 전(아직 세지 않음) · 토 · 일은 주중 복습 · 칸을 누르면 그날 과제 · 상태 바꾸기 · 「직접」 = 손으로 바꾼 칸</p>' +
       '<div class="hd-foot"><button type="button" class="hd-relink" data-app-relink="' + esc(sid) + '" aria-expanded="' + !!(window.AppLink && AppLink.current() === sid && AppLink.editing()) + '">링크 바꾸기</button>' +
         '<button type="button" class="hd-more" data-pv="parent" data-pv-view="app" data-sid="' + esc(sid) + '">과제 상세 보기 →</button>' +
         (window.AppLink && AppLink.openHtml ? AppLink.openHtml(sid, { noAdd: true, cls: 'hd-open' }) : '') + '</div>' +
