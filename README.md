@@ -990,6 +990,15 @@ delete from public.staff where email = '조교이메일@example.com';
 - 사본은 한 번 발송에 한 통: 「[사본] 목동반 · 레포트 안내 · 알림톡 학부모 10명 / 학생 10명 · 대체 문자 1명」 (알림톡 · 그때 같이 나간 레포트 안내 문자 · 대체 문자를 묶음 · 예전 「알림톡 한 통 + 문자 한 통」 두 통이던 것)
 - 레포트 발송 → 3 발송 [알림톡 n명 보내기] 옆 「학생에게도 학생용 알림톡 n명」(기본 켜짐 · 이 기기에 기억) — 코드가 있을 때만
 
+### 5-100. 20261108d — 레포트 안내 알림톡(학부모) 템플릿 코드를 설정에서 (migration-072 · 함수 kakao-send 다시 배포)
+1. SQL Editor → `supabase/migration-072-parent-tpl.sql` → Run (071 다음 · 맨 아래 줄 모두 true · 「학부모 코드 비어 있음 — 지금처럼 Secrets 의 SOLAPI_TEMPLATE_ID」)
+2. Edge Functions → kakao-send → 이 저장소의 `supabase/functions/kakao-send/index.ts` 전체로 다시 배포 (Verify JWT 끔 그대로)
+- 확인한 것: 「주간레포트안내」 코드는 코드 파일에 쓰여 있지 않고 Supabase Secrets 의 SOLAPI_TEMPLATE_ID 에만 있다 (kakao-send 가 읽음) — 그래서 Secrets 는 그대로 두고 기본값으로 쓴다
+- 문자 발송 → 연결 상태 → 알림톡 칸 「레포트 안내 알림톡 템플릿 코드 (학부모)」 (원장만 · kakao_tpl_set 'parent') — 비어 있으면 Secrets 코드 그대로 · 코드를 넣으면 그 코드
+- 「주간레포트안내_v2」가 승인되면 새 코드만 넣고 [저장] → 다음 발송부터 바로 (변수 #{이름} #{수업일} #{코드} · [레포트 보기] 버튼은 지금과 같아야 함)
+- 칸 옆 [시험 발송] — 칸에 넣은 코드로(저장 전에도) 원장 내 시험 번호에 한 통 · 가장 최근 공개 레포트 내용 · 원장만
+- 템플릿 내용은 건드리지 않는다 · 조교 화면은 「설정한 코드 / 지금 코드(Secrets)」만
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

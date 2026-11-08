@@ -14,6 +14,9 @@
      · 연결 상태 알림톡 칸 「학생용 레포트 알림톡 템플릿 코드」 — 원장만 고친다 (kakao_tpl_set · 조교는 「들어감 / 비어 있음」만)
        비어 있으면 학생은 지금처럼 문자 · 코드가 있으면 학생은 학생용 알림톡 (#{날짜} #{이름} #{링크} · 버튼 [레포트 보기])
      · 3 발송 [알림톡 n명 보내기] 옆 「학생에게도 학생용 알림톡 n명」 (기본 켜짐 · 이 기기에 기억) — 학부모를 보낸 뒤 학생에게
+   학부모 레포트 알림톡 템플릿 코드 (migration-072 · 20261108d)
+     · 같은 칸 「레포트 안내 알림톡 템플릿 코드(학부모)」 — 원장만 · 비어 있으면 지금 코드(Secrets 의 SOLAPI_TEMPLATE_ID) 그대로
+       「주간레포트안내_v2」가 승인되면 새 코드만 넣고 [저장] → 바로 그 템플릿으로 · 칸 옆 [시험 발송] → 원장 내 시험 번호로 한 통 (저장 전 코드로도)
    ============================================================ */
 
 (function () {
@@ -197,7 +200,7 @@
         ? '<ul class="kk-keys">' + Object.keys(KEY_NAME).map(function (k) {
             return '<li class="' + (keys[k] ? 'is-ok' : 'is-no') + '">' + (keys[k] ? '✓' : '✗') + ' ' + KEY_NAME[k] + ' <code>' + k + '</code></li>';
           }).join('') + '</ul>' +
-          '<p class="field__hint">템플릿 ID: ' + (fnRes.templateSet || fnRes.templateId ? '들어감 (템플릿 「주간레포트안내」)' : '아직 없음') + ' · 키 값은 화면에 보이지 않습니다 (Supabase Secrets 에만).</p>'
+          '<p class="field__hint">템플릿 ID: ' + (fnRes.templateSet || fnRes.templateId ? '들어감 (템플릿 「주간레포트안내」' + (fnRes.templateFrom === 'settings' ? ' · 아래 설정 코드' : '') + ')' : '아직 없음') + ' · 키 값은 화면에 보이지 않습니다 (Supabase Secrets 에만).</p>'
         : '<p class="panel__hint">' + esc((fnRes && fnRes.message) || '알림톡 함수(kakao-send)가 아직 배포되지 않았습니다.') + '</p>') +
       (cfg
         ? '<label class="check-line"><input type="checkbox" id="kkSms"' + (cfg.smsFallback ? ' checked' : '') + '> <span>알림톡이 실패하면 문자로 대신 보내기 <span class="field__opt">기본 끔 · 켜면 건당 약 ' + LMS_WON + '원까지 더 듭니다</span></span></label>' +
@@ -214,7 +217,7 @@
   function tplHtml(cfg) {
     if (!cfg || cfg.studentTpl == null) return '';
     var v = cfg.owner && cfg.tpl ? cfg.tpl.student || '' : '';
-    return '<div class="kk-tpl" id="kkTplStudent">' +
+    return parentTplHtml(cfg) + '<div class="kk-tpl" id="kkTplStudent">' +
       '<label class="field"><span class="field__label">학생용 레포트 알림톡 템플릿 코드 <span class="field__opt">「주간레포트안내_학생」 · 비우면 학생은 문자</span></span>' +
       (cfg.owner
         ? '<span class="kk-tpl__row"><input class="input" id="kkTplStudentIn" maxlength="80" autocomplete="off" spellcheck="false" placeholder="솔라피 템플릿 코드 (예: KA01TP…)" value="' + esc(v) + '">' +
@@ -223,6 +226,43 @@
       '</label>' +
       '<p class="field__hint">' + (cfg.studentTpl ? '학생은 학생용 알림톡으로 받습니다 (카톡을 안 받으면 문자로).' : '비어 있어 학생은 지금처럼 문자로 받습니다.') +
         ' 학부모는 그대로 「주간레포트안내」 알림톡입니다. 템플릿 변수는 #{날짜} #{이름} #{링크}, 버튼은 [레포트 보기](웹링크 #{링크}).</p></div>';
+  }
+  /* 학부모 — 레포트 안내 알림톡 템플릿 코드 (072 전이면 칸 없음) */
+  function parentTplHtml(cfg) {
+    if (cfg.parentTpl == null) return '';
+    var v = cfg.owner && cfg.tpl ? cfg.tpl.parent || '' : '';
+    return '<div class="kk-tpl" id="kkTplParent">' +
+      '<label class="field"><span class="field__label">레포트 안내 알림톡 템플릿 코드 (학부모) <span class="field__opt">비우면 지금 코드(Secrets 의 SOLAPI_TEMPLATE_ID) 그대로</span></span>' +
+      (cfg.owner
+        ? '<span class="kk-tpl__row"><input class="input" id="kkTplParentIn" maxlength="80" autocomplete="off" spellcheck="false" placeholder="비우면 지금 코드 · 새 템플릿 코드 (예: KA01TP…)" value="' + esc(v) + '">' +
+          '<button class="btn btn--sm" type="button" id="kkTplParentSave">저장</button><button class="btn btn--sm" type="button" id="kkTplParentTest">시험 발송</button></span>'
+        : '<span class="kk-tpl__ro">' + (cfg.parentTpl ? '설정한 코드' : '지금 코드(Secrets)') + ' <span class="muted-note">원장 계정만 바꿀 수 있습니다</span></span>') +
+      '</label>' +
+      '<p class="field__hint">' + (cfg.parentTpl ? '학부모는 설정한 코드로 받습니다.' : '비어 있어 학부모는 지금 「주간레포트안내」 코드로 받습니다.') +
+        ' 새 템플릿(「주간레포트안내_v2」)이 승인되면 코드만 넣고 [저장]하면 바로 바뀝니다. 칸(#{이름} #{수업일} #{코드})과 [레포트 보기] 버튼은 지금과 같아야 합니다. [시험 발송]은 칸에 넣은 코드로 원장 내 시험 번호에 한 통(가장 최근 공개 레포트 내용).</p>' +
+      '<p class="field__hint" id="kkTplParentMsg" role="status"></p></div>';
+  }
+  function saveParentTpl() {
+    var v = ($('#kkTplParentIn').value || '').trim();
+    if (v && !/^[A-Za-z0-9_-]{4,80}$/.test(v)) { toast('템플릿 코드는 솔라피에 보이는 영문 · 숫자 코드를 그대로 넣어 주세요', 'bad'); return; }
+    sb().rpc('kakao_tpl_set', { p_kind: 'parent', p_code: v }).then(function (r) {
+      if (r.error) { toast(r.error.message, 'bad'); return; }
+      toast(v ? '학부모 레포트 알림톡 템플릿 코드를 저장했습니다 — 다음 발송부터 이 코드로 갑니다' : '학부모 템플릿 코드를 비웠습니다 — 지금 코드(Secrets)로 갑니다', 'good');
+      loadSettings();
+    });
+  }
+  function testParentTpl() {
+    var v = ($('#kkTplParentIn').value || '').trim();
+    if (v && !/^[A-Za-z0-9_-]{4,80}$/.test(v)) { toast('템플릿 코드는 솔라피에 보이는 영문 · 숫자 코드를 그대로 넣어 주세요', 'bad'); return; }
+    var b = $('#kkTplParentTest'), msg = $('#kkTplParentMsg');
+    b.disabled = true; msg.textContent = '보내는 중…';
+    invoke({ action: 'test', latest: true, tpl: v }).then(function (r) {
+      b.disabled = false;
+      var ok = r && r.ok && r.sent;
+      msg.textContent = ok ? '✓ 내 시험 번호로 한 통 보냈습니다 (' + (v ? '칸에 넣은 코드' : '지금 코드') + ' · 카톡에서 확인해 보세요)'
+        : '보내지 못했습니다 — ' + ((r && (r.message || (r.results && r.results[0] && r.results[0].error))) || '이유 모름');
+      toast(msg.textContent, ok ? 'good' : 'bad');
+    });
   }
   function saveTpl() {
     var v = ($('#kkTplStudentIn').value || '').trim();
@@ -265,6 +305,8 @@
       set.addEventListener('click', function (e) {
         if (e.target.id === 'kkSaveCfg') saveCfg();
         if (e.target.id === 'kkTplStudentSave') saveTpl();
+        if (e.target.id === 'kkTplParentSave') saveParentTpl();
+        if (e.target.id === 'kkTplParentTest') testParentTpl();
       });
     }
   }
