@@ -1030,6 +1030,14 @@ delete from public.staff where email = '조교이메일@example.com';
 - 학생 알림 따로 없음 — 수업 전 예고 「모두 제출 칭찬 문자」 끝에 한 줄 「⭐ 이번 주 퍼펙트 배지를 받았어요! (지금까지 n개)」(문구 관리 「퍼펙트 배지 한 줄」 · {개수} · 비우면 안 붙임) · 칭찬을 끈 반은 배지만
 - 같은 분에 퍼펙트 배지 · 수업 전 예고가 한 학생을 셈하면 앱은 한 번만 부름 · 다른 학생 이름 · 인원 · 순위 없음
 
+### 5-104. 20261108h — 운영진 과제 현황 문자: 수업 30분 전 · 「⭐ 이번 주 퍼펙트 n명」 (migration-076 · 함수 note-remind 다시 배포)
+1. SQL Editor → `supabase/migration-076-hws-30.sql` → Run (075 다음 · 맨 아래 세 줄 true)
+2. Edge Functions → note-remind → 이 저장소의 `supabase/functions/note-remind/index.ts` 전체로 다시 배포 (주석만 바뀜 · 075 때 배포했다면 한 번만 해도 됨)
+- 보내는 때 20분 전 → 30분 전 (반 카드 「09:00 보낼 예정」 · 운영진 창 「수업 30분 전」도 같이)
+- 명단 위 「⭐ 이번 주 퍼펙트 n명」 + 「김승윤(6), 강지호(3)」(지금까지 모은 퍼펙트 배지 수 · 많은 순 · 같으면 이름순) · 0명이면 「⭐ 이번 주 퍼펙트 0명」만
+  - 이번 주 이미 생긴 배지 + 이 명단의 셈으로 모두 낸 학생(그 자리에서 배지도 남김 · 미리보기는 남기지 않음)
+- 나머지(완료율 높은 순 · 60% 미만 상담 필요 · 과제 없음 · 앱 기록 없음)는 그대로
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.
