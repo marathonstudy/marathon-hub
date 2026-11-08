@@ -87,8 +87,8 @@
             (s.active ? '' : ' <span class="tb-badge tb-badge--waived">사용 중지</span>') + '</div>' +
           '<div class="op-row__meta num">' + phoneMeta(s) +
             ' · 처음 들어온 날 ' + esc(fmt(s.created_at)) + ' · 마지막 접속 ' + esc(fmtDT(s.last_seen_at)) +
-            (s.addedBy ? ' · ' + esc(s.addedBy) + ' 등록' : s.approved_by ? ' · ' + esc(s.approved_by) + ' 승인' : '') +
             (s.active ? '' : '<br>' + esc(s.disabled_by || '') + ' · ' + esc(fmtDT(s.disabled_at)) + ' 에 중지') + '</div>' +
+          byHtml(s) +
           (s.active ? hwsRow(s, me) : '') +
           (editing === s.email ? phoneForm(s) : '') +
         '</div>' +
@@ -97,10 +97,20 @@
     }).join('') + '</div>';
   }
 
-  /* 조교 추가 · 번호 넣기 · 바꾸기 (migration-070) — 원장만 · 070 전이면 (smsLast4 칸이 없어) 옛 표시 그대로 */
+  /* 각 줄 작게 「추가한 사람: 김민서 · 11/8」 (080 · 20261108l) — 직접 가입해 승인받은 사람은 「승인한 사람: 원장 · 11/3」 */
+  function md(iso) { var d = new Date(iso); return isNaN(d) ? '' : (d.getMonth() + 1) + '/' + d.getDate(); }
+  function byHtml(s) {
+    if (s.addedBy) return '<div class="op-row__by">추가한 사람: ' + esc(s.addedBy) + (s.addedAt ? ' · ' + esc(md(s.addedAt)) : '') + '</div>';
+    if (s.approved_by) return '<div class="op-row__by">승인한 사람: ' + esc(s.approved_by) + (s.approved_at ? ' · ' + esc(md(s.approved_at)) : '') + '</div>';
+    return '';
+  }
+  /* 조교 추가 · 번호 넣기 · 바꾸기 (migration-070) — 원장 · 080 부터 사용 중인 조교도 [조교 추가] (서버가 「사용 중인 운영진」인지 본다)
+     번호 바꾸기 · 사용 중지는 원장만 · 조교는 자기 번호만 · 070 전이면 (smsLast4 칸이 없어) 옛 표시 그대로 */
   var adding = false, editing = '';
+  function canAdd() { return !!data && (data.owner || data.assistAdd) && data.canAdd !== false; }
+  function canPhone(s) { return !!data && (data.owner || (data.assistAdd && s.email === data.me)); }
   function addHtml() {
-    if (!data || !data.owner || !data.canAdd) return '';
+    if (!canAdd()) return '';
     if (!adding) return '<div class="op-add"><button class="btn btn--primary" type="button" id="opAddOpen">조교 추가</button>' +
       '<span class="muted-note">이름 · 휴대폰 번호만 넣으면 바로 사용 중 · 로그인은 이름 + 번호 8자리</span></div>';
     return '<form class="op-add op-add--form" id="opAddForm" autocomplete="off">' +
@@ -113,7 +123,7 @@
   function phoneMeta(s) {
     if (!('smsLast4' in s)) return s.phone ? '번호 뒤 4자리 ' + esc(s.last4 || '—') : '이메일 계정';
     var t = s.smsLast4 ? '<span class="op-phone">' + esc(mask(s.smsLast4)) + '</span>' : '<span class="op-phone is-none">번호 없음</span>';
-    if (data.owner) t += s.smsLast4 ? ' <button class="link-btn" type="button" data-phone-edit>번호 바꾸기</button>' : ' · <button class="link-btn" type="button" data-phone-edit>넣기</button>';
+    if (canPhone(s)) t += s.smsLast4 ? ' <button class="link-btn" type="button" data-phone-edit>번호 바꾸기</button>' : ' · <button class="link-btn" type="button" data-phone-edit>넣기</button>';
     if (!s.phone) t += ' · 이메일 계정';
     return t;
   }

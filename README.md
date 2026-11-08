@@ -1063,6 +1063,12 @@ delete from public.staff where email = '조교이메일@example.com';
 - 「06:30 보냄 25명(미제출 15 · 모두 제출 10)」 → 「수업 전 문자 06:30 보냄 · 25명 (독려 15 · 칭찬 10)」 · 숫자를 누르면 그 묶음 이름 (pre_remind_status names · 칭찬 = 모두 제출 칭찬 · 배지 줄이 붙어도 칭찬)
 - 「과제 현황 문자 09:00 보냄 · 운영진 1명」 · 번호 없어 못 받은 운영진은 옆에 「(번호 없음 2명 · 넣기)」 → 누르면 운영진 화면 (hw_status_status nophoneNames)
 
+### 5-108. 20261108l — 조교도 [조교 추가] (migration-080 · 함수 배포 없음)
+1. SQL Editor → `supabase/migration-080-staff-add-assistant.sql` → Run (079 다음 · 맨 아래 세 줄 true)
+- 운영진 창 [조교 추가] — 원장뿐 아니라 사용 중인 조교도 (서버가 사용 중인 운영진인지 확인 · 승인 대기 · 사용 중지 계정은 안 됨) · 알림 문자 없음
+- 목록 각 줄 작게 「추가한 사람: 김민서 · 11/8」(직접 가입해 승인받은 사람은 「승인한 사람: …」)
+- 번호 바꾸기 · 사용 중지는 원장만 · 조교는 자기 번호만 (로그인 번호도 같이)
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.
