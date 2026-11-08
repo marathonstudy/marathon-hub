@@ -14,6 +14,8 @@
 //    hw_status_due → 과제 기록 저장본(app_records · 없으면 앱에서 직접)으로 학생마다 제출 수 · 전체 수 → hw_status_prepare → 솔라피 → hw_status_record
 //    운영진만 받는다(학생 · 학부모 없음) · 사본 없음 · 「오늘」 [미리보기] { action: "hwstat", class, dry: true } · [지금 운영진에게 보내기] { action: "hwstat", class }
 //
+//  주간 퍼펙트 배지 (migration-075 · 20261108g) — 같은 매분 실행에서 수업 전 예고가 계산되는 시각에 반마다 한 번 hw_badge_due → 셈 → hw_badge_save
+//    수업 전 예고 칭찬 문자 끝에 「⭐ 이번 주 퍼펙트 배지를 받았어요! (지금까지 n개)」 (pre_remind_prepare 가 붙인다)
 //  사본 — 매분 copy_due → 묶음마다 1통 → 원장 시험 번호로 → copy_record (migration-064 · 20261106g).
 //  레포트 업데이트 문자 (migration-073 · 20261108e) — 매분 report_upd_prepare: 이미 보낸 레포트가 마지막으로 바뀐 뒤 30분 조용하면
 //    모아 한 통 (밤 10시 ~ 아침 8시는 8시 · 하루 두 번까지 · 반마다 끄기) → 받은 학생(학부모는 설정을 켰을 때만 · 일반 문자)
@@ -250,7 +252,14 @@ export function missDays(data: Any, fix: Record<string, string>, startOn: string
 const mdw = (iso: string) => `${+iso.slice(5, 7)}/${+iso.slice(8, 10)}(${DOWK[dowOf(iso)]})`;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /* 앱 서버가 바쁘거나 응답이 없으면 0.7초 · 1.8초 쉬었다가 2번까지 다시 (app-report 와 같다) */
-async function fetchApp(share: string): Promise<Any> {
+/* 같은 매분 실행 안에서는 한 학생을 한 번만 부른다 (퍼펙트 배지 · 수업 전 예고가 같은 분에 같은 학생을 셈 · 20261108g) */
+let TICK: Map<string, Promise<Any>> | null = null;
+function fetchApp(share: string): Promise<Any> {
+  if (!TICK) return fetchApp0(share);
+  if (!TICK.has(share)) TICK.set(share, fetchApp0(share));
+  return TICK.get(share) as Promise<Any>;
+}
+async function fetchApp0(share: string): Promise<Any> {
   for (let k = 0; k < 3; k++) {
     if (k) await sleep(k === 1 ? 700 : 1800);
     try {
@@ -292,7 +301,7 @@ async function preRemind(now: string) {
      기간 · 셈은 수업 전 예고와 같다 (D-7 ~ D-1 · hwCount · 늦게 낸 것은 냄 · 면제 · 과제 수정값 · 수강 시작일)
      저장본(rec · app-sync 가 받아 둔 lite)이 있으면 그것으로 · 없으면 앱에서 직접 · 그래도 없으면 「앱 기록 없음」
    ============================================================ */
-export async function hwItems(due: Any, fetcher: (share: string) => Promise<Any> = fetchApp): Promise<Record<string, Any[]>> {
+export async function hwItems(due: Any, fetcher: (share: string) => Promise<Any> = fetchApp, fresh = false): Promise<Record<string, Any[]>> {
   const day = String(due?.day || "");
   const out: Record<string, Any[]> = {};
   for (const c of due?.classes || []) {
@@ -301,8 +310,11 @@ export async function hwItems(due: Any, fetcher: (share: string) => Promise<Any>
     const items: Any[] = [];
     for (let i = 0; i < list.length; i += 3) {
       await Promise.all(list.slice(i, i + 3).map(async (s: Any) => {
-        let data: Any = s.rec && Array.isArray(s.rec.calendar) ? { calendar: s.rec.calendar, history: Array.isArray(s.rec.history) ? s.rec.history : [] } : null;
-        if (!data && s.share && /^[A-Za-z0-9_-]{8,128}$/.test(s.share)) data = await fetcher(s.share);
+        /* fresh — 앱에서 먼저(수업 전 예고와 같은 값) · 못 받으면 저장본 (퍼펙트 배지 · 075) */
+        const saved: Any = s.rec && Array.isArray(s.rec.calendar) ? { calendar: s.rec.calendar, history: Array.isArray(s.rec.history) ? s.rec.history : [] } : null;
+        const okShare = !!s.share && /^[A-Za-z0-9_-]{8,128}$/.test(s.share);
+        let data: Any = fresh ? (okShare ? await fetcher(s.share) : null) || saved : saved;
+        if (!data && !fresh && okShare) data = await fetcher(s.share);
         if (!data) { items.push({ id: s.id, known: false, done: 0, total: 0 }); return; }
         const n = hwCount(data, s.fix || {}, s.startOn || "", addDays(day, -7), addDays(day, -1));
         items.push({ id: s.id, known: true, done: n.done, total: n.total });
@@ -311,6 +323,17 @@ export async function hwItems(due: Any, fetcher: (share: string) => Promise<Any>
     out[c.name] = items;
   }
   return out;
+}
+/* 주간 퍼펙트 배지 (075 · 20261108g) — 수업 전 예고가 계산되는 시각(시작 n시간 전 · 예고를 끈 반도)에 반마다 한 번
+     셈은 과제 현황과 같다 (hwItems · 저장본 · 없으면 앱에서 직접) → hw_badge_save (모두 냈으면 그 주 배지 · 과제 0개는 없음) */
+async function badgeRun(now: string) {
+  const due: Any = await rpc("hw_badge_due", { p_now: now });
+  const cls: Any[] = due?.classes || [];
+  if (!cls.length) return { classes: 0 };
+  const items = await hwItems(due, fetchApp, true);
+  for (const c of cls) if (!items[c.name]) items[c.name] = [];     /* 학생이 없는 반도 그날 셈한 것으로 */
+  const r: Any = await rpc("hw_badge_save", { p_now: now, p_items: items });
+  return { classes: cls.length, perfect: r?.perfect || 0 };
 }
 /* 레포트 업데이트 문자 (073) — 보낼 때가 된 것을 한 번에 */
 async function reportUpd(now: string, week?: string, cls?: string, by?: string) {
@@ -339,6 +362,7 @@ function jwtEmail(auth: string): string {
 }
 
 async function handle(req: Request, cors: Record<string, string>) {
+  TICK = null;
   if (!env("SUPABASE_URL") || !env("SUPABASE_SERVICE_ROLE_KEY")) return json({ ok: false, reason: "error", message: "서버 설정을 읽지 못했습니다." }, cors);
   const body: Any = await req.json().catch(() => ({}));
   const missing = KEYS.filter((k) => !env(k));
@@ -353,12 +377,16 @@ async function handle(req: Request, cors: Record<string, string>) {
     if (!okKey) return json({ ok: false, reason: "auth" }, cors, 403);
     if (missing.length) return json({ ok: false, reason: "nokeys", missing }, cors);       /* 키가 없으면 대상도 만들지 않는다 (같은 날 한 번 막힘이 생기지 않게) */
     const now = typeof body.now === "string" && /^\d{4}-\d{2}-\d{2}T/.test(body.now) ? body.now : new Date().toISOString();
+    TICK = new Map();
     const prep: Any = await rpc("note_remind_prepare", { p_now: now, p_site: SITE });
     const rows: Any[] = prep?.rows || [];
     const r = await sendRows(rows);
     /* 과제 현황 — 069 를 아직 안 돌렸거나 오류가 나도 다른 일은 그대로 */
     let hws: Any = null;
     try { hws = await hwStatus(now); } catch (e) { hws = { error: String((e as Error).message || e).slice(0, 160) }; }
+    /* 주간 퍼펙트 배지 — 수업 전 예고보다 먼저 (같은 분에 칭찬 문자 끝 한 줄) · 075 전이면 조용히 넘어간다 */
+    let badge: Any = null;
+    try { badge = await badgeRun(now); } catch (e) { badge = { error: String((e as Error).message || e).slice(0, 160) }; }
     /* 수업 전 예고 — 056 을 아직 안 돌렸거나 오류가 나도 필기 문자는 그대로 */
     let pre: Any = null;
     try { pre = await preRemind(now); } catch (e) { pre = { error: String((e as Error).message || e).slice(0, 160) }; }
@@ -368,7 +396,7 @@ async function handle(req: Request, cors: Record<string, string>) {
     /* 사본 — 064 를 아직 안 돌렸거나 오류가 나도 다른 일은 그대로 */
     let copy: Any = null;
     try { copy = await copyFlush(now); } catch (e) { copy = { error: String((e as Error).message || e).slice(0, 160) }; }
-    return json({ ok: true, day: prep?.day, rows: rows.length, ...r, hws, pre, rupd, copy }, cors);
+    return json({ ok: true, day: prep?.day, rows: rows.length, ...r, hws, badge, pre, rupd, copy }, cors);
   }
 
   /* 2) 「지금 다시 보내기」 — 로그인한 운영진 */

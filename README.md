@@ -1021,6 +1021,15 @@ delete from public.staff where email = '조교이메일@example.com';
 - 바꾼 칸 「직접」 · 상세 「김민서 · 11/8 15:10 바꿈 · 종이로 제출 · [원래대로]」 · 원래 앱 기록 · 공개한 기간 안내 · 수정 기록 n건 (예전 기능 그대로 옮김)
 - 수동 값은 앱 자동 갱신이 덮지 않음(hw_fixes 따로) — 과제 평균 · 과제 문자 · 수업 전 예고 · 운영진 과제 현황 · 레포트 · 러닝노트가 이미 이 값을 씀 · 조교도 바꿈
 
+### 5-103. 20261108g — 주간 퍼펙트 배지 ⭐ (migration-075 · 함수 note-remind 다시 배포)
+1. SQL Editor → `supabase/migration-075-perfect-badge.sql` → Run (074 다음 · 맨 아래 네 줄 true)
+2. Edge Functions → note-remind → 이 저장소의 `supabase/functions/note-remind/index.ts` 전체로 다시 배포 (Verify JWT 끔 그대로)
+- 기준: 수업 전 예고와 같은 기간(D-7 ~ D-1 평일) 과제를 모두 냄 — 늦게 낸 것도 냄 · 면제 뺌 · 직접 바꾼 값 · 수강 시작일 반영 · 과제 0개면 없음
+- 생기는 때: 수업 전 예고가 계산되는 시각(시작 pre_hours 시간 전 · 예고를 끈 반도) — note-remind 매분 hw_badge_due → 셈(앱에서 먼저 · 못 받으면 저장본) → hw_badge_save · 반 · 그날 한 번 · 원장 확인 없음
+- hw_weeks — 한 학생 한 주(월~일) 한 줄(그 주 과제 수 · 낸 수 · 퍼펙트) · 한 번 퍼펙트면 그대로 · 수업 전 예고 · 과제 현황(076)도 같은 셈으로 남김
+- 학생 알림 따로 없음 — 수업 전 예고 「모두 제출 칭찬 문자」 끝에 한 줄 「⭐ 이번 주 퍼펙트 배지를 받았어요! (지금까지 n개)」(문구 관리 「퍼펙트 배지 한 줄」 · {개수} · 비우면 안 붙임) · 칭찬을 끈 반은 배지만
+- 같은 분에 퍼펙트 배지 · 수업 전 예고가 한 학생을 셈하면 앱은 한 번만 부름 · 다른 학생 이름 · 인원 · 순위 없음
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.
