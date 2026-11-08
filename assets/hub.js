@@ -1321,6 +1321,7 @@
       /* 레포트 — 새 레포트 알림 빨간 점은 탭을 눌러 볼 때까지 */
       var reports = d.reports || [];
       renderReportList(h.code, reports, d.draft || null);
+      loadBadges(h.code);
       if (reports.length) $('#tabReport').classList.add('has-new');
 
       /* 수업 영상 — 영상이 있을 때만 탭이 보인다 */
@@ -1651,6 +1652,17 @@
       teacherNoticeHtml(noticeItems());
   }
 
+  /* 「🏅 내 루틴 배지」 — 레포트 탭 위쪽 · 그 학생 것만 (hub_badges · migration-078 · 20261108j)
+     그달 우수자면 맨 위 「🏅 10월 루틴 우수자」(한 달 동안) · 받은 달 배지를 누르면 그달 우수자 화면 */
+  function loadBadges(code) {
+    var host = $('#badgeBox');
+    if (!host || !global.BadgeView) return;
+    rpc('hub_badges', { p_code: code }).then(function (v) {
+      var el = $('#badgeBox');
+      if (!el || !v) return;
+      BadgeView.mount(el, v, function (m) { if (global.HubAward) HubAward.open(m); });
+    }).catch(function () {});
+  }
   function renderReportList(code, reports, draft) {
     var host = $('#panelReport');
     if (draft) reports = [{ week_start: draft.week_start, week_end: draft.week_end, lesson_date: draft.lesson_date || '', draft: true }].concat(reports);
@@ -1658,6 +1670,7 @@
     RP.latest = -1;
     for (var k = 0; k < reports.length; k++) if (!reports[k].draft) { RP.latest = k; break; }
     host.innerHTML =
+      '<div id="badgeBox" class="bdg-host"></div>' +                              /* 「🏅 내 루틴 배지」 (078 · 20261108j) */
       '<div id="rvTop"><button type="button" class="tw-rv-btn" id="twRvBtn" hidden>📝 복습테스트 입력하기</button><div id="reviewCard" hidden></div></div>' +
       '<div id="reportView">' +
         '<div class="rw-nav" id="reportNav"></div>' +

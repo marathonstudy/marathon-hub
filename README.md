@@ -1050,6 +1050,14 @@ delete from public.staff where email = '조교이메일@example.com';
 - 사본 한 통 「[사본] 10월 루틴 우수자 · 학생 7명 / 학부모 7명」
 - 링크 화면 — 러닝노트 #코드/award/2026-10 (assets/award-view.js · award.css · 학생 · 학부모 같은 화면 · 보낸 달만) · [이미지로 저장] 1080×1920 세로 카드
 
+### 5-106. 20261108j — 배지 모음 「🏅 내 루틴 배지」 (migration-078 · 함수 배포 없음)
+1. SQL Editor → `supabase/migration-078-badge-box.sql` → Run (077 다음 · 맨 아래 세 줄 true)
+- 러닝노트(학생 · 학부모) 레포트 탭 위쪽 — hub_badges(그 학생 것만)
+  - 월간 배지 12칸(두 줄 · 받은 달 금색 · 안 받은 달 회색 · 아직 안 온 달 흐리게 · ◀ 해 ▶) · 누르면 그달 우수자 화면 · 연속 2개월부터 「연속 달성 최장 n개월」 · 3개월 연속부터 화려한 테두리 · 보낸 달만
+  - 「⭐ 퍼펙트 배지 n개」 + 최근 주 별 줄(금별 · 빈 별 · 누르면 그 주 날짜 · 과제 수) · 3주 이상 연속이면 「n주 연속 퍼펙트」 · 하나도 없으면 작은 안내
+  - 지난달 우수자로 보냈으면 이번 달 내내 맨 위 「🏅 10월 루틴 우수자」
+- 코치룸 — 학생 상세 배지 줄(staff_badges) · 반 카드 이름 옆 ⭐n(staff_badge_counts) · 미리보기는 학부모 화면 그대로(staff_badges · staff_award_view)
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

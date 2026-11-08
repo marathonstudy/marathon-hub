@@ -92,6 +92,9 @@
         return sb().rpc('staff_hub_hw_fix', { p_student: cur.sid }).then(function (r) { return r.error ? {} : (r.data || {}); }, function () { return {}; });
       }
       if (name === 'hub_textbook') return sb().rpc('staff_hub_textbook', { p_student: cur.sid }).then(unwrap);
+      /* 루틴 배지 · 우수자 화면 (078 · 077) — 학부모가 보는 것 그대로 (우수자 화면은 보내기 전에도) */
+      if (name === 'hub_badges') return sb().rpc('staff_badges', { p_student: cur.sid }).then(function (r) { return r.error ? null : r.data; }, function () { return null; });
+      if (name === 'hub_award') return sb().rpc('staff_award_view', { p_student: cur.sid, p_month: String(args && args.p_month || '') + '-01' }).then(function (r) { return r.error ? null : r.data; }, function () { return null; });
       if (name === 'hub_trend') return sb().rpc('staff_hub_trend', { p_student: cur.sid }).then(unwrap);
       /* 레포트 복습테스트 칸의 낸 것(맞은 수 / 전체) · 미응시 — 직원 표(review_week)에서 그 학생 줄만 hub_review_week(030)와 같은 모양으로 (메모 없이) */
       if (name === 'hub_review_week') {

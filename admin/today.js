@@ -1652,7 +1652,7 @@
   }
   function studentRow(s, c) {
     return '<div class="tdc-st tdc-grid" data-id="' + esc(s.id) + '">' +
-      '<div class="tdc-st__main">' + (window.Profile ? Profile.avatar({ id: s.id, name: s.name }, 's') : '') + '<span class="qn-namebox"><span class="qn-nameline"><button type="button" class="roster__name roster__name-btn" data-card="' + esc(s.id) + '">' + esc(s.name) + '</button>' + newBadge(s.id) + '</span>' + (window.QuickNote ? QuickNote.tagHtml(s.id) : '') + '</span>' + (linkWarn(s) === 'other' ? warnHtml(s) : '') + '</div>' +
+      '<div class="tdc-st__main">' + (window.Profile ? Profile.avatar({ id: s.id, name: s.name }, 's') : '') + '<span class="qn-namebox"><span class="qn-nameline"><button type="button" class="roster__name roster__name-btn" data-card="' + esc(s.id) + '">' + esc(s.name) + '</button>' + newBadge(s.id) + (window.Badges ? Badges.tag(s.id) : '') + '</span>' + (window.QuickNote ? QuickNote.tagHtml(s.id) : '') + '</span>' + (linkWarn(s) === 'other' ? warnHtml(s) : '') + '</div>' +
       '<span class="tdc-app-slot tdc-tri">' + triHtml(s, c) + '</span>' +
       actsHtml(s) +
       (window.AppLink ? AppLink.boxHtml(s.id) : '') +

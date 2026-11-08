@@ -8,6 +8,7 @@
      과제 n개 중 m개 · 연속 제출 최장 n일 · 한 달 ○ △ ✕ 달력 · 영역별 정답률(지난달보다 오르면 ▲) · 선생님 한마디(있을 때만) · 지금까지 모은 배지 n개
      [이미지로 저장] — 배지 · 제출률 · 상위 % 부분만 세로 카드(1080×1920 · 인스타 스토리)로
    다른 학생의 이름 · 순위 · 인원은 넣지 않는다 (상위 % 는 그 학생 것만)
+   BadgeView — 「🏅 내 루틴 배지」 (아래 · 20261108j)
    ============================================================ */
 (function (global) {
   'use strict';
@@ -153,4 +154,95 @@
   }
 
   global.AwardView = { html: html, cardHtml: cardHtml, lead: lead, saveImage: saveImage, canvasOf: canvasOf };
+
+  /* ============================================================
+     BadgeView — 「🏅 내 루틴 배지」 (러닝노트 레포트 탭 위쪽 · 코치룸 학생 상세 · 20261108j · migration-078)
+       v = hub_badges / staff_badges { today, perfect, weeks: [{ week, from, to, total, done, perfect }], months: ['2026-10'], first, cur }
+       위쪽 — 월간 배지 12칸(1월~12월 · 두 줄) · 받은 달 금색 · 안 받은 달 회색 · 아직 안 온 달 흐리게 · ◀ 해 ▶ (지난해도)
+              누르면 그달 우수자 화면 · 2개월 이상 연속이면 「연속 달성 최장 n개월」 · 3개월 연속부터 테두리 더 화려하게
+       아래쪽 — 「⭐ 퍼펙트 배지 n개」 + 최근 주들의 별 줄(받은 주 금별 · 못 받은 주 빈 별) · 별을 누르면 그 주 날짜 · 과제 수
+              3주 이상 연속(가장 최근 주부터)이면 「n주 연속 퍼펙트」
+       하나도 없으면 작게 「매주 과제를 모두 내면 퍼펙트 배지, 한 달 제출률이 높으면 루틴 배지를 받아요」
+     ============================================================ */
+  function ymAdd(ym, n) { var y = +ym.slice(0, 4), m = +ym.slice(5, 7) - 1 + n; y += Math.floor(m / 12); m = ((m % 12) + 12) % 12; return y + '-' + String(m + 1).padStart(2, '0'); }
+  function monthRuns(list) {
+    var set = {}, run = {}, best = 0;
+    (list || []).forEach(function (m) { set[m] = 1; });
+    Object.keys(set).sort().forEach(function (m) {
+      if (set[ymAdd(m, -1)]) return;                 /* 이어진 줄의 첫 달에서만 센다 */
+      var k = m, n = 0, part = [];
+      while (set[k]) { part.push(k); n++; k = ymAdd(k, 1); }
+      part.forEach(function (x) { run[x] = n; });
+      if (n > best) best = n;
+    });
+    return { run: run, best: best };
+  }
+  function weekRun(weeks) {
+    var n = 0;
+    for (var i = (weeks || []).length - 1; i >= 0; i--) { if (weeks[i].perfect) n++; else break; }
+    return n;
+  }
+  function mdOf(iso) { var m = /^\d{4}-(\d{2})-(\d{2})/.exec(String(iso || '')); return m ? (+m[1]) + '/' + (+m[2]) : ''; }
+  function weekInfo(w) { return mdOf(w.from) + '~' + mdOf(w.to) + ' · 과제 ' + num(w.total) + '개' + (w.perfect ? ' 모두 냄 ⭐' : ' 중 ' + num(w.done) + '개 냄'); }
+  function boxHtml(v, year, opt) {
+    opt = opt || {};
+    if (!v) return '';
+    var today = String(v.today || '').slice(0, 7) || '';
+    var y = year || +today.slice(0, 4) || new Date().getFullYear();
+    var firstY = +(String(v.first || '').slice(0, 4)) || y, lastY = +today.slice(0, 4) || y;
+    var runs = monthRuns(v.months), got = {};
+    (v.months || []).forEach(function (m) { got[m] = 1; });
+    var cells = '';
+    for (var m = 1; m <= 12; m++) {
+      var ym = y + '-' + String(m).padStart(2, '0'), on = !!got[ym], fut = ym >= today;
+      var cls = on ? 'is-got' + (runs.run[ym] >= 3 ? ' is-streak' : '') : fut ? 'is-future' : 'is-miss';
+      cells += on
+        ? '<button type="button" class="bdg-m ' + cls + '" data-bdg-m="' + ym + '" aria-label="' + esc(m + '월 루틴 우수자 — 누르면 그달 화면') + '"><span aria-hidden="true">🏅</span><small>' + m + '월</small></button>'
+        : '<span class="bdg-m ' + cls + '" aria-label="' + esc(m + '월' + (fut ? ' (아직)' : '')) + '"><span aria-hidden="true">🏅</span><small>' + m + '월</small></span>';
+    }
+    var weeks = v.weeks || [], wr = weekRun(weeks), none = !num(v.perfect) && !(v.months || []).length;
+    return '<div class="card bdg" data-bdg-year="' + y + '">' +
+      '<h2 class="card-title">🏅 내 루틴 배지' + (opt.note ? '<span class="card-note">' + esc(opt.note) + '</span>' : '') + '</h2>' +
+      '<div class="bdg-year"><button type="button" class="bdg-y" data-bdg-y="-1"' + (y <= firstY ? ' disabled' : '') + ' aria-label="지난해">◀</button><b class="num">' + y + '년</b>' +
+        '<button type="button" class="bdg-y" data-bdg-y="1"' + (y >= lastY ? ' disabled' : '') + ' aria-label="다음 해">▶</button></div>' +
+      '<div class="bdg-months">' + cells + '</div>' +
+      (runs.best >= 2 ? '<p class="bdg-run">연속 달성 최장 <b class="num">' + runs.best + '개월</b></p>' : '') +
+      '<div class="bdg-perfect"><b>⭐ 퍼펙트 배지 <span class="num">' + num(v.perfect) + '개</span></b>' + (wr >= 3 ? ' <span class="bdg-wrun">' + wr + '주 연속 퍼펙트</span>' : '') + '</div>' +
+      (weeks.length ? '<div class="bdg-stars">' + weeks.map(function (w, i) {
+        return '<button type="button" class="bdg-s' + (w.perfect ? ' is-got' : '') + '" data-bdg-w="' + i + '" aria-label="' + esc(weekInfo(w)) + '">' + (w.perfect ? '★' : '☆') + '</button>';
+      }).join('') + '</div><p class="bdg-info" data-bdg-info hidden></p>' : '') +
+      (none ? '<p class="bdg-hint">매주 과제를 모두 내면 퍼펙트 배지, 한 달 제출률이 높으면 루틴 배지를 받아요</p>' : '') +
+    '</div>';
+  }
+  function nowHtml(v) {
+    if (!v || !v.cur) return '';
+    return '<button type="button" class="bdg-now" data-bdg-m="' + esc(v.cur) + '">🏅 ' + (+v.cur.slice(5, 7)) + '월 루틴 우수자</button>';
+  }
+  /* 한 곳에 붙이고 ◀ ▶ · 별 · 달 누르기를 맡는다 — onMonth(ym) 는 그달 화면 열기 */
+  function mount(host, v, onMonth, opt) {
+    if (!host) return;
+    var year = 0;
+    function paint() { host.innerHTML = (opt && opt.noNow ? '' : nowHtml(v)) + boxHtml(v, year, opt); }
+    paint();
+    host.onclick = function (e) {
+      var yb = e.target.closest('[data-bdg-y]');
+      if (yb && !yb.disabled) { year = (year || +String(v.today || '').slice(0, 4)) + (+yb.dataset.bdgY); paint(); return; }
+      var mb = e.target.closest('[data-bdg-m]');
+      if (mb && onMonth) { onMonth(mb.dataset.bdgM); return; }
+      var sb = e.target.closest('[data-bdg-w]');
+      if (sb) {
+        var w = (v.weeks || [])[+sb.dataset.bdgW], info = host.querySelector('[data-bdg-info]');
+        if (w && info) { info.hidden = false; info.textContent = weekInfo(w); }
+        Array.prototype.forEach.call(host.querySelectorAll('[data-bdg-w]'), function (b) { b.classList.toggle('is-pick', b === sb); });
+      }
+    };
+  }
+  /* 코치룸 한 줄 — 「⭐ 퍼펙트 6개 · 🏅 루틴 배지 2개(10월 · 9월) · 3주 연속」 */
+  function lineText(v) {
+    if (!v) return '';
+    var ms = (v.months || []).slice().reverse().map(function (m) { return (+m.slice(5, 7)) + '월'; });
+    var wr = weekRun(v.weeks || []);
+    return '⭐ 퍼펙트 ' + num(v.perfect) + '개 · 🏅 루틴 배지 ' + ms.length + '개' + (ms.length ? '(' + ms.slice(0, 3).join(' · ') + (ms.length > 3 ? ' …' : '') + ')' : '') + (wr >= 3 ? ' · ' + wr + '주 연속' : '');
+  }
+  global.BadgeView = { html: boxHtml, nowHtml: nowHtml, mount: mount, lineText: lineText, monthRuns: monthRuns, weekRun: weekRun };
 })(window);
