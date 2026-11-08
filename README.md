@@ -999,6 +999,20 @@ delete from public.staff where email = '조교이메일@example.com';
 - 칸 옆 [시험 발송] — 칸에 넣은 코드로(저장 전에도) 원장 내 시험 번호에 한 통 · 가장 최근 공개 레포트 내용 · 원장만
 - 템플릿 내용은 건드리지 않는다 · 조교 화면은 「설정한 코드 / 지금 코드(Secrets)」만
 
+### 5-101. 20261108e — 보낸 레포트가 바뀌면 업데이트 문자 (migration-073 · 함수 note-remind 다시 배포)
+1. SQL Editor → `supabase/migration-073-report-update.sql` → Run (072 다음 · 맨 아래 줄 모두 true · 「학부모에게도 보내기 — 꺼짐(기본)」)
+2. Edge Functions → note-remind → 이 저장소의 `supabase/functions/note-remind/index.ts` 전체로 다시 배포 (Verify JWT 끔 그대로 · 매분 실행 050 그대로)
+- 확인한 것: 「보낸 레포트」 = sent 표에 그 주 · 그 학생 줄 · 받은 사람 = sms_log.mark_week · kakao_log (학생 · 학부모)
+  - 수업 영상 lesson_videos · 수업 자료 class_files · 반 공지 class_notices — 다시 공개 없이 바로 보임 (러닝노트가 열 때 읽음)
+  - 반 공통 코멘트 · 학생별 코멘트(합쳐서 레포트 코멘트) · 수업 내용 · 복습 테스트 — published.report_data (다시 공개해야 보임)
+- 트리거가 바뀐 것을 report_upd_ev 에 남김 (보낸 레포트만) → note-remind 매분 report_upd_prepare: 마지막으로 바뀐 뒤 30분 조용하면 모아 한 통
+  - 밤 10시 ~ 아침 8시는 8시 · 같은 레포트 하루 두 번까지(넘으면 다음 날 8시) · 반마다 「업데이트 문자 자동 발송」(classes.upd_auto · 기본 켜짐)
+- 항목: · 수업 영상 · 수업 자료 n개 · 선생님 코멘트 · 수업 내용 · 복습 테스트 결과 · 반 공지 — 10글자 미만 수정 · 넣었다 지운 것은 뺌(처음 상태 report_upd_base 와 견줌) · 항목 없으면 안 보냄 · 상담 · 성적 · 금액 없음
+- 받는 사람: 그 레포트를 받은 사람 — 학생 문자 · 학부모는 기본 끔(연결 상태 「학부모에게도 업데이트 문자 보내기」 · 일반 문자)
+- 문구 관리 「레포트 업데이트」 {이름} {날짜} {바뀐 항목 목록} {링크}
+- 코치룸 맨 위 띠 「반포반 11/7 레포트 · 수업 영상 · 받는 학생 10명 — 30분 뒤(14:35) 업데이트 문자가 나가요 [지금 보내기] [이번엔 안 보내기]」 · 다시 공개 뒤 「바뀐 학생에게 알리기」 창 대신 이 띠
+- 사본 한 통 「[사본] 목동반 학생 10명 · 자동(레포트 업데이트) · 수업 영상, 수업 자료 1개」
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

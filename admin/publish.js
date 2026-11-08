@@ -371,6 +371,12 @@
     return DB.weekSendData(state.week).then(function (x) {
       notifyList = changed.filter(function (c) { return x.sent && x.sent[c.id]; });
       if (!notifyList.length) return;
+      /* 레포트 업데이트 문자(migration-073)가 있으면 따로 묻지 않는다 — 30분 뒤 모아 한 통 · 맨 위 띠에서 [지금 보내기] [이번엔 안 보내기] (20261108e) */
+      if (window.RUpd && RUpd.has()) {
+        window.dispatchEvent(new CustomEvent('jt:rupd'));
+        toast('이미 보낸 ' + notifyList.length + '명 — 바뀐 내용은 30분 뒤 업데이트 문자로 갑니다 (맨 위 띠에서 바로 보내거나 안 보낼 수 있어요)', 'good');
+        return;
+      }
       $('#notifyDesc').textContent = '이미 레포트를 보낸 학생 중 내용이 바뀐 ' + notifyList.length + '명입니다. 알릴 학생만 체크하세요.';
       $('#notifyList').innerHTML = notifyList.map(function (c) {
         return '<label class="notify-row"><input type="checkbox" data-nt="' + esc(c.id) + '" checked> <b>' + esc(c.name) + '</b> <span class="notify-row__what">' + esc(c.what) + '</span></label>';

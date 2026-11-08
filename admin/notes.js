@@ -7,6 +7,7 @@
        (class_meta_set · class_pre_set · 반 관리 → 수업 설정과 같은 값 · migration-056)
      · 수업 전 예고를 보낸 날 — 그 아래 작게 「15:30 보냄 11명(미제출 8 · 모두 제출 3)」 (pre_remind_status · 20261101j · 067 부터 두 종류)
      · [바꾸기] 「모두 제출 칭찬 문자 보내기」 (반마다 · 기본 켜짐 · class_praise_set · migration-067 · 20261107b)
+     · [바꾸기] 「업데이트 문자 자동 발송」 (반마다 · 기본 켜짐 · class_upd_set · migration-073 · 20261108e) — 보낸 레포트가 바뀌면 30분 뒤 모아 한 통
        시각이 비어 있으면 눈에 띄는 [수업 시각 넣기] (보라 테두리)
      · 「필기 미제출 n명」 — 수업 날 · 끝나기 n분 전(기본 5분)부터 그날 밤까지만 (수업 시작 전에는 안 보임)
        누르면 이름(결석 · 번호 없음 표시) · [지금 다시 보내기](안 낸 · 결석 아닌 · 번호 있는 학생 본인에게만)
@@ -111,6 +112,8 @@
       '</div>' +
       (m.praiseSql ? '<div class="tdc-tedit__row"><label class="tdc-tedit__chk"><input type="checkbox" data-tf="praise"' + (m.praise !== false ? ' checked' : '') + '> 모두 제출 칭찬 문자 보내기</label>' +
         '<span class="muted-note">이번 주 과제를 모두 낸 학생에게 같은 시각에</span></div>' : '') +
+      (m.updSql ? '<div class="tdc-tedit__row"><label class="tdc-tedit__chk"><input type="checkbox" data-tf="upd"' + (m.upd !== false ? ' checked' : '') + '> 업데이트 문자 자동 발송</label>' +
+        '<span class="muted-note">보낸 레포트에 영상 · 자료 · 코멘트가 더해지면 30분 뒤 받은 학생에게</span></div>' : '') +
       '<div class="tdc-tedit__row">' +
         '<label class="tdc-tedit__chk"><input type="checkbox" data-tf="remind"' + (m.remind || !m.end ? ' checked' : '') + '> 필기·복습 문자 켜기</label>' +
         '<label class="tdc-tedit__f tdc-tedit__f--min"><span>끝나기</span><input type="number" class="input" data-tf="min" inputmode="numeric" min="1" max="60" value="' + esc(m.min || 5) + '"><span>분 전</span></label>' +
@@ -133,6 +136,7 @@
     if (args.p_min < 1 || args.p_min > 60) { err.textContent = '「끝나기 몇 분 전」은 1~60분으로 정해 주세요.'; return Promise.resolve(false); }
     var pre = g('pre').checked && !!args.p_start, preH = parseInt(g('preH').value, 10) || 3;
     var praiseBox = g('praise'), praise = praiseBox ? praiseBox.checked : m0.praise !== false;      /* 시각을 비우면 수업 전 문자도 끈다 */
+    var updBox = g('upd'), upd = updBox ? updBox.checked : m0.upd !== false;
     if (preH < 1 || preH > 12) { err.textContent = '「수업 몇 시간 전」은 1~12시간으로 정해 주세요.'; return Promise.resolve(false); }
     if (pre && hm2min(args.p_start) < preH * 60) { err.textContent = '수업 전 문자 시각이 자정보다 앞이 됩니다 — 몇 시간 전을 줄여 주세요.'; return Promise.resolve(false); }
     var btn = form.querySelector('[data-note-save]');
@@ -146,15 +150,20 @@
         var preSql = !(r2.error && missingFn(r2.error));
         if (r2.error && preSql) { err.textContent = r2.error.message; return false; }
         /* 모두 제출 칭찬 문자 (migration-067) — 칸이 있을 때만 */
-        if (!praiseBox) return done(staff, preSql);
-        return Promise.resolve(sb().rpc('class_praise_set', { p_class: cls, p_on: praise })).then(function (r3) {
+        var p3 = !praiseBox ? Promise.resolve({}) : Promise.resolve(sb().rpc('class_praise_set', { p_class: cls, p_on: praise }));
+        return p3.then(function (r3) {
           if (r3.error && !missingFn(r3.error)) { err.textContent = r3.error.message; return false; }
-          return done(staff, preSql);
+          /* 업데이트 문자 자동 발송 (migration-073) — 칸이 있을 때만 */
+          if (!updBox) return done(staff, preSql);
+          return Promise.resolve(sb().rpc('class_upd_set', { p_class: cls, p_on: upd })).then(function (r4) {
+            if (r4.error && !missingFn(r4.error)) { err.textContent = r4.error.message; return false; }
+            return done(staff, preSql);
+          });
         });
       });
     }, function (e) { btn.disabled = false; err.textContent = (e && e.message) || '저장하지 못했습니다'; return false; });
     function done(staff, preSql) {
-      Store.setMetaLocal(cls, { start: args.p_start, end: args.p_end, endOn: args.p_end_on || '', staff: staff, remind: args.p_remind, min: args.p_min, pre: preSql && pre, preH: preH, preSql: preSql, praise: praise, praiseSql: !!m0.praiseSql,
+      Store.setMetaLocal(cls, { start: args.p_start, end: args.p_end, endOn: args.p_end_on || '', staff: staff, remind: args.p_remind, min: args.p_min, pre: preSql && pre, preH: preH, preSql: preSql, praise: praise, praiseSql: !!m0.praiseSql, upd: upd, updSql: !!m0.updSql,
                                 appCode: m0.appCode || '', appClass: m0.appClass || '', appSql: !!m0.appSql });
       delete editing[cls];
       toast(cls + ' 수업 시각을 저장했습니다' + (preSql && pre ? ' · 수업 전 문자 ' + preAt({ start: args.p_start, preH: preH }) : '') + (args.p_remind ? ' · 필기·복습 문자 ' + remindAt({ end: args.p_end, min: args.p_min }) : '') + (preSql ? '' : ' (수업 전 문자는 migration-056 SQL 을 실행하면 저장됩니다)'), preSql ? 'good' : 'bad');

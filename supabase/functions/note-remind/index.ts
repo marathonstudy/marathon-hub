@@ -15,6 +15,9 @@
 //    운영진만 받는다(학생 · 학부모 없음) · 사본 없음 · 「오늘」 [미리보기] { action: "hwstat", class, dry: true } · [지금 운영진에게 보내기] { action: "hwstat", class }
 //
 //  사본 — 매분 copy_due → 묶음마다 1통 → 원장 시험 번호로 → copy_record (migration-064 · 20261106g).
+//  레포트 업데이트 문자 (migration-073 · 20261108e) — 매분 report_upd_prepare: 이미 보낸 레포트가 마지막으로 바뀐 뒤 30분 조용하면
+//    모아 한 통 (밤 10시 ~ 아침 8시는 8시 · 하루 두 번까지 · 반마다 끄기) → 받은 학생(학부모는 설정을 켰을 때만 · 일반 문자)
+//    「업데이트 문자 지금 보내기」 { action: "rupd", week, class } — 로그인한 운영진 · 그 반 그 주 기다리는 것을 바로
 //         모든 발송의 사본을 여기 한 곳에서 보낸다. 사본이 실패해도 원래 발송에는 영향이 없다. 064 전이면 조용히 넘어간다.
 //  키 — sms-send 와 같은 솔라피 Secrets(SOLAPI_API_KEY · SOLAPI_API_SECRET · SOLAPI_SENDER).
 //       DB 는 Supabase 가 함수에 기본으로 주는 SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY 로 (이 함수 안에서만). 새로 넣을 키는 없다.
@@ -309,6 +312,13 @@ export async function hwItems(due: Any, fetcher: (share: string) => Promise<Any>
   }
   return out;
 }
+/* 레포트 업데이트 문자 (073) — 보낼 때가 된 것을 한 번에 */
+async function reportUpd(now: string, week?: string, cls?: string, by?: string) {
+  const prep: Any = await rpc("report_upd_prepare", week ? { p_now: now, p_site: SITE, p_week: week, p_class: cls || "", p_by: by || "" } : { p_now: now, p_site: SITE });
+  const rows: Any[] = prep?.rows || [];
+  const r = await sendRows(rows);
+  return { reports: prep?.reports || 0, rows: rows.length, ...r };
+}
 async function hwStatus(now: string) {
   const due: Any = await rpc("hw_status_due", { p_now: now });
   if (!(due?.classes || []).length) return { rows: 0 };
@@ -352,17 +362,35 @@ async function handle(req: Request, cors: Record<string, string>) {
     /* 수업 전 예고 — 056 을 아직 안 돌렸거나 오류가 나도 필기 문자는 그대로 */
     let pre: Any = null;
     try { pre = await preRemind(now); } catch (e) { pre = { error: String((e as Error).message || e).slice(0, 160) }; }
+    /* 레포트 업데이트 — 073 을 아직 안 돌렸거나 오류가 나도 다른 일은 그대로 (사본보다 먼저 · 같은 분에 사본 묶음으로) */
+    let rupd: Any = null;
+    try { rupd = await reportUpd(now); } catch (e) { rupd = { error: String((e as Error).message || e).slice(0, 160) }; }
     /* 사본 — 064 를 아직 안 돌렸거나 오류가 나도 다른 일은 그대로 */
     let copy: Any = null;
     try { copy = await copyFlush(now); } catch (e) { copy = { error: String((e as Error).message || e).slice(0, 160) }; }
-    return json({ ok: true, day: prep?.day, rows: rows.length, ...r, hws, pre, copy }, cors);
+    return json({ ok: true, day: prep?.day, rows: rows.length, ...r, hws, pre, rupd, copy }, cors);
   }
 
   /* 2) 「지금 다시 보내기」 — 로그인한 운영진 */
   const auth = req.headers.get("authorization") ?? "";
   const apikey = req.headers.get("apikey") ?? "";
-  if (body.action !== "now" && body.action !== "hwstat") return json({ ok: false, reason: "input" }, cors, 400);
+  if (body.action !== "now" && body.action !== "hwstat" && body.action !== "rupd") return json({ ok: false, reason: "input" }, cors, 400);
   if (!/^Bearer\s+\S+/.test(auth) || !apikey) return json({ ok: false, reason: "login", message: "코치룸에 다시 로그인해 주세요." }, cors, 401);
+  /* 레포트 업데이트 문자 [지금 보내기] — 운영진만 · 그 반 그 주 기다리는 것 (반 자동 발송을 꺼 둬도) */
+  if (body.action === "rupd") {
+    let staff = false;
+    try { staff = (await rpc("is_staff", {}, auth, apikey)) === true; } catch { staff = false; }
+    if (!staff) return json({ ok: false, reason: "auth", message: "운영진 계정으로 다시 로그인해 주세요." }, cors, 403);
+    if (missing.length) return json({ ok: false, reason: "nokeys", missing, message: "문자 키가 아직 다 들어가지 않았습니다 (" + missing.join(", ") + ")." }, cors);
+    const week = String(body.week ?? "");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(week)) return json({ ok: false, reason: "input", message: "주를 골라 주세요." }, cors, 400);
+    try {
+      const r = await reportUpd(new Date().toISOString(), week, String(body.class ?? "").slice(0, 60), jwtEmail(auth));
+      return json({ ok: true, ...r }, cors);
+    } catch (e) {
+      return json({ ok: false, reason: "nosql", message: "migration-073 SQL 을 먼저 실행해 주세요 — " + String((e as Error).message || e).slice(0, 120) }, cors);
+    }
+  }
   /* 과제 현황 [미리보기] · [지금 운영진에게 보내기] — 운영진만 · 그 반 · 오늘 수업이 있는 반 */
   if (body.action === "hwstat") {
     let staff = false;

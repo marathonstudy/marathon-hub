@@ -276,6 +276,7 @@
       if (!('end_time' in r)) return;
       out[r.name] = { start: hm(r.start_time), end: hm(r.end_time), endOn: r.end_on || '', staff: r.staff_emails || [], remind: !!r.note_remind, min: r.remind_min || 5, pre: !!r.pre_remind, preH: r.pre_hours || 3, preSql: 'pre_remind' in r,
                      praise: r.pre_praise !== false, praiseSql: 'pre_praise' in r,   /* 모두 제출 칭찬 문자 (migration-067 · 20261107b) */
+                     upd: r.upd_auto !== false, updSql: 'upd_auto' in r,             /* 레포트 업데이트 문자 자동 발송 (migration-073 · 20261108e) */
                      appCode: r.app_code || '', appClass: r.app_class || '', appSql: 'app_class' in r };   /* 앱 핀번호 · 기억한 앱 클래스 (migration-060 · 20261101p) */
     });
     return out;

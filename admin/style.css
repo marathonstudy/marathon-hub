@@ -4244,3 +4244,9 @@ dialog.vl-modal[open] { display: flex; flex-direction: column; overflow: hidden;
 .kk-tpl__ro { font-weight: 700; }
 .snd-kkstu { font-size: 13px; }
 .sms-via__n { color: var(--ink-deep); }
+/* 레포트 업데이트 문자 — 맨 위 띠 (20261108e) */
+.rupd { margin: 0 0 12px; display: flex; flex-direction: column; gap: 6px; }
+.rupd__row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 10px 12px; border: 1px solid #C9BEF5; border-radius: 12px; background: #F6F3FF; }
+.rupd__t { flex: 1 1 220px; min-width: 0; font-size: 13.5px; line-height: 1.5; color: var(--ink-deep); }
+.rupd__acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.rupd__acts .btn { min-height: 36px; }
