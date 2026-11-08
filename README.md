@@ -1076,6 +1076,12 @@ delete from public.staff where email = '조교이메일@example.com';
 - 줄마다 「100% 강지호 (지난주 80% ↑)」 — 오르면 ↑ · 내리면 ↓ · 같으면 화살표 없음 · 20%p 이상 떨어지면 「↓↓」(이번 주 60% 이상이어도) · 지난주 과제 0개 · 신입이면 「(지난주 없음)」
 - 정렬 · 60% 미만 「→ 상담 필요」 · 끝 문장은 이번 주 그대로 · 그 아래 「2주 연속 60% 미만: 이름, 이름」(없으면 뺌) · 퍼펙트 줄 그대로 · 미리보기 · 지금 보내기 같은 글 · 넘치면 나눔
 
+### 5-110. 20261108n — 루틴 우수자 알림톡은 버튼으로 연결 (migration-082 · 함수 배포 없음)
+1. SQL Editor → `supabase/migration-082-award-kakao-button.sql` → Run (081 다음 · 맨 아래 줄 true)
+- 알림톡 템플릿 「과제루틴우수자」 — 변수 #{이름}(학생 이름) #{월}(10) #{코드}(받는 사람 각자의 링크 코드 · 학생 / 학부모) #{년월}(2026-10) · 본문에 #{링크} 없음
+- 버튼 [리포트 보기] 웹링크(모바일 · PC) `https://marathonstudy.github.io/marathon-hub/me/?c=#{코드}&a=#{년월}` → 러닝노트가 #코드/award/2026-10 화면으로
+- 문자로 보낼 때는 지금처럼 본문 끝에 링크 · 템플릿 코드 칸이 비어 있으면 문자
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

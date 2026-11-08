@@ -93,7 +93,7 @@
           '<label><input type="radio" name="awdVia" value="sms"' + (c.via !== 'kakao' ? ' checked' : '') + '> 문자(LMS)</label>' +
           '<label><input type="radio" name="awdVia" value="kakao"' + (c.via === 'kakao' ? ' checked' : '') + '> 알림톡</label></fieldset>' +
         '<label class="awd-cfg__tpl">알림톡 템플릿 코드 <input class="input" id="awdCfgTpl" maxlength="80" placeholder="비어 있으면 문자로 보냅니다" value="' + esc(c.tpl || '') + '"></label>' +
-        '<p class="muted-note">알림톡 변수 #{이름} #{월} #{링크} · 템플릿 코드가 비어 있으면 알림톡을 골라도 문자로 보냅니다</p>' +
+        '<p class="muted-note">알림톡 템플릿 「과제루틴우수자」 — 변수 #{이름} #{월} #{코드} #{년월} · 버튼 [리포트 보기] https://marathonstudy.github.io/marathon-hub/me/?c=#{코드}&amp;a=#{년월} (본문에 링크 없음) · 템플릿 코드가 비어 있으면 알림톡을 골라도 문자(본문에 링크)로 보냅니다</p>' +
         '<button type="button" class="btn btn--sm btn--primary" data-awd-cfg-save>설정 저장</button>' +
       '</div></details>';
   }
