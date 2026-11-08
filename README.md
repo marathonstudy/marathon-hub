@@ -1090,6 +1090,15 @@ delete from public.staff where email = '조교이메일@example.com';
 - 보낸 뒤 「10월 루틴 우수자 7명 · 10:00 보냄」(누르면 받은 학생) · 같은 달 한 학생 한 번
 - 설정 「월간 루틴 우수자 자동 발송」(기본 켜짐 · 원장만) — 확인 창 · 문자 발송 → 연결 상태 「월간 루틴 우수자」(후보 계산 전에도 템플릿 코드 칸)
 
+### 5-112. 20261108p — 알림톡이 실패하면 코치룸이 링크 든 문자로 (migration-084 · 함수 kakao-send · note-remind 다시 배포)
+1. SQL Editor → `supabase/migration-084-kakao-alt.sql` → Run (083 다음 · 맨 아래 세 줄 true)
+2. Edge Functions → kakao-send · note-remind → 이 저장소의 각 `index.ts` 전체로 다시 배포
+- 확인한 것: 레포트 안내 알림톡 · 루틴 우수자 알림톡은 솔라피 자동 대체(disableSms false)라 카톡이 없으면 버튼 링크가 빠진 템플릿 글만 문자로 갔다 · 코치룸 재발송은 솔라피가 바로 받지 않은 경우(문자 발송 화면)뿐이었다
+- 이제 disableSms true(솔라피 자동 대체 끔) · 보낸 알림톡 줄마다 kakao_alt 에 다시 보낼 문자(번호 · 글) — 레포트 안내는 문자 발송 화면의 그 사람 문자 글(없으면 문구 「레포트 안내」) · 루틴 우수자는 문구 「루틴 우수자」(본문에 …/me/#코드/award/2026-10)
+- note-remind 매분 — 보낸 지 1분 지난 알림톡 결과를 솔라피(GET /messages/v4/list?messageId=)에 묻고 4000 받음 · 2000/3000 아직 · 그 밖 실패 → 실패만 문자 한 통(「대체 문자」 · 사본 없음 · 한 줄 한 번 · 3시간 지나면 그만)
+- 솔라피가 바로 받지 않은 줄 — 문자 발송 화면은 예전처럼 바로 · 3 발송 [알림톡 보내기] · 루틴 우수자는 다음 분에 바로
+- 레포트 안내는 대체 문자를 쓰는 때만(「카톡으로 보내기(안 받는 사람은 문자로)」 · 설정 「알림톡이 실패하면 문자로 대신 보내기」) · 번호는 그 학생의 번호만
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

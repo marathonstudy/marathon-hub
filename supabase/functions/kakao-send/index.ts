@@ -13,7 +13,12 @@
 //                      템플릿 코드는 코드 파일이 아니라 설정(app_settings 'kakao_tpl' · 원장만 고침)에서 DB 함수 kakao_prepare_student 가 돌려준다
 //                      변수 #{날짜} #{이름} #{링크}(학생 링크 전체 주소) · 버튼 [레포트 보기](웹링크 #{링크}) · 코드가 비어 있으면 reason notpl
 //                      학부모(기본 who)는 그대로 기존 템플릿(SOLAPI_TEMPLATE_ID · #{이름} #{수업일} #{코드}) — 기존 템플릿은 건드리지 않는다
-//                      대체 문자는 학부모와 같다 — 카톡이 없어 나중에 실패하면 솔라피가 문자로 대신 (disableSms 규칙 그대로)
+//                      대체 문자는 학부모와 같다 (아래 084)
+//    대체 문자 (migration-084 · 20261108p) — 솔라피 자동 대체(disableSms false)는 쓰지 않는다 (버튼 링크가 빠진 템플릿 글만 가서)
+//                      대체 문자를 쓰는 때(fallback: true · 설정 「알림톡이 실패하면 문자로 대신 보내기」)는 보낸 줄마다 kakao_alt_put 으로
+//                      「다시 보낼 문자」(번호 · 글)를 남기고 → note-remind 가 매분 결과를 물어 실패한 사람만 그 글(본문에 링크)로 문자
+//                      글 = body.alt [{ student_id, target, text }](문자 발송 화면의 그 사람 문자 글) · 없으면 문구 관리 「레포트 안내」로 채움
+//                      altClient: true — 솔라피가 바로 받지 않은 줄은 화면이 바로 다시 보내므로 남기지 않는다
 //    학부모 템플릿 코드 (migration-072 · 20261108d) — 설정(app_settings 'kakao_tpl' parent · 원장만 고침)에 있으면 그 코드,
 //                      비어 있으면 지금처럼 Secrets 의 SOLAPI_TEMPLATE_ID. 새 템플릿(「주간레포트안내_v2」)은 설정에 코드만 넣으면 바로 바뀐다
 //    action "test" { tpl, latest: true } — 설정 칸 옆 [시험 발송]: 원장만 · 칸에 넣은 코드(저장 전에도)로 · 가장 최근 공개 레포트 내용으로 내 시험 번호에 한 통
@@ -170,7 +175,7 @@ async function handle(req: Request, cors: Record<string, string>) {
       variables: who === "student"
         ? { "#{날짜}": String(r.date || ""), "#{이름}": String(r.name || ""), "#{링크}": String(r.link || "") }
         : { "#{이름}": String(r.name || ""), "#{수업일}": String(r.lesson || ""), "#{코드}": String(r.code || "") },
-      disableSms: !(prep.smsFallback || body.fallback === true),
+      disableSms: true,                                   /* 솔라피 자동 대체 끔 — 실패하면 코치룸이 링크 든 문자로 (084) */
     },
     customFields: { log: String(r.log_id) },
   }));
@@ -204,6 +209,20 @@ async function handle(req: Request, cors: Record<string, string>) {
 
   /* 3) 기록 (번호는 기록에 뒤 4자리만 — DB 가 처음부터 뒤 4자리만 받았다) */
   await rpcAs(auth, apikey, "kakao_record", { p_results: results.map(({ log_id, ok, error, message_id }) => ({ log_id, ok, error, message_id })) }).catch(() => {});
+  /* 4) 대체 문자 남기기 (084) — 실패한 사람만 note-remind 가 링크 든 문자로 다시 · 084 전이면 조용히 넘어간다 */
+  if (action === "send" && (prep.smsFallback || body.fallback === true)) {
+    const alts: Any[] = Array.isArray(body.alt) ? body.alt : [];
+    const altOf = (sid: string) => {
+      const a = alts.find((x: Any) => x && String(x.student_id) === sid && (who === "student" ? x.target === "student" : x.target !== "student"));
+      return a && typeof a.text === "string" ? a.text.slice(0, 2000) : "";
+    };
+    const altRows = rows.map((r, i) => ({ r, x: results[i] })).filter(({ x }) => x && (x.ok || body.altClient !== true)).map(({ r, x }) => ({
+      src: "report", log_id: r.log_id, student_id: r.student_id, target: who, to: String(r.to), text: altOf(String(r.student_id)),
+      name: String(r.name || ""), lesson: String(who === "student" ? r.date || "" : r.lesson || ""),
+      link: who === "student" ? String(r.link || "") : SITE + "/me/#" + String(r.code || ""), message_id: x.message_id || "", failed: !x.ok,
+    }));
+    if (altRows.length) await rpcAs(auth, apikey, "kakao_alt_put", { p_rows: altRows }).catch(() => {});
+  }
   const sent = results.filter((x) => x.ok).length;
   return json({
     ok: true, test: action === "test", who, sent, failed: results.length - sent, skipped, tpl: who === "parent" ? (testTpl ? "input" : parentTpl ? "settings" : "secrets") : "student",

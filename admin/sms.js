@@ -16,7 +16,7 @@
        설정에 학생용 템플릿 코드가 있으면 학생도 학생용 알림톡 (kakao-send who student · migration-071 · 20261108c)
        「보내는 방법」 아래 「학부모 10명 알림톡 · 학생 10명 알림톡 (실패 시 문자)」 / 코드가 없으면 「학생 10명 문자」
        솔라피가 바로 받지 않은 사람만 문자로 대신 (학생 = 학생 문자 글 · 학부모 = 그 문자 글 · 보낸 기록 이름 「대체 문자」)
-       카톡이 없어 나중에 실패하는 사람은 지금처럼 솔라피가 문자로 대신 · 사본은 한 번 발송에 한 통 (copy_due · 071)
+       카톡이 없어 나중에 실패하는 사람은 note-remind 가 그 사람 문자 글로 (084 · 솔라피 자동 대체는 끔) · 사본은 한 번 발송에 한 통 (copy_due · 071)
      · 보낸 뒤 맨 위 띠 「✓ 보냄 22 · 실패 0」(실패면 빨간 띠 · 실패만 다시 보내기)
      · 내용 칸: {학생이름} {반이름} #{링크}(학부모에겐 학부모 링크, 학생에겐 학생 링크) #{수업일} {첫수업일} {앱입장코드} #{앱 설치 링크} {러닝노트주소}
        예전 칸 #{이름} #{반} #{입장코드}도 그대로 · 단문(90바이트까지) · 장문 표시 · 예상 비용 · [내용 비우기] · [이 글을 문구로 저장]
@@ -1187,7 +1187,7 @@
     return chunks.reduce(function (pr, c) {
       return pr.then(function () {
         if (!all.ok) return null;
-        return invoke({ action: 'send', week: st.week, students: c, resend: resend, fallback: true }, KFN).then(function (r) {
+        return invoke({ action: 'send', week: st.week, students: c, resend: resend, fallback: true, altClient: true, alt: altTexts(par, c) }, KFN).then(function (r) {
           if (!r || !r.ok) { all = r || { ok: false, message: '알림톡을 보내지 못했습니다.' }; return; }
           all.sent += r.sent || 0; all.failed += r.failed || 0;
           (r.results || []).forEach(function (x) {
@@ -1210,7 +1210,7 @@
       return schunks.reduce(function (pr, c) {
         return pr.then(function () {
           if (!all.ok) return null;
-          return invoke({ action: 'send', who: 'student', week: st.week, students: c, resend: sresend, fallback: true }, KFN).then(function (r) {
+          return invoke({ action: 'send', who: 'student', week: st.week, students: c, resend: sresend, fallback: true, altClient: true, alt: altTexts(kstu, c) }, KFN).then(function (r) {
             if (!r || !r.ok) {
               /* 학생 알림톡을 못 쓰면(코드 오류 등) 그 학생들은 문자로 */
               stu = stu.concat(kstu.filter(function (x) { return c.indexOf(x.s.id) >= 0; }));
@@ -1242,7 +1242,17 @@
     });
   }
 
-  /* 대체 문자 — 솔라피가 바로 받지 않은 알림톡(번호 오류 등)만 그 사람 문자 글로 한 번 (카톡이 없어 나중에 실패하는 사람은 솔라피가 대신 보낸다) */
+  /* 알림톡이 나중에 실패하면(카톡 없음 등) 코치룸이 보낼 그 사람 문자 글 — kakao-send 가 kakao_alt 에 남긴다 (084 · 솔라피 자동 대체는 끔) */
+  function altTexts(list, ids) {
+    var lessons = plan ? plan.lessons : {}, body = $('#smsBody').value, out = [];
+    list.forEach(function (x) {
+      if (ids.indexOf(x.s.id) < 0) return;
+      if (out.some(function (y) { return y.student_id === x.s.id && (y.target === 'student') === (x.t === 'student'); })) return;
+      out.push({ student_id: x.s.id, target: x.t === 'student' ? 'student' : 'parent', text: textFor(body, x.s, x.t, lessons) });
+    });
+    return out;
+  }
+  /* 대체 문자 — 솔라피가 바로 받지 않은 알림톡(번호 오류 등)만 그 사람 문자 글로 바로 한 번 · 카톡이 없어 나중에 실패하는 사람은 note-remind 가 같은 글로 (084) */
   function altSms(pl, items, all) {
     if (!all.ok) return Promise.resolve(all);
     var bad = all.results.filter(function (x) { return x.via === 'kakao' && !x.ok; });

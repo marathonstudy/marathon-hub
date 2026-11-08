@@ -22,6 +22,8 @@
 //    같은 날 10:00 자동 발송 (migration-083 · award_auto_prepare · 설정에서 끄면 원장이 [보내기])
 //    「오늘」 확인 창 [우수자 다시 계산] { action: "award", op: "calc", month } · [보내기] { action: "award", op: "send", month } — 원장만
 //    문자 또는 알림톡(설정에 템플릿 코드 · SOLAPI_PFID · 카톡이 없으면 솔라피가 문자로) · 같은 달 한 학생 한 번
+//  알림톡 대체 문자 (migration-084 · 20261108p) — 솔라피 자동 대체는 끈다. 매분 kakao_alt 의 알림톡 결과를 솔라피에 물어
+//    실패한 사람에게만 링크가 본문에 든 문자(레포트 안내 · 루틴 우수자 문자 문구)로 한 통 (보낸 기록 「대체 문자」)
 //  사본 — 매분 copy_due → 묶음마다 1통 → 원장 시험 번호로 → copy_record (migration-064 · 20261106g).
 //  레포트 업데이트 문자 (migration-073 · 20261108e) — 매분 report_upd_prepare: 이미 보낸 레포트가 마지막으로 바뀐 뒤 30분 조용하면
 //    모아 한 통 (밤 10시 ~ 아침 8시는 8시 · 하루 두 번까지 · 반마다 끄기) → 받은 학생(학부모는 설정을 켰을 때만 · 일반 문자)
@@ -93,7 +95,7 @@ export function leftOf(text: string): string[] {
 export const leftMsg = (left: string[]) => "바뀌지 않은 칸이 있어 보내지 않음: " + left.join(" ");
 
 /* rows → 솔라피 → 결과 기록 (바뀌지 않은 칸이 남은 줄은 보내지 않고 실패로 · 20261101m) */
-async function sendRows(all: Any[], record = "note_remind_record", copy = true) {
+async function sendRows(all: Any[], record = "note_remind_record", copy = true, keep?: (results: Any[]) => void) {
   if (!all.length) return { sent: 0, failed: 0 };
   const blocked = all.filter((r) => leftOf(r.text).length);
   const rows = all.filter((r) => !leftOf(r.text).length);
@@ -105,7 +107,7 @@ async function sendRows(all: Any[], record = "note_remind_record", copy = true) 
       headers: { Authorization: await solapiAuth(env("SOLAPI_API_KEY"), env("SOLAPI_API_SECRET")), "Content-Type": "application/json" },
       body: JSON.stringify({
         messages: rows.map((r) => r.kakao && r.kakao.templateId && env("SOLAPI_PFID")
-          ? { to: String(r.to), from, kakaoOptions: { pfId: env("SOLAPI_PFID"), templateId: String(r.kakao.templateId), variables: r.kakao.variables || {}, disableSms: false }, customFields: { log: String(r.log_id) } }
+          ? { to: String(r.to), from, kakaoOptions: { pfId: env("SOLAPI_PFID"), templateId: String(r.kakao.templateId), variables: r.kakao.variables || {}, disableSms: true }, customFields: { log: String(r.log_id) } }
           : { to: String(r.to), from, text: String(r.text || ""), type: r.kind === "LMS" ? "LMS" : "SMS", customFields: { log: String(r.log_id) } }),
         allowDuplicates: true, showMessageList: true,
       }),
@@ -129,6 +131,7 @@ async function sendRows(all: Any[], record = "note_remind_record", copy = true) 
   }
   blocked.forEach((r) => results.push({ log_id: r.log_id, ok: false, error: leftMsg(leftOf(r.text)), message_id: "" }));
   await rpc(record, { p_results: results }).catch(() => {});
+  if (keep) keep(results);
   if (copy) await rpc("msg_copy_note", { p_rows: all.map((r) => ({ log_id: r.log_id, text: r.text, name: r.name })) }).catch(() => {});
   const sent = results.filter((x) => x.ok).length;
   return { sent, failed: results.length - sent, blocked: blocked.length };
@@ -431,6 +434,47 @@ export async function awardCalc(now: string, month?: string, by?: string, fetche
   return { month: due.month, students: list.length, eligible: r?.eligible || 0, candidates: r?.candidates || 0 };
 }
 
+/* 알림톡 대체 문자 (084 · 20261108p) — 솔라피 자동 대체는 끄고, 실패한 사람만 코치룸이 링크 든 문자로
+     awardSend — 루틴 우수자 줄을 보내고 알림톡 줄은 kakao_alt 에 남긴다 (바로 받지 않은 줄은 fail → 다음 분에 바로)
+     altCheck — 매분 kakao_alt_due → 솔라피 결과(GET /messages/v4/list?messageId=) → kakao_alt_prepare → 실패만 문자 */
+async function awardSend(rows: Any[], by: string) {
+  let got: Any[] = [];
+  const r = await sendRows(rows, "note_remind_record", true, (results) => { got = results; });
+  const ok = new Map<string, Any>(got.map((x: Any) => [String(x.log_id), x]));
+  const alts = rows.filter((w) => w.kakao && w.kakao.templateId && env("SOLAPI_PFID")).map((w) => {
+    const x = ok.get(String(w.log_id)) || {};
+    return { src: "award", log_id: w.log_id, student_id: w.student_id, target: w.who, to: String(w.to), text: String(w.text || ""), message_id: x.message_id || "", failed: !x.ok };
+  });
+  if (alts.length) await rpc("kakao_alt_put_svc", { p_rows: alts, p_by: by }).catch(() => {});
+  return r;
+}
+const SOLAPI_LIST = "https://api.solapi.com/messages/v4/list";
+/* 솔라피 메시지 상태 — 4000 받음 · 2000 · 3000 · 비어 있음 아직 · 그 밖 실패 */
+export function altStatus(code: unknown): "ok" | "wait" | "fail" {
+  const c = String(code ?? "").trim();
+  if (c === "4000") return "ok";
+  if (!c || c === "2000" || c === "3000") return "wait";
+  return "fail";
+}
+async function altCheck(now: string) {
+  const due: Any[] = (await rpc("kakao_alt_due", { p_now: now })) || [];
+  if (!due.length) return { checked: 0 };
+  const results: Any[] = [];
+  for (const d of due) {
+    if (d.state === "fail") { results.push({ id: d.id, status: "fail" }); continue; }
+    try {
+      const res = await fetch(SOLAPI_LIST + "?messageId=" + encodeURIComponent(String(d.message_id)), { headers: { Authorization: await solapiAuth(env("SOLAPI_API_KEY"), env("SOLAPI_API_SECRET")) } });
+      const out: Any = await res.json().catch(() => null);
+      const list: Any = out?.messageList || {};
+      const m: Any = Array.isArray(list) ? list.find((x: Any) => x?.messageId === d.message_id) : list[d.message_id];
+      results.push({ id: d.id, status: res.ok && m ? altStatus(m.statusCode) : "wait" });
+    } catch { results.push({ id: d.id, status: "wait" }); }
+  }
+  const prep: Any = await rpc("kakao_alt_prepare", { p_results: results });
+  const rows: Any[] = prep?.rows || [];
+  const r = rows.length ? await sendRows(rows, "note_remind_record", false) : { sent: 0, failed: 0 };
+  return { checked: due.length, resent: rows.length, ...r };
+}
 /* 레포트 업데이트 문자 (073) — 보낼 때가 된 것을 한 번에 */
 async function reportUpd(now: string, week?: string, cls?: string, by?: string) {
   const prep: Any = await rpc("report_upd_prepare", week ? { p_now: now, p_site: SITE, p_week: week, p_class: cls || "", p_by: by || "" } : { p_now: now, p_site: SITE });
@@ -497,12 +541,15 @@ async function handle(req: Request, cors: Record<string, string>) {
     try {
       const ap: Any = await rpc("award_auto_prepare", { p_now: now, p_site: SITE });
       const arows: Any[] = ap?.rows || [];
-      awardAuto = arows.length ? { month: ap.month, students: ap.students || 0, rows: arows.length, ...(await sendRows(arows)) } : { month: ap?.month || null };
+      awardAuto = arows.length ? { month: ap.month, students: ap.students || 0, rows: arows.length, ...(await awardSend(arows, "")) } : { month: ap?.month || null };
     } catch (e) { awardAuto = { error: String((e as Error).message || e).slice(0, 160) }; }
+    /* 알림톡 대체 문자 — 실패한 사람만 링크 든 문자로 (084 전이면 조용히 넘어간다) */
+    let alt: Any = null;
+    if (!missing.length) { try { alt = await altCheck(now); } catch (e) { alt = { error: String((e as Error).message || e).slice(0, 160) }; } }
     /* 사본 — 064 를 아직 안 돌렸거나 오류가 나도 다른 일은 그대로 */
     let copy: Any = null;
     try { copy = await copyFlush(now); } catch (e) { copy = { error: String((e as Error).message || e).slice(0, 160) }; }
-    return json({ ok: true, day: prep?.day, rows: rows.length, ...r, hws, badge, pre, rupd, award, awardAuto, copy }, cors);
+    return json({ ok: true, day: prep?.day, rows: rows.length, ...r, hws, badge, pre, rupd, award, awardAuto, alt, copy }, cors);
   }
 
   /* 2) 「지금 다시 보내기」 — 로그인한 운영진 */
@@ -528,7 +575,7 @@ async function handle(req: Request, cors: Record<string, string>) {
     if (missing.length) return json({ ok: false, reason: "nokeys", missing, message: "문자 키가 아직 다 들어가지 않았습니다 (" + missing.join(", ") + ")." }, cors);
     const prep: Any = await rpc("award_send_prepare", { p_month: month + "-01", p_by: jwtEmail(auth), p_site: SITE });
     const rows: Any[] = prep?.rows || [];
-    const r = await sendRows(rows);
+    const r = await awardSend(rows, jwtEmail(auth));
     return json({ ok: true, month: prep?.month, students: prep?.students || 0, rows: rows.length, kakao: !!prep?.kakao, ...r }, cors);
   }
   /* 레포트 업데이트 문자 [지금 보내기] — 운영진만 · 그 반 그 주 기다리는 것 (반 자동 발송을 꺼 둬도) */
