@@ -334,12 +334,12 @@
     });
   }
   function refreshBtn(attr, val, label) {
-    return STORE.on ? '<button type="button" class="tdc-refresh" ' + attr + '="' + esc(val) + '"' + (STORE.busy[attr + val] ? ' disabled' : '') + ' aria-label="' + esc(label) + '" title="' + esc(label) + '">' + (STORE.busy[attr + val] ? '받는 중…' : '새로고침') + '</button>' : '';
+    return STORE.on ? '<button type="button" class="tdc-refresh" ' + attr + '="' + esc(val) + '"' + (STORE.busy[attr + val] ? ' disabled' : '') + ' aria-label="' + esc(label) + '" title="' + esc(label) + '">' + (STORE.busy[attr + val] ? '…' : '↻') + '</button>' : '';     /* 작은 아이콘 (20261108s) */
   }
   function paintRefresh() {
     Array.prototype.forEach.call(document.querySelectorAll('#tdBody .tdc-refresh'), function (b) {
       var attr = b.hasAttribute('data-app-refresh-cls') ? 'data-app-refresh-cls' : 'data-app-refresh-sid', on = !!STORE.busy[attr + b.getAttribute(attr)];
-      b.disabled = on; b.textContent = on ? '받는 중…' : '새로고침';
+      b.disabled = on; b.textContent = on ? '…' : '↻';
     });
   }
   function loadApp(only, force) {
@@ -1045,6 +1045,8 @@
     e.stopPropagation();
     var sid = det.sid, day = det.day;
     if (b.hasAttribute('data-hd-note')) {
+      /* 20261108s — 빠른 상담 창으로 (그 과제 날짜 · 분류 과제) · 창이 없을 때만 예전 칸 */
+      if (window.QuickNote && QuickNote.open) { QuickNote.open(sid, { hwDay: day }); return; }
       hm.note = !hm.note; hm.err = ''; paintDetail();
       var ta = document.getElementById('hdNoteText'); if (ta && hm.note) { try { ta.focus({ preventScroll: true }); } catch (x) { ta.focus(); } }
       return;
@@ -1076,6 +1078,13 @@
   }, true);
   document.addEventListener('input', function (e) { if (e.target && e.target.id === 'hdNoteText') hm.text = e.target.value; });
   window.addEventListener('jt:hwnote', function () { if (det.sid) paintDetail(); });
+  /* 빠른 상담을 남기면 — 수업 시간인 반은 줄 순서가 바뀐다 (오늘 상담한 학생은 아래로 · 20261108s) */
+  window.addEventListener('jt:consult-loaded', function () {
+    if (!st.data || !Object.keys(st.clsBy || {}).some(function (n) { return st.open[n] && classNow(n); })) return;
+    var a = document.activeElement;
+    if (a && /^(INPUT|TEXTAREA)$/.test(a.tagName) && document.getElementById('tdBody') && document.getElementById('tdBody').contains(a)) return;
+    render();
+  });
 
   var FIX_NAME = { onTime: '정시 제출', late: '늦게 제출', none: '미제출', exempt: '면제', off: '과제 없음' };
   /* 사유(선택) — 면제는 「결석으로 면제」 · 「기타」(예: 병결) */
@@ -1386,8 +1395,69 @@
     var v = c.per ? perVal(s, c.per[appSortP()]) : null;
     return v && v.k === 'ok' ? { g: 0, r: v.done / v.days, n: v.done } : { g: x.k === 'wait' || x.k === 'fail' ? 2 : 1 };
   }
+  /* ---------- 빠른 상담 (20261108s · quicknote.js) ----------
+     수업 시간(그 반 수업일 · 시작 30분 전 ~ 끝) — 이번 주(기준 기간) 과제를 안 낸 학생을 위로(✕ 많은 순) · 오늘 이미 상담한 학생은 그 아래
+     그 밖에는 지금 순서 그대로 */
+  function hmMin(hm) { var m = /^(\d{1,2}):(\d{2})/.exec(hm || ''); return m ? +m[1] * 60 + +m[2] : null; }
+  function classNow(cls) {
+    var m = (Store.metaOf && Store.metaOf(cls)) || {}, a = hmMin(m.start), b = hmMin(m.end);
+    if (a == null || b == null) return false;
+    var ds = lessonDates(cls), t0 = DDay.today();
+    if (!ds || ds.indexOf(t0) === -1) return false;
+    var d = new Date(), now = d.getHours() * 60 + d.getMinutes();
+    return now >= a - 30 && now <= b;
+  }
+  /* 학생 한 명 · 기준 기간 — { known, done, total, miss: [날짜], period, goalLesson, m } (상담 창 맨 위 · 약속 버튼) */
+  function hwInfo(sid) {
+    var s = rowById(sid) || stu(sid);
+    var cls = s && (s.class_name || s.className || '');
+    var c = cls && (st.clsBy || {})[cls];
+    var P = c ? hwPeriod(c) : null;
+    if (!P) return null;
+    var t0 = DDay.today(), a = app[sid], out = { known: false, done: 0, total: 0, miss: [], period: P, cls: cls };
+    var ds = lessonDates(cls) || [], nx = ds.filter(function (d) { return d > P.lesson; })[0];
+    out.goalLesson = nx || (P.lesson ? Lesson.addDays(P.lesson, 7) : '');
+    if (a && a.ok && a.data && P.upto >= P.from) {
+      var w = AppWeek.compute(a.data, P.from, P.upto, t0);
+      if (w) {
+        out.known = true;
+        w.days.forEach(function (x) {
+          if (x.weekend) return;
+          if ((x.hw === 'onTime' || x.hw === 'late') && x.date <= t0) out.done++;
+          else if (x.hw === 'none' && x.date < t0) out.miss.push(x.date);
+        });
+        out.total = out.done + out.miss.length;
+      }
+    }
+    out.m = out.total || weekdaysIn(P).length;
+    return out;
+  }
+  /* 그 기간에 낸 과제 · 전체 (늦게 = 냄 · 면제 · 과제 없는 날 · 오늘 아직 안 낸 것은 뺌) — 숫자 약속 판정 */
+  function hwCount(sid, from, to) {
+    var a = app[sid];
+    if (!a) return undefined;
+    if (!a.ok || !a.data) return null;
+    var t0 = DDay.today(), w = AppWeek.compute(a.data, from, to < t0 ? to : t0, t0), n = { done: 0, total: 0 };
+    if (!w) return null;
+    w.days.forEach(function (x) {
+      if (x.weekend) return;
+      if (x.hw === 'onTime' || x.hw === 'late') { n.done++; n.total++; }
+      else if (x.hw === 'none' && x.date < t0) n.total++;
+    });
+    return n;
+  }
+  function missOfRow(sid) { var h = hwInfo(sid); return h && h.known ? h.miss.length : 0; }
   function sortRows(rows, c) {
     var dir = appSort() === 'least' ? 1 : -1;
+    if (c && classNow(c.name)) {
+      var done = function (s) { return window.QuickNote && QuickNote.todayNote ? !!QuickNote.todayNote(s.id) : false; };
+      return rows.map(function (s) { return { s: s, x: missOfRow(s.id), d: done(s) }; }).sort(function (a, b) {
+        var ga = a.d ? 2 : a.x ? 0 : 1, gb = b.d ? 2 : b.x ? 0 : 1;
+        if (ga !== gb) return ga - gb;
+        if (a.x !== b.x) return b.x - a.x;
+        return byName(a.s, b.s);
+      }).map(function (x) { return x.s; });
+    }
     return rows.map(function (s) { return { s: s, k: sortKeyOf(s, c) }; }).sort(function (a, b) {
       if (a.k.g !== b.k.g) return a.k.g - b.k.g;
       if (a.k.g === 0 && a.k.r !== b.k.r) return (a.k.r - b.k.r) * dir;
@@ -1696,13 +1766,14 @@
 
   /* 학생 줄 — 이름 | 세 칸 | 버튼 (휴대폰에서는 버튼을 「⋯」 하나로 묶는다 · 20261031g)
      버튼은 [상담 카드] [문자]만 — 학부모 · 학생 화면 미리보기는 상담 카드 맨 위로 옮겼다 (20261101g) */
+  /* 20261108s — [상담 카드] · [상담 기록 +] 를 [상담 n] 하나로 (quicknote.js 빠른 상담 창 · 줄 아무 곳을 눌러도 같은 창) */
   function actsHtml(s) {
     var id = esc(s.id);
-    var btns = '<button type="button" class="btn btn--sm" data-card="' + id + '">상담 카드</button>' +
-      '<button type="button" class="btn btn--sm" data-sms-sid="' + id + '">문자</button>';
-    /* [상담 기록 +] (quicknote.js · 20261031o) — 휴대폰(600px 이하)은 버튼을 모두 숨기고 「⋯」 메뉴 안으로 (20261106a) */
-    return '<div class="tdc-st__acts">' + btns + (window.QuickNote ? QuickNote.btnHtml(s.id, s.name) : '') + refreshBtn('data-app-refresh-sid', s.id, s.name + ' 과제 기록 새로고침') +
-      '<details class="tdc-more"><summary class="btn btn--sm tdc-more__b" aria-label="' + esc(s.name) + ' 더 보기">⋯</summary><div class="tdc-more__menu">' + btns + (window.QuickNote ? QuickNote.btnHtml(s.id, s.name) : '') + refreshBtn('data-app-refresh-sid', s.id, s.name + ' 과제 기록 새로고침') +
+    var cs = window.QuickNote ? QuickNote.btnHtml(s.id, s.name) : '<button type="button" class="btn btn--sm" data-card="' + id + '">상담</button>';
+    var btns = cs + '<button type="button" class="btn btn--sm" data-sms-sid="' + id + '">문자</button>';
+    /* 휴대폰(600px 이하)은 [상담]만 밖에 · 나머지는 「⋯」 메뉴 안으로 (20261106a) */
+    return '<div class="tdc-st__acts">' + btns + refreshBtn('data-app-refresh-sid', s.id, s.name + ' 과제 기록 새로고침') +
+      '<details class="tdc-more"><summary class="btn btn--sm tdc-more__b" aria-label="' + esc(s.name) + ' 더 보기">⋯</summary><div class="tdc-more__menu">' + '<button type="button" class="btn btn--sm" data-sms-sid="' + id + '">문자</button>' + refreshBtn('data-app-refresh-sid', s.id, s.name + ' 과제 기록 새로고침') +
         (window.AppLink && AppLink.openHtml ? AppLink.openHtml(s.id, { noAdd: true, cls: 'btn btn--sm' }) : '') + '</div></details></div>';
   }
   /* 「신입」 — 수강 시작한 지 2주가 안 된 학생 (20261031q) */
@@ -1711,8 +1782,10 @@
     return x && Store.isNew(x) ? '<span class="new-badge" title="' + esc('수강 시작 ' + md(Store.startOf(x))) + '">신입</span>' : '';
   }
   function studentRow(s, c) {
-    return '<div class="tdc-st tdc-grid" data-id="' + esc(s.id) + '">' +
-      '<div class="tdc-st__main">' + (window.Profile ? Profile.avatar({ id: s.id, name: s.name }, 's') : '') + '<span class="qn-namebox"><span class="qn-nameline"><button type="button" class="roster__name roster__name-btn" data-card="' + esc(s.id) + '">' + esc(s.name) + '</button>' + newBadge(s.id) + (window.Badges ? Badges.tag(s.id) : '') + '</span>' + (window.QuickNote ? QuickNote.tagHtml(s.id) : '') + '</span>' + (linkWarn(s) === 'other' ? warnHtml(s) : '') + '</div>' +
+    var inClass = c && classNow(c.name), x = inClass ? missOfRow(s.id) : 0;
+    return '<div class="tdc-st tdc-grid' + (inClass && x ? ' is-miss' : '') + '" data-id="' + esc(s.id) + '" data-cs-row="' + esc(s.id) + '">' +
+      '<div class="tdc-st__main">' + (window.Profile ? Profile.avatar({ id: s.id, name: s.name }, 's') : '') + '<span class="qn-namebox"><span class="qn-nameline"><button type="button" class="roster__name roster__name-btn" ' + (window.QuickNote ? 'data-cs-open' : 'data-card') + '="' + esc(s.id) + '">' + esc(s.name) + '</button>' + newBadge(s.id) + (window.Badges ? Badges.tag(s.id) : '') +
+        (x ? '<b class="tdc-xbig num" title="이번 주 안 낸 과제 ' + x + '개">✕' + x + '</b>' : '') + '</span>' + (window.QuickNote ? QuickNote.tagHtml(s.id) : '') + '</span>' + (linkWarn(s) === 'other' ? warnHtml(s) : '') + '</div>' +
       '<span class="tdc-app-slot tdc-tri">' + triHtml(s, c) + '</span>' +
       actsHtml(s) +
       (window.AppLink ? AppLink.boxHtml(s.id) : '') +
@@ -2187,6 +2260,7 @@
     /* 종강했지만 마지막 레포트가 남은 반 — 반 고르기에서 접지 않는다 (write.js · 20261106c) */
     endedLeft: function (cls) { return !!st.data && !!st.allStudents && Store.isEnded(cls) && !classGone(cls); },
     missFor: missFor,
+    hwInfo: hwInfo, hwCount: hwCount, classNow: classNow,      /* 빠른 상담 창 (quicknote.js · 20261108s) */
     appFailed: failedIds,
     appWhy: whyText,
     retryMany: retryMany,
