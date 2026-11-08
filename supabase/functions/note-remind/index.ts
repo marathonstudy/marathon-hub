@@ -12,6 +12,7 @@
 //  보낸 기록 — 문자 발송 → 보낸 기록에 「필기 알림(학생)」 「필기 알림(운영진)」 「수업 전 예고」 (번호는 뒤 4자리만)
 //  과제 현황 (migration-069 · 20261108a · 076 부터 30분 전) — 같은 매분 실행에서 수업 30분 전 반마다 운영진에게 명단 한 통(넘치면 나눔)
 //    명단 위 「⭐ 이번 주 퍼펙트 n명」 「김승윤(6), 강지호(3)」 (076 · 그 자리에서 모두 낸 학생은 배지도 남김)
+//    둘째 줄 「이번 주 11/1~11/7 · 지난주 10/25~10/31」 · 줄마다 「(지난주 80% ↑)」 · 끝에 「2주 연속 60% 미만: …」 (081 · 지난주도 같은 셈)
 //    hw_status_due → 과제 기록 저장본(app_records · 없으면 앱에서 직접)으로 학생마다 제출 수 · 전체 수 → hw_status_prepare → 솔라피 → hw_status_record
 //    운영진만 받는다(학생 · 학부모 없음) · 사본 없음 · 「오늘」 [미리보기] { action: "hwstat", class, dry: true } · [지금 운영진에게 보내기] { action: "hwstat", class }
 //
@@ -329,7 +330,9 @@ export async function hwItems(due: Any, fetcher: (share: string) => Promise<Any>
         if (!data && !fresh && okShare) data = await fetcher(s.share);
         if (!data) { items.push({ id: s.id, known: false, done: 0, total: 0 }); return; }
         const n = hwCount(data, s.fix || {}, s.startOn || "", addDays(day, -7), addDays(day, -1));
-        items.push({ id: s.id, known: true, done: n.done, total: n.total });
+        /* 지난주 — 바로 앞의 같은 길이 기간 (D-14 ~ D-8 · 081 · 수강 시작 전이면 0개 → 「지난주 없음」) */
+        const pv = hwCount(data, s.fix || {}, s.startOn || "", addDays(day, -14), addDays(day, -8));
+        items.push({ id: s.id, known: true, done: n.done, total: n.total, pdone: pv.done, ptotal: pv.total });
       }));
     }
     out[c.name] = items;

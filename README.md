@@ -1069,6 +1069,13 @@ delete from public.staff where email = '조교이메일@example.com';
 - 목록 각 줄 작게 「추가한 사람: 김민서 · 11/8」(직접 가입해 승인받은 사람은 「승인한 사람: …」)
 - 번호 바꾸기 · 사용 중지는 원장만 · 조교는 자기 번호만 (로그인 번호도 같이)
 
+### 5-109. 20261108m — 운영진 과제 현황 문자에 지난주 기록 (migration-081 · 함수 note-remind 다시 배포)
+1. SQL Editor → `supabase/migration-081-hws-lastweek.sql` → Run (080 다음 · 맨 아래 줄 true)
+2. Edge Functions → note-remind → 이 저장소의 `supabase/functions/note-remind/index.ts` 전체로 다시 배포
+- 둘째 줄 「이번 주 11/1~11/7 · 지난주 10/25~10/31」 — 지난주 = 바로 앞의 같은 길이 기간(D-14 ~ D-8 · 그 전 수업 기준) · 첫 줄은 「[과제 현황] 반포반 · 오늘 09:30 수업」
+- 줄마다 「100% 강지호 (지난주 80% ↑)」 — 오르면 ↑ · 내리면 ↓ · 같으면 화살표 없음 · 20%p 이상 떨어지면 「↓↓」(이번 주 60% 이상이어도) · 지난주 과제 0개 · 신입이면 「(지난주 없음)」
+- 정렬 · 60% 미만 「→ 상담 필요」 · 끝 문장은 이번 주 그대로 · 그 아래 「2주 연속 60% 미만: 이름, 이름」(없으면 뺌) · 퍼펙트 줄 그대로 · 미리보기 · 지금 보내기 같은 글 · 넘치면 나눔
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.
