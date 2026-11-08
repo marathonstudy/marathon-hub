@@ -10,6 +10,11 @@
      [사용 중지] · [다시 사용]은 지금처럼 원장 계정만
    · 「수업 전 과제 현황 받기」 켜짐/꺼짐 — 사람마다 (기본 켜짐 · 나 자신 · 원장은 누구나 · staff_hwstat_set · migration-069 · 20261108a)
      번호가 없으면 「번호 없음」 (원장 = 내 시험 번호 · 조교 = 로그인 번호) · 맨 위 「상담 기준 60%」 (hw_status_cut_set · 운영진 누구나)
+   · 맨 위 [조교 추가] — 원장만 (staff_add · migration-070 · 20261108b): 이름 + 휴대폰 번호(어떤 형식이든) → 승인 대기 없이 바로 사용 중
+     로그인은 지금처럼 이름 + 번호 8자리 · 과제 현황 문자 · 필기 알림(운영진)도 바로 그 번호로
+   · 줄마다 번호는 뒤 4자리만 「010-****-5678」 · 없으면 「번호 없음 · 넣기」 · 있으면 [번호 바꾸기] — 원장만 (staff_phone_set)
+     조교 번호를 바꾸면 로그인 번호도 같이 바뀐다고 확인창에서 알린다 · 원장 번호는 문자용만 (원장 로그인은 이메일 + 비밀번호)
+     같은 번호가 다른 운영진에 있으면 서버가 막고 「이미 등록된 번호입니다 — 김조교(사용 중)」
    ============================================================ */
 
 (function () {
@@ -70,7 +75,7 @@
     var list = data.staff || [];
     $('#staffDesc').textContent = list.filter(function (s) { return s.active; }).length + '명 사용 중' +
       (data.owner ? ' · 사용 중지하면 그 사람은 바로 못 들어오고, 쓴 기록은 그대로 남습니다.' : '');
-    host.innerHTML = pendingHtml() + hwsHead() + '<div class="op-list">' + list.map(function (s) {
+    host.innerHTML = addHtml() + pendingHtml() + hwsHead() + '<div class="op-list">' + list.map(function (s) {
       var me = s.email === data.me;
       var acts = !data.owner ? '' : me ? '<span class="muted-note">나</span>'
         : s.active ? '<button class="btn btn--sm btn--danger" type="button" data-op="off">사용 중지</button>'
@@ -80,16 +85,91 @@
           '<div class="op-row__name">' + esc(s.name || '(이름 없음)') +
             (s.role === 'teacher' ? ' <span class="tb-badge tb-badge--paid">원장</span>' : '') +
             (s.active ? '' : ' <span class="tb-badge tb-badge--waived">사용 중지</span>') + '</div>' +
-          '<div class="op-row__meta num">' + (s.phone ? '번호 뒤 4자리 ' + esc(s.last4 || '—') : '이메일 계정') +
+          '<div class="op-row__meta num">' + phoneMeta(s) +
             ' · 처음 들어온 날 ' + esc(fmt(s.created_at)) + ' · 마지막 접속 ' + esc(fmtDT(s.last_seen_at)) +
-            (s.approved_by ? ' · ' + esc(s.approved_by) + ' 승인' : '') +
+            (s.addedBy ? ' · ' + esc(s.addedBy) + ' 등록' : s.approved_by ? ' · ' + esc(s.approved_by) + ' 승인' : '') +
             (s.active ? '' : '<br>' + esc(s.disabled_by || '') + ' · ' + esc(fmtDT(s.disabled_at)) + ' 에 중지') + '</div>' +
           (s.active ? hwsRow(s, me) : '') +
+          (editing === s.email ? phoneForm(s) : '') +
         '</div>' +
         (acts ? '<div class="op-row__acts">' + acts + '</div>' : '') +
       '</div>';
     }).join('') + '</div>';
   }
+
+  /* 조교 추가 · 번호 넣기 · 바꾸기 (migration-070) — 원장만 · 070 전이면 (smsLast4 칸이 없어) 옛 표시 그대로 */
+  var adding = false, editing = '';
+  function addHtml() {
+    if (!data || !data.owner || !data.canAdd) return '';
+    if (!adding) return '<div class="op-add"><button class="btn btn--primary" type="button" id="opAddOpen">조교 추가</button>' +
+      '<span class="muted-note">이름 · 휴대폰 번호만 넣으면 바로 사용 중 · 로그인은 이름 + 번호 8자리</span></div>';
+    return '<form class="op-add op-add--form" id="opAddForm" autocomplete="off">' +
+      '<label class="op-add__f"><span>이름</span><input class="input" id="opAddName" maxlength="20" placeholder="홍길동"></label>' +
+      '<label class="op-add__f"><span>휴대폰 번호</span><input class="input num" id="opAddPhone" inputmode="tel" maxlength="20" placeholder="010-1234-5678"></label>' +
+      '<div class="op-add__acts"><button class="btn btn--primary" type="submit" id="opAddSave">추가</button><button class="btn" type="button" id="opAddCancel">취소</button></div>' +
+      '<p class="muted-note op-add__hint">승인 대기 없이 바로 「사용 중」입니다. 조교는 로그인 화면에서 이 이름 + 번호 8자리로 들어옵니다. 과제 현황 문자 · 필기 알림도 이 번호로 갑니다.</p></form>';
+  }
+  function mask(l4) { return '010-****-' + l4; }
+  function phoneMeta(s) {
+    if (!('smsLast4' in s)) return s.phone ? '번호 뒤 4자리 ' + esc(s.last4 || '—') : '이메일 계정';
+    var t = s.smsLast4 ? '<span class="op-phone">' + esc(mask(s.smsLast4)) + '</span>' : '<span class="op-phone is-none">번호 없음</span>';
+    if (data.owner) t += s.smsLast4 ? ' <button class="link-btn" type="button" data-phone-edit>번호 바꾸기</button>' : ' · <button class="link-btn" type="button" data-phone-edit>넣기</button>';
+    if (!s.phone) t += ' · 이메일 계정';
+    return t;
+  }
+  function phoneForm(s) {
+    return '<form class="op-phoneform" data-phone-form autocomplete="off"><input class="input num" data-phone-in inputmode="tel" maxlength="20" placeholder="010-1234-5678" aria-label="' + esc(s.name || '') + ' 휴대폰 번호">' +
+      '<button class="btn btn--sm btn--primary" type="submit">저장</button><button class="btn btn--sm" type="button" data-phone-cancel>취소</button>' +
+      (s.role === 'teacher' ? '<small class="muted-note">문자용 번호만 — 원장 로그인은 이메일 + 비밀번호 그대로</small>'
+        : '<small class="muted-note">조교 로그인 번호도 이 번호로 바뀝니다</small>') + '</form>';
+  }
+  /* 화면에서 먼저 보는 번호 형식 — 서버(_staff_ph8)와 같다 */
+  function ph8(v) {
+    var d = String(v || '').replace(/\D/g, '');
+    if (/^8210\d{8}$/.test(d)) d = '0' + d.slice(2);
+    if (/^\d{8}$/.test(d)) d = '010' + d;
+    return /^010\d{8}$/.test(d) ? d.slice(3) : '';
+  }
+  function addSubmit() {
+    var nm = ($('#opAddName').value || '').trim(), p = ph8($('#opAddPhone').value);
+    if (!nm) { toast('조교 이름을 넣어 주세요', 'bad'); $('#opAddName').focus(); return; }
+    if (!p) { toast('휴대폰 번호를 010-1234-5678 처럼 넣어 주세요', 'bad'); $('#opAddPhone').focus(); return; }
+    var b = $('#opAddSave'); b.disabled = true;
+    Promise.resolve(sb().rpc('staff_add', { p_name: nm, p_phone: '010' + p })).then(function (r) {
+      b.disabled = false;
+      if (r.error) { toast(r.error.message, 'bad'); return; }
+      toast(nm + ' 님을 추가했습니다 — 바로 사용 중 · 로그인은 이름 + 번호 8자리', 'good');
+      adding = false;
+      window.dispatchEvent(new CustomEvent('jt:staff-pending'));
+      return load();
+    }, function (x) { b.disabled = false; toast(x.message, 'bad'); });
+  }
+  function phoneSubmit(form) {
+    var em = form.closest('[data-email]').dataset.email;
+    var s = (data.staff || []).find(function (x) { return x.email === em; }) || {};
+    var p = ph8(form.querySelector('[data-phone-in]').value);
+    if (!p) { toast('휴대폰 번호를 010-1234-5678 처럼 넣어 주세요', 'bad'); return; }
+    var login = s.role !== 'teacher';
+    var change = !!s.smsLast4 || (login && !!s.phone);
+    UI.confirmAsk(change ? '번호 바꾸기' : '번호 넣기', (s.name || '이 사람') + ' 님 번호를 ' + mask(p.slice(4)) + ' 로 ' + (change ? '바꿉니다. ' : '넣습니다. ') +
+        (login ? '로그인 번호도 같이 바뀌어, 다음 로그인부터 이 번호 8자리로 들어옵니다. 과제 현황 문자 · 필기 알림도 이 번호로 갑니다.'
+               : '문자용 번호만 바뀌고, 원장 로그인은 이메일 + 비밀번호 그대로입니다.'), change ? '바꾸기' : '넣기')
+      .then(function (ok) {
+        if (!ok) return null;
+        return sb().rpc('staff_phone_set', { p_email: em, p_phone: '010' + p });
+      }).then(function (r) {
+        if (!r) return;
+        if (r.error) throw new Error(r.error.message);
+        toast((s.name || '') + ' 님 번호를 ' + mask(p.slice(4)) + ' 로 저장했습니다' + (login ? ' — 로그인 번호도 같이 바뀌었습니다' : ''), 'good');
+        editing = '';
+        return load();
+      }).catch(function (x) { toast(x.message, 'bad'); });
+  }
+  $('#staffList').addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (e.target.id === 'opAddForm') { addSubmit(); return; }
+    if (e.target.matches('[data-phone-form]')) phoneSubmit(e.target);
+  });
 
   /* 수업 전 과제 현황 (migration-069) — 069 전이면 칸이 없어 아무것도 안 보인다 */
   function hwsHead() {
@@ -105,9 +185,14 @@
     return '<div class="op-row__hws">' + (can
       ? '<button class="btn btn--sm op-hwsbtn' + (on ? ' is-on' : '') + '" type="button" data-hws-on="' + (on ? '0' : '1') + '" aria-pressed="' + on + '">' + esc(lbl) + '</button>'
       : '<span class="muted-note">' + esc(lbl) + '</span>') +
-      (on && !s.smsPhone ? ' <small class="muted-note">번호 없음' + (s.role === 'teacher' ? ' — 문자 발송 → 연결 상태에 내 시험 번호를 넣어 주세요' : '') + '</small>' : '') + '</div>';
+      (on && !s.smsPhone && !('smsLast4' in s) ? ' <small class="muted-note">번호 없음' + (s.role === 'teacher' ? ' — 문자 발송 → 연결 상태에 내 시험 번호를 넣어 주세요' : '') + '</small>' : '') + '</div>';
   }
   $('#staffList').addEventListener('click', function (e) {
+    if (e.target.closest('#opAddOpen')) { adding = true; render(); var n = $('#opAddName'); if (n) n.focus(); return; }
+    if (e.target.closest('#opAddCancel')) { adding = false; render(); return; }
+    var pe = e.target.closest('[data-phone-edit]');
+    if (pe && data) { editing = pe.closest('[data-email]').dataset.email; render(); var f = $('#staffList [data-phone-in]'); if (f) f.focus(); return; }
+    if (e.target.closest('[data-phone-cancel]')) { editing = ''; render(); return; }
     if (e.target.closest('#opHwsCutSave')) {
       var v = parseInt(($('#opHwsCut') || {}).value, 10);
       if (!(v >= 1 && v <= 100)) { toast('상담 기준은 1~100% 로 정해 주세요', 'bad'); return; }
@@ -152,6 +237,7 @@
   });
 
   function open() {
+    adding = false; editing = '';
     $('#staffList').innerHTML = '<p class="panel__hint">운영진 목록을 불러오는 중…</p>';
     $('#staffDesc').textContent = '';
     $('#staffModal').showModal();

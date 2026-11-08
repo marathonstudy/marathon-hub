@@ -4225,3 +4225,15 @@ dialog.vl-modal[open] { display: flex; flex-direction: column; overflow: hidden;
 .op-hws__t { font-weight: 800; font-size: 14px; }
 .op-hws .input { width: 72px; }
 .op-hwsbtn.is-on { border-color: var(--indigo); color: var(--indigo); }
+/* 운영진 — 조교 추가 · 번호 넣기 (20261108b) */
+.op-add { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; margin: 0 0 12px; }
+.op-add--form { align-items: flex-end; background: var(--surface-2); }
+.op-add__f { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; font-weight: 700; flex: 1 1 150px; min-width: 0; }
+.op-add__f .input { width: 100%; }
+.op-add__acts { display: flex; gap: 6px; }
+.op-add__hint { flex-basis: 100%; margin: 0; }
+.op-phone { font-weight: 700; color: var(--ink-deep); }
+.op-phone.is-none { color: #B4231F; }
+.op-phoneform { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.op-phoneform .input { width: 160px; max-width: 100%; }
+.op-phoneform small { flex-basis: 100%; }
