@@ -17,6 +17,9 @@
 //
 //  주간 퍼펙트 배지 (migration-075 · 20261108g) — 같은 매분 실행에서 수업 전 예고가 계산되는 시각에 반마다 한 번 hw_badge_due → 셈 → hw_badge_save
 //    수업 전 예고 칭찬 문자 끝에 「⭐ 이번 주 퍼펙트 배지를 받았어요! (지금까지 n개)」 (pre_remind_prepare 가 붙인다)
+//  루틴 우수자 (migration-077 · 20261108i) — 매달 1일 08:00 지난달 후보 계산(award_due → 셈 → award_save · 자동 발송 없음)
+//    「오늘」 확인 창 [우수자 다시 계산] { action: "award", op: "calc", month } · [보내기] { action: "award", op: "send", month } — 원장만
+//    문자 또는 알림톡(설정에 템플릿 코드 · SOLAPI_PFID · 카톡이 없으면 솔라피가 문자로) · 같은 달 한 학생 한 번
 //  사본 — 매분 copy_due → 묶음마다 1통 → 원장 시험 번호로 → copy_record (migration-064 · 20261106g).
 //  레포트 업데이트 문자 (migration-073 · 20261108e) — 매분 report_upd_prepare: 이미 보낸 레포트가 마지막으로 바뀐 뒤 30분 조용하면
 //    모아 한 통 (밤 10시 ~ 아침 8시는 8시 · 하루 두 번까지 · 반마다 끄기) → 받은 학생(학부모는 설정을 켰을 때만 · 일반 문자)
@@ -99,7 +102,9 @@ async function sendRows(all: Any[], record = "note_remind_record", copy = true) 
       method: "POST",
       headers: { Authorization: await solapiAuth(env("SOLAPI_API_KEY"), env("SOLAPI_API_SECRET")), "Content-Type": "application/json" },
       body: JSON.stringify({
-        messages: rows.map((r) => ({ to: String(r.to), from, text: String(r.text || ""), type: r.kind === "LMS" ? "LMS" : "SMS", customFields: { log: String(r.log_id) } })),
+        messages: rows.map((r) => r.kakao && r.kakao.templateId && env("SOLAPI_PFID")
+          ? { to: String(r.to), from, kakaoOptions: { pfId: env("SOLAPI_PFID"), templateId: String(r.kakao.templateId), variables: r.kakao.variables || {}, disableSms: false }, customFields: { log: String(r.log_id) } }
+          : { to: String(r.to), from, text: String(r.text || ""), type: r.kind === "LMS" ? "LMS" : "SMS", customFields: { log: String(r.log_id) } }),
         allowDuplicates: true, showMessageList: true,
       }),
     });
@@ -207,13 +212,15 @@ function appData(src: Any) {
     calendar: cal.filter((c: Any) => isoOk(String(c?.date ?? ""))).map((c: Any) => ({
       date: String(c.date), order: Number(c.lectureOrder) || 0, status: ["onTime", "late", "none"].includes(c.status) ? c.status : "none",
     })),
-    history: hist.map((h: Any) => ({ title: String(h?.title ?? ""), order: Number(h?.lectureOrder) || 0, submittedAt: String(h?.submittedAt ?? ""), late: !!h?.isLate })),
+    history: hist.map((h: Any) => ({ title: String(h?.title ?? ""), order: Number(h?.lectureOrder) || 0, submittedAt: String(h?.submittedAt ?? ""), late: !!h?.isLate,
+                                     correctRate: h?.correctRate == null || !isFinite(Number(h.correctRate)) ? null : Math.round(Number(h.correctRate)) })),
   };
 }
 /* 과제 수 — 과제 수정값을 덮고(withFix) · 과제 날짜를 맞춘(normalize) 달력에서 from ~ to 의 평일 (20261101l · migration-058)
    total = 과제가 있던 평일(면제 · 수강 시작 전 제외) · done = 낸 날(늦게 낸 것 포함) · miss = 안 낸 날(오래된 날 먼저)
    to 는 어제까지 — 오늘 과제는 마감 전이라 넣지 않는다 · 토 · 일(주중 복습)은 세지 않는다 */
-export function hwCount(data: Any, fix: Record<string, string>, startOn: string, from: string, to: string): { done: number; total: number; miss: string[] } {
+/* 날짜별 상태 { 날짜: onTime | late | none | exempt } — 과제 수정값을 덮고 과제 날짜를 맞춘 달력 (hwCount · 루틴 우수자가 같이 쓴다 · 20261108i) */
+export function dayMap(data: Any, fix: Record<string, string>): Record<string, string> {
   const OK: Record<string, number> = { onTime: 1, late: 1, none: 1, exempt: 1 };
   const cal: Any[] = (data?.calendar || []).map((c: Any) => fix && OK[fix[c.date]] ? { ...c, status: fix[c.date], fixed: 1 } : c);
   Object.keys(fix || {}).forEach((k) => { if (isoOk(k) && OK[fix[k]] && !cal.some((c) => c.date === k)) cal.push({ date: k, order: 0, status: fix[k], fixed: 1 }); });
@@ -238,6 +245,10 @@ export function hwCount(data: Any, fix: Record<string, string>, startOn: string,
     by[c.date] = st;
   });
   Object.keys(groups).forEach((d) => { if (!(d in by) && !isWeekend(d)) by[d] = "onTime"; });
+  return by;
+}
+export function hwCount(data: Any, fix: Record<string, string>, startOn: string, from: string, to: string): { done: number; total: number; miss: string[] } {
+  const by = dayMap(data, fix);
   const out = { done: 0, total: 0, miss: [] as string[] };
   for (let d = from, k = 0; d <= to && k < 31; d = addDays(d, 1), k++) {
     if (isWeekend(d) || (startOn && d < startOn)) continue;
@@ -336,6 +347,86 @@ async function badgeRun(now: string) {
   const r: Any = await rpc("hw_badge_save", { p_now: now, p_items: items });
   return { classes: cls.length, perfect: r?.perfect || 0 };
 }
+/* ============================================================
+   월간 과제 루틴 우수자 (migration-077 · 20261108i)
+     매달 1일 08:00 (매분 award_due 가 그때만 학생을 준다) — 지난달 학생마다 셈 → award_save (후보만 남김 · 자동 발송 없음)
+       셈은 수업 전 예고와 같다 (dayMap — 과제 수정값 · 늦게 낸 것은 냄 · 면제 뺌 · 토 · 일 안 셈 · 수강 시작일)
+       연속 제출 최장 일수 — 과제가 있던 평일을 이어서 (면제 · 과제 없는 날은 건너뜀 · 안 낸 날에서 끊김)
+       영역별 정답률 — 그달 과제 이름의 파트(독서-과학기술 · 현대시 …)마다 평균 · 지난달 값도 (오르면 ▲)
+     코치룸 [우수자 다시 계산] { action: "award", op: "calc", month } · [보내기] { action: "award", op: "send", month } — 원장만
+   ============================================================ */
+const READ_PARTS = ["인문예술", "인문", "예술", "사회문화", "사회", "문화", "과학기술", "과학", "기술", "주제통합"];
+const LIT_PARTS = ["현대시가", "현대시", "고전시가", "고전시", "현대소설", "고전소설", "수필", "극"];
+function genreOf(name: string): string {
+  const n = String(name || "").trim(), m = /^(독서|문학)\s*[-–—]/.exec(n);
+  if (m) return m[1] === "독서" ? "read" : "lit";
+  if (READ_PARTS.includes(n)) return "read";
+  if (LIT_PARTS.includes(n)) return "lit";
+  return "";
+}
+function cleanTitle(t: unknown): string {
+  const s = String(t || "");
+  return s.replace(/^\s*\[[^\]]{1,12}\]\s*/, "").replace(new RegExp("\\s*" + TITLE_DATE.source + "\\s*", "g"), " ").replace(/\s+/g, " ").trim() || s.trim();
+}
+/* 과제 이름의 파트 — assets/app-week.js partOf 와 같다 */
+export function partOf(title: unknown): string {
+  const t = cleanTitle(title);
+  let m = /^(독서|문학)\s*[-–—]\s*([^\s"'“‘「『(…·,:]{1,12})\s*(.*)$/.exec(t);
+  if (m) return m[2];
+  m = /^([가-힣]{1,4})(?:\s+(.*)|\s*(["'“‘「『].*))?$/.exec(t);
+  if (m && genreOf(m[1])) return m[1];
+  return "";
+}
+function areaAvg(data: Any, from: string, to: string): Record<string, number> {
+  const byO: Record<number, string> = {};
+  (data?.calendar || []).forEach((c: Any) => { if (c?.order && isoOk(c.date)) byO[c.order] = c.date; });
+  const sum: Record<string, { s: number; n: number }> = {};
+  (data?.history || []).forEach((h: Any) => {
+    if (!h || h.correctRate == null || !isFinite(Number(h.correctRate))) return;
+    const d = h.order && byO[h.order] ? byO[h.order] : (titleDate(h.title, kstDay(h.submittedAt)) || kstDay(h.submittedAt));
+    if (!isoOk(d) || d < from || d > to) return;
+    const p = partOf(h.title);
+    if (!p) return;
+    const x = sum[p] = sum[p] || { s: 0, n: 0 };
+    x.s += Number(h.correctRate); x.n++;
+  });
+  const out: Record<string, number> = {};
+  Object.keys(sum).forEach((k) => { out[k] = Math.round(sum[k].s / sum[k].n); });
+  return out;
+}
+/* 한 달 — 과제 수 · 낸 수 · 날짜별 상태 · 연속 제출 최장 · 영역별 정답률(지난달과 함께) */
+export function monthStats(data: Any, fix: Record<string, string>, startOn: string, from: string, to: string, prevFrom: string, prevTo: string) {
+  const by = dayMap(data, fix);
+  const cal: Record<string, string> = {};
+  let done = 0, total = 0, run = 0, streak = 0;
+  for (let d = from, k = 0; d <= to && k < 32; d = addDays(d, 1), k++) {
+    if (isWeekend(d) || (startOn && d < startOn)) continue;
+    const st = by[d];
+    if (st === "onTime" || st === "late") { total++; done++; run++; if (run > streak) streak = run; cal[d] = st; }
+    else if (st === "none") { total++; run = 0; cal[d] = "none"; }
+    else if (st === "exempt") cal[d] = "exempt";
+  }
+  const now = areaAvg(data, from, to), prev = areaAvg(data, prevFrom, prevTo);
+  const areas = Object.keys(now).sort((a, b) => now[b] - now[a] || a.localeCompare(b)).map((k) => ({ name: k, rate: now[k], prev: k in prev ? prev[k] : null }));
+  return { done, total, streak, cal, areas };
+}
+export async function awardCalc(now: string, month?: string, by?: string, fetcher: (share: string) => Promise<Any> = fetchApp) {
+  const due: Any = await rpc("award_due", month ? { p_now: now, p_month: month } : { p_now: now });
+  if (!due?.month) return { month: null };
+  const list: Any[] = due.students || [];
+  const items: Any[] = [];
+  for (let i = 0; i < list.length; i += 3) {
+    await Promise.all(list.slice(i, i + 3).map(async (s: Any) => {
+      let data: Any = s.rec && Array.isArray(s.rec.calendar) && s.rec.calendar.length ? s.rec : null;
+      if (!data && s.share && /^[A-Za-z0-9_-]{8,128}$/.test(s.share)) data = await fetcher(s.share);
+      if (!data) { items.push({ id: s.id, known: false }); return; }
+      items.push({ id: s.id, known: true, ...monthStats(data, s.fix || {}, s.startOn || "", String(due.from), String(due.to), String(due.prev), addDays(String(due.from), -1)) });
+    }));
+  }
+  const r: Any = await rpc("award_save", { p_month: due.month, p_items: items, p_by: by || "" });
+  return { month: due.month, students: list.length, eligible: r?.eligible || 0, candidates: r?.candidates || 0 };
+}
+
 /* 레포트 업데이트 문자 (073) — 보낼 때가 된 것을 한 번에 */
 async function reportUpd(now: string, week?: string, cls?: string, by?: string) {
   const prep: Any = await rpc("report_upd_prepare", week ? { p_now: now, p_site: SITE, p_week: week, p_class: cls || "", p_by: by || "" } : { p_now: now, p_site: SITE });
@@ -394,17 +485,41 @@ async function handle(req: Request, cors: Record<string, string>) {
     /* 레포트 업데이트 — 073 을 아직 안 돌렸거나 오류가 나도 다른 일은 그대로 (사본보다 먼저 · 같은 분에 사본 묶음으로) */
     let rupd: Any = null;
     try { rupd = await reportUpd(now); } catch (e) { rupd = { error: String((e as Error).message || e).slice(0, 160) }; }
+    /* 루틴 우수자 — 매달 1일 08:00 지난달 후보 계산 (보내지는 않음) · 077 전이면 조용히 넘어간다 */
+    let award: Any = null;
+    try { award = await awardCalc(now); } catch (e) { award = { error: String((e as Error).message || e).slice(0, 160) }; }
     /* 사본 — 064 를 아직 안 돌렸거나 오류가 나도 다른 일은 그대로 */
     let copy: Any = null;
     try { copy = await copyFlush(now); } catch (e) { copy = { error: String((e as Error).message || e).slice(0, 160) }; }
-    return json({ ok: true, day: prep?.day, rows: rows.length, ...r, hws, badge, pre, rupd, copy }, cors);
+    return json({ ok: true, day: prep?.day, rows: rows.length, ...r, hws, badge, pre, rupd, award, copy }, cors);
   }
 
   /* 2) 「지금 다시 보내기」 — 로그인한 운영진 */
   const auth = req.headers.get("authorization") ?? "";
   const apikey = req.headers.get("apikey") ?? "";
-  if (body.action !== "now" && body.action !== "hwstat" && body.action !== "rupd") return json({ ok: false, reason: "input" }, cors, 400);
+  if (body.action !== "now" && body.action !== "hwstat" && body.action !== "rupd" && body.action !== "award") return json({ ok: false, reason: "input" }, cors, 400);
   if (!/^Bearer\s+\S+/.test(auth) || !apikey) return json({ ok: false, reason: "login", message: "코치룸에 다시 로그인해 주세요." }, cors, 401);
+  /* 루틴 우수자 [우수자 다시 계산] · [보내기] — 원장만 (award_list 의 owner 를 로그인 토큰으로 본다 · 077) */
+  if (body.action === "award") {
+    let list: Any = null;
+    try { list = await rpc("award_list", {}, auth, apikey); } catch (e) {
+      const m = String((e as Error).message || e);
+      return json({ ok: false, reason: /Could not find|schema cache/i.test(m) ? "nosql" : "auth", message: /Could not find|schema cache/i.test(m) ? "migration-077 SQL 을 먼저 실행해 주세요." : "운영진 계정으로 다시 로그인해 주세요." }, cors, 403);
+    }
+    if (!list?.owner) return json({ ok: false, reason: "owner", message: "루틴 우수자 계산 · 보내기는 원장 계정만 할 수 있습니다." }, cors, 403);
+    const month = String(body.month ?? "");
+    if (body.op === "calc") {
+      const r = await awardCalc(new Date().toISOString(), /^\d{4}-\d{2}$/.test(month) ? month + "-01" : String(list.month || "") || undefined, jwtEmail(auth));
+      if (!r.month) return json({ ok: false, reason: "month", message: "계산할 달이 없습니다." }, cors);
+      return json({ ok: true, ...r }, cors);
+    }
+    if (body.op !== "send" || !/^\d{4}-\d{2}$/.test(month)) return json({ ok: false, reason: "input", message: "달을 골라 주세요." }, cors, 400);
+    if (missing.length) return json({ ok: false, reason: "nokeys", missing, message: "문자 키가 아직 다 들어가지 않았습니다 (" + missing.join(", ") + ")." }, cors);
+    const prep: Any = await rpc("award_send_prepare", { p_month: month + "-01", p_by: jwtEmail(auth), p_site: SITE });
+    const rows: Any[] = prep?.rows || [];
+    const r = await sendRows(rows);
+    return json({ ok: true, month: prep?.month, students: prep?.students || 0, rows: rows.length, kakao: !!prep?.kakao, ...r }, cors);
+  }
   /* 레포트 업데이트 문자 [지금 보내기] — 운영진만 · 그 반 그 주 기다리는 것 (반 자동 발송을 꺼 둬도) */
   if (body.action === "rupd") {
     let staff = false;

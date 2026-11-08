@@ -1,0 +1,50 @@
+/* ============================================================
+   award.css — 월간 과제 루틴 우수자 화면 · 루틴 배지 칸 (award-view.js · 20261108i · 20261108j)
+   러닝노트(me) · 코치룸 미리보기가 같이 쓴다 · 마라톤국어 보라(#5A3FD0 · #2E2266) + 금색(#F2C14E)
+   ============================================================ */
+.awd { display: grid; gap: 12px; max-width: 560px; margin: 0 auto; }
+.awd--none { text-align: center; color: #6B6F86; padding: 24px 8px; }
+.awd-back { appearance: none; border: 0; background: none; font: inherit; font-size: 14px; font-weight: 800; color: #5A3FD0; justify-self: start; padding: 6px 2px; min-height: 40px; cursor: pointer; }
+.awd-card { position: relative; display: grid; justify-items: center; gap: 10px; padding: 22px 18px 18px; border-radius: 18px; text-align: center;
+  background: linear-gradient(160deg, #2E2266 0%, #5A3FD0 100%); color: #fff; border: 3px solid #F2C14E; box-shadow: 0 6px 18px rgba(46, 34, 102, .25); }
+.awd-badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px 6px 8px; border-radius: 999px; background: #F2C14E; color: #2E2266; font-weight: 900; font-size: 16px; }
+.awd-medal { font-size: 24px; line-height: 1; }
+.awd-char { width: 96px; height: 96px; }
+.awd-lead { margin: 0; font-size: 16px; line-height: 1.6; font-weight: 700; overflow-wrap: anywhere; word-break: keep-all; }
+.awd-pct { display: inline-block; font-size: 40px; line-height: 1.1; color: #F2C14E; font-weight: 900; vertical-align: -4px; margin: 0 2px; }
+.awd-top { color: #F2C14E; }
+.awd-brand { margin: 0; font-size: 12px; font-weight: 800; letter-spacing: .12em; color: #E8E2FF; }
+.awd-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.awd-stat { display: grid; gap: 2px; padding: 12px; border-radius: 12px; background: #F6F3FF; border: 1px solid #E2DBFF; text-align: center; }
+.awd-stat__k { font-size: 12px; font-weight: 700; color: #6B6F86; }
+.awd-stat b { font-size: 18px; color: #2E2266; }
+.awd-box { padding: 12px; border-radius: 12px; background: #fff; border: 1px solid #E6E3F2; }
+.awd-h { margin: 0 0 8px; font-size: 14px; font-weight: 900; color: #2E2266; }
+.awd-cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.awd-cal__h { text-align: center; font-size: 11px; font-weight: 800; color: #6B6F86; }
+.awd-cal__h.is-wk { color: #A3A7BC; }
+.awd-cal__c { display: grid; justify-items: center; align-content: center; min-height: 40px; border-radius: 8px; background: #FAFAFD; font-size: 11px; color: #A3A7BC; }
+.awd-cal__c.is-pad { background: none; }
+.awd-cal__c i { font-style: normal; line-height: 1; }
+.awd-cal__c b { font-size: 15px; line-height: 1.2; min-height: 18px; }
+.awd-cal__c.is-onTime { background: #E6F6EE; color: #135C3B; }
+.awd-cal__c.is-late { background: #FFF1DF; color: #874A0B; }
+.awd-cal__c.is-none { background: #FDECEF; color: #9E1F3B; }
+.awd-cal__c.is-exempt { background: #F2F2F7; color: #7D8199; }
+.awd-legend { margin: 6px 0 0; font-size: 11.5px; color: #6B6F86; }
+.awd-areas { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.awd-areas li { display: grid; grid-template-columns: 5.5em 1fr 4.6em; gap: 8px; align-items: center; font-size: 13px; }
+.awd-area__n { font-weight: 800; color: #2E2266; overflow-wrap: anywhere; }
+.awd-area__bar { height: 10px; border-radius: 6px; background: #EEEAFB; overflow: hidden; }
+.awd-area__bar i { display: block; height: 100%; background: linear-gradient(90deg, #5A3FD0, #8E7BF0); border-radius: 6px; }
+.awd-area__v { text-align: right; font-weight: 800; color: #2E2266; }
+.awd-up { color: #1E8A5A; font-size: 12px; }
+.awd-note p { margin: 0; font-size: 14px; line-height: 1.6; color: #2E2266; overflow-wrap: anywhere; }
+.awd-count { margin: 0; text-align: center; font-size: 14px; font-weight: 700; color: #2E2266; }
+.awd-count b { color: #B07A00; }
+.awd-save { min-height: 48px; font-size: 15px; justify-self: stretch; }
+@media (max-width: 420px) {
+  .awd-pct { font-size: 34px; }
+  .awd-lead { font-size: 15px; }
+  .awd-areas li { grid-template-columns: 4.6em 1fr 4.2em; }
+}

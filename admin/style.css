@@ -4271,3 +4271,40 @@ dialog.vl-modal[open] { display: flex; flex-direction: column; overflow: hidden;
 .rupd__t { flex: 1 1 220px; min-width: 0; font-size: 13.5px; line-height: 1.5; color: var(--ink-deep); }
 .rupd__acts { display: flex; gap: 6px; flex-wrap: wrap; }
 .rupd__acts .btn { min-height: 36px; }
+
+/* ---------- 월간 루틴 우수자 (award.js · 20261108i) — 「오늘」 맨 위 띠 · 확인 창 ---------- */
+.awd-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 12px; padding: 10px 14px; border-radius: 12px;
+  background: linear-gradient(90deg, #2E2266, #5A3FD0); color: #fff; border: 2px solid #F2C14E; }
+.awd-bar__t { font-weight: 800; font-size: 14.5px; }
+.awd-bar__t b { color: #F2C14E; }
+.awd-bar .btn { margin-left: auto; min-height: 40px; background: #F2C14E; border-color: #F2C14E; color: #2E2266; font-weight: 900; }
+.awd-modal { width: min(760px, 96vw); }
+.awd-mbody { display: grid; gap: 12px; max-height: 70vh; overflow: auto; }
+.awd-cfg summary { cursor: pointer; font-size: 12.5px; font-weight: 700; color: var(--ink-mid); }
+.awd-cfg__g { display: grid; gap: 8px; padding: 8px 0; }
+.awd-cfg__g label { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; }
+.awd-cfg__g .input.num { width: 5em; }
+.awd-cfg__via { border: 0; padding: 0; margin: 0; display: flex; gap: 12px; font-size: 13px; }
+.awd-cfg__via legend { font-weight: 800; margin-bottom: 4px; }
+.awd-cfg__tpl .input { flex: 1 1 200px; min-width: 0; }
+.awd-cls__t { margin: 0 0 6px; font-size: 14px; font-weight: 900; color: var(--ink-deep); }
+.awd-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.awd-row { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) auto; gap: 6px 10px; align-items: center; padding: 8px 10px; border-radius: 10px; background: #FAFAFE; border: 1px solid #E6E3F2; }
+.awd-row.is-out { opacity: .55; }
+.awd-row.is-sent { background: #F3F8F5; }
+.awd-row__n { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: 13.5px; overflow-wrap: anywhere; }
+.awd-row__n input[type="checkbox"] { width: 20px; height: 20px; }
+.awd-row__n small { color: var(--ink-mid); }
+.awd-row__to { color: var(--ink-light); }
+.awd-row__note { width: 100%; min-width: 0; box-sizing: border-box; }
+.awd-row__sent { font-size: 12.5px; font-weight: 800; color: #1E8A5A; }
+.awd-pv { padding: 12px; border-radius: 12px; background: #F6F3FF; border: 1px dashed #C9BEF5; }
+.awd-pv__t { margin: 0 0 8px; font-size: 12.5px; font-weight: 800; color: #4A33B8; }
+.awd-foot { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; align-items: center; }
+.awd-foot .btn { min-height: 44px; }
+@media (max-width: 600px) {
+  .awd-modal { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; border-radius: 0; }
+  .awd-mbody { max-height: none; }
+  .awd-row { grid-template-columns: 1fr; }
+  .awd-bar .btn { margin-left: 0; width: 100%; }
+}

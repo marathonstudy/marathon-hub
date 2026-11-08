@@ -1234,7 +1234,7 @@
 
   /* ============================================================
      뒤로가기 (개인 페이지) — 탭 · 레포트 한 편 · 크게 보기 사진마다 기록
-       주소: #코드(레포트) · #코드/reports(누적 추이) · #코드/report/주차 · #코드/app · #코드/photo(/날짜) · #코드/book
+       주소: #코드(레포트) · #코드/reports(누적 추이) · #코드/report/주차 · #코드/app · #코드/photo(/날짜) · #코드/book · #코드/award/2026-10(루틴 우수자 · 077)
          · #코드/review(복습테스트 입력 카드 바로) · #코드/todo/날짜(복습테스트 입력 + 「필기 사진도 올려 주세요」) — 수업 끝 필기·복습 문자 링크 (migration-056)
        # 바로 뒤의 개인 링크 코드는 절대 바꾸지 않는다 (뒤에 /보기 만 붙였다 뗐다 한다)
        코치룸 미리보기(틀 안)에서는 기록하지 않는다 — 코치룸 뒤로가기를 흐트러뜨리지 않게
@@ -1255,7 +1255,9 @@
   function fromQuery() {
     var m = /[?&]c=([A-Za-z0-9]{20,64})(?:&|$)/.exec(global.location.search || '');
     if (!m || PV) return;
-    try { history.replaceState(null, '', global.location.pathname + '#' + m[1]); } catch (e) { global.location.hash = m[1]; }
+    var aw = /[?&]a=(\d{4}-\d{2})(?:&|$)/.exec(global.location.search || '');     /* 루틴 우수자 알림톡 ?c=코드&a=2026-10 (077) */
+    var to = m[1] + (aw ? '/award/' + aw[1] : '');
+    try { history.replaceState(null, '', global.location.pathname + '#' + to); } catch (e) { global.location.hash = to; }
   }
 
   function bootMe() {
@@ -1303,6 +1305,7 @@
          예전 「이번 주」 · 「내 레포트」는 「레포트」 하나로 합쳤다 */
       root.innerHTML =
         '<section class="hub-panel" id="panelReport" role="tabpanel"></section>' +
+        '<section class="hub-panel" id="panelAward" hidden></section>' +
         '<section class="hub-panel" id="panelVideo" role="tabpanel" hidden></section>' +
         '<section class="hub-panel" id="panelApp" role="tabpanel" hidden></section>' +
         '<section class="hub-panel" id="panelBook" role="tabpanel" hidden></section>' +
@@ -1433,6 +1436,12 @@
           $(t[1]).setAttribute('aria-selected', on ? 'true' : 'false');
           $(t[2]).hidden = !on;
         });
+        /* 루틴 우수자 화면 (#코드/award/2026-10 · 20261108i) — 레포트 탭 안의 한 화면 */
+        var pa = $('#panelAward');
+        if (pa) {
+          pa.hidden = which !== 'award';
+          if (which === 'award') { $('#panelReport').hidden = true; $('#tabReport').setAttribute('aria-selected', 'true'); }
+        }
         if (which === 'app') openApp();
         if (which === 'photo') openPhoto('');
         if (which === 'video') openVideos();
@@ -1449,6 +1458,21 @@
       $('#tabBook').onclick   = function () { select('book'); navPush('book'); };
       $('#tabPhoto').onclick  = function () { select('photo'); navPush('photo'); };
       if (tabInfo) tabInfo.onclick = function () { select('info'); navPush('info'); };
+      /* 루틴 우수자 화면 — 그 학생 링크로만 · 원장이 보낸 달만 (hub_award · migration-077) */
+      function openAward(code, month) {
+        var pa = $('#panelAward');
+        if (!pa) return;
+        if (!global.AwardView) { pa.innerHTML = '<div class="empty">화면을 불러오지 못했습니다</div>'; return; }
+        pa.innerHTML = '<div class="awb-wait">불러오는 중…</div>';
+        rpc('hub_award', { p_code: code, p_month: month }).then(function (v) {
+          pa.innerHTML = AwardView.html(v || null, { back: true });
+          pa.onclick = function (e) {
+            if (e.target.closest('[data-awd-back]')) { select('report'); showLatest(); navPush('week'); return; }
+            if (e.target.closest('[data-awd-save]') && v) AwardView.saveImage(v);
+          };
+        }).catch(function () { pa.innerHTML = AwardView.html(null, { back: true }); });
+      }
+      global.HubAward = { open: function (m) { select('award'); openAward(h.code, m); navPush('award', m); } };
       /* 레포트 「오늘 수업 필기」의 「내 필기에서 전체 보기」 → 내 필기 탭의 그 날짜 */
       $('#panelReport').addEventListener('click', function (e) {
         var g = e.target.closest('[data-photo-go]');
@@ -1475,6 +1499,7 @@
           rvWant = { photo: v === 'todo' ? (/^\d{4}-\d{2}-\d{2}$/.test(arg) ? arg : new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10)) : '' };
           rvShow();
         }
+        else if (v === 'award' && /^\d{4}-\d{2}$/.test(arg || '')) { select('award'); openAward(h.code, arg); }
         else if (v === 'book' && !$('#tabBook').hidden) select('book');
         else if (v === 'info' && infoOn) select('info');
         else { select('report'); showLatest(); }

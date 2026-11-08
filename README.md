@@ -1038,6 +1038,18 @@ delete from public.staff where email = '조교이메일@example.com';
   - 이번 주 이미 생긴 배지 + 이 명단의 셈으로 모두 낸 학생(그 자리에서 배지도 남김 · 미리보기는 남기지 않음)
 - 나머지(완료율 높은 순 · 60% 미만 상담 필요 · 과제 없음 · 앱 기록 없음)는 그대로
 
+### 5-105. 20261108i — 월간 과제 루틴 우수자 🏅 (migration-077 · 함수 note-remind 다시 배포)
+1. SQL Editor → `supabase/migration-077-routine-award.sql` → Run (076 다음 · 맨 아래 네 줄 true)
+2. Edge Functions → note-remind → 이 저장소의 `supabase/functions/note-remind/index.ts` 전체로 다시 배포 (알림톡으로 보낼 때는 Secrets 의 SOLAPI_PFID 를 씀 · 이미 있음)
+- 매달 1일 08:00 note-remind 가 지난달 후보 계산(award_due → 셈 → award_save) · 자동 발송 없음
+  - 기준(설정 app_settings 'award' · 원장만): 제출률 90% 이상 · 그달 과제 8개 이상 · 상위 % 는 30% 이내만 보여 줌 · 늦게 낸 것 냄 · 면제 뺌 · 직접 바꾼 값
+  - 상위 % = (나보다 높은 사람 + 1) / 그달 과제 8개 이상 전체 수강생 × 100 · 같은 제출률 같은 % · 반올림 · 최소 1%
+  - 연속 제출 최장 일수(면제 · 과제 없는 날은 건너뜀 · 안 낸 날에서 끊김) · 날짜별 ○△✕ · 영역별 정답률(과제 이름의 파트 · 지난달과 함께)
+- 「오늘」 맨 위 띠 「10월 루틴 우수자 후보 7명 · 확인하고 보내기」 → 반별 후보 · 체크 빼기 · 선생님 한마디 · 미리보기 · [보내기](원장만 · 서버도 확인) · [우수자 다시 계산](보낸 학생 그대로)
+- 문자(LMS) 학생 · 학부모 · 문구 관리 「루틴 우수자」 {이름} {월} {링크} · % 없음 · 발송 방식 문자 / 알림톡(템플릿 코드 · 비면 문자 · 변수 #{이름} #{월} #{링크}) · 같은 달 한 학생 한 번
+- 사본 한 통 「[사본] 10월 루틴 우수자 · 학생 7명 / 학부모 7명」
+- 링크 화면 — 러닝노트 #코드/award/2026-10 (assets/award-view.js · award.css · 학생 · 학부모 같은 화면 · 보낸 달만) · [이미지로 저장] 1080×1920 세로 카드
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.
