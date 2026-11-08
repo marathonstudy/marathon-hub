@@ -10,6 +10,7 @@
      · ⋯ — 인사말 고치기 · 알림톡 나에게 시험 발송 · 문자 보내기 · 문자 보낸 기록 · 새로고침
    반 카드 (「오늘」과 같은 순서 — 수업이 가까운 반 먼저)
      · 머리: 반 이름 · 수업일 · 「공개 n/전체 · 보냄 n/전체」 · 다 보냈으면 ✓
+     · 머리 아래 크게 「11/8 레포트 · 보냄 24/25 (알림톡 20 · 문자 4 · 실패 0) · 11:26」 · 안 받은 학생이 있으면 [안 받은 n명 · 보내기] → 문자 발송 화면에 그 학생들만 (20261108q)
      · 다 보낸 반은 접어 두고 남은 일이 있는 반만 처음에 펼친다. 펼침은 주소에 남는다(#tab=send&week=…&open=반)
        → 뒤로가기로 접힌다 (nav.js)
      · 공개 전 학생만 있는 반은 「아직 공개 전입니다 [공개하러 가기]」만
@@ -285,6 +286,37 @@
       '</div>';
   }
 
+  /* 레포트가 나갔는지 한눈에 (20261108q) — 「11/8 레포트 · 보냄 24/25 (알림톡 20 · 문자 4 · 실패 0) · 11:26」
+     보냄 표시(sent)로 센다 — 시험 발송은 표시가 없어 세지 않는다 · 알림톡 = kakao · 문자 = 사이트 문자 · 그 밖(복사 · 공유 · 내 폰 문자)은 「기타」
+     안 받은 학생이 있으면 [안 받은 n명 · 보내기] → 문자 발송 화면에 그 학생들만 (레포트 안내 문구 · 알림톡 기본) · 실제 발송은 거기서 누른다 */
+  function sendStat(g) {
+    var o = { n: g.rows.length, sent: 0, kakao: 0, sms: 0, other: 0, fail: 0, last: '', miss: [] };
+    g.rows.forEach(function (s) {
+      var x = state.sent[s.id];
+      if (x) {
+        o.sent++;
+        if (x.via === 'kakao') o.kakao++; else if (x.via === 'sitesms') o.sms++; else o.other++;
+        if ((x.at || '') > o.last) o.last = x.at;
+        return;
+      }
+      o.miss.push(s.id);
+      var k = window.Kakao && Kakao.ready && Kakao.ready() ? Kakao.of(s.id) : null;
+      if (k && k.last && k.last.status === 'fail') o.fail++;
+    });
+    return o;
+  }
+  function statHtml(g) {
+    if (!g.pub || g.name === NOCLS) return '';
+    var o = sendStat(g), L = g.lesson;
+    var day = L && L.date ? (+L.date.slice(5, 7)) + '/' + (+L.date.slice(8, 10)) + ' ' : '';
+    var parts = '알림톡 ' + o.kakao + ' · 문자 ' + o.sms + (o.other ? ' · 기타 ' + o.other : '') + ' · 실패 ' + o.fail;
+    return '<div class="snd-stat' + (o.miss.length ? ' has-miss' : ' is-all') + '">' +
+        '<span class="snd-stat__main num">' + esc(day + '레포트 · 보냄 ' + o.sent + '/' + o.n) + '</span>' +
+        '<span class="snd-stat__sub num">(' + esc(parts) + ')' + (o.last ? ' · ' + esc(fmtSent(o.last)) : '') + '</span>' +
+        (o.miss.length ? '<button type="button" class="btn btn--sm snd-stat__go" data-send-miss="' + esc(o.miss.join(',')) + '">안 받은 ' + o.miss.length + '명 · 보내기</button>' : '') +
+      '</div>';
+  }
+
   function cardHtml(g) {
     var n = g.rows.length;
     var open = isOpen(g);
@@ -326,6 +358,7 @@
         /* 공개했는데 그 수업 영상이 없으면 「영상 없음」 — 누르면 「영상 연결하기」 (vidlink.js · 20261107a) */
         (g.pub && g.name !== NOCLS && state.vids && state.vids.week === state.week && !state.vids.m[g.name] && window.VidLink
           ? '<div class="snd-novid"><button type="button" class="tdc-novid" data-vidlink-cls="' + esc(g.name) + '" data-vidlink-week="' + esc(state.week) + '" data-vidlink-gone title="수업 영상이 아직 없습니다 — 누르면 「영상 연결하기」 (문자는 다시 보내지 않습니다)">영상 없음</button></div>' : '') +
+        statHtml(g) +
         (open ? '<div class="snd-body">' + body + '</div>' : '') +
       '</section>';
   }
@@ -514,6 +547,13 @@
 
     var ks = ev.target.closest('[data-kk-stu]');
     if (ks) { Kakao.setWithStudent(ks.checked); render(); return; }
+
+    var sm = ev.target.closest('[data-send-miss]');
+    if (sm) {
+      var mids = sm.dataset.sendMiss.split(',').filter(Boolean);
+      if (mids.length && window.Sms) Sms.open({ students: mids, week: state.week, from: 'send', to: 'both' });
+      return;
+    }
 
     var kc = ev.target.closest('[data-kk-class]');
     if (kc && !kc.disabled) {

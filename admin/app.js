@@ -40,19 +40,75 @@
 
   var confirmModal = $('#confirmModal');
 
-  function confirmAsk(title, desc, okLabel, noLabel) {
+  /* opts (20261108q · 발송 확인 창)
+       test    — { run: function (phone) → Promise<{ ok, message }>, kakao, phone } 「먼저 나에게 보내 보기」 칸 (번호를 그 자리에서 · 이 기기에 마지막 번호 기억)
+       choices — [{ v, label }] 고르기 (첫 번째가 기본) · [보내기]를 누르면 고른 v 를 돌려준다
+       lead    — 설명 맨 앞에 굵게 한 줄 (「11월 8일 11시 26분에 … 이미 보냈어요」) */
+  var TEST_KEY = 'mh.testTo';
+  function testPhoneLast() { try { return localStorage.getItem(TEST_KEY) || ''; } catch (e) { return ''; } }
+  function testPhoneKeep(v) { try { localStorage.setItem(TEST_KEY, v); } catch (e) {} }
+  function phoneDigits(v) { return String(v || '').replace(/\D/g, ''); }
+  function phoneOk(v) { return /^01[016789]\d{7,8}$/.test(phoneDigits(v)); }
+  function confirmExtra(opts) {
+    var host = $('#confirmExtra');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'confirmExtra';
+      host.className = 'cf-extra';
+      var foot = confirmModal.querySelector('.modal__foot');
+      foot.parentNode.insertBefore(host, foot);
+    }
+    var html = '';
+    if (opts && opts.lead) html += '<p class="cf-lead">' + escHtml(opts.lead) + '</p>';
+    if (opts && opts.choices && opts.choices.length) {
+      html += '<div class="cf-choices" role="radiogroup">' + opts.choices.map(function (c, i) {
+        return '<label class="cf-choice"><input type="radio" name="cfChoice" value="' + escHtml(c.v) + '"' + (i === 0 ? ' checked' : '') + '> <span>' + escHtml(c.label) + '</span></label>';
+      }).join('') + '</div>';
+    }
+    if (opts && opts.test && typeof opts.test.run === 'function') {
+      var ph = testPhoneLast() || opts.test.phone || '';
+      html += '<div class="cf-test">' +
+          '<div class="cf-test__t">먼저 나에게 보내 보기 <small>' + (opts.test.kakao ? '같은 알림톡 · 첫 학생 내용으로 한 통' : '첫 학생 내용으로 한 통') + ' · 보낸 숫자에는 세지 않음</small></div>' +
+          '<div class="cf-test__row"><input class="input cf-test__phone" id="cfTestPhone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="010-0000-0000" aria-label="시험으로 받을 번호" value="' + escHtml(ph) + '">' +
+          '<button class="btn btn--sm" type="button" id="cfTestGo">보내 보기</button></div>' +
+          '<p class="cf-test__msg" id="cfTestMsg" aria-live="polite"></p>' +
+        '</div>';
+    }
+    host.innerHTML = html;
+    host.hidden = !html;
+    var go = $('#cfTestGo');
+    if (go) go.addEventListener('click', function () {
+      var v = $('#cfTestPhone').value, msg = $('#cfTestMsg');
+      if (!phoneOk(v)) { msg.textContent = '휴대폰 번호를 넣어 주세요 (010 …)'; msg.className = 'cf-test__msg is-bad'; return; }
+      testPhoneKeep(v.trim());
+      go.disabled = true; msg.textContent = '보내는 중…'; msg.className = 'cf-test__msg';
+      Promise.resolve(opts.test.run(phoneDigits(v))).then(function (r) {
+        go.disabled = false;
+        var ok = r && r.ok;
+        msg.textContent = ok ? '✓ ' + v.trim() + ' 로 한 통 보냈습니다' + (r.note ? ' · ' + r.note : '') : '시험 발송 실패 — ' + ((r && r.message) || '보내지 못했습니다');
+        msg.className = 'cf-test__msg ' + (ok ? 'is-ok' : 'is-bad');
+      }, function (e) { go.disabled = false; msg.textContent = '시험 발송 실패 — ' + ((e && e.message) || ''); msg.className = 'cf-test__msg is-bad'; });
+    });
+  }
+  function escHtml(v) { return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+  function confirmAsk(title, desc, okLabel, noLabel, opts) {
     return new Promise(function (resolve) {
       $('#confirmTitle').textContent = title;
       $('#confirmDesc').textContent = desc;
       $('#btnConfirmYes').textContent = okLabel || '삭제';
       $('#btnConfirmNo').textContent = noLabel || '취소';
+      confirmExtra(opts || null);
       function cleanup(result) {
         $('#btnConfirmYes').removeEventListener('click', onYes);
         $('#btnConfirmNo').removeEventListener('click', onNo);
         confirmModal.close();
         resolve(result);
       }
-      function onYes() { cleanup(true); }
+      function onYes() {
+        var c = opts && opts.choices && opts.choices.length ? confirmModal.querySelector('input[name="cfChoice"]:checked') : null;
+        cleanup(c ? c.value : true);
+      }
       function onNo()  { cleanup(false); }
       $('#btnConfirmYes').addEventListener('click', onYes);
       $('#btnConfirmNo').addEventListener('click', onNo);

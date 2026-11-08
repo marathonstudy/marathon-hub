@@ -4323,3 +4323,40 @@ dialog.vl-modal[open] { display: flex; flex-direction: column; overflow: hidden;
 .awd-bar__link b { color: #F2C14E; }
 .awd-cfg__auto { display: flex; gap: 6px; align-items: flex-start; font-size: 13px; font-weight: 700; }
 .awd-cfg__auto input { width: 20px; height: 20px; flex: none; }
+
+/* ---------- 발송 확인 창 — 먼저 나에게 보내 보기 · 다시 보낼 때 고르기 (20261108q) ---------- */
+.cf-extra { display: flex; flex-direction: column; gap: 10px; padding: 0 20px 4px; }
+.cf-lead { margin: 0; padding: 10px 12px; border-radius: 10px; background: #FFF8EC; border: 1px solid #F5E3C6; color: #8A6326; font-weight: 700; font-size: 13.5px; word-break: keep-all; }
+.cf-choices { display: flex; flex-direction: column; gap: 6px; }
+.cf-choice { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; font-weight: 700; color: var(--ink-deep); min-height: 32px; }
+.cf-choice input { width: 20px; height: 20px; flex: none; margin-top: 1px; }
+.cf-test { border: 1px dashed var(--line); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.cf-test__t { font-size: 13px; font-weight: 800; color: var(--ink-deep); }
+.cf-test__t small { font-weight: 500; color: var(--ink-soft, #6B6880); }
+.cf-test__row { display: flex; gap: 6px; align-items: center; }
+.cf-test__phone { flex: 1 1 auto; min-width: 0; }
+.cf-test__msg { margin: 0; font-size: 12.5px; min-height: 1em; }
+.cf-test__msg.is-ok { color: #35806A; font-weight: 700; }
+.cf-test__msg.is-bad { color: var(--danger); font-weight: 700; }
+
+/* 보낸 기록 — 종류 고르기 · 레포트 안내 줄 색 · 시험 줄 */
+.sms-kinds { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+.sms-kind { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 12px; min-height: 34px; font: inherit; font-size: 13px; font-weight: 700; color: var(--ink-deep); cursor: pointer; }
+.sms-kind.is-on { background: #5B4BC4; border-color: #5B4BC4; color: #fff; }
+.sms-batch--report { background: #EEF6FF; border-color: #A9CBF0; border-left: 4px solid #3D7DC9; }
+.sms-batch--test { background: transparent; border-style: dashed; }
+
+/* 레포트 발송 반 카드 — 「11/8 레포트 · 보냄 24/25 (알림톡 20 · 문자 4 · 실패 0) · 11:26」 */
+.snd-stat { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 10px 14px; border-top: 1px solid var(--line); }
+.snd-stat__main { font-size: 17px; font-weight: 800; color: var(--ink-deep); }
+.snd-stat.is-all .snd-stat__main { color: #35806A; }
+.snd-stat.has-miss .snd-stat__main { color: #B4542B; }
+.snd-stat__sub { font-size: 13px; color: var(--ink-soft, #6B6880); }
+.snd-stat__go { margin-left: auto; }
+
+/* 업데이트 문자 띠 — 눈에 띄게 */
+.rupd--hot .rupd__row { background: #FFF4D6; border: 2px solid #F2C14E; border-radius: 12px; padding: 10px 12px; }
+.rupd--hot .rupd__t { font-size: 14.5px; }
+.rupd-wait__row { display: flex; align-items: center; gap: 6px; }
+.rupd-wait__row .input { width: 80px; }
+

@@ -447,7 +447,19 @@
       (p.items.some(function (x) { return x.again; }) ? ' 오늘 이미 보낸 사람에게 한 번 더 보냅니다.' : '') +
       (p.left.length ? ' ⚠ 바뀌지 않은 칸이 있어 ' + uniq(p.left) + '명에게는 보내지 않습니다.' : '') +
       ' 보낸 기록에 「' + KIND[st.kind].label + '」' + (p.praise && p.praise.people ? ' · 「과제 칭찬」' : '') + '으로 남습니다.';
-    UI.confirmAsk(KIND[st.kind].title, desc, '보내기').then(function (yes) {
+    /* 먼저 나에게 보내 보기 — 첫 사람 글 그대로 한 통 (sms.js testTo · 20261108q) */
+    var x0 = p.items[0];
+    var test = { phone: Sms.myPhone ? Sms.myPhone() || '' : '', run: function (ph) {
+      var v = {}, c = codeOf(x0.s), f = firstOf(x0.s), vars = {};
+      if (c) v.code = c;
+      if (f) v.first = f;
+      if (v.code || v.first) vars[x0.s.id] = v;
+      return Sms.testTo(ph, function () {
+        return Sms.invoke({ action: 'test', body: outBody(x0), items: [{ student_id: x0.s.id, to: x0.t }], ad: false, lessons: {}, siblings: true, markWeek: '',
+          label: x0.pr ? '과제 칭찬' : KIND[st.kind].label, purpose: x0.pr ? 'praise' : st.kind, vars: vars });
+      });
+    } };
+    UI.confirmAsk(p.people === 1 ? '1명에게만 보냅니다. 맞나요?' : KIND[st.kind].title, desc, '보내기', null, { test: test }).then(function (yes) {
       if (!yes) return;
       st.busy = true; paint();
       sendItems(p.items).then(function (res) {

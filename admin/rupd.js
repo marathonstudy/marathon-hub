@@ -1,14 +1,15 @@
 /* ============================================================
    rupd.js — 보낸 레포트 업데이트 문자 (migration-073 · 함수 note-remind · 20261108e)
 
-   이미 보낸 레포트에 영상 · 자료 · 코멘트 · 수업 내용 · 반 공지가 바뀌면 서버(트리거)가 기록하고,
-   마지막으로 바뀐 뒤 30분 동안 더 안 바뀌면 note-remind 가 모아 한 통 보낸다 (밤 10시 ~ 아침 8시는 8시 · 하루 두 번까지).
+   이미 보낸 레포트에 수업 영상 · 자료 · 선생님 코멘트가 바뀌면 서버(트리거)가 기록하고,
+   마지막으로 바뀐 뒤 10분(설정 5 ~ 60분) 동안 더 안 바뀌면 note-remind 가 모아 한 통 보낸다 (밤 10시 ~ 아침 8시는 8시 · 같은 레포트 하루 한 번).
+   출석 · 과제 상태 · 필기 · 사본 · 설정 · 반 공지 · 수업 내용 변경으로는 안 나간다. 원장 · 조교가 같은 내용을 직접 보냈으면 그 항목은 뺀다 (migration-085 · 20261108q)
    이 파일은 화면만:
-     · 맨 위 띠 「목동반 11/7 레포트 · 수업 영상 · 학생 10명 — 30분 뒤(14:35) 업데이트 문자가 나가요 [지금 보내기] [이번엔 안 보내기]」
+     · 맨 위 띠 「목동반 11/7 레포트 · 수업 영상 · 학생 10명 — 10분 뒤(14:35) 업데이트 문자가 나가요 [지금 보내기] [이번엔 안 보내기]」 (눈에 띄게 · 085)
        고친 직후(영상 넣기 · 다시 공개 · 자료 · 공지 저장 뒤) 바로 · 그 밖에는 1분마다 다시 읽는다
        반 설정에서 자동 발송을 껐으면 「자동 발송 꺼짐 · [지금 보내기]」
      · [지금 보내기] → note-remind { action: "rupd", week, class } (운영진 로그인) · [이번엔 안 보내기] → report_upd_skip
-     · 문자 발송 → 연결 상태 「레포트 업데이트 문자」 — 「학부모에게도 업데이트 문자 보내기」(기본 끔 · 학부모는 일반 문자)
+     · 문자 발송 → 연결 상태 「레포트 업데이트 문자」 — 「학부모에게도 업데이트 문자 보내기」(기본 끔 · 학부모는 일반 문자) · 「마지막 변경 뒤 기다리는 시간」 5 ~ 60분 (기본 10 · 085)
    073 전이면 아무것도 안 보인다.
    ============================================================ */
 
@@ -24,7 +25,7 @@
   }
   function missing(e) { return /Could not find the function|does not exist|schema cache/i.test((e && e.message) || ''); }
 
-  var st = { list: [], parents: false, sql: null, busy: false, timer: 0 };
+  var st = { list: [], parents: false, wait: 10, sql: null, busy: false, timer: 0 };
 
   function bar() {
     var b = document.getElementById('rupdBar');
@@ -58,6 +59,7 @@
     if (!b) return;
     var list = st.list || [];
     b.hidden = !list.length;
+    b.classList.toggle('rupd--hot', list.some(function (x) { return x.auto; }));
     b.innerHTML = list.map(function (x) {
       var what = (x.items || []).join(' · ');
       return '<div class="rupd__row" data-rupd-week="' + esc(x.week) + '" data-rupd-cls="' + esc(x['class']) + '">' +
@@ -75,6 +77,7 @@
       st.sql = true;
       st.list = (r.data && r.data.list) || [];
       st.parents = !!(r.data && r.data.parents);
+      if (r.data && r.data.wait) st.wait = r.data.wait;
       render();
       paintSettings();
     }, function () {});
@@ -130,10 +133,22 @@
     if (!st.sql) { host.hidden = true; return; }
     host.hidden = false;
     host.innerHTML = '<div class="extra-head" style="margin-top:18px"><span class="extra-head__title">레포트 업데이트 문자</span></div>' +
-      '<p class="field__hint">이미 보낸 레포트에 영상 · 자료 · 코멘트 · 수업 내용 · 반 공지가 바뀌면 30분 뒤 모아 한 통 (밤 10시 ~ 아침 8시는 8시 · 하루 두 번까지). 반마다 끄기는 「오늘」 반 카드 수업 [바꾸기] · 문구는 「레포트 업데이트」.</p>' +
+      '<p class="field__hint">이미 보낸 레포트에 수업 영상 · 자료 · 선생님 코멘트가 바뀌면 마지막 변경 ' + st.wait + '분 뒤 모아 한 통 (밤 10시 ~ 아침 8시는 8시 · 같은 레포트 하루 한 번). 출석 · 과제 상태 · 필기 · 공지 · 설정 변경으로는 안 나갑니다. 같은 내용을 직접 보냈으면(수업 영상 알림 등) 그 항목은 뺍니다. 반마다 끄기는 「오늘」 반 카드 수업 [바꾸기] · 문구는 「레포트 업데이트」.</p>' +
+      '<label class="field rupd-wait"><span class="field__label">마지막 변경 뒤 기다리는 시간</span><span class="rupd-wait__row"><input class="input num" id="rupdWait" type="number" min="5" max="60" step="1" value="' + st.wait + '" aria-label="기다리는 시간(분)"> 분 <span class="field__opt">5 ~ 60분 · 기본 10분</span></span></label>' +
       '<label class="check-line"><input type="checkbox" id="rupdParents"' + (st.parents ? ' checked' : '') + '> <span>학부모에게도 업데이트 문자 보내기 <span class="field__opt">기본 끔 · 켜면 레포트를 받은 학부모에게 일반 문자</span></span></label>';
   }
   document.addEventListener('change', function (e) {
+    if (e.target.id === 'rupdWait') {
+      var m = Math.max(5, Math.min(60, Math.round(+e.target.value || 10)));
+      e.target.value = m;
+      Promise.resolve(sb().rpc('report_upd_wait_set', { p_min: m })).then(function (r) {
+        if (r.error) { toast(missing(r.error) ? 'migration-085 SQL 을 먼저 실행해 주세요' : r.error.message, 'bad'); e.target.value = st.wait; return; }
+        st.wait = (r.data && r.data.wait) || m;
+        toast('업데이트 문자는 마지막 변경 ' + st.wait + '분 뒤에 나갑니다', 'good');
+        paintSettings(); load();
+      });
+      return;
+    }
     if (e.target.id !== 'rupdParents') return;
     var on = e.target.checked;
     Promise.resolve(sb().rpc('report_upd_parents_set', { p_on: on })).then(function (r) {

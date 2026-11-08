@@ -140,7 +140,30 @@
       (msgs !== n ? ' (번호 ' + msgs + '개)' : '') + '.' +
       (cfg.smsFallback ? ' 알림톡이 실패하면 문자로 대신 보내며, 그때는 건당 약 ' + LMS_WON + '원까지 더 들 수 있습니다.' : '') +
       (resend ? ' 이미 보낸 학생에게 한 번 더 보냅니다.' : '');
-    return UI.confirmAsk(resend ? '알림톡 다시 보내기' : '알림톡 보내기', desc, '보내기').then(function (yes) {
+    /* 받는 학생이 1명이면 제목 「1명에게만 보냅니다. 맞나요?」 · 이미 받은 학생이면 언제 · 누가 · 「안 받은 사람에게만」 · 「먼저 나에게 보내 보기」 (20261108q) */
+    var people = list.map(function (s) { return s.id; }).concat(sids).filter(function (v, i, a) { return a.indexOf(v) === i; });
+    var test = { kakao: true, phone: window.Sms && Sms.myPhone ? Sms.myPhone() || '' : '',
+      run: function (ph) {
+        if (!window.Sms || !Sms.testTo) return Promise.resolve({ ok: false, message: '문자 발송 화면을 불러오지 못했습니다' });
+        return Sms.testTo(ph, function () { return invoke({ action: 'test', week: st.week, students: [(list[0] || {}).id || sids[0]] }); });
+      } };
+    var chk = window.Sms && Sms.dupCheck ? Sms.dupCheck(people, '', st.week, 'report') : Promise.resolve(null);
+    return chk.then(function (d) {
+      var opts = { test: test }, left = people;
+      if (d && d.n > 0) {
+        left = people.filter(function (id) { return (d.ids || []).indexOf(id) < 0; });
+        opts.lead = Sms.dupLead(d);
+        if (left.length) opts.choices = [{ v: 'left', label: '이미 받은 ' + d.n + '명은 빼고 안 받은 ' + left.length + '명에게만 보내기' }, { v: 'all', label: '모두에게 다시 보내기 (' + people.length + '명)' }];
+      }
+      var title = people.length === 1 ? '1명에게만 보냅니다. 맞나요?' : resend ? '알림톡 다시 보내기' : '알림톡 보내기';
+      return UI.confirmAsk(title, desc, '보내기', null, opts).then(function (ans) {
+        if (ans === 'left') {
+          list = list.filter(function (s) { return left.indexOf(s.id) >= 0; });
+          sids = sids.filter(function (id) { return left.indexOf(id) >= 0; });
+        } else if (ans && d && d.n > 0) resend = true;
+        return ans;
+      });
+    }).then(function (yes) {
       if (!yes) return;
       st.busy = true; changed();
       var all = list.map(function (s) { return s.id; });

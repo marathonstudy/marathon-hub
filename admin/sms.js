@@ -27,6 +27,13 @@
    「자주 쓰는 문구」 — 이름 · 첫 줄 · [고치기] [복사해서 새로 만들기] [삭제](확인) · [+ 새 문구] · ⠿ 끌어서 순서
        고치기 화면: 칸 넣기 버튼 · 예시 학생으로 미리보기 · 「AI로 다듬기」(aipolish.js · text-polish)
    「보낸 기록」 — 「10/29 15:30 · 고2 선수능반 레포트 안내 · 22건 · 성공 22」 · 누르면 받는 사람 표(보냄 시각 · 실패 사유) · [실패만 다시 보내기]
+       위에 종류 고르기 (전체 / 레포트 안내 / 레포트 업데이트 / 수업 전 / 필기 / 과제 문자 / 기타) · 레포트 안내 줄은 색을 달리 · 시험 줄 「테스트 · 김민서 · 010-****-1234」 (20261108q)
+   보내기 전 확인 창 (20261108q · UI.confirmAsk opts)
+       「먼저 나에게 보내 보기」 — 그 자리에서 번호를 넣고 [보내 보기] → 그 번호로 한 통 (알림톡이면 같은 알림톡 · 첫 학생 내용 · 보낸 숫자에는 안 셈)
+         내 시험 번호를 잠깐 그 번호로 바꿔 보내고 원래대로 돌린다 · 이 기기에 마지막 번호 기억 (localStorage mh.testTo)
+       받는 사람이 1명이면 제목 「1명에게만 보냅니다. 맞나요?」
+       이미 보낸 것을 다시 — 「11월 8일 11시 26분에 김종현 님이 이미 보냈어요(알림톡 24명). 다시 보내시겠어요?」 (send_dup_check · 085)
+         일부만 받았으면 「이미 받은 24명은 빼고 안 받은 1명에게만 보내기」(기본) / 「모두에게 다시 보내기」
    「연결 상태」 — 카톡 알림톡(「연동됨 · 템플릿 주간레포트안내」 / 「템플릿 ID 없음」 / 「함수 응답 없음」) · 보내는 번호 ·
        이번 달 남은 건수 · 내 시험 번호(바로 고침) · [나에게 시험 발송](문자 한 통 · 카톡 한 통) · 앱 설치 링크 · 키 · 단가 · 상한
    여는 곳 — Sms.open(…) · [data-sms-cls] · [data-sms-sid] · [data-app-invite] 모두 이 탭의 「보내기」를 골라진 채로 연다 (창으로 따로 열지 않는다)
@@ -1151,7 +1158,29 @@
       (p.left.length ? ' ⚠ 바뀌지 않은 칸이 있어 ' + p.left.map(function (x) { return x.s.id; }).filter(function (v, i, a) { return a.indexOf(v) === i; }).length + '명에게는 보내지 않습니다 (' + p.left.map(function (x) { return x.left.join(' '); }).filter(function (v, i, a) { return a.indexOf(v) === i; }).join(', ') + ').' : '') +
       ' 오늘 ' + ((st.cfg && st.cfg.today) || 0) + ' / ' + cfg().dailyMax + '건.' +
       detailText(st.purpose === 'app' || p.items.length <= 5 ? (kk ? (stuKk() ? [] : p.items.filter(function (x) { return x.t === 'student'; })) : p.items) : []);
-    UI.confirmAsk(retryList ? '실패만 다시 보내기' : again ? '다시 보내기' : lead || '문자 보내기', desc, '보내기').then(function (yes) {
+    /* 이미 보낸 것을 다시 보내려 하면 — 언제 · 누가 · 몇 명 · 「안 받은 사람에게만」(기본) / 「모두에게 다시」 (send_dup_check · 085 · 20261108q) */
+    var ids0 = uniq(p.items.map(function (x) { return x.s.id; }));
+    var isRep = !!st.week && !st.notify && (kk || payload(p.items).purpose === 'report');
+    var chk = retryList || again ? Promise.resolve(null) : dupCheck(ids0, isRep ? '' : body, isRep ? st.week : null, isRep ? 'report' : '');
+    st.forceResend = false;
+    chk.then(function (d) {
+      var opts = { test: { run: function (ph) { return testTo(ph, function () { return testRun(p, kk); }); }, kakao: kk && p.items.some(function (x) { return x.t !== 'student'; }), phone: me.phone || '' } };
+      var left = ids0;
+      if (d && d.n > 0) {
+        left = ids0.filter(function (id) { return (d.ids || []).indexOf(id) < 0; });
+        opts.lead = dupLead(d);
+        if (left.length) opts.choices = [{ v: 'left', label: '이미 받은 ' + d.n + '명은 빼고 안 받은 ' + left.length + '명에게만 보내기' }, { v: 'all', label: '모두에게 다시 보내기 (' + ids0.length + '명)' }];
+      }
+      /* 받는 사람이 1명이면 — 한 명에게만 가는지 한 번 더 (20261108q · 11/8 반포반 1건 발송) */
+      var title = retryList ? '실패만 다시 보내기' : again ? '다시 보내기' : p.people === 1 ? '1명에게만 보냅니다. 맞나요?' : lead || '문자 보내기';
+      return UI.confirmAsk(title, desc, '보내기', null, opts).then(function (ans) {
+        if (ans === 'left') {
+          p = Object.assign({}, p, { items: p.items.filter(function (x) { return left.indexOf(x.s.id) >= 0; }), left: (p.left || []).filter(function (x) { return left.indexOf(x.s.id) >= 0; }), people: left.length });
+          copy = copy && p.people > 1;
+        } else if (ans === 'all' || (d && d.n > 0 && !left.length && ans)) st.forceResend = true;
+        return ans;
+      });
+    }).then(function (yes) {
       if (!yes) return;
       st.busy = true; updateButtons();
       var pl = payload(p.items);
@@ -1175,6 +1204,50 @@
     });
   }
 
+  /* ---------- 다시 보낼 때 확인 (085 send_dup_check · 20261108q) ----------
+     레포트 안내 — 그 주 레포트를 이미 받은 학생(보냄 표시) · 그 밖 — 오늘 같은 글을 받은 학생. 085 전이면 묻지 않는다 */
+  function dupCheck(ids, body, week, purpose) {
+    if (!ids.length || !sb() || !sb().rpc) return Promise.resolve(null);
+    return Promise.resolve(sb().rpc('send_dup_check', { p_students: ids, p_body: body || '', p_week: week || null, p_purpose: purpose || '' })).then(function (r) {
+      return r && !r.error && r.data && r.data.n > 0 ? r.data : null;
+    }, function () { return null; });
+  }
+  /* 「11월 8일 11시 26분에 김종현 님이 이미 보냈어요(알림톡 24명). 다시 보내시겠어요?」 */
+  function dupLead(d) {
+    var t = d.at ? new Date(d.at) : null;
+    var when = t && !isNaN(t) ? (t.getMonth() + 1) + '월 ' + t.getDate() + '일 ' + t.getHours() + '시 ' + t.getMinutes() + '분에 ' : '';
+    var via = [];
+    if (d.kakao) via.push('알림톡 ' + d.kakao + '명');
+    if (d.sms) via.push('문자 ' + d.sms + '명');
+    if (d.other) via.push('복사 · 공유 ' + d.other + '명');
+    return when + (d.by ? d.by + ' 님이 ' : '') + '이미 보냈어요(' + (via.join(' · ') || d.n + '명') + '). 다시 보내시겠어요?';
+  }
+
+  /* ---------- 먼저 나에게 보내 보기 (20261108q) ----------
+     그 자리에서 넣은 번호로 한 통 — 서버가 내 시험 번호를 맡아 두고(test_phone_hold) 그 번호로 보낸 뒤 원래대로 돌린다(test_phone_release · 085)
+     미리 등록할 필요 없음 · 기록은 시험 줄(「테스트 · 김민서 · 010-****-1234」) · 반 발송 숫자(보냄 표시)에는 세지 않는다 */
+  function testTo(phone, run) {
+    var back = function () { return Promise.resolve(sb().rpc('test_phone_release')).then(function () {}, function () {}); };
+    return Promise.resolve(sb().rpc('test_phone_hold', { p_phone: phone })).then(function (r) {
+      if (r && r.error) throw new Error(isMissing(r.error) ? 'migration-085 SQL 을 먼저 실행해 주세요' : r.error.message);
+      return Promise.resolve(run()).then(function (res) {
+        return back().then(function () { return res; });
+      }, function (e) { return back().then(function () { throw e; }); });
+    }).then(function (res) {
+      var r0 = res && res.results && res.results[0];
+      return { ok: !!(res && res.ok && (res.sent || 0) > 0), message: (res && res.message) || (r0 && r0.error) || '' };
+    }, function (e) { return { ok: false, message: (e && e.message) || '보내지 못했습니다' }; });
+  }
+  /* 시험 한 통 — 알림톡이면 같은 알림톡(첫 학부모 · 학생만이면 학생 글을 문자로) · 문자면 첫 사람 글 그대로 */
+  function testRun(p, kk) {
+    var par = p.items.filter(function (x) { return x.t !== 'student'; })[0];
+    if (kk && par && st.week) return invoke({ action: 'test', week: st.week, students: [par.s.id] }, KFN);
+    var x0 = p.items[0], pl = payload([x0]), b = pl.body;
+    if (hasMiss(b)) b = b.split('{밀린날짜}').join(missFor(x0.s));
+    if (st.notify) b = b.split('#{바뀐 내용}').join(String(st.notify[x0.s.id] || '내용'));
+    return invoke(Object.assign({ action: 'test' }, pl, { body: b, markWeek: '' }));
+  }
+
   /* 카톡 — 학부모는 kakao-send(레포트 템플릿 · 안 받으면 문자로) · 학생 본인 번호는 문자로. 결과는 한 모양으로 모은다 */
   function sendKakao(pl, items) {
     var par = items.filter(function (x) { return x.t !== 'student'; });
@@ -1183,7 +1256,7 @@
     var all = { ok: true, sent: 0, failed: 0, results: [], skipped: [] };
     var chunks = [];
     for (var i = 0; i < ids.length; i += 100) chunks.push(ids.slice(i, i + 100));
-    var resend = ids.some(function (id) { return st.prev[id]; });
+    var resend = st.forceResend || ids.some(function (id) { return st.prev[id]; });
     return chunks.reduce(function (pr, c) {
       return pr.then(function () {
         if (!all.ok) return null;
@@ -1204,7 +1277,7 @@
       var sids = uniq(stu.map(function (x) { return x.s.id; }));
       var schunks = [];
       for (var j = 0; j < sids.length; j += 100) schunks.push(sids.slice(j, j + 100));
-      var sresend = sids.some(function (id) { return st.prev[id]; });
+      var sresend = st.forceResend || sids.some(function (id) { return st.prev[id]; });
       var kstu = stu;
       stu = [];
       return schunks.reduce(function (pr, c) {
@@ -1464,18 +1537,29 @@
     sb().rpc('sms_batch_list', Object.assign(logArgs(), { p_limit: 200 })).then(function (r) {
       if (r.error && isMissing(r.error)) return findLogFlat(host);
       if (r.error) { host.innerHTML = '<p class="cp-warn">' + esc(r.error.message) + '</p>'; return; }
-      batches = r.data || [];
-      if (!batches.length) { host.innerHTML = '<p class="panel__hint">이 조건으로 보낸 문자가 없습니다.</p>'; return; }
+      batches = (r.data || []).filter(function (x) { return !st.logKind || kindOf(x) === st.logKind; });
+      if (!batches.length) { host.innerHTML = '<p class="panel__hint">' + (st.logKind ? '이 조건 · 이 종류로' : '이 조건으로') + ' 보낸 문자가 없습니다.</p>'; return; }
       host.innerHTML = '<p class="sms-sum">' + batches.length + '번 보냄 · ' + batches.reduce(function (a, x) { return a + x.n; }, 0) + '건 · 성공 ' + batches.reduce(function (a, x) { return a + x.ok; }, 0) + ' · 실패 ' + batches.reduce(function (a, x) { return a + x.fail; }, 0) + '</p>' +
         '<ul class="sms-batches">' + batches.map(function (x, i) {
           var name = x.label || firstLine(x.body).slice(0, 24) || '(이름 없음)';
           var cls = (x.classes || []).slice(0, 3).join(', ') + ((x.classes || []).length > 3 ? ' 외 ' + ((x.classes || []).length - 3) : '');
-          return '<li><button type="button" class="sms-batch' + (x.fail ? ' has-fail' : '') + '" data-batch="' + i + '">' +
+          if (x.test) name = '테스트 · ' + (x.by_name || '') + (x.last4 ? ' · 010-****-' + x.last4 : '');
+          return '<li><button type="button" class="sms-batch' + (x.fail ? ' has-fail' : '') + (!x.test && kindOf(x) === 'report' ? ' sms-batch--report' : '') + (x.test ? ' sms-batch--test' : '') + '" data-batch="' + i + '">' +
               '<span class="sms-batch__main"><span class="num">' + esc(fmtAt(x.at)) + '</span> · ' + (cls ? esc(cls) + ' ' : '') + esc(name) + ' · <span class="num">' + x.n + '</span>건 · 성공 <span class="num">' + x.ok + '</span>' + (x.fail ? ' · <b class="sms-batch__bad">실패 ' + x.fail + '</b>' : '') + '</span>' +
               '<span class="sms-batch__sub muted-note">' + (x.via === 'kakao' ? '알림톡' : '문자') + (x.test ? ' · 내 번호 확인용' : '') + ' · ' + esc(x.by_name || '') + copyTag(x.copy) + '</span>' +
             '</button></li>';
         }).join('') + '</ul>';
     });
+  }
+  /* 종류 — 전체 / 레포트 안내 / 레포트 업데이트 / 수업 전 / 필기 / 과제 문자 / 기타 (20261108q) */
+  function kindOf(x) {
+    var pu = x.purpose || '', lb = x.label || '';
+    if (x.via === 'kakao' || pu === 'report' || /레포트 안내|레포트 알림톡/.test(lb)) return 'report';
+    if (pu === 'rupd' || lb === '레포트 업데이트') return 'rupd';
+    if (pu === 'pre' || /수업 전/.test(lb)) return 'pre';
+    if (pu === 'note' || /필기/.test(lb)) return 'note';
+    if (pu === 'nudge' || pu === 'praise' || pu === 'hws' || /^과제/.test(lb)) return 'hw';
+    return 'etc';
   }
   /* 사본을 보냈는지 (migration-064 · 20261106g) */
   var COPY_TAG = { sent: ['사본 보냄', 'sms-copytag--ok'], fail: ['사본 실패', 'sms-copytag--bad'], wait: ['사본 곧 보냄', ''], digest: ['사본 저녁 9시', ''], none: ['사본 없음(번호 없음)', ''] };
@@ -1908,6 +1992,14 @@
     $('#smsClose').addEventListener('click', function () { if (st.back >= 0) UI.selectTab(st.back); });
     $('#smsReset').addEventListener('click', function () { open({}); });
     $('#smsLogFind').addEventListener('click', findLog);
+    var kinds = $('#smsLogKinds');
+    if (kinds) kinds.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-log-kind]');
+      if (!b) return;
+      st.logKind = b.dataset.logKind || '';
+      $$('[data-log-kind]', kinds).forEach(function (x) { x.classList.toggle('is-on', x === b); });
+      findLog();
+    });
     $('#tplNew').addEventListener('click', function () { openTplEdit(null, false); });
     $('#tplCancel').addEventListener('click', closeTplEdit);
     $('#tplSave').addEventListener('click', saveTplEdit);
@@ -2011,6 +2103,7 @@
     isOpen: function () { return !!$('#panel-sms') && !$('#panel-sms').hidden && st.pane === 'send'; },
     /* 「내 번호로도 한 통 받기」 — kakao.js · send.js 도 같이 (20261031r) */
     copyHtml: copyHtml, copyOn: copyOn, myPhone: function () { return me.phone; }, loadMyPhone: loadMyPhone,
+    testTo: testTo, dupCheck: dupCheck, dupLead: dupLead,
     /* 학생용 템플릿 코드를 바꾼 뒤 (kakao.js · 071) */
     reloadKakao: function () { return loadKakao().then(function () { if ($("#smsBody")) { try { renderPreview(); } catch (e) {} } }); }
   };

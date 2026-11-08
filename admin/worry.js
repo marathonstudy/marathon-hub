@@ -376,7 +376,19 @@
       });
     };
     if (list.length === 1) { go2(); return; }
-    UI.confirmAsk('걱정 문자 ' + list.length + '명', list.map(function (it) { var s = stu(it.sid) || {}; return '· ' + (s.name || '') + ' — ' + (whoText(picked(it)) || '받는 사람 없음'); }).join('\n') + '\n\n학생마다 고친 글 그대로 보냅니다.', '보내기').then(function (yes) { if (yes) go2(); });
+    UI.confirmAsk('걱정 문자 ' + list.length + '명', list.map(function (it) { var s = stu(it.sid) || {}; return '· ' + (s.name || '') + ' — ' + (whoText(picked(it)) || '받는 사람 없음'); }).join('\n') + '\n\n학생마다 고친 글 그대로 보냅니다.', '보내기', null,
+      { test: { run: function (ph) { return testOne(list[0], ph); }, phone: window.Sms && Sms.myPhone ? Sms.myPhone() || '' : '' } }).then(function (yes) { if (yes) go2(); });
+  }
+  /* 먼저 나에게 보내 보기 — 첫 학생의 첫 받는 사람 글 그대로 한 통 (sms.js testTo · 20261108q) */
+  function testOne(it, ph) {
+    var s = stu(it.sid);
+    if (!s || !window.Sms || !Sms.testTo) return Promise.resolve({ ok: false, message: '학생을 찾지 못했습니다' });
+    var tg = targets(s, it), a = auds(it).filter(function (x) { return tg.some(function (y) { return x === 'student' ? y.t === 'student' : y.t !== 'student'; }); })[0];
+    if (!a) return Promise.resolve({ ok: false, message: '받는 사람이 없습니다' });
+    var t0 = tg.filter(function (y) { return a === 'student' ? y.t === 'student' : y.t !== 'student'; })[0];
+    return Sms.testTo(ph, function () {
+      return invoke({ action: 'test', items: [{ student_id: s.id, to: t0.t }], body: fillName(it.text[a], s).trim(), ad: false, lessons: {}, siblings: true, markWeek: '', label: '걱정 문자', purpose: 'worry', vars: {} });
+    });
   }
 
   /* ---------- 과제 칸 상담 기록 (분류 「과제」 · hw_day) ---------- */

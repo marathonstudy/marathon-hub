@@ -893,7 +893,8 @@
         esc(day + ' 레포트 — 보내지 않고 건너뜀' + (sk && sk.skipped_name ? ' (' + sk.skipped_name + ')' : '')) + '">' + esc(day + ' 건너뜀') + '</button>' +
         (st.skipMenu === mk ? '<button type="button" class="tdc-chip__act" data-rewrite-cls="' + esc(c.name) + '" data-rewrite-date="' + esc(x.date) + '" data-rewrite-week="' + esc(x.week) + '">다시 작성하기</button>' : '') + '</span>';
     }
-    var t = x.kind === 'wip' ? day + ' 작성 중' : x.kind === 'part' ? day + ' ' + x.pct + '% · 안 보냄 ' + x.left + '명' : day + ' ' + x.pct + '%';
+    /* 보낸 숫자 그대로 「11/8(일) 24/25」 (레포트 발송 반 카드와 같은 숫자 · 20261108q) */
+    var t = x.kind === 'wip' ? day + ' 작성 중' : day + ' ' + x.sent + '/' + x.n;
     /* 공개 · 발송된 칩은 누르면 그 수업 레포트를 학부모 화면 그대로 미리보기 (◀ 학생 ▶ · 20261102f) · 「작성 중」은 예전처럼 작성 → 발송 화면 */
     var view = x.kind !== 'wip' && publishedAny(c, x);
     var chip = '<button type="button" class="tdc-chip tdc-chip--' + x.kind + ' num" ' + (view ? 'data-rep-view="' + esc(c.name) + '"' : 'data-go-send="' + esc(c.name) + '"') + ' data-week="' + esc(x.week) + '" title="' +
