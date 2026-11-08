@@ -18,7 +18,8 @@
 //
 //  주간 퍼펙트 배지 (migration-075 · 20261108g) — 같은 매분 실행에서 수업 전 예고가 계산되는 시각에 반마다 한 번 hw_badge_due → 셈 → hw_badge_save
 //    수업 전 예고 칭찬 문자 끝에 「⭐ 이번 주 퍼펙트 배지를 받았어요! (지금까지 n개)」 (pre_remind_prepare 가 붙인다)
-//  루틴 우수자 (migration-077 · 20261108i) — 매달 1일 08:00 지난달 후보 계산(award_due → 셈 → award_save · 자동 발송 없음)
+//  루틴 우수자 (migration-077 · 20261108i) — 매달 1일 08:00 지난달 후보 계산(award_due → 셈 → award_save)
+//    같은 날 10:00 자동 발송 (migration-083 · award_auto_prepare · 설정에서 끄면 원장이 [보내기])
 //    「오늘」 확인 창 [우수자 다시 계산] { action: "award", op: "calc", month } · [보내기] { action: "award", op: "send", month } — 원장만
 //    문자 또는 알림톡(설정에 템플릿 코드 · SOLAPI_PFID · 카톡이 없으면 솔라피가 문자로) · 같은 달 한 학생 한 번
 //  사본 — 매분 copy_due → 묶음마다 1통 → 원장 시험 번호로 → copy_record (migration-064 · 20261106g).
@@ -491,10 +492,17 @@ async function handle(req: Request, cors: Record<string, string>) {
     /* 루틴 우수자 — 매달 1일 08:00 지난달 후보 계산 (보내지는 않음) · 077 전이면 조용히 넘어간다 */
     let award: Any = null;
     try { award = await awardCalc(now); } catch (e) { award = { error: String((e as Error).message || e).slice(0, 160) }; }
+    /* 루틴 우수자 자동 발송 — 그달 1일 10:00 (083 · 설정에서 끄면 안 감 · 그사이 원장이 고친 빼기 · 한마디 그대로) */
+    let awardAuto: Any = null;
+    try {
+      const ap: Any = await rpc("award_auto_prepare", { p_now: now, p_site: SITE });
+      const arows: Any[] = ap?.rows || [];
+      awardAuto = arows.length ? { month: ap.month, students: ap.students || 0, rows: arows.length, ...(await sendRows(arows)) } : { month: ap?.month || null };
+    } catch (e) { awardAuto = { error: String((e as Error).message || e).slice(0, 160) }; }
     /* 사본 — 064 를 아직 안 돌렸거나 오류가 나도 다른 일은 그대로 */
     let copy: Any = null;
     try { copy = await copyFlush(now); } catch (e) { copy = { error: String((e as Error).message || e).slice(0, 160) }; }
-    return json({ ok: true, day: prep?.day, rows: rows.length, ...r, hws, badge, pre, rupd, award, copy }, cors);
+    return json({ ok: true, day: prep?.day, rows: rows.length, ...r, hws, badge, pre, rupd, award, awardAuto, copy }, cors);
   }
 
   /* 2) 「지금 다시 보내기」 — 로그인한 운영진 */

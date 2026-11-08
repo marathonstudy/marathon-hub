@@ -1082,6 +1082,14 @@ delete from public.staff where email = '조교이메일@example.com';
 - 버튼 [리포트 보기] 웹링크(모바일 · PC) `https://marathonstudy.github.io/marathon-hub/me/?c=#{코드}&a=#{년월}` → 러닝노트가 #코드/award/2026-10 화면으로
 - 문자로 보낼 때는 지금처럼 본문 끝에 링크 · 템플릿 코드 칸이 비어 있으면 문자
 
+### 5-111. 20261108o — 월간 루틴 우수자 원장 확인 없이 자동 발송 (migration-083 · 함수 note-remind 다시 배포)
+1. SQL Editor → `supabase/migration-083-award-auto.sql` → Run (082 다음 · 맨 아래 세 줄 true)
+2. Edge Functions → note-remind → 이 저장소의 `supabase/functions/note-remind/index.ts` 전체로 다시 배포
+- 매달 1일 08:00 후보 계산 → 같은 날 10:00 자동 발송(award_auto_prepare · 달마다 한 번 · 배지도 그때) · 그달 1일에만 (1일이 지나 계산된 달은 원장이 [보내기])
+- 08:00~10:00 띠 「10월 루틴 우수자 7명 · 10:00 자동 발송 예정 · [미리보기·고치기]」 — 빼기 · 한마디 · [지금 보내기] 그대로 · 아무것도 안 하면 10:00 그대로
+- 보낸 뒤 「10월 루틴 우수자 7명 · 10:00 보냄」(누르면 받은 학생) · 같은 달 한 학생 한 번
+- 설정 「월간 루틴 우수자 자동 발송」(기본 켜짐 · 원장만) — 확인 창 · 문자 발송 → 연결 상태 「월간 루틴 우수자」(후보 계산 전에도 템플릿 코드 칸)
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

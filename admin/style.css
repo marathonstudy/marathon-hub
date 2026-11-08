@@ -4317,3 +4317,9 @@ dialog.vl-modal[open] { display: flex; flex-direction: column; overflow: hidden;
 
 /* 운영진 줄 「추가한 사람: 김민서 · 11/8」 (staff.js · 20261108l) */
 .op-row__by { margin-top: 2px; font-size: 11.5px; color: var(--ink-light); }
+
+/* 루틴 우수자 자동 발송 (award.js · 20261108o) */
+.awd-bar__link { appearance: none; border: 0; background: none; color: inherit; font: inherit; font-weight: 800; font-size: 14.5px; cursor: pointer; text-align: left; padding: 4px 0; min-height: 40px; text-decoration: underline; text-underline-offset: 3px; }
+.awd-bar__link b { color: #F2C14E; }
+.awd-cfg__auto { display: flex; gap: 6px; align-items: flex-start; font-size: 13px; font-weight: 700; }
+.awd-cfg__auto input { width: 20px; height: 20px; flex: none; }

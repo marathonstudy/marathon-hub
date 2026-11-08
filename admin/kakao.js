@@ -225,7 +225,8 @@
         : '<span class="kk-tpl__ro">' + (cfg.studentTpl ? '들어감' : '비어 있음') + ' <span class="muted-note">원장 계정만 바꿀 수 있습니다</span></span>') +
       '</label>' +
       '<p class="field__hint">' + (cfg.studentTpl ? '학생은 학생용 알림톡으로 받습니다 (카톡을 안 받으면 문자로).' : '비어 있어 학생은 지금처럼 문자로 받습니다.') +
-        ' 학부모는 그대로 「주간레포트안내」 알림톡입니다. 템플릿 변수는 #{날짜} #{이름} #{링크}, 버튼은 [레포트 보기](웹링크 #{링크}).</p></div>';
+        ' 학부모는 그대로 「주간레포트안내」 알림톡입니다. 템플릿 변수는 #{날짜} #{이름} #{링크}, 버튼은 [레포트 보기](웹링크 #{링크}).</p></div>' +
+      '<div id="awdSettingsHost">' + (window.Award && Award.settingsHtml ? Award.settingsHtml() : '') + '</div>';     /* 월간 루틴 우수자 설정 (award.js · 083) */
   }
   /* 학부모 — 레포트 안내 알림톡 템플릿 코드 (072 전이면 칸 없음) */
   function parentTplHtml(cfg) {
