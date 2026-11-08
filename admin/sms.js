@@ -696,6 +696,12 @@
   function deleteTemplate(id) {
     var t = tplById(id);
     if (!t) return Promise.resolve();
+    /* 과제 문자 돌림 문구 — 「과제 독려(학생) n」 · 「과제 칭찬(학생) n」은 최소 1개 남긴다 (20261108r) */
+    var hw = /^(과제 (독려|칭찬)\(학생\)) \d{1,2}$/.exec((t.title || '').trim());
+    if (hw && st.templates.filter(function (x) { return new RegExp('^' + hw[1].replace(/[()]/g, '\\$&') + ' \\d{1,2}$').test((x.title || '').trim()); }).length <= 1) {
+      toast('「' + hw[1] + '」 문구는 최소 1개 남겨야 합니다 — 고쳐서 쓰세요', 'bad');
+      return Promise.resolve();
+    }
     return UI.confirmAsk('문구 삭제', '「' + (t.title || '') + '」 문구를 지웁니다. 다른 직원 화면에서도 사라집니다.', '삭제').then(function (y) {
       if (!y) return;
       return sb().from('sms_templates').delete().eq('id', t.id).then(function (r) {

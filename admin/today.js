@@ -1526,13 +1526,41 @@
        링크가 없거나 못 불러온 학생은 판단할 수 없어 뺀다 · 학생 번호가 없으면 「번호 없음 n명」
      「진행 중」 칩 오른쪽 [과제 문자 · 독려 19 · 칭찬 3] (20261107c) — 칭찬 = 그 주 지금까지 나온 과제를 모두 낸 학생(늦게 낸 것 포함 · 면제는 뺌 · 0개면 없음)
        칭찬 0명이면 「과제 문자 · 독려 19」 · 독려 0명이면 「과제 문자 · 칭찬 3」 · 둘 다 0이면 버튼 없음 · 오늘 이미 칭찬 받은 학생은 칭찬 수에서 뺀다
-     정말 0명이면 연하게 「밀린 과제 없음 👍」 · 옆에 작게 「오늘 10:20 보냄 4명」 */
-  function nudgeOf(c) {
+     정말 0명이면 연하게 「밀린 과제 없음 👍」 · 옆에 작게 「오늘 10:20 보냄 4명」
+     기준 기간 하나 (20261108r · hwPeriod) — 독려 · 칭찬 모두 이 기간만 센다
+       수업 날 — 그 수업 전 주(D-7 ~ D-1) · 수업이 끝난 뒤(반 끝 시각 지남)면 「지난주」(after) · 끝나기 전이면 「이번 주」
+       수업 다음 날부터 — 새 주 과제가 하나라도 생기면 진행 중 주(L1 ~ 다음 수업 전날 · 「이번 주」) · 아직 없으면 지난 주 그대로(「지난주」) */
+  function nowHM() { var d = new Date(); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
+  function newWeekStarted(c, p, t0) {
+    return c.rows.some(function (s) {
+      var a = app[s.id];
+      if (!a || !a.ok || !a.data) return false;
+      var w = AppWeek.compute(a.data, p.from, t0, t0);
+      return !!(w && w.days.some(function (x) { return !x.weekend && x.date >= p.from && x.date <= t0 && ['none', 'onTime', 'late', 'exempt', 'today'].indexOf(x.hw) !== -1; }));
+    });
+  }
+  function hwPeriod(c) {
     if (!c || !c.per || !window.AppWeek) return null;
+    var t0 = DDay.today(), r = c.per.recent, n = c.per.now, m = (Store.metaOf && Store.metaOf(c.name)) || {};
+    var mk = function (p, lesson, word, extra) { return Object.assign({ from: p.from, to: p.to, lesson: lesson || '', word: word, upto: p.to < t0 ? p.to : t0, winFrom: Lesson.addDays(p.from, 1), winTo: lesson && lesson < t0 ? lesson : t0 }, extra || {}); };
+    if (r && r.lesson === t0) {
+      var ended = !!(m.end && nowHM() >= m.end);
+      return mk(r, r.lesson, ended ? '지난주' : '이번 주', { after: ended ? 'today' : '' });
+    }
+    if (n && n.from <= t0 && newWeekStarted(c, n, t0)) return mk({ from: n.from, to: n.to }, n.lesson, '이번 주');
+    if (r) return mk(r, r.lesson, '지난주', { after: 'nonew' });
+    return null;
+  }
+  function weekdaysIn(p) { var a = []; for (var d = p.from; d <= p.to; d = Lesson.addDays(d, 1)) { var w = Lesson.dowOf(d); if (w !== 0 && w !== 6) a.push(d); } return a; }
+  function nudgeOf(c) {
+    var P = hwPeriod(c);
+    if (!P || P.upto < P.from) return null;
     var t0 = DDay.today();
-    var ps = [c.per.recent, c.per.now].filter(function (p) { return p && (p.live ? (p.to < t0 ? p.to : t0) : p.to) >= p.from; });
-    if (!ps.length) return null;
-    var out = { ids: [], miss: {}, seen: {}, phone: 0, noPhone: 0, judged: 0, praise: [], total: {} };
+    var ps = [{ from: P.from, to: P.upto }];
+    var wd = weekdaysIn(P);
+    var out = { ids: [], miss: {}, seen: {}, phone: 0, noPhone: 0, judged: 0, praise: [], total: {},
+      period: { from: P.from, to: P.to, lesson: P.lesson, word: P.word, after: P.after || '', winFrom: P.winFrom, winTo: P.winTo, cls: c.name,
+                fromLabel: mdw(P.from), toLabel: mdw(P.to), lessonLabel: P.lesson ? mdw(P.lesson) : '', hwFrom: wd.length ? md(wd[0]) : md(P.from), hwTo: wd.length ? md(wd[wd.length - 1]) : md(P.to) } };
     c.rows.forEach(function (s) {
       var a = app[s.id];
       if (!a || !a.ok || !a.data) return;
@@ -1599,6 +1627,7 @@
     if (!v || !v.judged) return '';
     if (nudgeSent === null) setTimeout(loadNudgeSent, 0);
     if (praised === null) setTimeout(loadPraised, 0);
+    if (hwHist === null) setTimeout(loadHwHist, 0);
     return '<span class="tdc-nudge-box" data-nudge-box="' + esc(c.name) + '">' + nudgeInner(c, v) + '</span>';
   }
   /* 「과제 문자 · 독려 19 · 칭찬 3」 — 칭찬 0 · 독려 0 이면 그 칸을 뺀다 · 둘 다 0 이면 버튼 없음 (20261107c) */
@@ -1606,7 +1635,8 @@
   function nudgeInner(c, v) {
     v = v || nudgeOf(c);
     if (!v) return '';
-    var sent = '<small class="tdc-nudge__sent num" data-nudge-sent="' + esc(c.name) + '">' + sentText(c.name) + '</small>';
+    var sent = '<small class="tdc-nudge__sum num" data-nudge-sum="' + esc(c.name) + '">' + sumText(c.name) + '</small>' +
+      '<small class="tdc-nudge__sent num" data-nudge-sent="' + esc(c.name) + '">' + sentText(c.name) + '</small>';
     var dN = v.phone, pN = praiseLeft(v).length;
     var btn = dN || pN ? '<button type="button" class="btn btn--sm tdc-nudge num" data-nudge="' + esc(c.name) + '" aria-label="' + esc('과제 문자 — 독려 ' + dN + '명 · 칭찬 ' + pN + '명') + '">' + esc(nudgeLabel(dN, pN)) + '</button>' : '';
     if (!v.ids.length) return btn + (btn ? '' : '<span class="tdc-nudge-ok" title="지난 수업 이후 마감이 지난 과제를 모두 냈습니다">밀린 과제 없음 👍</span>') + sent;
@@ -1617,13 +1647,42 @@
     var c = (st.clsBy || {})[cls];
     var v = nudgeOf(c);
     if (!v || (!v.ids.length && !v.praise.length) || !window.Welcome) return;
-    Welcome.nudge({ students: v.ids, miss: v.miss, praise: v.praise, total: v.total });
+    Welcome.nudge({ students: v.ids, miss: v.miss, praise: v.praise, total: v.total, period: v.period });
   }
+  /* 반 카드 「이번 주 독려 18통 · 칭찬 6통」 (20261108r · migration-086 hw_msg_history) — 기준 기간에 그 반 학생이 받은 과제 문자 (직접 + 수업 전 자동) */
+  var hwHist = null;
+  function loadHwHist() {
+    if (!window.Welcome || !Welcome.hwHistory) return;
+    var t0 = DDay.today();
+    Welcome.hwHistory(Lesson.addDays(t0, -21), t0).then(function (rows) {
+      var h = JSON.stringify(rows || []);
+      if (hwHist && JSON.stringify(hwHist) === h) return;
+      hwHist = rows || [];
+      Array.prototype.forEach.call(document.querySelectorAll('[data-nudge-sum]'), function (el) { el.innerHTML = sumText(el.dataset.nudgeSum); });
+    });
+  }
+  function sumText(cls) {
+    var c = (st.clsBy || {})[cls];
+    if (!c || !hwHist || !hwHist.length) return '';
+    var v = nudgeOf(c);
+    if (!v) return '';
+    var P = v.period, ids = {}, n = { nudge: 0, praise: 0 };
+    c.rows.forEach(function (s) { ids[s.id] = 1; });
+    hwHist.forEach(function (x) {
+      var d = isoKst(x.at);
+      if (ids[x.student_id] && d >= P.winFrom && d <= P.winTo && n[x.kind] !== undefined) n[x.kind]++;
+    });
+    if (!n.nudge && !n.praise) return '';
+    return esc(P.word + ' ' + [n.nudge ? '독려 ' + n.nudge + '통' : '', n.praise ? '칭찬 ' + n.praise + '통' : ''].filter(Boolean).join(' · '));
+  }
+  function isoKst(at) { var d = new Date(new Date(at).getTime() + 9 * 3600000); return d.toISOString().slice(0, 10); }
   window.addEventListener('jt:welcome-sent', function (e) {
     if (e.detail && e.detail.kind !== 'nudge') return;
     nudgeSent = null;
+    hwHist = null;
     loadNudgeSent();
     loadPraised();
+    loadHwHist();
   });
 
   function linesHtml(c, chips) {
