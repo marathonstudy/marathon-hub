@@ -1124,7 +1124,7 @@
       if (fx.otherOpen) h += '<div class="hd-fix__otherrow"><input class="input hd-fix__other" data-hd-other type="text" maxlength="100" placeholder="' + (ex ? '예: 병결' : '사유를 적어 주세요') + '" aria-label="' + (ex ? '면제 사유(예: 병결)' : '기타 사유') + '" value="' + esc(fx.other) + '">' +
         '<button type="button" class="btn btn--sm btn--primary" data-hd-fix="other"' + (fx.other.trim() && !fx.busy ? '' : ' disabled') + '>저장</button></div>';
     }
-    if (pub) h += '<p class="hd-fix__pub">이미 공개한 레포트 기간입니다 — 바꾸면 다시 공개해야 학부모에게 반영됩니다</p>';
+    if (pub) h += '<p class="hd-fix__pub">이미 공개한 레포트 기간입니다 — 바꾸면 다시 공개해야 학생·학부모에게 반영됩니다</p>';
     if (rows.length) h += '<details class="hd-fix__log"><summary>수정 기록 ' + rows.length + '건</summary><ol>' + rows.slice().reverse().map(function (r) {
       return '<li>' + (r.status === 'app' ? '원래대로(앱 값)' : esc(FIX_NAME[r.status]) + (r.reason ? ' · ' + esc(r.reason) : '')) + (HwFix.stamp(r) ? ' · ' + esc(HwFix.stamp(r)) : '') + '</li>';
     }).join('') + '</ol></details>';
@@ -1136,7 +1136,7 @@
     var cut = HwFix.cutKnown(sid);
     fx.err = '';
     paintDetail();
-    if (msg && window.UI && UI.toast) UI.toast(msg + (cut && day <= cut ? ' · 이미 공개한 레포트 기간이라 다시 공개해야 학부모에게 반영됩니다' : ''), 'good');
+    if (msg && window.UI && UI.toast) UI.toast(msg + (cut && day <= cut ? ' · 이미 공개한 레포트 기간이라 다시 공개해야 학생·학부모에게 반영됩니다' : ''), 'good');
   }
   function setStatus(sid, day, to, reason) {
     var was = appStatusOf(sid, day);

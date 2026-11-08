@@ -159,7 +159,8 @@
   });
 
   /* 고친 뒤 · 다른 기기에서 바뀐 뒤 · 1분마다 */
-  ['jt:loaded', 'jt:video-linked', 'jt:rupd', 'jt:refreshed', 'jt:remote', 'jt:files-changed', 'jt:notice-saved'].forEach(function (ev) {
+  /* jt:weekly-changed · jt:videos-changed — 작성 화면 반 공통에서 자료 · 영상을 넣거나 지운 직후 (예전엔 1분 뒤에야 띠가 떴다 · 20261109a) */
+  ['jt:loaded', 'jt:video-linked', 'jt:rupd', 'jt:refreshed', 'jt:remote', 'jt:files-changed', 'jt:notice-saved', 'jt:weekly-changed', 'jt:videos-changed'].forEach(function (ev) {
     window.addEventListener(ev, soon);
   });
   setInterval(function () { if (!document.hidden) load(); }, 60000);

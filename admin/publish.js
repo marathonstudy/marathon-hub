@@ -314,10 +314,15 @@
     /* 정말 빠진 것만 한 줄 (막지는 않는다 · 개별 코멘트는 넣지 않는다) */
     var gap = Report.gapLine(picked.map(function (r) { return { name: r.student.name, common: r.common, entry: r.entry }; }));
     var ab = absentLine(picked.map(function (r) { return { student: r.student, data: Report.toReportData(r.student, r.common, r.entry, { start: state.week, end: state.weekEnd }) }; }));
-    UI.confirmAsk('학부모에게 공개',
-      picked.length + '명의 ' + whenText() + '를 공개합니다. 공개하면 바로 학생 개인 페이지에서 보입니다.' +
+    /* 이미 공개한 레포트를 다시 공개 — 「다시 공개 (내용 업데이트)」 (20261109a) */
+    var nAgain = picked.filter(function (r) { return state.published[r.student.id]; }).length;
+    var allAgain = nAgain === picked.length;
+    UI.confirmAsk(allAgain ? '다시 공개 (내용 업데이트)' : '학생·학부모에게 공개',
+      (allAgain ? picked.length + '명의 ' + whenText() + '를 다시 공개합니다. 이미 보낸 레포트 내용이 새로 바뀝니다. 학생·학부모 화면에 바로 보입니다.'
+        : picked.length + '명의 ' + whenText() + '를 공개합니다. 공개하면 바로 학생·학부모 화면에서 보입니다.' +
+          (nAgain ? '\n\n그중 ' + nAgain + '명은 다시 공개 — 이미 보낸 레포트 내용이 새로 바뀝니다.' : '')) +
       (gap ? '\n\n' + gap + ' — 비어 있는 칸은 레포트에서 숨습니다.' : '') +
-      (ab ? '\n\n' + ab : ''), '공개').then(function (ok) {
+      (ab ? '\n\n' + ab : ''), allAgain ? '다시 공개' : '공개').then(function (ok) {
       if (!ok) return;
       var btn = $('#btnPublish');
       btn.disabled = true;
@@ -354,6 +359,7 @@
         if (window.HwFix) HwFix.clearCut();
         toast(rows.length + '명 공개했습니다. 레포트 발송 → 3 발송에서 링크를 보내세요', 'good');
         if (window.RTabs) RTabs.counts();           /* 단계 버튼 「2 공개 11/11 ✓」 바로 */
+        window.dispatchEvent(new CustomEvent('jt:rupd'));   /* 업데이트 문자 띠를 바로 다시 (자료 · 영상만 바뀌어도 · 20261109a) */
         return load().then(function () { return changed.length ? askNotify(changed) : null; });
       }).catch(function (e) {
         showError('공개하지 못했습니다 — ' + e.message);
@@ -374,7 +380,7 @@
       /* 레포트 업데이트 문자(migration-073)가 있으면 따로 묻지 않는다 — 30분 뒤 모아 한 통 · 맨 위 띠에서 [지금 보내기] [이번엔 안 보내기] (20261108e) */
       if (window.RUpd && RUpd.has()) {
         window.dispatchEvent(new CustomEvent('jt:rupd'));
-        toast('이미 보낸 ' + notifyList.length + '명 — 바뀐 내용은 30분 뒤 업데이트 문자로 갑니다 (맨 위 띠에서 바로 보내거나 안 보낼 수 있어요)', 'good');
+        toast('이미 보낸 ' + notifyList.length + '명 — 바뀐 내용은 ' + ((RUpd.state && RUpd.state().wait) || 10) + '분 뒤 업데이트 문자로 갑니다 (밤 10시 ~ 아침 8시는 8시 · 맨 위 띠에서 바로 보내거나 안 보낼 수 있어요)', 'good');
         return;
       }
       $('#notifyDesc').textContent = '이미 레포트를 보낸 학생 중 내용이 바뀐 ' + notifyList.length + '명입니다. 알릴 학생만 체크하세요.';
