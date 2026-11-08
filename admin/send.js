@@ -143,6 +143,8 @@
   }
 
   function kakaoOn() { return !!(window.Kakao && Kakao.ready()); }
+  /* 학생용 알림톡을 보낼 수 있는 그 반 학생 (071) */
+  function stuOf(g) { return kakaoOn() && Kakao.studentTpl && Kakao.studentTpl() ? Kakao.studentTargets(g.rows.map(function (s) { return s.id; })) : []; }
 
   function fmtSent(iso) {
     if (!iso) return '';
@@ -296,9 +298,13 @@
           : '<div class="snd-unpub">아직 공개 전입니다 <button class="btn btn--sm" type="button" data-gopub>공개하러 가기</button></div>';
       } else {
         var targets = kakaoOn() ? g.rows.filter(function (s) { var k = rowState(s); return k === 'ready' || k === 'failed'; }) : [];
+        var stuIds = stuOf(g);
         var need = window.Today && Today.appNeed ? g.rows.filter(function (s) { return Today.appNeed(s.id); }).map(function (s) { return s.id; }) : [];
         body = '<div class="snd-acts">' +
-            (kakaoOn() ? '<button class="btn btn--sm btn--primary" type="button" data-kk-class' + (targets.length && !Kakao.busy() ? '' : ' disabled') + '>알림톡 ' + targets.length + '명 보내기</button>' : '') +
+            (kakaoOn() ? '<button class="btn btn--sm btn--primary" type="button" data-kk-class' + ((targets.length || (stuIds.length && Kakao.withStudent())) && !Kakao.busy() ? '' : ' disabled') + '>알림톡 ' + targets.length + '명 보내기</button>' : '') +
+            /* 학생에게도 학생용 알림톡 (설정에 학생용 템플릿 코드가 있을 때 · 기본 켜짐 · 071) — 학부모 번호가 없는 학생도 */
+            (stuIds.length
+              ? '<label class="check-line snd-kkstu"><input type="checkbox" data-kk-stu' + (Kakao.withStudent() ? ' checked' : '') + '> <span>학생에게도 학생용 알림톡 ' + stuIds.length + '명</span></label>' : '') +
             /* 여러 명에게 알림톡 — 「내 번호로도 한 통 받기(맨 위 학생 기준)」 (sms.js · 20261031r) */
             (kakaoOn() && targets.length > 1 && window.Sms && Sms.copyHtml ? Sms.copyHtml() : '') +
             (g.name === NOCLS ? '' : '<button class="btn btn--sm" type="button" data-sms-cls="' + esc(g.name) + '" data-sms-week="' + esc(state.week) + '" title="문자 창 — 보낼 표 · 이 수업 레포트를 누구에게 언제 보냈는지도 표에 나옵니다">반 전체 문자 · 보낸 표</button>') +
@@ -506,11 +512,14 @@
 
     if (ev.target.closest('[data-gopub]')) { goPublish(); return; }
 
+    var ks = ev.target.closest('[data-kk-stu]');
+    if (ks) { Kakao.setWithStudent(ks.checked); render(); return; }
+
     var kc = ev.target.closest('[data-kk-class]');
     if (kc && !kc.disabled) {
       var g = groups().find(function (x) { return x.name === cls; });
       var ids = g ? g.rows.filter(function (s) { var k = rowState(s); return k === 'ready' || k === 'failed'; }).map(function (s) { return s.id; }) : [];
-      Kakao.send(ids, false);
+      Kakao.send(ids, false, g ? stuOf(g) : []);
       return;
     }
 

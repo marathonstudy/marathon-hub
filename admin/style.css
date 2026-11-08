@@ -4237,3 +4237,10 @@ dialog.vl-modal[open] { display: flex; flex-direction: column; overflow: hidden;
 .op-phoneform { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
 .op-phoneform .input { width: 160px; max-width: 100%; }
 .op-phoneform small { flex-basis: 100%; }
+/* 학생용 레포트 알림톡 (20261108c) */
+.kk-tpl { margin-top: 12px; }
+.kk-tpl__row { display: flex; gap: 6px; flex-wrap: wrap; }
+.kk-tpl__row .input { flex: 1 1 220px; min-width: 0; }
+.kk-tpl__ro { font-weight: 700; }
+.snd-kkstu { font-size: 13px; }
+.sms-via__n { color: var(--ink-deep); }

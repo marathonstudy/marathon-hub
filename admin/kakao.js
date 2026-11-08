@@ -10,6 +10,10 @@
    「문자 발송」 → 연결 상태의 알림톡 칸 (20261031m · 예전 「오늘」 → [설정]) — 키가 들어갔는지(✓/✗) · 문자로 대신 보내기 · 하루 최대 · 1건 예상 비용
      (내 시험 번호 · 나에게 시험 발송은 연결 상태 위쪽 — sms.js)
    키 값 · 템플릿 ID 값은 어디에도 보이지 않는다 (함수가 있음/없음만 알려 준다).
+   학생용 레포트 알림톡 (migration-071 · 20261108c)
+     · 연결 상태 알림톡 칸 「학생용 레포트 알림톡 템플릿 코드」 — 원장만 고친다 (kakao_tpl_set · 조교는 「들어감 / 비어 있음」만)
+       비어 있으면 학생은 지금처럼 문자 · 코드가 있으면 학생은 학생용 알림톡 (#{날짜} #{이름} #{링크} · 버튼 [레포트 보기])
+     · 3 발송 [알림톡 n명 보내기] 옆 「학생에게도 학생용 알림톡 n명」 (기본 켜짐 · 이 기기에 기억) — 학부모를 보낸 뒤 학생에게
    ============================================================ */
 
 (function () {
@@ -26,6 +30,17 @@
   var FN = 'kakao-send';
   var LMS_WON = 45;                     /* 문자로 대신 보낼 때 대략 (LMS) */
   var st = { week: '', data: null, missing: false, busy: false, run: 0 };
+  /* 3 발송 — 학생에게도 학생용 알림톡 (기본 켜짐 · 이 기기에 기억) */
+  var STU_KEY = 'mhub.kkStudent';
+  function withStu() { try { return localStorage.getItem(STU_KEY) !== '0'; } catch (e) { return true; } }
+  function setWithStu(on) { try { localStorage.setItem(STU_KEY, on ? '1' : '0'); } catch (e) {} }
+  function stuTpl() { return !!(st.data && st.data.cfg && st.data.cfg.studentTpl); }
+  /* 학생 알림톡을 보낼 수 있는 학생 — 공개 · 학생 링크 · 학생 번호(학부모와 다름) · 아직 안 보냄 */
+  function stuTargets(ids, resend) {
+    return ids.map(byId).filter(function (s) {
+      return s && s.published && s.slink && s.sphone && (resend || !(s.slast && s.slast.status === 'ok'));
+    }).map(function (s) { return s.id; });
+  }
 
   function invoke(body) {
     var fns = sb() && sb().functions;
@@ -89,7 +104,8 @@
     var parts = [];
     if (test) parts.push(res.sent ? '내 번호로 시험 알림톡을 보냈습니다' : '시험 발송이 실패했습니다' + (res.results && res.results[0] && res.results[0].error ? ' — ' + res.results[0].error : ''));
     else {
-      parts.push('알림톡 ' + res.sent + '건 접수');
+      parts.push('알림톡 ' + (res.stuSent != null ? '학부모 ' + res.sent + '건 · 학생 ' + res.stuSent + '건' : res.sent + '건') + ' 접수');
+      if (res.stuError) parts.push('학생: ' + res.stuError);
       if (res.failed) parts.push('실패 ' + res.failed + '건');
       var sk = (res.skipped || []).length;
       if (sk) parts.push('건너뜀 ' + sk + '명');
@@ -104,17 +120,20 @@
   }
 
   /* ids — 학생 id 목록 (알림톡 상태 자료에 있는 학생만) */
-  function send(ids, resend) {
+  /* stuIds — 학생용 알림톡을 보낼 학생 (3 발송 반 카드가 넘긴다 · 없으면 ids 에서 고른다) */
+  function send(ids, resend, stuIds) {
     var list = ids.map(byId).filter(Boolean);
-    if (!list.length) { toast('알림톡을 보낼 학생이 없습니다', 'bad'); return Promise.resolve(); }
+    var sids = stuTpl() && withStu() ? stuTargets(stuIds || ids, resend) : [];
+    if (!list.length && !sids.length) { toast('알림톡을 보낼 학생이 없습니다', 'bad'); return Promise.resolve(); }
     var cfg = (st.data && st.data.cfg) || {};
     var n = list.length;
     var msgs = list.reduce(function (a, s) { return a + Math.max(1, (s.phones || []).length); }, 0);
     var won = msgs * (cfg.unitWon != null ? cfg.unitWon : 13);
     /* 「내 번호로도 한 통 받기(맨 위 학생 기준)」 — 맨 위 학생 알림톡 그대로 내 시험 번호로 (보낸 기록 「내 번호 확인용」 · sms.js · 20261031r) */
     var copy = n > 1 && !!(window.Sms && Sms.copyOn && Sms.copyOn());
-    var nm0 = (Store.getStudents().find(function (x) { return x.id === list[0].id; }) || {}).name || '첫';
-    var desc = n + '명에게 알림톡을 보냅니다' + (copy ? ' + 내 번호 1통 (맨 위 ' + nm0 + ' 학생 내용 그대로 · ' + Sms.myPhone() + ' · 보냄 표시에는 세지 않음)' : '') + '. 예상 비용 약 ' + won.toLocaleString() + '원' +
+    var nm0 = list.length ? (Store.getStudents().find(function (x) { return x.id === list[0].id; }) || {}).name || '첫' : '';
+    won += sids.length * (cfg.unitWon != null ? cfg.unitWon : 13);
+    var desc = (sids.length ? (n ? '학부모 ' + n + '명 · ' : '') + '학생 ' + sids.length + '명(학생용 알림톡)' : n + '명') + '에게 알림톡을 보냅니다' + (copy ? ' + 내 번호 1통 (맨 위 ' + nm0 + ' 학생 내용 그대로 · ' + Sms.myPhone() + ' · 보냄 표시에는 세지 않음)' : '') + '. 예상 비용 약 ' + won.toLocaleString() + '원' +
       (msgs !== n ? ' (번호 ' + msgs + '개)' : '') + '.' +
       (cfg.smsFallback ? ' 알림톡이 실패하면 문자로 대신 보내며, 그때는 건당 약 ' + LMS_WON + '원까지 더 들 수 있습니다.' : '') +
       (resend ? ' 이미 보낸 학생에게 한 번 더 보냅니다.' : '');
@@ -135,6 +154,20 @@
           });
         });
       }, Promise.resolve()).then(function () {
+        /* 학생 — 학생용 알림톡 (학부모를 보낸 뒤) */
+        if (!total.ok || !sids.length) return;
+        var sc = [];
+        for (var j = 0; j < sids.length; j += 100) sc.push(sids.slice(j, j + 100));
+        return sc.reduce(function (p, c) {
+          return p.then(function () {
+            return invoke({ action: 'send', who: 'student', week: st.week, students: c, resend: !!resend }).then(function (r) {
+              if (!r || !r.ok) { total.stuError = (r && r.message) || '학생 알림톡을 보내지 못했습니다.'; return; }
+              total.stuSent = (total.stuSent || 0) + (r.sent || 0); total.failed += r.failed || 0;
+              total.skipped = total.skipped.concat(r.skipped || []);
+            });
+          });
+        }, Promise.resolve());
+      }).then(function () {
         summarize(total, false);
         if (!copy || !total.ok) { after(); return; }
         return invoke({ action: 'test', week: st.week, students: [list[0].id] }).then(function (r) {
@@ -174,7 +207,32 @@
             '<button class="btn btn--sm" type="button" id="kkSaveCfg">알림톡 설정 저장</button>' +
           '</div>' +
           '<p class="field__hint">오늘 알림톡 ' + esc(cfg.today || 0) + '건' + (cfg.testPhone ? ' · 내 시험 번호 <span class="num">' + esc(cfg.testPhone) + '</span> (위에서 바꿉니다)' : '') + '</p>'
-        : '<p class="panel__hint">migration-020 SQL 을 실행하면 알림톡 설정을 바꿀 수 있습니다.</p>');
+        : '<p class="panel__hint">migration-020 SQL 을 실행하면 알림톡 설정을 바꿀 수 있습니다.</p>') +
+      tplHtml(cfg);
+  }
+  /* 학생용 레포트 알림톡 템플릿 코드 — 원장만 고친다 (071 전이면 칸 없음) */
+  function tplHtml(cfg) {
+    if (!cfg || cfg.studentTpl == null) return '';
+    var v = cfg.owner && cfg.tpl ? cfg.tpl.student || '' : '';
+    return '<div class="kk-tpl" id="kkTplStudent">' +
+      '<label class="field"><span class="field__label">학생용 레포트 알림톡 템플릿 코드 <span class="field__opt">「주간레포트안내_학생」 · 비우면 학생은 문자</span></span>' +
+      (cfg.owner
+        ? '<span class="kk-tpl__row"><input class="input" id="kkTplStudentIn" maxlength="80" autocomplete="off" spellcheck="false" placeholder="솔라피 템플릿 코드 (예: KA01TP…)" value="' + esc(v) + '">' +
+          '<button class="btn btn--sm" type="button" id="kkTplStudentSave">저장</button></span>'
+        : '<span class="kk-tpl__ro">' + (cfg.studentTpl ? '들어감' : '비어 있음') + ' <span class="muted-note">원장 계정만 바꿀 수 있습니다</span></span>') +
+      '</label>' +
+      '<p class="field__hint">' + (cfg.studentTpl ? '학생은 학생용 알림톡으로 받습니다 (카톡을 안 받으면 문자로).' : '비어 있어 학생은 지금처럼 문자로 받습니다.') +
+        ' 학부모는 그대로 「주간레포트안내」 알림톡입니다. 템플릿 변수는 #{날짜} #{이름} #{링크}, 버튼은 [레포트 보기](웹링크 #{링크}).</p></div>';
+  }
+  function saveTpl() {
+    var v = ($('#kkTplStudentIn').value || '').trim();
+    if (v && !/^[A-Za-z0-9_-]{4,80}$/.test(v)) { toast('템플릿 코드는 솔라피에 보이는 영문 · 숫자 코드를 그대로 넣어 주세요', 'bad'); return; }
+    sb().rpc('kakao_tpl_set', { p_kind: 'student', p_code: v }).then(function (r) {
+      if (r.error) { toast(r.error.message, 'bad'); return; }
+      toast(v ? '학생용 템플릿 코드를 저장했습니다 — 이제 학생도 알림톡으로 받습니다' : '학생용 템플릿 코드를 비웠습니다 — 학생은 문자로 받습니다', 'good');
+      loadSettings(); load();
+      if (window.Sms && Sms.reloadKakao) Sms.reloadKakao();
+    });
   }
 
   function loadSettings() {
@@ -206,6 +264,7 @@
     if (set) {
       set.addEventListener('click', function (e) {
         if (e.target.id === 'kkSaveCfg') saveCfg();
+        if (e.target.id === 'kkTplStudentSave') saveTpl();
       });
     }
   }
@@ -223,6 +282,10 @@
     cfg: function () { return (st.data && st.data.cfg) || {}; },
     today: function () { return (st.data && st.data.today) || 0; },
     send: send,
-    testSend: testSend
+    testSend: testSend,
+    studentTpl: stuTpl,
+    withStudent: withStu,
+    setWithStudent: setWithStu,
+    studentTargets: stuTargets
   };
 })();

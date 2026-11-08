@@ -9,6 +9,11 @@
 //                      한 번에 100명 · 하루 최대 건수). 보낸 결과는 kakao_record 로 기록(번호는 뒤 4자리만).
 //                      fallback: true — 「카톡으로 보내기(안 받는 사람은 문자로)」 · 설정의 「문자로 대신 보내기」가 꺼져 있어도 이번만 문자로 대신
 //    action "test"   — { week, students } 그 주 레포트가 공개된 첫 학생 내용으로, 설정에 넣은 내 번호에 한 건만.
+//    who: "student" (send) — 학생 본인에게 학생용 알림톡 (migration-071 · 20261108c)
+//                      템플릿 코드는 코드 파일이 아니라 설정(app_settings 'kakao_tpl' · 원장만 고침)에서 DB 함수 kakao_prepare_student 가 돌려준다
+//                      변수 #{날짜} #{이름} #{링크}(학생 링크 전체 주소) · 버튼 [레포트 보기](웹링크 #{링크}) · 코드가 비어 있으면 reason notpl
+//                      학부모(기본 who)는 그대로 기존 템플릿(SOLAPI_TEMPLATE_ID · #{이름} #{수업일} #{코드}) — 기존 템플릿은 건드리지 않는다
+//                      대체 문자는 학부모와 같다 — 카톡이 없어 나중에 실패하면 솔라피가 문자로 대신 (disableSms 규칙 그대로)
 //  솔라피는 「접수」 결과만 바로 알려 준다 (실제 도착 여부는 솔라피 콘솔의 발송 내역에서 본다).
 //
 //  키 — Supabase 대시보드 → Edge Functions → Secrets 에만 넣는다. 이 파일 · 저장소 · 화면에는 어떤 키도 없다.
@@ -73,7 +78,9 @@ const REASON: Record<string, string> = {
   nolink: "학부모 링크 없음",
   nophone: "번호 없음",
   already: "이미 보냄",
+  same: "학부모와 같은 번호",
 };
+const SITE = "https://marathonstudy.github.io/marathon-hub";          // 학생 링크 앞부분 (assets/config.js 의 siteUrl 과 같다)
 
 async function handle(req: Request, cors: Record<string, string>) {
   const auth = req.headers.get("authorization") ?? "";
@@ -94,10 +101,13 @@ async function handle(req: Request, cors: Record<string, string>) {
 
   const have: Record<string, boolean> = {};
   KEYS.forEach((k) => { have[k] = !!env(k); });
-  if (action === "health") return json({ ok: true, keys: have, ready: KEYS.every((k) => have[k]) }, cors);
+  const studentTpl = !!cfg?.studentTpl;
+  if (action === "health") return json({ ok: true, keys: have, ready: KEYS.every((k) => have[k]), studentTpl }, cors);
   if (action === "status") {
-    return json({ ok: true, keys: have, templateSet: have.SOLAPI_TEMPLATE_ID, cfg }, cors);
+    return json({ ok: true, keys: have, templateSet: have.SOLAPI_TEMPLATE_ID, studentTpl, cfg }, cors);
   }
+  const who = body.who === "student" ? "student" : "parent";
+  if (who === "student" && action === "test") return json({ ok: false, reason: "input", message: "학생 알림톡 시험 발송은 아직 없습니다." }, cors, 400);
   if (action !== "send" && action !== "test") return json({ ok: false, reason: "input", message: "알 수 없는 요청입니다." }, cors, 400);
 
   const week = String(body.week ?? "");
@@ -113,10 +123,16 @@ async function handle(req: Request, cors: Record<string, string>) {
   /* 1) 보낼 줄 — 기록 줄을 먼저 만든다 */
   let prep: Any;
   try {
-    prep = await rpcAs(auth, apikey, "kakao_prepare", { p_week: week, p_students: students, p_resend: !!body.resend, p_test: action === "test" });
+    prep = who === "student"
+      ? await rpcAs(auth, apikey, "kakao_prepare_student", { p_week: week, p_students: students, p_resend: !!body.resend, p_site: SITE })
+      : await rpcAs(auth, apikey, "kakao_prepare", { p_week: week, p_students: students, p_resend: !!body.resend, p_test: action === "test" });
   } catch (e) {
-    return json({ ok: false, reason: "prepare", message: String((e as Error).message || e) }, cors, 200);
+    const m = String((e as Error).message || e);
+    if (who === "student" && /Could not find the function|schema cache/i.test(m)) return json({ ok: false, reason: "nosql", message: "migration-071 SQL 을 먼저 실행해 주세요." }, cors, 200);
+    return json({ ok: false, reason: "prepare", message: m }, cors, 200);
   }
+  const tplId = who === "student" ? String(prep?.tpl || "") : env("SOLAPI_TEMPLATE_ID");
+  if (prep?.ok && !tplId) return json({ ok: false, reason: "notpl", message: "학생용 레포트 알림톡 템플릿 코드가 설정에 없습니다." }, cors, 200);
   const skipped = (prep?.skipped || []).map((s: Any) => ({ id: s.id, name: s.name, reason: s.reason, label: REASON[s.reason] || s.reason }));
   if (!prep?.ok) return json({ ok: false, reason: prep?.reason || "prepare", message: prep?.message || "보낼 수 없습니다.", skipped }, cors, 200);
   const rows: Any[] = prep.rows || [];
@@ -128,8 +144,10 @@ async function handle(req: Request, cors: Record<string, string>) {
     from: env("SOLAPI_SENDER").replace(/\D/g, ""),
     kakaoOptions: {
       pfId: env("SOLAPI_PFID"),
-      templateId: env("SOLAPI_TEMPLATE_ID"),
-      variables: { "#{이름}": String(r.name || ""), "#{수업일}": String(r.lesson || ""), "#{코드}": String(r.code || "") },
+      templateId: tplId,
+      variables: who === "student"
+        ? { "#{날짜}": String(r.date || ""), "#{이름}": String(r.name || ""), "#{링크}": String(r.link || "") }
+        : { "#{이름}": String(r.name || ""), "#{수업일}": String(r.lesson || ""), "#{코드}": String(r.code || "") },
       disableSms: !(prep.smsFallback || body.fallback === true),
     },
     customFields: { log: String(r.log_id) },
@@ -166,7 +184,7 @@ async function handle(req: Request, cors: Record<string, string>) {
   await rpcAs(auth, apikey, "kakao_record", { p_results: results.map(({ log_id, ok, error, message_id }) => ({ log_id, ok, error, message_id })) }).catch(() => {});
   const sent = results.filter((x) => x.ok).length;
   return json({
-    ok: true, test: action === "test", sent, failed: results.length - sent, skipped,
+    ok: true, test: action === "test", who, sent, failed: results.length - sent, skipped,
     results: results.map((x) => ({ student_id: x.student_id, ok: x.ok, error: x.error })),
   }, cors);
 }

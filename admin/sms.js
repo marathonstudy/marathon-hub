@@ -13,6 +13,10 @@
        확인 한 번(「목동반 학생 11명에게 보냅니다」) → 「보냄 n · 실패 n(이름)」 · 학생 줄마다 「보냄 18:09」 / 「실패(사유)」
      · 카톡 알림톡이 연동돼 있고 레포트 안내(3 발송에서 · 「레포트」 + #{링크})면 「카톡으로 보내기(안 받는 사람은 문자로)」 / 「문자로만」
        카톡은 학부모에게 템플릿(주간레포트안내) 그대로 · 학생 본인 번호는 문자로 (kakao-send · fallback)
+       설정에 학생용 템플릿 코드가 있으면 학생도 학생용 알림톡 (kakao-send who student · migration-071 · 20261108c)
+       「보내는 방법」 아래 「학부모 10명 알림톡 · 학생 10명 알림톡 (실패 시 문자)」 / 코드가 없으면 「학생 10명 문자」
+       솔라피가 바로 받지 않은 사람만 문자로 대신 (학생 = 학생 문자 글 · 학부모 = 그 문자 글 · 보낸 기록 이름 「대체 문자」)
+       카톡이 없어 나중에 실패하는 사람은 지금처럼 솔라피가 문자로 대신 · 사본은 한 번 발송에 한 통 (copy_due · 071)
      · 보낸 뒤 맨 위 띠 「✓ 보냄 22 · 실패 0」(실패면 빨간 띠 · 실패만 다시 보내기)
      · 내용 칸: {학생이름} {반이름} #{링크}(학부모에겐 학부모 링크, 학생에겐 학생 링크) #{수업일} {첫수업일} {앱입장코드} #{앱 설치 링크} {러닝노트주소}
        예전 칸 #{이름} #{반} #{입장코드}도 그대로 · 단문(90바이트까지) · 장문 표시 · 예상 비용 · [내용 비우기] · [이 글을 문구로 저장]
@@ -382,6 +386,19 @@
 
   /* ---------- 카톡 알림톡으로 보내기 (레포트 안내만 · 학부모) ---------- */
   function kakaoReady() { return !!(st.kk && st.kk.ok && st.kk.ready); }
+  function stuKk() { return kakaoReady() && !!st.kk.studentTpl; }
+  /* 「학부모 10명 알림톡 · 학생 10명 알림톡 (실패 시 문자)」 */
+  function uniq(a) { return a.filter(function (v, i) { return a.indexOf(v) === i; }); }
+  function viaLine(p) {
+    if (!p) return '';
+    var par = uniq(p.items.filter(function (x) { return x.t !== 'student'; }).map(function (x) { return x.s.id; })).length;
+    var stu = uniq(p.items.filter(function (x) { return x.t === 'student'; }).map(function (x) { return x.s.id; })).length;
+    var parts = [];
+    if (par) parts.push('학부모 ' + par + '명 알림톡');
+    if (stu) parts.push('학생 ' + stu + '명 ' + (stuKk() ? '알림톡' : '문자'));
+    if (!parts.length) return '';
+    return parts.join(' · ') + (!par && !stuKk() ? '' : stu && !stuKk() ? ' (알림톡 실패 시 문자)' : ' (실패 시 문자)');
+  }
   function viaKakao() { return !$('#smsViaSec').hidden && $('#smsViaKakao').checked; }
   function renderVia() {
     var show = kakaoReady() && !!st.week && !st.notify && isReportBody();
@@ -390,8 +407,10 @@
       sec.hidden = !show;
       if (show && !st.viaTouched) $('#smsViaKakao').checked = true;
     }
-    $('#smsViaHint').textContent = show
-      ? (viaKakao() ? '학부모에게는 알림톡 「' + KK_TEMPLATE + '」 템플릿 그대로 갑니다 (위 글이 아니라 템플릿 글 · 카톡을 안 받으면 문자로). 학생 본인 번호는 위 글로 문자.' : '모두 위 글 그대로 문자로 보냅니다.')
+    var vl = show && viaKakao() ? viaLine(plan) : '';
+    $('#smsViaHint').innerHTML = show
+      ? (viaKakao() ? (vl ? '<b class="sms-via__n">' + esc(vl) + '</b><br>' : '') + esc('학부모에게는 알림톡 「' + KK_TEMPLATE + '」 템플릿 그대로 갑니다 (위 글이 아니라 템플릿 글 · 카톡을 안 받으면 문자로). ' +
+          (stuKk() ? '학생 본인 번호는 학생용 알림톡으로 갑니다 (카톡을 안 받으면 문자로).' : '학생 본인 번호는 위 글로 문자.')) : '모두 위 글 그대로 문자로 보냅니다.')
       : '';
   }
 
@@ -531,8 +550,8 @@
     var body = $('#smsBody').value;
     var sibOn = !!($('#smsSib') && $('#smsSib').checked);
     renderEntry();
-    renderVia();
     plan = build(listFromPicks(), body, sibOn);
+    renderVia();
     var b0 = bytes(body), ex = plan.items[0];
     var kind = ex ? ex.kind : b0 <= 90 && !$('#smsAd').checked && !hasLink(body) && !hasApp(body) ? 'SMS' : 'LMS';
     $('#smsLen').innerHTML = body ? '<span class="sms-kind sms-kind--' + kind + '">' + (kind === 'SMS' ? '단문' : '장문') + '</span> ' + body.length + '자 · ' + (ex ? ex.bytes : b0) + '바이트 <span class="muted-note">90바이트가 넘으면 장문</span>' : '';
@@ -896,7 +915,7 @@
     return invoke({ action: 'health' }, KFN).then(function (r) {
       if (r && r.ok && r.keys) {
         var miss = Object.keys(r.keys).filter(function (k) { return !r.keys[k]; });
-        st.kk = { ok: true, ready: !miss.length, keys: r.keys, missing: miss };
+        st.kk = { ok: true, ready: !miss.length, keys: r.keys, missing: miss, studentTpl: !!r.studentTpl };
       } else st.kk = { ok: false, ready: false, message: (r && r.message) || '' };
       return st.kk;
     });
@@ -1121,7 +1140,7 @@
     var lead = retryList || again ? '' : leadOf(p);
     var desc = (lead ? lead + '. ' : '') + p.people + '명 · 문자 ' + p.items.length + '건' + (copy ? ' + 내 번호 1통' : '') + ' (단문 ' + p.sms + ' · 장문 ' + p.lms + ') · 예상 약 ' + p.won.toLocaleString() + '원을 보냅니다.' +
       (copy ? ' 맨 위 ' + p.items[0].s.name + ' 학생에게 가는 내용 그대로 내 번호(' + me.phone + ')로도 한 통 갑니다 (보냄 표시에는 세지 않음).' : '') +
-      (kk ? ' 학부모 ' + kkN + '명은 카톡 알림톡(「' + KK_TEMPLATE + '」 템플릿)으로 — 카톡을 안 받으면 문자로 대신 갑니다.' : '') +
+      (kk ? ' ' + viaLine(p) + '. 학부모 ' + kkN + '명은 카톡 알림톡(「' + KK_TEMPLATE + '」 템플릿)' + (stuKk() ? ' · 학생은 학생용 알림톡' : '') + '으로 — 카톡을 안 받으면 문자로 대신 갑니다.' : '') +
       (again ? ' 방금 보낸 사람에게 한 번 더 보냅니다.' : '') +
       (prevN ? ' 이 레포트를 이미 보낸 학생 ' + prevN + '명에게도 다시 보냅니다.' : '') +
       ($('#smsAd').checked ? ' 광고 문자입니다 — (광고) · 발신처 · 무료수신거부 안내가 붙습니다.' : '') +
@@ -1131,7 +1150,7 @@
       (st.purpose === 'app' ? ' 보내면 상담 카드에 「앱 안내 문자 보냄」이 남습니다.' : '') +
       (p.left.length ? ' ⚠ 바뀌지 않은 칸이 있어 ' + p.left.map(function (x) { return x.s.id; }).filter(function (v, i, a) { return a.indexOf(v) === i; }).length + '명에게는 보내지 않습니다 (' + p.left.map(function (x) { return x.left.join(' '); }).filter(function (v, i, a) { return a.indexOf(v) === i; }).join(', ') + ').' : '') +
       ' 오늘 ' + ((st.cfg && st.cfg.today) || 0) + ' / ' + cfg().dailyMax + '건.' +
-      detailText(st.purpose === 'app' || p.items.length <= 5 ? (kk ? p.items.filter(function (x) { return x.t === 'student'; }) : p.items) : []);
+      detailText(st.purpose === 'app' || p.items.length <= 5 ? (kk ? (stuKk() ? [] : p.items.filter(function (x) { return x.t === 'student'; })) : p.items) : []);
     UI.confirmAsk(retryList ? '실패만 다시 보내기' : again ? '다시 보내기' : lead || '문자 보내기', desc, '보내기').then(function (yes) {
       if (!yes) return;
       st.busy = true; updateButtons();
@@ -1180,6 +1199,39 @@
         });
       });
     }, Promise.resolve()).then(function () {
+      if (!all.ok || !stu.length || !stuKk()) return all;
+      /* 학생 — 학생용 알림톡 (설정에 코드가 있을 때 · 071) */
+      var sids = uniq(stu.map(function (x) { return x.s.id; }));
+      var schunks = [];
+      for (var j = 0; j < sids.length; j += 100) schunks.push(sids.slice(j, j + 100));
+      var sresend = sids.some(function (id) { return st.prev[id]; });
+      var kstu = stu;
+      stu = [];
+      return schunks.reduce(function (pr, c) {
+        return pr.then(function () {
+          if (!all.ok) return null;
+          return invoke({ action: 'send', who: 'student', week: st.week, students: c, resend: sresend, fallback: true }, KFN).then(function (r) {
+            if (!r || !r.ok) {
+              /* 학생 알림톡을 못 쓰면(코드 오류 등) 그 학생들은 문자로 */
+              stu = stu.concat(kstu.filter(function (x) { return c.indexOf(x.s.id) >= 0; }));
+              return;
+            }
+            all.sent += r.sent || 0; all.failed += r.failed || 0;
+            (r.results || []).forEach(function (x) {
+              kstu.filter(function (y) { return y.s.id === x.student_id; }).forEach(function (y) {
+                all.results.push({ student_id: x.student_id, to: 'student', name: y.s.name, ok: x.ok, error: x.error || '', via: 'kakao' });
+              });
+            });
+            (r.skipped || []).forEach(function (x) {
+              /* 학생 링크 · 번호가 없거나 학부모와 같은 번호 · 이미 보냄 — 문자로도 안 보낸다 (학부모와 같으면 학부모 알림톡 한 통) */
+              all.skipped.push({ student_id: x.id, name: x.name, to: 'student', reason: x.reason, label: x.label });
+            });
+          });
+        });
+      }, Promise.resolve()).then(function () { return all; });
+    }).then(function () {
+      return altSms(pl, items, all);
+    }).then(function () {
       if (!all.ok || !stu.length) return all;
       return invoke(Object.assign({ action: 'send' }, pl, { items: stu.map(function (x) { return { student_id: x.s.id, to: x.t }; }), vars: varsFor(stu) })).then(function (r) {
         if (!r || !r.ok) { all.results = all.results.concat(stu.map(function (x) { return { student_id: x.s.id, to: x.t, name: x.s.name, ok: false, error: (r && r.message) || '보내지 못함' }; })); return all; }
@@ -1187,6 +1239,27 @@
         all.results = all.results.concat(r.results || []); all.skipped = all.skipped.concat(r.skipped || []);
         return all;
       });
+    });
+  }
+
+  /* 대체 문자 — 솔라피가 바로 받지 않은 알림톡(번호 오류 등)만 그 사람 문자 글로 한 번 (카톡이 없어 나중에 실패하는 사람은 솔라피가 대신 보낸다) */
+  function altSms(pl, items, all) {
+    if (!all.ok) return Promise.resolve(all);
+    var bad = all.results.filter(function (x) { return x.via === 'kakao' && !x.ok; });
+    var redo = items.filter(function (y) {
+      return bad.some(function (x) { return x.student_id === y.s.id && (y.t === 'student') === (x.to === 'student'); });
+    });
+    if (!redo.length) return Promise.resolve(all);
+    return invoke(Object.assign({ action: 'send' }, pl, { items: redo.map(function (x) { return { student_id: x.s.id, to: x.t }; }), vars: varsFor(redo), label: '대체 문자', markWeek: '' })).then(function (r) {
+      if (!r || !r.ok) return all;
+      (r.results || []).forEach(function (x) {
+        if (!x.ok) return;
+        all.results.forEach(function (y) {
+          if (y.via === 'kakao' && !y.ok && !y.alt && y.student_id === x.student_id && (x.to === 'student') === (y.to === 'student')) { y.ok = true; y.alt = true; y.error = ''; all.failed = Math.max(0, all.failed - 1); all.sent += 1; }
+        });
+      });
+      all.alt = (all.alt || 0) + (r.sent || 0);
+      return all;
     });
   }
 
@@ -1927,6 +2000,8 @@
     build: build, bytes: bytes, kdate: kdate, state: function () { return st; },
     isOpen: function () { return !!$('#panel-sms') && !$('#panel-sms').hidden && st.pane === 'send'; },
     /* 「내 번호로도 한 통 받기」 — kakao.js · send.js 도 같이 (20261031r) */
-    copyHtml: copyHtml, copyOn: copyOn, myPhone: function () { return me.phone; }, loadMyPhone: loadMyPhone
+    copyHtml: copyHtml, copyOn: copyOn, myPhone: function () { return me.phone; }, loadMyPhone: loadMyPhone,
+    /* 학생용 템플릿 코드를 바꾼 뒤 (kakao.js · 071) */
+    reloadKakao: function () { return loadKakao().then(function () { if ($("#smsBody")) { try { renderPreview(); } catch (e) {} } }); }
   };
 })();
