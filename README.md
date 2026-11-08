@@ -1058,6 +1058,11 @@ delete from public.staff where email = '조교이메일@example.com';
   - 지난달 우수자로 보냈으면 이번 달 내내 맨 위 「🏅 10월 루틴 우수자」
 - 코치룸 — 학생 상세 배지 줄(staff_badges) · 반 카드 이름 옆 ⭐n(staff_badge_counts) · 미리보기는 학부모 화면 그대로(staff_badges · staff_award_view)
 
+### 5-107. 20261108k — 반 카드 발송 표시 알아보기 쉽게 (migration-079 · 함수 배포 없음)
+1. SQL Editor → `supabase/migration-079-send-names.sql` → Run (078 다음 · 맨 아래 두 줄 true)
+- 「06:30 보냄 25명(미제출 15 · 모두 제출 10)」 → 「수업 전 문자 06:30 보냄 · 25명 (독려 15 · 칭찬 10)」 · 숫자를 누르면 그 묶음 이름 (pre_remind_status names · 칭찬 = 모두 제출 칭찬 · 배지 줄이 붙어도 칭찬)
+- 「과제 현황 문자 09:00 보냄 · 운영진 1명」 · 번호 없어 못 받은 운영진은 옆에 「(번호 없음 2명 · 넣기)」 → 누르면 운영진 화면 (hw_status_status nophoneNames)
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

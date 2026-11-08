@@ -57,15 +57,35 @@
   }
   /* 「15:30 보냄 11명(다 냄 5 · 일부 4 · 밀림 2)」 · 0 인 구간은 빼고 · 실패가 있으면 「· 실패 n」 (migration-058 · 20261101l)
      058 전(구간 없음)이면 「(밀린 n명)」 */
+  /* 「수업 전 문자 06:30 보냄 · 25명 (독려 15 · 칭찬 10)」 (20261108k) — 숫자를 누르면 그 묶음에 들어간 이름 (079 · names)
+     칭찬 = 모두 제출 칭찬 문자 (퍼펙트 배지 한 줄이 붙어도 칭찬) · 067 전(구간 다섯)은 예전처럼 */
+  var preOpen = {};
   function preHtml(cls) {
     var x = preSt.v && preSt.v[cls];
     if (!x || !(x.n || x.failed)) return '';
-    /* 067 부터 — 미제출 · 모두 제출 두 종류 */
-    var bands = 'miss' in x ? [['miss', '미제출'], ['all', '모두 제출']] : [['all', '다 냄'], ['part', '일부'], ['low', '밀림'], ['none', '과제 없음']];
-    var parts = bands.filter(function (b) { return x[b[0]]; }).map(function (b) { return b[1] + ' ' + x[b[0]]; });
-    var why = 'all' in x ? (parts.length ? '(' + parts.join(' · ') + ')' : '') : (x.missed ? '(밀린 ' + x.missed + '명)' : '');
-    return '<small class="tdc-pre num">' + esc(x.at) + ' 보냄 ' + x.n + '명' + why + (x.failed ? ' · 실패 ' + x.failed : '') + '</small>';
+    var fail = x.failed ? ' · 실패 ' + x.failed : '';
+    if (!('miss' in x)) {
+      var bands = [['all', '다 냄'], ['part', '일부'], ['low', '밀림'], ['none', '과제 없음']];
+      var parts = bands.filter(function (b) { return x[b[0]]; }).map(function (b) { return b[1] + ' ' + x[b[0]]; });
+      var why = 'all' in x ? (parts.length ? '(' + parts.join(' · ') + ')' : '') : (x.missed ? '(밀린 ' + x.missed + '명)' : '');
+      return '<small class="tdc-pre num">수업 전 문자 ' + esc(x.at) + ' 보냄 · ' + x.n + '명' + why + fail + '</small>';
+    }
+    var nm = x.names || null, open = preOpen[cls] || '';
+    var grp = [['miss', '독려'], ['all', '칭찬']].filter(function (b) { return x[b[0]]; }).map(function (b) {
+      var t = b[1] + ' ' + x[b[0]];
+      return nm && nm[b[0]] ? '<button type="button" class="tdc-pre__n" data-pre-names="' + esc(cls) + '" data-band="' + b[0] + '" aria-expanded="' + (open === b[0]) + '">' + t + '</button>' : t;
+    });
+    var who = nm && open && nm[open] ? '<span class="tdc-pre__who">' + (open === 'miss' ? '독려' : '칭찬') + ' ' + nm[open].length + '명: ' + nm[open].map(esc).join(', ') + '</span>' : '';
+    return '<small class="tdc-pre num">수업 전 문자 ' + esc(x.at) + ' 보냄 · ' + x.n + '명' + (grp.length ? ' (' + grp.join(' · ') + ')' : '') + fail + '</small>' + who;
   }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-pre-names]');
+    if (!b) return;
+    e.preventDefault();
+    var cls = b.dataset.preNames, band = b.dataset.band;
+    preOpen[cls] = preOpen[cls] === band ? '' : band;
+    Array.prototype.forEach.call(document.querySelectorAll('[data-pre-st]'), function (el) { if (el.dataset.preSt === cls) el.innerHTML = preHtml(cls); });
+  });
 
   /* ---------- 수업 시각 한 줄 · 그 자리에서 바꾸기 ---------- */
   var DOWS = ['일', '월', '화', '수', '목', '금', '토'];

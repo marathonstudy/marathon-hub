@@ -39,7 +39,7 @@
     return st.busy;
   }
 
-  /* 「과제 현황 문자 09:10 보냄 · 운영진 3명 · 번호 없음 1」 */
+  /* 「과제 현황 문자 09:00 보냄 · 운영진 1명」 · 번호가 없어 못 받은 운영진은 옆에 「(번호 없음 2명 · 넣기)」 → 운영진 화면 (20261108k) */
   function stText(cls) {
     var x = st.v && st.v[cls];
     var m = Store.metaOf(cls) || {};
@@ -52,12 +52,17 @@
     if (x.people) bits.push('운영진 ' + x.people + '명');
     if (x.pending) bits.push('보내는 중 ' + x.pending);
     if (x.failed) bits.push('실패 ' + x.failed + '명');
-    if (x.nophone) bits.push('번호 없음 ' + x.nophone + '명');
     return bits.join(' · ');
+  }
+  function nophoneHtml(cls) {
+    var x = st.v && st.v[cls];
+    if (!x || !x.nophone) return '';
+    var names = (x.nophoneNames || []).join(', ');
+    return '<button type="button" class="tdc-hws__np" data-hws-staff title="' + esc((names ? names + ' — ' : '') + '운영진 화면에서 번호를 넣으면 다음부터 받습니다') + '">(번호 없음 ' + x.nophone + '명 · 넣기)</button>';
   }
   function lineInner(cls) {
     var x = st.v && st.v[cls];
-    return '<span class="tdc-hws__t num' + (x ? ' is-sent' : '') + '" data-hws-st="' + esc(cls) + '">' + esc(stText(cls)) + '</span>' +
+    return '<span class="tdc-hws__t num' + (x ? ' is-sent' : '') + '" data-hws-st="' + esc(cls) + '">' + esc(stText(cls)) + '</span>' + nophoneHtml(cls) +
       '<button type="button" class="tdc-time__chg" data-hws-view="' + esc(cls) + '">미리보기</button>' +
       '<button type="button" class="tdc-time__chg" data-hws-send="' + esc(cls) + '">지금 운영진에게 보내기</button>';
   }
@@ -157,6 +162,7 @@
     if (v) { view(v.dataset.hwsView); return; }
     var s = e.target.closest('[data-hws-send]');
     if (s) { send(s.dataset.hwsSend); return; }
+    if (e.target.closest('[data-hws-staff]') && window.Staff && Staff.open) Staff.open();
   });
 
   window.HwStat = { cardHtml: cardHtml, paint: paint, status: load, stText: stText, dueAt: dueAt };
