@@ -235,20 +235,21 @@
         '<div class="tb-acts"><button class="btn btn--sm" type="button" data-rv="entry" data-tid="' + esc(t.id) + '">점수 입력</button>' +
         '<button class="btn btn--sm btn--ghost" type="button" data-rv="absent" data-tid="' + esc(t.id) + '">결석 · 사유</button></div></td>';
     }
-    /* 미응시 — 회색 「미응시 · 결석」(누르면 사유 바꾸기 · 미응시 취소) · 메모는 여기(코치룸)에서만 */
+    /* 표시가 있는 칸(응시 · 점수 없음 / 미응시 / 점수) — 누르면 먼저 「지금: …」 한 줄과 할 일 버튼 (data-rv="menu" · 20261108t)
+       미응시 사유는 [미응시로 바꾸기]를 눌렀을 때만 · [대신 입력] · [고치기]도 같은 흐름 · 메모는 여기(코치룸)에서만 */
     if (ab) {
       return '<td class="rv-cell is-absent">' +
-        '<button type="button" class="rv-absent" data-rv="absent" data-tid="' + esc(t.id) + '" title="사유 바꾸기 · 미응시 취소">' + esc(absText(ab)) + (ab.auto ? ' <small>(기본값)</small>' : '') + '</button>' +
+        '<button type="button" class="rv-absent" data-rv="menu" data-tid="' + esc(t.id) + '" title="지금 상태 · 할 일">' + esc(absText(ab)) + (ab.auto ? ' <small>(기본값)</small>' : '') + '</button>' +
         (ab.memo ? '<div class="muted-note rv-absent__memo">' + esc(ab.memo) + '</div>' : '') +
         '<div class="muted-note">' + esc(ab.set_by || '') + ' ' + fmtDT(ab.set_at) + '</div>' +
-        '<div class="tb-acts"><button class="btn btn--sm btn--ghost" type="button" data-rv="entry" data-tid="' + esc(t.id) + '">대신 입력</button></div></td>';
+        '<div class="tb-acts"><button class="btn btn--sm btn--ghost" type="button" data-rv="menu" data-tid="' + esc(t.id) + '">대신 입력</button></div></td>';
     }
     var acts = !s
       ? '<button class="btn btn--sm" type="button" data-rv="entry" data-tid="' + esc(t.id) + '">대신 입력</button>' +
         '<button class="btn btn--sm btn--ghost" type="button" data-rv="absent" data-tid="' + esc(t.id) + '">미응시</button>'
-      : '<button class="btn btn--sm btn--ghost" type="button" data-rv="edit" data-tid="' + esc(t.id) + '">고치기</button>';
+      : '<button class="btn btn--sm btn--ghost" type="button" data-rv="edit" data-tid="' + esc(t.id) + '">고치기</button>';    /* [고치기]는 바로 점수 고치기 (점수를 누르면 할 일) */
     return '<td class="rv-cell">' +
-      (s ? '<div class="num rv-cell__score">' + esc(scoreText(s)) + '</div>' +
+      (s ? '<button type="button" class="num rv-cell__score rv-cell__scoreb" data-rv="menu" data-tid="' + esc(t.id) + '" title="지금 상태 · 할 일">' + esc(scoreText(s)) + '</button>' +
            (s.mode === 'numbers' && (s.wrong || []).length ? '<div class="muted-note">틀린 번호 ' + esc(s.wrong.join(', ')) + '</div>' : '') : '') +
       '<div>' + stateHtml(s) + '</div>' +
       '<div class="tb-acts">' + acts + '</div></td>';
@@ -281,8 +282,30 @@
     return { ok: true, q: q, w: w, text: (q - w) + ' / ' + q + ' · ' + Math.round((q - w) / q * 100) + '점' };
   }
 
+  /* 「조재혁 · 지금: 응시 · 점수 없음」 + 할 일 버튼 (20261108t) — 응시(점수 없음) [점수 입력] [미응시로 바꾸기] · 미응시 [점수 입력] [응시로 바꾸기] · 점수 [점수 고치기] [미응시로 바꾸기] · [닫기]는 그대로 */
+  function nowOf(x, t) {
+    var s = x && x.subs && x.subs[t.id], ab = absentOf(x, t);
+    if (s) return { k: 'score', text: '응시 · ' + s.score + '점' };
+    if (ab && ab.reason === 'taken') return { k: 'taken', text: '응시 · 점수 없음' };
+    if (ab) return { k: 'absent', text: absText(ab) };
+    return { k: 'none', text: '표시 없음' };
+  }
+  function menuHtml(e) {
+    var x = rowOf(e.sid) || {}, t = testOf(e.tid) || {}, now = nowOf(x, t);
+    var b = function (act, label, main) { return '<button type="button" class="btn rv-menu__b' + (main ? ' btn--primary' : '') + '" data-rv="' + act + '">' + label + '</button>'; };
+    var acts = now.k === 'score' ? b('m-edit', '점수 고치기', true) + b('m-absent', '미응시로 바꾸기')
+      : now.k === 'taken' ? b('m-entry', '점수 입력', true) + b('m-absent', '미응시로 바꾸기')
+      : b('m-entry', '점수 입력', true) + b('m-taken', '응시로 바꾸기');
+    return '<div class="rv-editor rv-menu" role="group" aria-label="' + esc((x.name || '') + ' ' + label(t)) + '">' +
+      '<p class="rv-menu__now"><b>' + esc(x.name || '') + '</b> · ' + esc(label(t)) + ' · 지금: <b class="rv-menu__st" data-rv-now="' + now.k + '">' + esc(now.text) + '</b></p>' +
+      '<div class="rv-menu__acts">' + acts + b('cancel', '닫기') + '</div>' +
+      /* 예전 사유 창에 있던 것 — 미응시 사유만 바꾸기 · 표시 지우기(미응시 취소) */
+      (now.k === 'absent' || now.k === 'taken' ? '<p class="rv-menu__more">' + (now.k === 'absent' ? '<button type="button" class="link-btn" data-rv="m-reason">사유 바꾸기</button> · ' : '') +
+        '<button type="button" class="link-btn" data-rv="m-clear">표시 지우기</button></p>' : '') + '</div>';
+  }
   function editorHtml() {
     var e = st.edit;
+    if (e.mode === 'menu') return menuHtml(e);
     if (e.mode === 'absent') return absentEditorHtml(e);
     var t = tests().find(function (x) { return x.id === e.tid; }) || {};
     var c = editCheck(e);
@@ -316,6 +339,7 @@
         ? '<label class="field rv-memo"><span class="field__label">메모 (선택 · 60자 · 코치룸에서만 보임)</span>' +
             '<input class="input" type="text" maxlength="60" data-rv-memo value="' + esc(e.memo || '') + '" placeholder="' + (e.reason === 'replaced' ? '예: 10/23 재시험으로 대체' : '예: 병원 진료') + '"></label>'
         : '') +
+      (e.fromScore ? '<p class="cp-warn rv-absent__warn">지금 있는 점수는 지워집니다 (누가 · 언제 지웠는지와 지운 점수는 기록에 남습니다)</p>' : '') +
       '<span class="muted-note">학부모 · 학생 화면에는 「미응시 · 결석」처럼 사유 이름만 나갑니다. 나중에 학생이 직접 내거나 대신 입력하면 미응시는 저절로 풀립니다.</span>' +
       '<div class="wk-edit__btns"><button class="btn btn--sm btn--primary" type="button" data-rv="absent-save"' + (e.reason ? '' : ' disabled') + '>저장</button>' +
         (e.had ? '<button class="btn btn--sm" type="button" data-rv="absent-clear">미응시 취소</button>' : '') +
@@ -363,6 +387,30 @@
     if (act === 'clean') cleanPhotos();
     if (act === 'edit' && s) { st.edit = { sid: x.student_id, tid: t.id, mode: 'edit', q: String(s.q_count), w: String(wrongN(s)), blobs: [] }; draw(); focusEditor(); }
     if (act === 'entry' && x && t) { st.edit = { sid: x.student_id, tid: t.id, mode: 'entry', q: isAlt(t) ? String(t.q_count || '') : '', w: '', blobs: [] }; draw(); focusEditor(); }
+    /* 표시가 있는 칸 → 「지금: …」 + 할 일 (20261108t) */
+    if (act === 'menu' && x && t) { st.edit = { sid: x.student_id, tid: t.id, mode: 'menu' }; draw(); var mb = document.querySelector('#rvTable .rv-menu .btn--primary'); if (mb) try { mb.focus(); } catch (er) {} return; }
+    if (/^m-/.test(act) && st.edit && st.edit.mode === 'menu') {
+      var mx = rowOf(st.edit.sid), mt = testOf(st.edit.tid), ms = mx && mt && mx.subs ? mx.subs[mt.id] : null;
+      if (!mx || !mt) return;
+      if (act === 'm-edit' && ms) { st.edit = { sid: mx.student_id, tid: mt.id, mode: 'edit', q: String(ms.q_count), w: String(wrongN(ms)), blobs: [] }; draw(); focusEditor(); return; }
+      if (act === 'm-entry') { st.edit = { sid: mx.student_id, tid: mt.id, mode: 'entry', q: mt.q_count ? String(mt.q_count) : '', w: '', blobs: [] }; draw(); focusEditor(); return; }
+      if (act === 'm-absent') {
+        var ab0 = absentOf(mx, mt), real = ab0 && REASONS.some(function (r) { return r[0] === ab0.reason; });
+        st.edit = { sid: mx.student_id, tids: [mt.id], mode: 'absent', all: false, reason: real ? ab0.reason : '', memo: real ? ab0.memo || '' : '', had: false, fromScore: !!ms };
+        draw(); return;
+      }
+      if (act === 'm-reason') {
+        var ab1 = absentOf(mx, mt);
+        st.edit = { sid: mx.student_id, tids: [mt.id], mode: 'absent', all: false, reason: ab1 ? ab1.reason : '', memo: ab1 ? ab1.memo || '' : '', had: !!ab1 };
+        draw(); return;
+      }
+      if (act === 'm-clear') { call('review_absent_clear', { p_test: mt.id, p_student: mx.student_id }, mx.name + ' ' + mt.test_name + ' 표시를 지웠습니다', NEED_028); return; }
+      if (act === 'm-taken') {
+        var nm0 = mx.name;
+        call('review_status_set', { p_tests: [mt.id], p_student: mx.student_id, p_state: 'taken' }, nm0 + ' ' + mt.test_name + ' 「응시」로 바꿨습니다', '응시로 바꾸기는 migration-048 SQL 을 먼저 실행해 주세요.');
+        return;
+      }
+    }
     if (act === 'absent' && x && t) {
       var ab = absentOf(x, t);
       st.edit = { sid: x.student_id, tids: [t.id], mode: 'absent', all: false, reason: ab ? ab.reason : '', memo: ab ? ab.memo || '' : '', had: !!ab };
@@ -438,7 +486,12 @@
     $('#rvSkipModal').showModal();
   }
 
-  function focusEditor() { var i = document.querySelector('#rvTable [data-rv-eq]'); if (i) try { i.focus(); } catch (er) {} }
+  /* 점수 칸에 바로 커서 — 전체 문항 수를 이미 알면 틀린 개수 칸 (20261108t) */
+  function focusEditor() {
+    var q = document.querySelector('#rvTable [data-rv-eq]'), w = document.querySelector('#rvTable [data-rv-ew]');
+    var i = q && String(q.value || '').trim() && w ? w : q;
+    if (i) try { i.focus(); if (i.select) i.select(); } catch (er) {}
+  }
 
   function onInput(e) {
     if (st.alt && e.target.hasAttribute('data-rv-altname')) { st.alt.name = e.target.value; return; }
@@ -492,8 +545,11 @@
     var memo = memoOk(e.reason) ? String(e.memo || '').trim().slice(0, 60) : '';
     var what = e.all ? '이번 주 시험 ' + e.tids.length + '개' : ((testOf(e.tids[0]) || {}).test_name || '');
     var sid = x.student_id, name = x.name, reason = e.reason, mon = st.mon;
-    call('review_absent_set', { p_tests: e.tids, p_student: sid, p_reason: reason, p_memo: memo },
-         name + ' ' + what + ' 미응시(' + reasonLabel(reason) + ')로 넣었습니다', NEED_028).then(function (res) {
+    /* 점수가 있는 칸 — 점수를 지우고 미응시로 (지운 점수는 기록에 남음 · migration-088) */
+    var go = e.fromScore
+      ? call('review_score_to_absent', { p_test: e.tids[0], p_student: sid, p_reason: reason, p_memo: memo }, name + ' ' + what + ' 점수를 지우고 미응시(' + reasonLabel(reason) + ')로 바꿨습니다', '점수가 있는 칸을 미응시로 바꾸려면 migration-088 SQL 을 먼저 실행해 주세요.')
+      : call('review_absent_set', { p_tests: e.tids, p_student: sid, p_reason: reason, p_memo: memo }, name + ' ' + what + ' 미응시(' + reasonLabel(reason) + ')로 넣었습니다', NEED_028);
+    go.then(function (res) {
       if (!res || reason !== 'absent' || !window.Writer || !Writer.attendOf) return;
       if (!attendOpen(Writer.attendOf(sid, mon))) return;      /* 지각 · 결석을 넣었거나 다른 주를 쓰는 중이면 묻지 않는다 */
       UI.confirmAsk('출결', name + ' — 출결도 결석으로 바꿀까요?', '결석으로 바꾸기').then(function (yes) {

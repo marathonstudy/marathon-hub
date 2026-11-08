@@ -4402,6 +4402,24 @@ dialog.vl-modal[open] { display: flex; flex-direction: column; overflow: hidden;
 .rupd-wait__row { display: flex; align-items: center; gap: 6px; }
 .rupd-wait__row .input { width: 80px; }
 
+/* 복습테스트 점수 칸 — 「지금: …」 한 줄 + 할 일 버튼 (review.js · 20261108t) · 버튼 44px 이상 (휴대폰도) */
+.rv-cell__scoreb { appearance: none; border: 0; background: none; padding: 2px 0; font: inherit; font-weight: 800; color: var(--ink-deep); cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; min-height: 32px; text-align: left; }
+.rv-menu { gap: 8px; }
+.rv-menu__now { margin: 0; font-size: 14.5px; line-height: 1.5; overflow-wrap: anywhere; }
+.rv-menu__st { color: #4A34B8; }
+.rv-menu__acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.rv-menu__b { min-height: 44px; padding: 8px 14px; font-size: 14.5px; font-weight: 800; }
+.rv-menu__b.btn--primary { min-width: 120px; font-size: 15.5px; }
+.rv-menu__more { margin: 0; font-size: 13px; color: var(--ink-light); }
+.rv-menu__more .link-btn { min-height: 40px; padding: 0 4px; }
+.rv-absent-ed .rv-reason, .rv-edit-row .wk-edit__btns .btn { min-height: 44px; }
+.rv-edit-row .input--num { min-height: 44px; font-size: 16px; }
+@media (max-width: 600px) {
+  .rv-menu__acts .rv-menu__b { flex: 1 1 auto; }
+  .rv-menu__acts .rv-menu__b.btn--primary { flex-basis: 100%; }
+  .rv-absent { min-height: 36px; }
+}
+
 /* ============================================================
    빠른 상담 (quicknote.js · 20261108s) — 학생 줄 [상담 n] 하나 · 줄 눌러 열기 · 휴대폰은 아래에서 올라오는 창
    ============================================================ */
