@@ -281,6 +281,8 @@
         (st.err ? '<p class="cs-err" role="alert">' + esc(st.err) + '</p>' : '') +
         '<div class="cs-tools">' + (h && h.known && h.miss.length && window.Worry ? '<button type="button" class="btn btn--sm" data-cs-worry>걱정 문자</button>' : '') +
           '<button type="button" class="btn btn--sm" data-cs-card>상담 카드 전체</button></div>' +
+        /* 모의고사 (mogo.js · 20261109b) — 저장본만 · 누르면 화면 안 창 */
+        (window.Mogo ? '<div class="cs-mogo" data-mg-host="' + esc(sid) + '">' + Mogo.sectionHtml(sid) + '</div>' : '') +
         pastHtml(sid) + setHtml() + '</div>' +
       '<div class="cs-foot"><button type="button" class="btn btn--primary cs-save" id="csSave"' + (st.busy ? ' disabled' : '') + '>' + (st.busy ? '저장하는 중…' : '저장') + '</button></div></div>';
     if (focus) { var el = document.getElementById(focus); if (el) { el.focus(); try { if (pos != null && el.setSelectionRange) el.setSelectionRange(pos, pos); } catch (e) {} } }
@@ -295,6 +297,7 @@
     kb();
     loadCfg().then(paint);
     loadNotes(sid);
+    if (window.Mogo && Mogo.state().sql === null) Mogo.load();
   }
   function close() {
     var m = modal();

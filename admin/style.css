@@ -4411,6 +4411,56 @@ dialog.vl-modal[open] { display: flex; flex-direction: column; overflow: hidden;
 .rv-menu__b { min-height: 44px; padding: 8px 14px; font-size: 14.5px; font-weight: 800; }
 .rv-menu__b.btn--primary { min-width: 120px; font-size: 15.5px; }
 .rv-menu__more { margin: 0; font-size: 13px; color: var(--ink-light); }
+
+/* 모의고사 분석 레포트 연동 (mogo.js · 20261109b) — 학생 상세 칸 · 화면 안 창 · 「오늘」 맨 위 작은 줄 */
+.mg-sec { margin: 8px 0 10px; padding: 10px 12px; border: 1px solid var(--line-soft); border-radius: 12px; background: var(--surface); }
+.mg-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.mg-title { margin: 0; font-size: 14.5px; font-weight: 800; color: var(--ink-deep); }
+.mg-refresh { border: 0; background: none; color: #5A3FD0; font-size: 16px; min-width: 44px; min-height: 44px; border-radius: 8px; cursor: pointer; }
+.mg-refresh:hover { background: #F1EEFF; }
+.mg-when { margin-left: auto; font-size: 11.5px; color: var(--ink-light); }
+.mg-muted { margin: 6px 0 0; font-size: 13px; color: var(--ink-light); }
+.mg-top { margin: 6px 0 4px; display: grid; gap: 4px; }
+.mg-top__btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.mg-top__btns .btn { min-height: 44px; }
+.mg-type { margin: 0; font-size: 13px; color: var(--ink-mid); }
+.mg-sum { margin: 0; font-size: 13px; color: var(--ink-deep); overflow-wrap: anywhere; }
+.mg-list { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
+.mg-row { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; text-align: left; padding: 8px 10px; min-height: 48px; border: 1px solid var(--line-soft); border-radius: 10px; background: #FBFAFF; cursor: pointer; font: inherit; }
+.mg-row:hover { border-color: #7858E8; }
+.mg-row__n { font-weight: 800; color: var(--ink-deep); overflow-wrap: anywhere; }
+.mg-row__m { font-size: 12.5px; color: var(--ink-mid); grid-column: 1; }
+.mg-row__t { grid-column: 2; grid-row: 1 / span 2; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.mg-tag { font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 999px; background: var(--surface-2); color: var(--ink-mid); white-space: nowrap; }
+.mg-tag--done { background: #EAF7EE; color: #135C3B; }
+.mg-tag--wip { background: #FFF1D6; color: #7A4A00; }
+.mg-tag--again { background: #EFEBFF; color: #4A34B8; }
+.mg-modal { border: 0; padding: 0; width: min(900px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); border-radius: 14px; overflow: hidden; }
+.mg-modal[open] { display: flex; flex-direction: column; }
+.mg-modal::backdrop { background: rgba(20, 16, 60, .45); }
+.mg-modal__head { display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 14px; border-bottom: 1px solid var(--line-soft); flex: none; }
+.mg-modal__t { margin: 0; font-size: 15px; font-weight: 800; flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.mg-modal__new { font-size: 12.5px; font-weight: 700; color: #5A3FD0; white-space: nowrap; }
+.mg-modal__x { width: 44px; height: 44px; border: 0; background: none; font-size: 18px; cursor: pointer; border-radius: 10px; }
+.mg-modal__body { flex: 1 1 auto; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.mg-frame { display: block; width: 100%; border: 0; min-height: 200px; }
+.mg-ops { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 0 0 8px; font-size: 12.5px; }
+.mg-ops[hidden] { display: none; }
+.mg-ops__bad { color: #C62828; font-weight: 800; }
+.mg-ops__new { color: #4A34B8; font-weight: 700; }
+.mg-ops__np summary { cursor: pointer; color: var(--ink-mid); font-weight: 700; min-height: 32px; }
+.mg-ops__names, .mg-ops__hint { margin: 4px 0 0; overflow-wrap: anywhere; }
+.mg-ops__hint { color: var(--ink-light); }
+.mg-ops__ck summary { cursor: pointer; color: #8A4B00; font-weight: 800; min-height: 32px; }
+.mg-ops__list { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 2px; }
+.mg-ops__list small { color: var(--ink-light); overflow-wrap: anywhere; }
+.mg-ops__who { border: 0; background: none; padding: 0 4px; min-height: 44px; font: inherit; font-weight: 800; color: #5A3FD0; cursor: pointer; text-decoration: underline; }
+.mg-check { margin: 6px 0 0; font-size: 13.5px; font-weight: 800; color: #8A4B00; }
+.mg-fail { color: #8A4B00; }
+.mg-via { margin: 4px 0 0; color: var(--ink-light); font-size: 12px; }
+@media (max-width: 600px) {
+  .mg-modal { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; border-radius: 0; }
+}
 .rv-menu__more .link-btn { min-height: 40px; padding: 0 4px; }
 .rv-absent-ed .rv-reason, .rv-edit-row .wk-edit__btns .btn { min-height: 44px; }
 .rv-edit-row .input--num { min-height: 44px; font-size: 16px; }

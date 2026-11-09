@@ -286,6 +286,17 @@
      ============================================================ */
 
   var WEEKLY = null;
+  var MOGO = null;           /* 모의고사 저장본 (hub_mogo · 20261109b) */
+  /* 주간 레포트 아래 「📝 모의고사 기록」 — 그 레포트 기간 시작일부터의 회차는 NEW */
+  function drawMogoWeek() {
+    var host = document.getElementById('rwMogo');
+    if (!host || !global.MogoView) return;
+    var since = (RP.data && (RP.data.periodFrom || RP.data.startDate)) || (RP.r && RP.r.week_start) || '';
+    host.innerHTML = MogoView.reportBlockHtml(MOGO, String(since).slice(0, 10));
+  }
+  document.addEventListener('click', function (e) {
+    if (e.target.closest && e.target.closest('[data-mgv-all]') && global.HubMogo) HubMogo.open();
+  });
   var PART_NAME = { full: '수업 전체', '1': '1차시', '2': '2차시', makeup: '보강' };
   var PART_ORDER = { full: 0, '1': 1, '2': 2, makeup: 3 };
   /* 한 주 안에서 수업 전체 → 1차시 → 2차시 → 보강 */
@@ -1310,6 +1321,7 @@
         '<section class="hub-panel" id="panelApp" role="tabpanel" hidden></section>' +
         '<section class="hub-panel" id="panelBook" role="tabpanel" hidden></section>' +
         '<section class="hub-panel" id="panelPhoto" role="tabpanel" hidden></section>' +
+        '<section class="hub-panel" id="panelMogo" role="tabpanel" hidden></section>' +
         '<section class="hub-panel" id="panelInfo" role="tabpanel" hidden></section>';
       /* 홈 화면 앱 띠 — 휴대폰 · 앱으로 연 게 아닐 때 · [다음에] 7일 · 세 번이면 그만 (a2hs.js · 20261101k) */
       if (!PV && global.A2HS) A2HS.band(root, 'hub');
@@ -1328,6 +1340,29 @@
       var hasVideos = videoWeeks().length > 0;
       var tabVideo = $('#tabVideo');
       if (tabVideo) tabVideo.hidden = !hasVideos;
+      /* 모의고사 (mogo-view.js · migration-089 hub_mogo · 20261109b) — 코치룸 저장본만 · 그 학생 링크로만 · 완성된 레포트만
+         기록이 있을 때만 탭이 보인다 · 주간 레포트 아래 「📝 모의고사 기록 · 지금까지 n회」 */
+      var tabMogo = $('#tabMogo');
+      if (tabMogo) tabMogo.hidden = true;
+      if (global.MogoView && tabMogo) {
+        /* 이 기기에서 전에 모의고사 기록을 본 적이 있으면 — 못 읽었을 때 탭에 「모의고사 기록을 불러오지 못했어요」만 (처음 보는 학생은 조용히) */
+        var mgSeenKey = 'hub-mogo-seen:' + String(h.code);
+        var mgSeen = false;
+        try { mgSeen = localStorage.getItem(mgSeenKey) === '1'; } catch (e) {}
+        rpc('hub_mogo', { p_code: h.code }).then(function (v) {
+          MOGO = v || null;
+          tabMogo.hidden = !MogoView.has(MOGO);
+          if (!tabMogo.hidden) { try { localStorage.setItem(mgSeenKey, '1'); } catch (e) {} }
+          layoutTabs();
+          drawMogoWeek();
+          if ($('#panelMogo') && !$('#panelMogo').hidden) $('#panelMogo').innerHTML = MogoView.panelHtml(MOGO);
+        }, function () {
+          MOGO = { failed: true };
+          if (!mgSeen) return;
+          tabMogo.hidden = false;
+          layoutTabs();
+        });
+      }
       var videoOpened = false;
       function openVideos() {
         if (videoOpened) return;
@@ -1430,6 +1465,7 @@
          ['video',  '#tabVideo',  '#panelVideo'],
          ['app',    '#tabApp',    '#panelApp'],
          ['photo',  '#tabPhoto',  '#panelPhoto'],
+         ['mogo',   '#tabMogo',   '#panelMogo'],
          ['book',   '#tabBook',   '#panelBook'],
          ['info',   '#tabInfo',   '#panelInfo']].forEach(function (t) {
           if (!$(t[1]) || !$(t[2])) return;
@@ -1447,7 +1483,10 @@
         if (which === 'photo') openPhoto('');
         if (which === 'video') openVideos();
         if (which === 'info') openInfo();
+        if (which === 'mogo' && $('#panelMogo') && global.MogoView) $('#panelMogo').innerHTML = MOGO && MOGO.failed ? MogoView.failHtml() : MogoView.panelHtml(MOGO);
       }
+      if (tabMogo) tabMogo.onclick = function () { select('mogo'); navPush('mogo'); };
+      global.HubMogo = { open: function () { if (tabMogo && !tabMogo.hidden) { select('mogo'); navPush('mogo'); window.scrollTo(0, 0); } } };
 
       /* 레포트 — 가장 최근 수업 레포트를 바로 연다 (위 한 줄 ◀ ▶ · 수업일 목록으로 다른 수업) */
       $('#tabReport').onclick = function () {
@@ -1494,6 +1533,7 @@
         } else if (v === 'reports') { select('report'); showReportList(); }
         else if (v === 'videos' || v === 'video') select('video');
         else if (v === 'app') select('app');
+        else if (v === 'mogo') select(tabMogo && !tabMogo.hidden ? 'mogo' : 'report');
         else if (v === 'photo') { select('photo'); if (arg) openPhoto(arg); }
         else if (v === 'review' || v === 'todo') {
           select('report'); showLatest();
@@ -1858,6 +1898,8 @@
       if (global.Photos && Photos.lessonCard && ld) Photos.lessonCard($('#rwNotes'), code, ld);
       drawReportApp($('#rwApp'), code, r, data, idx);
       drawNote(code, r, idx);
+      if (!$('#rwMogo')) body.insertAdjacentHTML('beforeend', '<div id="rwMogo"></div>');
+      drawMogoWeek();
       loadThumbs(body, code);
     }).catch(function () {
       body.innerHTML = '<div class="empty">불러오지 못했습니다. 새로고침해 주세요.</div>';

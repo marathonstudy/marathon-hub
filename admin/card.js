@@ -161,8 +161,10 @@
       '<section class="cd-sec" id="cdMine"></section>' +
       '<section class="cd-sec" id="cdGrades-school"></section>' +
       '<section class="cd-sec" id="cdGrades-mock"></section>' +
+      '<div class="cd-sec cd-mogo" id="cdMogo"></div>' +                /* 모의고사 분석 레포트 (mogo.js · 20261109b) */
       '<section class="cd-sec" id="cdNotes"></section>' +
       '<section class="cd-sec cd-leave" id="cdLeave"></section>';
+    if (window.Mogo) Mogo.mount($('#cdMogo'), C.sid);
     renderPinned();
     renderBasic();
     renderMine();
