@@ -1336,31 +1336,22 @@
       loadBadges(h.code);
       if (reports.length) $('#tabReport').classList.add('has-new');
 
-      /* 수업 영상 — 영상이 있을 때만 탭이 보인다 */
-      var hasVideos = videoWeeks().length > 0;
+      /* 탭 다섯 개는 모든 학생에게 — [레포트][수업 영상][과제 상세][내 필기][모의고사] (20261109c)
+         휴대폰에서 한 줄에 안 들어가면 옆으로 밀어 본다 (hub.css .hub-tabs) */
       var tabVideo = $('#tabVideo');
-      if (tabVideo) tabVideo.hidden = !hasVideos;
-      /* 모의고사 (mogo-view.js · migration-089 hub_mogo · 20261109b) — 코치룸 저장본만 · 그 학생 링크로만 · 완성된 레포트만
-         기록이 있을 때만 탭이 보인다 · 주간 레포트 아래 「📝 모의고사 기록 · 지금까지 n회」 */
+      if (tabVideo) tabVideo.hidden = false;
+      /* 모의고사 (mogo-view.js · migration-089 hub_mogo) — 코치룸 저장본만 · 그 학생 링크로만 · 완성된 레포트만
+         기록이 없으면 「아직 받은 모의고사 레포트가 없어요」 · 못 읽으면 「모의고사 기록을 불러오지 못했어요」 · 주간 레포트 아래 「📝 모의고사 기록」 */
       var tabMogo = $('#tabMogo');
-      if (tabMogo) tabMogo.hidden = true;
+      if (tabMogo) tabMogo.hidden = !global.MogoView;
       if (global.MogoView && tabMogo) {
-        /* 이 기기에서 전에 모의고사 기록을 본 적이 있으면 — 못 읽었을 때 탭에 「모의고사 기록을 불러오지 못했어요」만 (처음 보는 학생은 조용히) */
-        var mgSeenKey = 'hub-mogo-seen:' + String(h.code);
-        var mgSeen = false;
-        try { mgSeen = localStorage.getItem(mgSeenKey) === '1'; } catch (e) {}
         rpc('hub_mogo', { p_code: h.code }).then(function (v) {
-          MOGO = v || null;
-          tabMogo.hidden = !MogoView.has(MOGO);
-          if (!tabMogo.hidden) { try { localStorage.setItem(mgSeenKey, '1'); } catch (e) {} }
-          layoutTabs();
+          MOGO = v || { reports: [] };
           drawMogoWeek();
           if ($('#panelMogo') && !$('#panelMogo').hidden) $('#panelMogo').innerHTML = MogoView.panelHtml(MOGO);
         }, function () {
           MOGO = { failed: true };
-          if (!mgSeen) return;
-          tabMogo.hidden = false;
-          layoutTabs();
+          if ($('#panelMogo') && !$('#panelMogo').hidden) $('#panelMogo').innerHTML = MogoView.failHtml();
         });
       }
       var videoOpened = false;
@@ -1700,7 +1691,9 @@
     rpc('hub_badges', { p_code: code }).then(function (v) {
       var el = $('#badgeBox');
       if (!el || !v) return;
-      BadgeView.mount(el, v, function (m) { if (global.HubAward) HubAward.open(m); });
+      BadgeView.mount(el, v, function (m) { if (global.HubAward) HubAward.open(m); }, { since: '2026-11' });   /* 2026-11 앞 달은 안 보임 (20261109c) */
+      var fold = $('#badgeFold');
+      if (fold) fold.hidden = false;
     }).catch(function () {});
   }
   function renderReportList(code, reports, draft) {
@@ -1710,12 +1703,13 @@
     RP.latest = -1;
     for (var k = 0; k < reports.length; k++) if (!reports[k].draft) { RP.latest = k; break; }
     host.innerHTML =
-      '<div id="badgeBox" class="bdg-host"></div>' +                              /* 「🏅 내 루틴 배지」 (078 · 20261108j) */
       '<div id="rvTop"><button type="button" class="tw-rv-btn" id="twRvBtn" hidden>📝 복습테스트 입력하기</button><div id="reviewCard" hidden></div></div>' +
       '<div id="reportView">' +
         '<div class="rw-nav" id="reportNav"></div>' +
         '<div id="reportBody">' + (reports.length ? '' : firstHtml()) + '</div>' +
       '</div>' +
+      /* 「🏅 내 루틴 배지」 — 레포트 아래 · 접어 둠 (078 · 20261108j → 20261109c) */
+      '<details class="bdg-fold" id="badgeFold" hidden><summary class="bdg-fold__s">🏅 내 루틴 배지</summary><div id="badgeBox" class="bdg-host"></div></details>' +
       '<div id="reportNotes" class="rn-all" hidden>' +
         '<button type="button" class="hub-back" id="notesBack">‹ 레포트로</button>' +
         '<div class="card"><h2 class="card-title">📒 복습 노트 모음<span class="card-note">수업일 순서</span></h2><div id="reportNotesBody"></div></div>' +

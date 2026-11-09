@@ -949,9 +949,10 @@
     btn.classList.toggle('is-shared', c.shared && !!txt);
     el.querySelector('.comment-btn__text').textContent =
       txt ? (c.shared ? '[반 공통] ' : '') +
-            txt.replace(/\s+/g, ' ').slice(0, 36) + (txt.length > 36 ? '…' : '')
+            txt.replace(/\s+/g, ' ').slice(0, 90) + (txt.length > 90 ? '…' : '')
           : '코멘트 작성';
-    el.querySelector('.comment-btn__count').textContent = txt ? txt.length + '자' : '';
+    /* 휴대폰 — 잘리지 않고 2줄까지 줄바꿈 · 길면 「더 보기」(누르면 전체 · 20261109c) */
+    el.querySelector('.comment-btn__count').textContent = txt ? txt.length + '자' + (txt.length > 40 ? ' · 더 보기' : '') : '';
   }
 
   /* 학생 카드 「복습테스트」 — 그 주 수업일 복습테스트 기록 (review.js 가 불러온 것 · 20261029g)
@@ -972,6 +973,11 @@
     var sh = el.querySelector('[data-role="rvst"]');
     if (sh) {
       var h = !isCourse(currentClass) && window.Review && Review.statusHtml ? Review.statusHtml(rvCls, draft.weekStart, id) : '';
+      /* 출결은 「출석」인데 미응시 사유가 「결석」 — 작게 알려만 준다 (기록은 바꾸지 않음 · 20261109c) */
+      var ee = entryOf(id), sv = h && Review.statusOf ? Review.statusOf(rvCls, draft.weekStart, id) : null;
+      if (sv && ee && (ee.attendStatus === 'attend' || ee.attendStatus === 'makeup') && (sv.tests || []).some(function (t) { return t.state === 'absent'; })) {
+        h += '<p class="rvst-warn" role="note">출석인데 미응시 사유가 결석이에요</p>';
+      }
       if (sh.innerHTML !== h) sh.innerHTML = h;
       sh.hidden = !h;
     }

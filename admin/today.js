@@ -1432,6 +1432,70 @@
     out.m = out.total || weekdaysIn(P).length;
     return out;
   }
+  /* 빠른 상담 기준 기간 (20261109c · quicknote.js) — 그 반의 가장 최근 수업 전 주(D-7 ~ D-1 · 레포트 기간 recent) 하나로 고정
+       예전 hwInfo 는 월요일에 새 주 과제가 하나라도 생기면 진행 중인 주로 넘어가 「이번 주 과제 0/0 · 1/1」 · 「전부 1개」가 나왔다
+     { known, done, total, miss, period: { from, to, lesson, label 「11/2~11/6」 }, live: { done, total } (진행 중인 주 · 작게) ,
+       m = 가장 최근에 다 끝난 주의 과제 수(다음 주 과제 수는 미리 알 수 없다 · 모르면 평일 수) , goalLesson = 다음 수업 (그 수업 전 주로 약속 판정) } */
+  function consultInfo(sid) {
+    var s = rowById(sid) || stu(sid);
+    var cls = s && (s.class_name || s.className || '');
+    var c = cls && (st.clsBy || {})[cls];
+    if (!c || !c.per || !c.per.recent || !window.AppWeek) return null;
+    var r = c.per.recent, t0 = DDay.today(), a = app[sid], wd = weekdaysIn(r);
+    var out = { known: false, done: 0, total: 0, miss: [], cls: cls,
+      period: { from: r.from, to: r.to, lesson: r.lesson, word: '지난주', label: wd.length ? md(wd[0]) + '~' + md(wd[wd.length - 1]) : md(r.from) + '~' + md(r.to) } };
+    var ds = lessonDates(cls) || [], nx = ds.filter(function (d) { return d > r.lesson; })[0];
+    out.goalLesson = (c.per.now && c.per.now.lesson) || nx || Lesson.addDays(r.lesson, 7);
+    if (a && a.ok && a.data) {
+      var w = AppWeek.compute(a.data, r.from, r.to < t0 ? r.to : t0, t0);
+      if (w) {
+        out.known = true;
+        w.days.forEach(function (x) {
+          if (x.weekend) return;
+          if ((x.hw === 'onTime' || x.hw === 'late') && x.date <= t0) out.done++;
+          else if (x.hw === 'none' && x.date < t0) out.miss.push(x.date);
+        });
+        out.total = out.done + out.miss.length;
+      }
+    }
+    out.m = out.total || wd.length;
+    var n = c.per.now;
+    if (n && n.from < t0 && out.known) {
+      var lv = hwCount(sid, n.from, n.to);
+      if (lv && lv.total) out.live = { from: n.from, done: lv.done, total: lv.total };
+    }
+    return out;
+  }
+  /* 학생 카드 — 최근 n주(수업마다 그 수업 전 주) 제출 수 · 오래된 것부터 [{ from, to, lesson, done, total, known }] (20261109c) */
+  function recentWeeks(sid, n) {
+    var s = rowById(sid) || stu(sid), cls = s && (s.class_name || s.className || '');
+    var ds = cls && lessonDates(cls);
+    if (!ds || !window.AppWeek) return [];
+    var t0 = DDay.today(), sc = Store.schedOf(cls), first = (sc && sc.first) || '';
+    var past = ds.filter(function (d) { return d <= t0 && (!first || d >= first); }).slice(-(n || 8));
+    return past.map(function (L) {
+      var x = AppWeek.lastWeek(L), c = hwCount(sid, x.from, x.to);
+      return { from: x.from, to: x.to, lesson: L, done: c ? c.done : 0, total: c ? c.total : 0, known: !!c };
+    });
+  }
+  /* 그 기간 날짜별 — [{ date, hw }] (평일만 · onTime · late · none · exempt · off · today · future) */
+  function hwWeek(sid, from, to) {
+    var a = app[sid];
+    if (!a || !a.ok || !a.data || !window.AppWeek) return null;
+    var t0 = DDay.today(), w = AppWeek.compute(a.data, from, to < t0 ? to : t0, t0);
+    return w ? w.days.filter(function (x) { return !x.weekend; }).map(function (x) { return { date: x.date, hw: x.hw }; }) : null;
+  }
+  /* 예전 「과제」 상담이 속한 기간 — 그 날짜가 들어 있는 레포트 기간(다음 수업 전 주 D-7 ~ D-1)
+     수업 날 남긴 기록은 그 수업 전 주 (수업 중 현장 상담은 지난주 과제 이야기 · 예전 빠른 상담 창의 기간과 같다) */
+  function periodAt(cls, iso) {
+    var ds = lessonDates(cls);
+    if (!ds || !window.AppWeek || !iso) return null;
+    var sc = Store.schedOf(cls), first = (sc && sc.first) || '';
+    var L = ds.filter(function (d) { return d >= iso && (!first || d >= first); })[0];
+    if (!L) return null;
+    var x = AppWeek.lastWeek(L);
+    return { from: x.from, to: x.to, lesson: L };
+  }
   /* 그 기간에 낸 과제 · 전체 (늦게 = 냄 · 면제 · 과제 없는 날 · 오늘 아직 안 낸 것은 뺌) — 숫자 약속 판정 */
   function hwCount(sid, from, to) {
     var a = app[sid];
@@ -1521,7 +1585,9 @@
       if (v.k === 'none') return '<span class="tdc-tc tdc-tc--muted' + live + '" title="' + esc(perTip(p) + ' — 앱 과제 없음') + '">없음</span>';
       var tip = mdw(v.from) + ' ~ ' + mdw(v.to) + ' · 평일 ' + v.days + '일 중 ' + v.done + '일 제출' + (p.live ? ' (진행 중 · 오늘은 내면 셈)' : '');
       return '<button type="button" class="tdc-tc tdc-app--btn tdc-app--' + hwTone(v.done, v.days) + live + ' num" data-app-detail="' + esc(s.id) + '" data-app-from="' + esc(p.from) + '" data-app-to="' + esc(p.to) + '" data-app-lesson="' + esc(p.lesson || '') + '"' + (p.live ? ' data-app-live="1"' : '') +
-        ' data-tip="' + esc(tip) + '" aria-expanded="' + (det.sid === s.id && det.from === p.from) + '" aria-label="' + esc(v.done + '/' + v.days + ' · ' + tip + ' · 누르면 날짜별 표') + '">' + v.done + '/' + v.days + '</button>';
+        ' data-tip="' + esc(tip) + '" aria-expanded="' + (det.sid === s.id && det.from === p.from) + '" aria-label="' + esc(v.done + '/' + v.days + ' · ' + tip + ' · 누르면 날짜별 표') + '">' + v.done + '/' + v.days +
+        /* 그 기간에 과제 상담이 있으면 작은 💬 — 누르면 그 상담 (quicknote.js · 20261109c) */
+        (!p.live && window.QuickNote && QuickNote.hwMark ? QuickNote.hwMark(s.id, p.from) : '') + '</button>';
   }
   /* 학생 목록 펼치기 · 접기 — 예전 자리(학생 목록 바로 위 머리줄 왼쪽) · 테두리 있는 작은 알약 「학생 11명 ▾」 / 같은 자리 「접기 ▴」 (20261102g)
      보라 글자 · 누르는 영역 40px 이상 · 펼치면 머리줄(버튼 · 칸 이름)이 카드 안에서 화면 위에 붙어 따라온다 · 반마다 이 기기에 기억
@@ -1934,7 +2000,7 @@
   function careChecks(r) { return r.reasons.map(function (x) { return { kind: x.kind, cls: r.cls, date: x.date, sid: r.sid }; }); }
   function careRowHtml(r) {
     return '<li class="td-care3__row" data-care-row="' + esc(r.sid) + '">' +
-      '<div class="td-care3__main"><button type="button" class="td-care3__name" data-card="' + esc(r.sid) + '" title="상담 카드 (전화 · 문자)">' + esc(r.name) + '</button>' + guessOf(r) +
+      '<div class="td-care3__main"><button type="button" class="td-care3__name" ' + (window.QuickNote ? 'data-cs-open="' + esc(r.sid) + '" data-cs-focus="consult"' : 'data-card="' + esc(r.sid) + '"') + ' title="학생 카드 — 상담 칸으로">' + esc(r.name) + '</button>' + guessOf(r) +
         '<span class="td-care3__cls">' + esc(r.cls || '(반 없음)') + '</span>' +
         '<span class="td-care3__whys">' + reasonsHtml(r) + '</span></div>' +
       '<button type="button" class="btn btn--sm td-care3__sms" data-care-sms1="' + esc(r.sid) + '" data-care-smscls="' + esc(r.cls) + '" data-care-smsold="' + (r.old ? 1 : 0) + '" title="사유에 맞춘 걱정 문자 (받는 사람 · 내용을 보고 보냄)">문자</button>' +   /* 걱정 문자 (worry.js · 20261101r) */
@@ -2044,6 +2110,7 @@
           attHtml(c.name, '') +
           (window.Notes && !endedNow ? Notes.cardHtml(c) : '') +          /* 수업 시각 [바꾸기] · 필기 미제출(끝나기 n분 전부터) (notes.js · 20261101f) */
           (window.HwStat && !endedNow ? HwStat.cardHtml(c) : '') +        /* 과제 현황 문자(운영진) 보냄 · [미리보기] [지금 운영진에게 보내기] (hwstat.js · 20261108a) */
+          (window.Mogo && Mogo.classHtml && !endedNow && n && c.name !== '(반 없음)' ? Mogo.classHtml(c.name) : '') +   /* [모고 기록 지금 받기] 그 반 전체 (mogo.js · 20261109c) */
           (c.name === '(반 없음)' || endedNow ? '' : '<div class="tdc-appbox" data-appcls="' + esc(c.name) + '">' + appClassHtml(c) + '</div>') +   /* 앱 클래스 · 핀번호 (20261101p) */
         '</div>' +
         '<div class="tdc-btns">' +
@@ -2261,6 +2328,8 @@
     endedLeft: function (cls) { return !!st.data && !!st.allStudents && Store.isEnded(cls) && !classGone(cls); },
     missFor: missFor,
     hwInfo: hwInfo, hwCount: hwCount, classNow: classNow,      /* 빠른 상담 창 (quicknote.js · 20261108s) */
+    consultInfo: consultInfo, periodAt: periodAt,              /* 빠른 상담 기준 기간 · 예전 과제 상담의 기간 (20261109c) */
+    recentWeeks: recentWeeks, hwWeek: hwWeek,                  /* 학생 카드 — 최근 8주 막대 · 날짜별 ✓/✕ (20261109c) */
     appFailed: failedIds,
     appWhy: whyText,
     retryMany: retryMany,

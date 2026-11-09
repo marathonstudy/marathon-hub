@@ -1323,6 +1323,20 @@ html.rn-lock, html.rn-lock body { overflow: hidden; }
 .mgv-row__m { grid-column: 1; font-size: 13px; color: var(--ink-mid, #5D6278); }
 .mgv-row__go { grid-column: 2; grid-row: 1 / span 2; padding: 6px 10px; border-radius: 999px; background: #EFEBFF; color: #4A34B8; font-size: 13px; font-weight: 800; white-space: nowrap; }
 .mgv-fail { color: #8A4B00; }
+.mgv-empty { margin: 4px 0 0; font-size: 14px; color: var(--ink-light, #8A8FA6); }
+.mgv-row__d { color: var(--ink-mid, #5D6278); font-weight: 700; }
+/* 탭 다섯 개 이상 — 한 줄에 안 들어가면 옆으로 밀어 본다 (20261109c) */
+.hub-tabs { display: flex; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; scroll-snap-type: x proximity; }
+.hub-tabs::-webkit-scrollbar { display: none; }
+.hub-tabs .hub-tab { flex: 1 0 auto; min-width: 64px; white-space: nowrap; padding-left: 10px; padding-right: 10px; scroll-snap-align: start; }
+/* 루틴 배지 — 레포트 아래 접어 둠 (20261109c) */
+.bdg-fold { margin: 12px 0; }
+.bdg-fold[hidden] { display: none; }
+.bdg-fold__s { cursor: pointer; min-height: 44px; display: flex; align-items: center; padding: 0 14px; border-radius: 14px; background: #fff; box-shadow: var(--card-shadow); font-weight: 800; color: var(--ink-mid, #5D6278); list-style: none; }
+.bdg-fold__s::-webkit-details-marker { display: none; }
+.bdg-fold__s::after { content: '▾'; margin-left: auto; }
+.bdg-fold[open] .bdg-fold__s::after { content: '▴'; }
+.bdg-fold[open] .bdg-fold__s { margin-bottom: 8px; }
 .mgv-ov__new { margin-left: auto; padding: 0 8px; min-height: 44px; display: inline-flex; align-items: center; font-size: 13px; font-weight: 700; color: #5A3FD0; white-space: nowrap; }
 .mgv-new { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 999px; background: #FF5A5F; color: #fff; font-size: 10.5px; font-weight: 900; vertical-align: 2px; }
 .mgv-all { margin-top: 8px; min-height: 44px; border: 0; background: none; color: #5A3FD0; font: inherit; font-weight: 800; cursor: pointer; }

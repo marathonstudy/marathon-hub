@@ -52,23 +52,28 @@
     return '<div class="mgv-btns">' + (nb ? '<button type="button" class="mgv-btn" data-mgv-url="' + esc(nb) + '" data-mgv-title="나의 기록장">📒 나의 기록장</button>' : '') +
       (an ? '<button type="button" class="mgv-btn" data-mgv-url="' + esc(an) + '" data-mgv-title="나의 종합 분석">📊 종합 분석</button>' : '') + '</div>';
   }
+  /* 한 줄 — 「11/8(일) · 한수 파이널 13회차 · [레포트 보기]」 (20261109c) · 아래 작게 점수 · 등급 */
   function rowHtml(x, since) {
     var isNew = since && x.date && x.date >= since;
+    var sub = [x.score != null ? x.score + '점' : '', x.grade || '', x.firstAttempt === false ? '재응시' : ''].filter(Boolean).join(' · ');
     return '<li><button type="button" class="mgv-row" data-mgv-id="' + esc(x.id) + '" data-mgv-title="' + esc(x.examName || '모의고사') + '">' +
-      '<span class="mgv-row__n">' + esc(x.examName || '모의고사') + (isNew ? ' <b class="mgv-new">NEW</b>' : '') + '</span>' +
-      '<span class="mgv-row__m num">' + esc([mdw(x.date), x.score != null ? x.score + '점' : '', x.grade || '', x.firstAttempt === false ? '재응시' : ''].filter(Boolean).join(' · ')) + '</span>' +
-      '<span class="mgv-row__go">레포트 열기 ›</span></button></li>';
+      '<span class="mgv-row__n"><span class="mgv-row__d num">' + esc(mdw(x.date)) + '</span>' + (x.date ? ' · ' : '') + esc(x.examName || '모의고사') + (isNew ? ' <b class="mgv-new">NEW</b>' : '') + '</span>' +
+      (sub ? '<span class="mgv-row__m num">' + esc(sub) + '</span>' : '') +
+      '<span class="mgv-row__go">레포트 보기 ›</span></button></li>';
   }
   /* 저장본을 못 읽었을 때 — 이 한 줄만 (러닝노트 다른 칸은 그대로) */
   var FAIL = '모의고사 기록을 불러오지 못했어요';
   function failHtml() { return '<div class="empty mgv-fail">' + FAIL + '</div>'; }
   /* 「모의고사」 탭 */
+  /* 「모의고사」 탭 — 모든 학생에게 보인다 (20261109c) · 없으면 한 줄만 (일치 없음 같은 안쪽 사정은 쓰지 않는다) */
+  var EMPTY = '아직 받은 모의고사 레포트가 없어요';
   function panelHtml(d) {
-    if (!has(d)) return '<div class="empty">아직 모의고사 분석 레포트가 없어요.</div>';
+    if (d && d.failed) return failHtml();
     var L = list(d);
+    if (!L.length && !has(d)) return '<div class="card mgv"><h2 class="mgv-title">모의고사 분석 레포트</h2><p class="mgv-empty">' + EMPTY + '</p></div>';
     return '<div class="card mgv">' +
       '<h2 class="mgv-title">모의고사 분석 레포트</h2>' + btnsHtml(d) + trendHtml(d) +
-      (L.length ? '<ol class="mgv-list">' + L.map(function (x) { return rowHtml(x, ''); }).join('') + '</ol>' : '<p class="hub-muted">완성된 레포트가 아직 없어요.</p>') +
+      (L.length ? '<ol class="mgv-list">' + L.map(function (x) { return rowHtml(x, ''); }).join('') + '</ol>' : '<p class="mgv-empty">' + EMPTY + '</p>') +
       '</div>';
   }
   /* 주간 레포트 아래 — 「📝 모의고사 기록 · 지금까지 n회」 최근 3회 + 전체 보기 */
@@ -126,5 +131,5 @@
     else if (okId(b.getAttribute('data-mgv-id'))) openUrl(ORIGIN + '/report.html?id=' + encodeURIComponent(b.getAttribute('data-mgv-id')), b.getAttribute('data-mgv-title'));
   });
 
-  global.MogoView = { has: has, list: list, panelHtml: panelHtml, failHtml: failHtml, FAIL: FAIL, reportBlockHtml: reportBlockHtml, trendHtml: trendHtml, openUrl: openUrl, close: close, ORIGIN: ORIGIN };
+  global.MogoView = { has: has, list: list, panelHtml: panelHtml, failHtml: failHtml, FAIL: FAIL, EMPTY: EMPTY, reportBlockHtml: reportBlockHtml, trendHtml: trendHtml, openUrl: openUrl, close: close, ORIGIN: ORIGIN };
 })(window);

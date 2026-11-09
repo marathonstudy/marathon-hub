@@ -29,6 +29,21 @@
   var CATS = ['상담', '과제 독려', '학습 상담', '학부모 연락', '집중', '정서·컨디션', '출결', '학습', '기타', '과제', '걱정 문자', '퇴원', '재등록'];   /* 과제 · 걱정 문자 (061) · 퇴원 · 재등록 (062 · 20261101s) */
   var CONSULT = ['상담', '과제 독려', '학습 상담', '학부모 연락', '과제', '걱정 문자'];
   function isConsult(n) { return (n.categories || []).some(function (c) { return CONSULT.indexOf(c) !== -1; }); }
+  /* 상담 종류 — 「과제 상담 / 일반 상담」 두 가지 (+ 퇴원 · 재등록 · 걱정 문자 같은 그 밖 기록) · quicknote.js 와 같은 규칙 (20261109c) */
+  var KINDS = [['hw', '과제 상담'], ['general', '일반 상담'], ['other', '그 밖 기록']];
+  function kindOf(n) { return window.QuickNote && QuickNote.kindOf ? QuickNote.kindOf(n) : (isConsult(n) ? 'general' : 'other'); }
+  function kindTag(n) {
+    var k = kindOf(n);
+    if (k === 'hw') {
+      var p = window.QuickNote && QuickNote.periodOf ? QuickNote.periodOf(n) : null;
+      return '<span class="nt-cat nt-cat--hw">과제 상담' + (p ? ' ' + esc(QuickNote.perLabel(p)) : '') + '</span>';
+    }
+    if (k === 'general') {
+      var sub = (n.categories || []).filter(function (c) { return c !== '상담'; });
+      return '<span class="nt-cat nt-cat--consult">일반 상담</span>' + (sub.length ? '<span class="nt-cat">' + esc(sub.join(', ')) + '</span>' : '');
+    }
+    return catsHtml(n.categories);
+  }
   var SUBJ = [['kor', '국어'], ['eng', '영어'], ['math', '수학'], ['inq', '탐구']];
   var COLS = ['kor_raw', 'kor_grade', 'eng_raw', 'eng_grade', 'math_raw', 'math_grade', 'inq_raw', 'inq_grade'];
   var LEVELS = ['N수', '고3', '고2', '고1', '중3', '중2', '중1'];
@@ -85,7 +100,7 @@
       sid: sid, card: null, cardAt: '', studentAt: Store.baseAt('students', sid),
       grades: [], notes: [], showDeleted: false, editing: null, pendingNotes: false,
       extra: { school: { levels: [], terms: {} }, mock: { levels: [], terms: {} } },
-      filter: { cats: {}, from: '', to: '', author: '', consult: false }
+      filter: { kinds: {}, from: '', to: '', author: '' }
     };
     $('#cardTitle').textContent = s.name + ' 상담 카드';
     /* 맨 위 얼굴 사진 — 학생이 「내 정보」에서 올린 사진 (없으면 이름 첫 글자 · migration-035 · 20261031c) */
@@ -319,7 +334,7 @@
     host.innerHTML = promiseHtml() + '<div class="cd-pinned"><div class="cd-pinned__title">📌 다음 상담 때 확인 ' + list.length + '건</div>' +
       list.map(function (n) {
         return '<div class="cd-pin" data-id="' + n.id + '">' +
-          '<div class="cd-pin__top"><span class="num">' + esc(fmtDate(n.note_date)) + '</span> ' + catsHtml(n.categories) +
+          '<div class="cd-pin__top"><span class="num">' + esc(fmtDate(n.note_date)) + '</span> ' + kindTag(n) +
           ' <span class="muted-note">' + esc(n.author_name) + '</span>' +
           '<span class="spacer"></span><button class="btn btn--sm btn--primary" type="button" data-nact="done">확인 완료</button></div>' +
           '<div class="cd-pin__body">' + esc(n.body) + '</div></div>';
@@ -721,11 +736,10 @@
 
   function visibleNotes() {
     var f = C.filter;
-    var anyCat = Object.keys(f.cats).filter(function (k) { return f.cats[k]; });
+    var anyKind = Object.keys(f.kinds || {}).filter(function (k) { return f.kinds[k]; });
     return C.notes.filter(function (n) {
       if (n.deleted_at && !(isTeacher() && C.showDeleted)) return false;
-      if (f.consult && !isConsult(n)) return false;
-      if (anyCat.length && !anyCat.some(function (c) { return (n.categories || []).indexOf(c) !== -1; })) return false;
+      if (anyKind.length && anyKind.indexOf(kindOf(n)) === -1) return false;
       if (f.from && n.note_date < f.from) return false;
       if (f.to && n.note_date > f.to) return false;
       if (f.author && n.author_email !== f.author) return false;
@@ -742,9 +756,9 @@
       '<div class="cn-compose">' +
         '<div class="toolbar">' +
           '<input class="input" type="date" id="cnDate" value="' + todayKST() + '" aria-label="날짜">' +
-          '<div class="chips tb-chips-sm" id="cnCats">' + catChips('ccat', {}) + '</div>' +
+          '<span class="muted-note">일반 상담으로 남깁니다 · 과제 상담은 빠른 상담 창 [과제 상담]에서</span>' +
         '</div>' +
-        '<textarea class="textarea" id="cnBody" rows="3" placeholder="오늘 상담·관찰한 내용을 적으세요"></textarea>' +
+        '<textarea class="textarea" id="cnBody" rows="3" placeholder="예) 진로 고민, 수업 태도, 학부모 요청 등"></textarea>' +
         '<input class="input cn-next" id="cnNext" type="text" maxlength="200" placeholder="다음에 확인할 것 (한 줄 · 비워도 됨) 예) 화 · 목 과제 내기" aria-label="다음에 확인할 것">' +
         '<div class="toolbar">' +
           '<label class="chk-inline"><input type="checkbox" id="cnFollow"> 다음 상담 때 확인</label>' +
@@ -754,9 +768,8 @@
       '</div>' +
       '<div class="cn-filter">' +
         '<div class="chips tb-chips-sm" id="cnFilterCats">' +
-          '<button type="button" class="chip chip--consult' + (C.filter.consult ? ' is-on' : '') + '" id="cnOnlyConsult">상담만 보기</button>' +
-          CATS.filter(function (c) { return c !== '상담'; }).map(function (c) {
-            return '<button type="button" class="chip' + (C.filter.cats[c] ? ' is-on' : '') + '" data-fcat="' + esc(c) + '">' + esc(c) + '</button>';
+          KINDS.map(function (k) {
+            return '<button type="button" class="chip' + (k[0] !== 'other' ? ' chip--consult' : '') + (C.filter.kinds[k[0]] ? ' is-on' : '') + '" data-fkind="' + k[0] + '" aria-pressed="' + !!C.filter.kinds[k[0]] + '">' + esc(k[1]) + '</button>';
           }).join('') +
         '</div>' +
         '<div class="toolbar">' +
@@ -784,11 +797,9 @@
 
     var body;
     if (editing) {
-      var picked = {};
-      (n.categories || []).forEach(function (c) { picked[c] = true; });
+      /* 분류는 고치지 않는다 (과제 상담 / 일반 상담 / 그 밖 기록 그대로 · 20261109c) */
       body = '<div class="cn-edit">' +
-        '<div class="toolbar"><input class="input" type="date" data-ef="date" value="' + esc(n.note_date) + '">' +
-        '<div class="chips tb-chips-sm">' + catChips('ecat', picked) + '</div></div>' +
+        '<div class="toolbar"><input class="input" type="date" data-ef="date" value="' + esc(n.note_date) + '">' + kindTag(n) + '</div>' +
         '<textarea class="textarea" data-ef="body" rows="3">' + esc(n.body) + '</textarea>' +
         '<input class="input cn-next" type="text" maxlength="200" data-ef="next" placeholder="다음에 확인할 것 (비워도 됨)" aria-label="다음에 확인할 것" value="' + esc(n.next_check || '') + '">' +
         '<div class="toolbar"><label class="chk-inline"><input type="checkbox" data-ef="follow"' + (n.follow_up ? ' checked' : '') + '> 다음 상담 때 확인</label>' +
@@ -803,7 +814,7 @@
       : (editing ? '' : '<button class="btn btn--sm btn--ghost" type="button" data-nact="edit">고치기</button>' +
          (isTeacher() ? '<button class="btn btn--sm btn--ghost" type="button" data-nact="del">삭제</button>' : ''));
     return '<div class="cn-item' + (consult ? ' cn-item--consult' : '') + (n.deleted_at ? ' is-deleted' : '') + '" data-id="' + n.id + '">' +
-      '<div class="cn-item__top"><span class="cn-item__date num">' + esc(fmtDate(n.note_date)) + '</span>' + catsHtml(n.categories) +
+      '<div class="cn-item__top"><span class="cn-item__date num">' + esc(fmtDate(n.note_date)) + '</span>' + kindTag(n) +
       '<span class="muted-note">' + esc(n.author_name) + '</span><span class="spacer"></span>' + acts + '</div>' +
       body + (meta.length ? '<div class="cn-item__meta">' + meta.join(' · ') + '</div>' : '') + '</div>';
   }
@@ -819,14 +830,18 @@
   function addNote() {
     var body = $('#cnBody').value.trim();
     if (!body) { toast('내용을 적어 주세요', 'bad'); $('#cnBody').focus(); return; }
-    var cats = $$('#cnCats .chip.is-on').map(function (b) { return b.dataset.ccat; });
     var sid = C.sid;
     var btn = $('#cnAdd');
     btn.disabled = true;
-    var row = { student_id: sid, note_date: $('#cnDate').value || todayKST(), categories: cats, body: body, follow_up: $('#cnFollow').checked };
+    /* 상담 카드에서 남기는 기록 = 일반 상담 (20261109c · migration-090 전이면 kind 없이) */
+    var row = { student_id: sid, note_date: $('#cnDate').value || todayKST(), categories: ['상담'], kind: 'general', body: body, follow_up: $('#cnFollow').checked };
     var nx = ($('#cnNext').value || '').trim();
     if (nx) row.next_check = nx.slice(0, 200);
-    sb().from('student_notes').insert(row).select('*').single().then(check).then(function (r) {
+    var ins = function (x) { return sb().from('student_notes').insert(x).select('*').single(); };
+    Promise.resolve(ins(row)).then(function (r) {
+      if (r && r.error && /kind|schema cache|Could not find/i.test(r.error.message || '')) { var x = Object.assign({}, row); delete x.kind; return ins(x); }
+      return r;
+    }).then(check).then(function (r) {
       btn.disabled = false;
       if (!C || C.sid !== sid) return;
       C.notes.unshift(r.data);
@@ -834,7 +849,6 @@
       $('#cnBody').value = '';
       $('#cnNext').value = '';
       $('#cnFollow').checked = false;
-      $$('#cnCats .chip').forEach(function (b) { b.classList.remove('is-on'); });
       renderPinned();
       renderNoteList();
       loadFollow();
@@ -869,7 +883,6 @@
       var patch = {
         note_date: ed.querySelector('[data-ef="date"]').value || n.note_date,
         body: ed.querySelector('[data-ef="body"]').value.trim(),
-        categories: $$('.chip.is-on', ed).map(function (b) { return b.dataset.ecat; }),
         follow_up: ed.querySelector('[data-ef="follow"]').checked
       };
       var nxe = ed.querySelector('[data-ef="next"]').value.trim().slice(0, 200);
@@ -946,13 +959,11 @@
     if (nb) { onNoteAction(nb); return; }
     if (e.target.closest('#cdBasicSave')) { saveBasic(); return; }
     if (e.target.closest('#cnAdd')) { addNote(); return; }
-    var cc = e.target.closest('[data-ccat], [data-ecat]');
-    if (cc) { cc.classList.toggle('is-on'); return; }
-    var fc = e.target.closest('[data-fcat]');
-    if (fc) { C.filter.cats[fc.dataset.fcat] = !C.filter.cats[fc.dataset.fcat]; fc.classList.toggle('is-on'); renderNoteList(); return; }
-    if (e.target.closest('#cnOnlyConsult')) {
-      C.filter.consult = !C.filter.consult;
-      e.target.closest('#cnOnlyConsult').classList.toggle('is-on', C.filter.consult);
+    var fk = e.target.closest('[data-fkind]');
+    if (fk) {
+      var k = fk.dataset.fkind;
+      C.filter.kinds[k] = !C.filter.kinds[k];
+      fk.classList.toggle('is-on', C.filter.kinds[k]); fk.setAttribute('aria-pressed', String(C.filter.kinds[k]));
       renderNoteList();
     }
   });

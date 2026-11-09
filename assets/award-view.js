@@ -189,18 +189,22 @@
     if (!v) return '';
     var today = String(v.today || '').slice(0, 7) || '';
     var y = year || +today.slice(0, 4) || new Date().getFullYear();
-    var firstY = +(String(v.first || '').slice(0, 4)) || y, lastY = +today.slice(0, 4) || y;
+    /* opt.since 「2026-11」 — 그 달 앞은 보이지 않게 (러닝노트 · 20261109c) */
+    var since = /^\d{4}-\d{2}$/.test(opt.since || '') ? opt.since : '';
+    var firstY = Math.max(+(String(v.first || '').slice(0, 4)) || y, since ? +since.slice(0, 4) : 0), lastY = +today.slice(0, 4) || y;
+    if (y < firstY) y = firstY;
     var runs = monthRuns(v.months), got = {};
     (v.months || []).forEach(function (m) { got[m] = 1; });
     var cells = '';
     for (var m = 1; m <= 12; m++) {
       var ym = y + '-' + String(m).padStart(2, '0'), on = !!got[ym], fut = ym >= today;
+      if (since && ym < since) continue;
       var cls = on ? 'is-got' + (runs.run[ym] >= 3 ? ' is-streak' : '') : fut ? 'is-future' : 'is-miss';
       cells += on
         ? '<button type="button" class="bdg-m ' + cls + '" data-bdg-m="' + ym + '" aria-label="' + esc(m + '월 루틴 우수자 — 누르면 그달 화면') + '"><span aria-hidden="true">🏅</span><small>' + m + '월</small></button>'
         : '<span class="bdg-m ' + cls + '" aria-label="' + esc(m + '월' + (fut ? ' (아직)' : '')) + '"><span aria-hidden="true">🏅</span><small>' + m + '월</small></span>';
     }
-    var weeks = v.weeks || [], wr = weekRun(weeks), none = !num(v.perfect) && !(v.months || []).length;
+    var weeks = (v.weeks || []).filter(function (w) { return !since || String(w.to || '').slice(0, 7) >= since; }), wr = weekRun(weeks), none = !num(v.perfect) && !(v.months || []).length;
     return '<div class="card bdg" data-bdg-year="' + y + '">' +
       '<h2 class="card-title">🏅 내 루틴 배지' + (opt.note ? '<span class="card-note">' + esc(opt.note) + '</span>' : '') + '</h2>' +
       '<div class="bdg-year"><button type="button" class="bdg-y" data-bdg-y="-1"' + (y <= firstY ? ' disabled' : '') + ' aria-label="지난해">◀</button><b class="num">' + y + '년</b>' +
