@@ -94,3 +94,8 @@
   .bdg-ml-row, .bdg-cells { gap: 2px; }
   .bdg-w { font-size: 9px; border-radius: 4px; }
 }
+/* 수업 왕 배지 — 📝 오답정리 · 🔍 지문장악 (20261110i) */
+.bdg-kings { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.bdg-kc { display: inline-flex; align-items: center; gap: 2px; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 800; background: #F3EFFF; color: #4A3AA8; }
+.bdg-kc.is-text { background: #E9F6EF; color: #1F6B4E; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

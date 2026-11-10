@@ -1277,6 +1277,18 @@ delete from public.staff where email = '조교이메일@example.com';
   - [성장 그래프 보기] 영역별 월별 정답률 꺾은선 + 「처음보다 독서 +12 · 가장 많이 큰 달 11월」 · 한 달뿐이면 안내 · 누르면 레포트 탭 영역별 정답률로 · 학부모 「○○ 학생의 능력치」 · 빈 상태 「과제를 내면 능력치가 열려요」
   - 코치룸 학생 카드(과제 아래) — 같은 능력치를 작게(app_records.data 를 그 학생 것만 읽음 · 직원만) · 기간 전환 · 성장 그래프
 
+### 5-125. 20261110i — 이번 주 「오답정리왕」 · 「지문 장악왕」 후보 자동 계산 · 확정 · 배지 (migration-099 · 함수 app-sync 다시 배포 · 함수 king-pick 새로 배포)
+1. SQL Editor → `supabase/migration-099-weekly-kings.sql` → Run (098 다음 · 065 · 078 · 097 이 먼저 · 맨 끝 확인 표 모두 true)
+2. Edge Functions → **app-sync** → `supabase/functions/app-sync/index.ts` 전체로 바꿔 Deploy (제출 사진 주소 · 앱 점수를 app_records.subs 에 · 099 전이면 저장만 건너뜀)
+3. Edge Functions → Deploy a new function → 이름 **king-pick** → `supabase/functions/king-pick/index.ts` 전체 → **Verify JWT 끄기** (AI 키는 AI 요약과 같은 `ANTHROPIC_API_KEY` · 새 키 없음)
+- 어디서 오나 — 앱 공유 리포트 응답(GET /api/share/report/:token · 앱 server/routes.ts:9928 · 181~275)의 homeworkHistory 에 이미 있는 files[].url(제출 사진 주소 · 앱 업로드는 visibility public · server/objectStorage.ts:244 · routes.ts:694) · wrongAnswerScore · textComprehensionScore(앱 AI 「흔적 있음 100」 점수 · server/homeworkAiAnalysis.ts:1296~1299) — 앱 로그인 · 관리자 권한 · 앱 DB 는 쓰지 않음
+  - 학생이 쓴 글(selfPraise · improvement · message)은 앱이 공유 응답에서 뺌(routes.ts:9951) — 오답정리 세 가지는 사진 속 손글씨로만 볼 수 있어 AI 가 사진을 본다
+- app-sync — 최근 120일 낸 과제의 { title, submittedAt, wa, tc, files(이미지 주소 · 8장까지) } 만 app_records.subs (직원 · 서버만 · 러닝노트 hub_app_record 는 data 만) · 사진은 복사하지 않음
+- king-pick — 15분마다(king_due: 그 주 배지가 생긴 반 · 수업일 0~6일 전 · 아직 안 함 · 2반까지) · 학생마다 그 주 사진 6장까지 읽어 Claude Haiku 한 번(이름 · 번호 안 보냄) → 종류마다 1~3위 { 점수 · 근거 한 줄 · 사진 주소 } · 사진 없는 종류는 none(사람이 고름) · 시간이 모자라면 저장 안 하고 다음 차례
+  - 비용 — 사진 1장 약 1,600 토큰 · 학생 6장 약 1만 토큰 · Haiku $0.1/백만 입력 · $0.5/백만 출력 → 학생 약 $0.001 · 반 15명 · 주 약 $0.015 (king_weeks.cost 에 남김)
+- 코치룸 「오늘」 반 카드 「👑 이번 주 오답정리왕 · 지문 장악왕」 — 1~3위 · 점수 · 근거 · 사진 미리보기 · [확정] [다른 학생으로] [확정 풀기] [후보 다시 계산] · 원장 설정 「n시간 안에 안 누르면 1위 자동 확정」(기본 0 = 끔) · 「매주 후보 자동 계산」
+- 배지 — 확정된 것만 _badge_box.kings { wrong, text, weeks } → 러닝노트 「🏅 내 배지」 [수업 왕 배지] 📝 오답정리 배지 n개 · 🔍 지문장악 배지 n개 · 주(수업일) · 학부모 링크도 · 점수 · 근거 · 사진 · 순위 없음 · 문자 · 알림톡 없음
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

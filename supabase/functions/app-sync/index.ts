@@ -102,7 +102,7 @@ function whoOf(src: Any): string {
   return v ? String(v).trim().slice(0, 40) : "";
 }
 
-function pick(src: Any) {
+export function pick(src: Any) {
   const st = src?.stats ?? {};
   const lectures = Array.isArray(src?.lectures) ? src.lectures : [];
   const cal = Array.isArray(src?.calendarData) ? src.calendarData : [];
@@ -179,6 +179,29 @@ function lite(full: Any) {
 
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/* 왕 후보용 (20261110i · migration-099) — 최근 120일 낸 과제의 사진 주소(이미지만 · 8장) · 앱 점수(wrongAnswerScore · textComprehensionScore)만
+   학생 글 · 피드백 · 파일 이름은 넣지 않는다 · 사진은 주소만(복사하지 않음) · app_records.subs(직원 · 서버만 · 러닝노트에는 안 나감) */
+const SUB_IMG = /^image\/(jpe?g|png|webp|gif)$/i;
+export function subsOf(src: Any) {
+  const cut = new Date(Date.now() - 120 * 86400000).toISOString();
+  const hist = Array.isArray(src?.homeworkHistory) ? src.homeworkHistory : [];
+  const sc = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? Math.max(0, Math.min(100, Math.round(v))) : null);
+  return hist
+    .filter((h: Any) => typeof h?.submittedAt === "string" && h.submittedAt >= cut)
+    .map((h: Any) => ({
+      title: String(h?.title ?? "").slice(0, 200),
+      order: num(h?.lectureOrder),
+      submittedAt: String(h.submittedAt),
+      wa: sc(h?.wrongAnswerScore),
+      tc: sc(h?.textComprehensionScore),
+      files: (Array.isArray(h?.files) ? h.files : [])
+        .filter((x: Any) => typeof x?.url === "string" && x.url.length <= 400 && /^(\/(objects|uploads)\/|https:\/\/(www\.)?marathonstudy\.com\/)/.test(x.url)
+          && (SUB_IMG.test(String(x?.type ?? "")) || (!x?.type && /\.(jpe?g|png|webp|gif)(\?|$)/i.test(x.url))))
+        .slice(0, 8).map((x: Any) => ({ url: String(x.url), type: String(x?.type ?? "") })),
+    }))
+    .slice(-200);
+}
+
 /* 한 명 — 앱 서버가 바쁘거나 응답이 없으면 0.7초 · 1.8초 쉬었다가 2번까지 다시 */
 async function fetchShare(share: string): Promise<Any> {
   let last: Any = { ok: false, reason: "upstream" };
@@ -190,7 +213,7 @@ async function fetchShare(share: string): Promise<Any> {
       const r = await fetch(APP_API + encodeURIComponent(share), { headers: { "Accept": "application/json" }, signal: ctl.signal });
       clearTimeout(t);
       if (r.status === 404) return { ok: false, reason: "expired" };
-      if (r.ok) { const data = pick(await r.json()); return { ok: true, data, lite: lite(data) }; }
+      if (r.ok) { const raw = await r.json(); const data = pick(raw); return { ok: true, data, lite: lite(data), subs: subsOf(raw) }; }
       last = { ok: false, reason: r.status === 429 || r.status === 503 ? "busy" : "upstream" };
     } catch (e) {
       last = { ok: false, reason: (e as Error)?.name === "AbortError" ? "timeout" : "upstream" };
@@ -209,7 +232,10 @@ export async function runList(list: Any[], started = Date.now()) {
       if (r.ok) out.saved++;
       else { out.failed++; out.reasons[r.reason] = (out.reasons[r.reason] || 0) + 1; console.error("app-sync fail", r.reason); }
     });
-    await rpc("app_sync_save", { p_results: results });
+    await rpc("app_sync_save", { p_results: results.map(({ subs: _s, ...x }: Any) => x) });
+    /* 왕 후보용 사진 주소 · 앱 점수 (099 전이면 함수가 없어 조용히 넘어간다) */
+    const subRows = results.filter((x: Any) => x.ok && Array.isArray(x.subs)).map((x: Any) => ({ id: x.id, subs: x.subs }));
+    if (subRows.length) await rpc("king_subs_save", { p_rows: subRows }).catch(() => 0);
     if (i + AT_ONCE < list.length) await sleep(PAUSE_MS);
   }
   return out;

@@ -312,8 +312,19 @@
           (mc.best >= 2 ? ' <span class="bdg-dot">·</span> <span>최장 연속 <b class="num">' + mc.best + '개월</b></span>' : '') + '</p>' +
         (mc.html ? '<div class="bdg-months">' + mc.html + '</div>' : '') +
       '</section>' +
+      kingsHtml(v) +
       (none ? '<p class="bdg-hint">한 주 과제를 모두 내면 주간 배지, 한 달 제출률이 높으면 월간 배지를 받아요</p>' : '') +
     '</div>';
+  }
+  /* [수업 왕 배지] — 선생님이 확정한 이번 주 오답정리왕 📝 · 지문 장악왕 🔍 (migration-099 · 20261110i) · 개수 · 받은 주(수업일) · 점수 · 순위 없음 · 하나도 없으면 칸 없음 */
+  function kingsHtml(v) {
+    var k = v && v.kings, nw = k ? num(k.wrong) : 0, nt = k ? num(k.text) : 0;
+    if (!nw && !nt) return '';
+    var ws = (k.weeks || []).slice().reverse().slice(0, 16);
+    return '<section class="bdg-sec bdg-sec--k"><h3 class="bdg-h">수업 왕 배지</h3>' +
+      '<p class="bdg-sum"><b>📝 오답정리 배지 <span class="num">' + nw + '개</span></b> <span class="bdg-dot">·</span> <b>🔍 지문장악 배지 <span class="num">' + nt + '개</span></b></p>' +
+      (ws.length ? '<ul class="bdg-kings">' + ws.map(function (x) { return '<li class="bdg-kc is-' + (x.kind === 'text' ? 'text' : 'wrong') + '"><span aria-hidden="true">' + (x.kind === 'text' ? '🔍' : '📝') + '</span> <span class="num">' + esc(mdOf(x.lesson)) + '</span><span class="sr-only">' + (x.kind === 'text' ? ' 지문장악 배지' : ' 오답정리 배지') + '</span></li>'; }).join('') + '</ul>' : '') +
+    '</section>';
   }
   function nowHtml(v) {
     if (!v || !v.cur) return '';
@@ -341,7 +352,8 @@
   /* 접는 칸 제목 옆 요약 — 「주간 6 · 월간 2」 */
   function sumText(v) {
     if (!v) return '';
-    return '⭐ 주간 ' + num(v.perfect) + ' · 🏅 월간 ' + (v.months || []).length;
+    var k = v.kings || {};
+    return '⭐ 주간 ' + num(v.perfect) + ' · 🏅 월간 ' + (v.months || []).length + (num(k.wrong) ? ' · 📝 ' + num(k.wrong) : '') + (num(k.text) ? ' · 🔍 ' + num(k.text) : '');
   }
   /* 코치룸 한 줄 — 「⭐ 주간 배지 6개 · 🏅 월간 배지 2개(10월 · 9월) · 3주 연속」 */
   function lineText(v) {
