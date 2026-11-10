@@ -93,7 +93,8 @@
           '<h2 class="card-title">📷 선생님이 이름을 익힐 수 있게 내 사진 올리기</h2>' +
           '<p class="mi-consent">' + esc(global.FaceCrop ? FaceCrop.NOTE : '선생님이 이름을 익히는 용도로만 쓰고, 선생님만 볼 수 있어요 · 언제든 지울 수 있어요') + '</p>' +
           '<div class="mi-photo">' + (st.pv ? '<img class="mi-photo__img" src="' + esc(st.pv) + '" alt="방금 올린 내 사진 (확인용)">' : '<span class="mi-photo__none">' + (has() ? '✓' : esc(String(d.name || '?').charAt(0))) + '</span>') +
-            '<div class="mi-photo__btns"><label class="hub-btn hub-btn--sm mi-file">' + (has() ? '사진 바꾸기' : '사진 올리기') + '<input type="file" accept="image/*" data-mi-file hidden></label>' +
+            '<label class="mi-agree"><input type="checkbox" data-mi-agree' + (st.agree ? ' checked' : '') + '> 위 안내를 읽었고 사진을 올리는 데 동의해요</label>' +
+            '<div class="mi-photo__btns"><label class="hub-btn hub-btn--sm mi-file' + (st.agree ? '' : ' is-off') + '">' + (has() ? '사진 바꾸기' : '사진 올리기') + '<input type="file" accept="image/*" data-mi-file hidden' + (st.agree ? '' : ' disabled') + '></label>' +
               (has() ? '<button type="button" class="hub-btn hub-btn--sm hub-btn--ghost" data-mi-del>사진 지우기</button>' : '') + '</div></div>' +
           '<p class="mi-muted">' + (has() ? '사진이 올라가 있어요 · ' : '') + '얼굴이 보이게 정사각형으로 잘라 작게 줄여 저장해요 (5MB까지).</p>' +
         '</div>';
@@ -126,8 +127,11 @@
       }, function () { st.busy = false; warn.hidden = false; warn.textContent = '저장하지 못했습니다. 인터넷을 확인하고 다시 눌러 주세요.'; });
     }
     function savePhoto(p) {
-      return rpc('me_photo_save', { p_code: code, p_photo: p ? p.photo : '', p_thumb: p ? p.thumb : '' }).then(function (r) {
-        if (!r || !r.ok) { alertMsg((r && REASON[r.reason]) || '사진을 저장하지 못했습니다'); return; }
+      if (p && !st.agree) { alertMsg('먼저 안내를 읽고 동의에 체크해 주세요'); return Promise.resolve(); }
+      var a3 = { p_code: code, p_photo: p ? p.photo : '', p_thumb: p ? p.thumb : '' };
+      /* 093 전이면 네 칸짜리가 없다 — 예전 세 칸짜리로 (화면의 확인 체크는 그대로 필요) */
+      return rpc('me_photo_save', Object.assign({ p_agree: !!(p && st.agree) }, a3)).catch(function () { return rpc('me_photo_save', a3); }).then(function (r) {
+        if (!r || !r.ok) { alertMsg(r && r.reason === 'agree' ? '먼저 안내를 읽고 동의에 체크해 주세요' : (r && REASON[r.reason]) || '사진을 저장하지 못했습니다'); return; }
         st.d.has_photo = !!p; st.d.photo = null; st.pv = p ? p.thumb : '';
         draw(p ? '사진을 저장했습니다' : '사진을 지웠습니다');
       });
@@ -140,6 +144,13 @@
       if (e.target.closest('[data-mi-del]')) savePhoto(null);
     });
     host.addEventListener('change', function (e) {
+      if (e.target.matches && e.target.matches('[data-mi-agree]')) {
+        /* 다시 그리지 않는다 (적던 내 정보가 지워지지 않게) — 올리기 버튼만 켠다 · 끈다 */
+        st.agree = !!e.target.checked;
+        var fi = host.querySelector('[data-mi-file]');
+        if (fi) { fi.disabled = !st.agree; fi.closest('label').classList.toggle('is-off', !st.agree); }
+        return;
+      }
       var inp = e.target.closest('[data-mi-file]');
       if (!inp || !inp.files || !inp.files[0]) return;
       MeInfo.makePhotos(inp.files[0]).then(savePhoto, function (err) { alertMsg(err.message || '사진을 열지 못했습니다'); });

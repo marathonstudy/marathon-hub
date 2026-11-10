@@ -2967,6 +2967,10 @@ dialog > .toast-host { position: fixed; }
 .fc-btns .btn, .fd-none__list .btn { min-height: 40px; }
 .fc-note, .fd-note { margin: 0; font-size: 12px; color: var(--ink-light); overflow-wrap: anywhere; }
 .fc-busy { font-size: 13px; color: var(--ink-mid); }
+.fc-agree { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: var(--ink-deep); min-height: 40px; cursor: pointer; }
+.fc-agree input { width: 20px; height: 20px; margin: 0; }
+.fc-file.is-off { opacity: .5; cursor: not-allowed; }
+.fc-meta { margin: 0; font-size: 12px; color: var(--ink-mid); }
 .fc-file { position: relative; cursor: pointer; }
 .fd-modal { width: min(560px, calc(100vw - 24px)); }
 .fd-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }

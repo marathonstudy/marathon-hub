@@ -198,7 +198,9 @@
     return '<div class="gm-face" id="gmFace"><h3 class="gm-sub">선생님이 이름을 익힐 수 있게 내 사진 올리기</h3>' +
       '<p class="gm-face__note">' + esc(global.FaceCrop ? FaceCrop.NOTE : '') + '</p>' +
       (H.facePv ? '<img class="gm-face__pv" src="' + esc(H.facePv) + '" alt="방금 올린 내 사진 (확인용)" width="96" height="96">' : '') +
-      '<div class="gm-face__b"><label class="gm-btn gm-btn--ghost gm-file">' + (f.has ? '사진 바꾸기' : '사진 올리기') + '<input type="file" accept="image/*" data-gm-face hidden></label>' +
+      /* 안내 문구 확인 체크 — 체크해야 올라간다 (093 · 동의한 날짜 · 「학생」이 올림을 남긴다) */
+      '<label class="gm-agree"><input type="checkbox" data-gm-agree' + (H.faceAgree ? ' checked' : '') + '> <span>위 안내를 읽었고 사진을 올리는 데 동의해요</span></label>' +
+      '<div class="gm-face__b"><label class="gm-btn gm-btn--ghost gm-file' + (H.faceAgree ? '' : ' is-off') + '">' + (f.has ? '사진 바꾸기' : '사진 올리기') + '<input type="file" accept="image/*" data-gm-face hidden' + (H.faceAgree ? '' : ' disabled') + '></label>' +
       (f.has ? '<button type="button" class="gm-btn gm-btn--ghost" data-gm-face-del>사진 지우기</button>' : '') + '</div>' +
       '<p class="gm-face__s" id="gmFaceMsg">' + (f.has ? '사진이 올라가 있어요' : '아직 올린 사진이 없어요') + '</p></div>';
   }
@@ -230,17 +232,20 @@
     if (!global.FaceCrop) return;
     var why = FaceCrop.check(file);
     if (why) { faceMsg(why); return; }
+    if (!H.faceAgree) { faceMsg('먼저 안내를 읽고 동의에 체크해 주세요'); return; }
     faceMsg('올리는 중…');
     FaceCrop.makeData(file).then(function (x) {
-      return Promise.resolve(H.ctx.rpc('me_photo_save', { p_code: H.ctx.code, p_photo: x.photo, p_thumb: x.thumb })).then(function (r) {
-        if (!r || !r.ok) { faceMsg('올리지 못했어요. 잠시 뒤 다시 해 주세요.'); return; }
+      var a3 = { p_code: H.ctx.code, p_photo: x.photo, p_thumb: x.thumb };
+      return Promise.resolve(H.ctx.rpc('me_photo_save', Object.assign({ p_agree: true }, a3))).catch(function () { return H.ctx.rpc('me_photo_save', a3); }).then(function (r) {   /* 093 전이면 세 칸짜리로 */
+        if (!r || !r.ok) { faceMsg(r && r.reason === 'agree' ? '먼저 안내를 읽고 동의에 체크해 주세요' : '올리지 못했어요. 잠시 뒤 다시 해 주세요.'); return; }
         H.face.has = true; H.facePv = x.thumb; repaintPicker(); faceMsg('올렸어요 · 선생님만 볼 수 있어요');
       });
     }).catch(function (e) { faceMsg(e.message || '올리지 못했어요.'); });
   }
   function deleteFace() {
     faceMsg('지우는 중…');
-    Promise.resolve(H.ctx.rpc('me_photo_save', { p_code: H.ctx.code, p_photo: '', p_thumb: '' })).then(function (r) {
+    var d3 = { p_code: H.ctx.code, p_photo: '', p_thumb: '' };
+    Promise.resolve(H.ctx.rpc('me_photo_save', Object.assign({ p_agree: false }, d3))).catch(function () { return H.ctx.rpc('me_photo_save', d3); }).then(function (r) {
       if (!r || !r.ok) { faceMsg('지우지 못했어요.'); return; }
       H.face.has = false; H.facePv = ''; repaintPicker(); faceMsg('사진을 지웠어요');
     }, function () { faceMsg('지우지 못했어요.'); });
@@ -281,6 +286,7 @@
       }
     });
     document.addEventListener('change', function (e) {
+      if (H && e.target.matches && e.target.matches('[data-gm-agree]')) { H.faceAgree = !!e.target.checked; repaintPicker(); return; }
       if (H && e.target.matches && e.target.matches('[data-gm-face]') && e.target.files && e.target.files[0]) uploadFace(e.target.files[0]);
     });
     document.addEventListener('toggle', function (e) {

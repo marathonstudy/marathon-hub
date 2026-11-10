@@ -4,7 +4,8 @@
    사진은 코치룸(학생 카드 · 학생 목록 · 출석 화면 · 「오늘」)에서만. 학생 러닝노트엔 캐릭터, 학부모 화면 · 문자 · 다른 학생에겐 절대 안 보인다
      저장 = 035 student_profile.photo(400px) · thumb(96px) — 직원만 읽는 표 · 공개 주소 없음
      올리기: 정사각형(세로 사진은 위쪽)으로 잘라 400px JPEG 로 다시 그림(위치 정보 등 부가 정보 없음) · 5MB 넘는 파일 · 이미지 아닌 파일 거부 (face-crop.js)
-     휴대폰은 [사진 올리기]에서 카메라로 바로 찍을 수 있다 (capture) · [사진 지우기] = 표에서 사진 · 작은 사진 모두 지움
+     휴대폰은 [사진 올리기]에서 카메라로 바로 찍을 수 있다 (capture) · [사진 지우기] = 표에서 사진 · 작은 사진 · 동의 기록 모두 지움
+     대신 올릴 때는 「학생 동의 받음」 체크를 해야 [사진 올리기]가 눌린다 (서버도 확인 · face_staff_save p_agree) · 동의한 날짜 · 올린 사람을 남기고 학생 카드에 「동의 11/10 · 올린 사람 김선생」
      AI 변환 · 외부 서비스 전송 없음
    학생 카드 머리 — 사진(없으면 학생이 고른 캐릭터) · [사진 올리기] [사진 지우기] · 안내 한 줄 · 레벨 · XP 작게
    이름 외우기 — 반 고르기 → 사진이 있는 학생 카드가 섞여 나옴 → 누르면 이름 · 학교 → [알았어요][헷갈려요]
@@ -19,17 +20,42 @@
   function stu(sid) { return (UI.activeStudents ? UI.activeStudents() : []).find(function (s) { return s.id === sid; }) || (Store.getStudent ? Store.getStudent(sid) : null); }
   var NOTE = function () { return global.FaceCrop ? FaceCrop.NOTE : '선생님이 이름을 익히는 용도로만 쓰고, 선생님만 볼 수 있어요 · 언제든 지울 수 있어요'; };
 
+  /* ---------- 동의 · 올린 사람 (093 consent_at · photo_by) ---------- */
+  var agreed = {};          /* 학생마다 「학생 동의 받음」 체크 (이 화면에서만) */
+  var meta = { by: {}, p: null };
+  function loadMeta(force) {
+    if (meta.p && !force) return meta.p;
+    meta.p = Promise.resolve(sb().from('student_profile').select('student_id,consent_at,photo_by')).then(function (r) {
+      meta.by = {};
+      if (r && !r.error) (r.data || []).forEach(function (x) { meta.by[x.student_id] = x; });
+      if (global.QuickNote && QuickNote.repaint && document.getElementById('scFace')) QuickNote.repaint(true);
+    }, function () {});
+    return meta.p;
+  }
+  function metaText(sid) {
+    var m = meta.by[sid];
+    if (!m || !m.consent_at) return '';
+    var d = new Date(m.consent_at);
+    return '동의 ' + (d.getMonth() + 1) + '/' + d.getDate() + ' · 올린 사람 ' + (m.photo_by || '—');
+  }
+  function agreeBox(sid) {
+    return '<label class="fc-agree"><input type="checkbox" data-fc-agree="' + esc(sid) + '"' + (agreed[sid] ? ' checked' : '') + '> 학생 동의 받음</label>';
+  }
+
   /* ---------- 올리기 · 지우기 ---------- */
   var busy = {};
   function upload(sid, file) {
     if (!global.FaceCrop || busy[sid]) return Promise.resolve(false);
+    if (!agreed[sid]) { toast('「학생 동의 받음」에 체크해야 올릴 수 있습니다', 'bad'); return Promise.resolve(false); }
     var why = FaceCrop.check(file);
     if (why) { toast(why, 'bad'); return Promise.resolve(false); }
     busy[sid] = true; changed();
     return FaceCrop.makeData(file).then(function (x) {
-      return Promise.resolve(sb().rpc('face_staff_save', { p_student: sid, p_photo: x.photo, p_thumb: x.thumb })).then(function (r) {
-        if (r.error || !r.data || !r.data.ok) throw new Error(r.error ? (/face_staff_save/.test(r.error.message || '') ? 'migration-093 SQL 을 먼저 실행해 주세요' : r.error.message) : '사진을 저장하지 못했습니다');
+      return Promise.resolve(sb().rpc('face_staff_save', { p_student: sid, p_photo: x.photo, p_thumb: x.thumb, p_agree: true })).then(function (r) {
+        if (r.error || !r.data || !r.data.ok) throw new Error(r.error ? (/face_staff_save/.test(r.error.message || '') ? 'migration-093 SQL 을 먼저 실행해 주세요' : r.error.message) : r.data && r.data.reason === 'agree' ? '「학생 동의 받음」에 체크해 주세요' : '사진을 저장하지 못했습니다');
         if (global.Profile && Profile.setThumb) Profile.setThumb(sid, x.thumb);
+        meta.by[sid] = { student_id: sid, consent_at: new Date().toISOString(), photo_by: (global.UI && UI.whoami ? UI.whoami() : '') || '직원' };
+        loadMeta(true);
         toast('사진을 올렸습니다 — 코치룸에서만 보여요', 'good');
         return true;
       });
@@ -40,9 +66,10 @@
     var s = stu(sid) || {};
     return UI.confirmAsk('사진 지우기', (s.name || '') + ' 학생 사진을 지웁니다. 저장된 사진이 완전히 지워집니다.', '지우기').then(function (y) {
       if (!y) return false;
-      return Promise.resolve(sb().rpc('face_staff_save', { p_student: sid, p_photo: '', p_thumb: '' })).then(function (r) {
+      return Promise.resolve(sb().rpc('face_staff_save', { p_student: sid, p_photo: '', p_thumb: '', p_agree: false })).then(function (r) {
         if (r.error || !r.data || !r.data.ok) { toast('지우지 못했습니다' + (r.error ? ' — ' + r.error.message : ''), 'bad'); return false; }
         if (global.Profile && Profile.setThumb) Profile.setThumb(sid, null);
+        delete meta.by[sid]; delete agreed[sid];
         toast('사진을 지웠습니다');
         changed();
         return true;
@@ -53,20 +80,26 @@
     if (global.QuickNote && QuickNote.repaint) QuickNote.repaint(true);
     if (drill.open) paintDrill();
   }
+  /* [사진 올리기] — 「학생 동의 받음」 체크 전에는 눌리지 않는다 */
   function fileInput(sid, label, cls) {
-    return '<label class="btn btn--sm ' + (cls || '') + ' fc-file">' + esc(label) + '<input type="file" accept="image/*" capture="user" data-fc-up="' + esc(sid) + '" hidden></label>';
+    var on = !!agreed[sid];
+    return agreeBox(sid) + '<label class="btn btn--sm ' + (cls || '') + ' fc-file' + (on ? '' : ' is-off') + '" title="' + (on ? '' : '「학생 동의 받음」에 먼저 체크') + '">' + esc(label) +
+      '<input type="file" accept="image/*" capture="user" data-fc-up="' + esc(sid) + '" hidden' + (on ? '' : ' disabled') + '></label>';
   }
 
   /* ---------- 학생 카드 머리 ---------- */
   function cardHtml(sid) {
     var s = stu(sid) || { id: sid, name: '' }, has = global.Profile && Profile.hasPhoto(sid);
     var g = global.Today && Today.gameOf ? Today.gameOf(sid) : null;
+    if (!meta.p) loadMeta();
+    var mt = has ? metaText(sid) : '';
     return '<section class="sc-sec fc-head" id="scFace" aria-label="사진">' +
       '<span class="fc-pic">' + (global.Profile ? Profile.avatar(s, 'xl') : '') + '</span>' +
       '<div class="fc-side">' +
         (g ? '<p class="fc-lv num" data-fc-lv>Lv.' + (g.level.i + 1) + ' ' + esc(g.level.name) + ' · ' + g.xp + ' XP</p>' : '') +
         '<div class="fc-btns">' + (busy[sid] ? '<span class="fc-busy">올리는 중…</span>' : fileInput(sid, has ? '사진 바꾸기' : '사진 올리기', '')) +
           (has && !busy[sid] ? '<button type="button" class="btn btn--sm btn--ghost" data-fc-del="' + esc(sid) + '">사진 지우기</button>' : '') + '</div>' +
+        (mt ? '<p class="fc-meta num" data-fc-meta>' + esc(mt) + '</p>' : '') +
         '<p class="fc-note">' + esc(NOTE()) + '</p>' +
       '</div></section>';
   }
@@ -186,11 +219,21 @@
   }, true);
   document.addEventListener('toggle', function (e) { if (e.target && e.target.hasAttribute && e.target.hasAttribute('data-fd-none')) drill.noneOpen = e.target.open; }, true);
   document.addEventListener('change', function (e) {
+    var ag = e.target.closest && e.target.closest('[data-fc-agree]');
+    if (ag) {
+      var aid = ag.getAttribute('data-fc-agree');
+      if (ag.checked) agreed[aid] = true; else delete agreed[aid];
+      /* 다시 그리지 않고 그 학생 [사진 올리기]만 켠다 · 끈다 (같은 학생 칸이 여러 곳이면 모두) */
+      Array.prototype.forEach.call(document.querySelectorAll('[data-fc-agree="' + aid + '"]'), function (x) { x.checked = !!agreed[aid]; });
+      Array.prototype.forEach.call(document.querySelectorAll('[data-fc-up="' + aid + '"]'), function (x) { x.disabled = !agreed[aid]; var l = x.closest('label'); if (l) l.classList.toggle('is-off', !agreed[aid]); });
+      return;
+    }
     var inp = e.target.closest && e.target.closest('[data-fc-up]');
     if (!inp || !inp.files || !inp.files[0]) return;
     var sid = inp.getAttribute('data-fc-up');
     upload(sid, inp.files[0]).then(function (ok) { if (ok && drill.open && drill.cls && !drill.cur && !drill.done) startClass(drill.cls); });
   });
 
-  global.Faces = { cardHtml: cardHtml, upload: upload, remove: remove, openDrill: openDrill, makeDeck: makeDeck, _drill: function () { return drill; }, next: next };
+  global.Faces = { cardHtml: cardHtml, upload: upload, remove: remove, openDrill: openDrill, makeDeck: makeDeck, _drill: function () { return drill; }, next: next,
+                   agree: function (sid, on) { if (on) agreed[sid] = true; else delete agreed[sid]; }, loadMeta: loadMeta, metaText: metaText };
 })(window);

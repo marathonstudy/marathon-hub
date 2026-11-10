@@ -1210,6 +1210,8 @@ delete from public.staff where email = '조교이메일@example.com';
 
 ### 5-121. 20261110b — 러닝노트 홈 · 게임 프로필 · 캐릭터 고르기 · 학생 사진(코치룸 전용) · 이름 외우기 (migration-093 · 함수 배포 없음)
 1. SQL Editor → `supabase/migration-093-game-face.sql` → Run (092 다음 · 035 가 먼저 · 맨 아래 줄 모두 true)
+   - 한 번에: `supabase/run-20261110-092-093.sql` (만든 곳 `node tools/make-run-sql.cjs`) — 맨 앞에서 086 ~ 091 이 실제로 들어가 있는지 읽기만 하는 확인(칸 · 표 · 함수 · 예약) → 없는 번호만 순서대로 같이 넣고 → 092 → 093 → 맨 끝 전체 확인 표(「실행 전」 줄은 있었는지 · 나머지 모두 true)
+- 사진 동의 — 코치룸이 대신 올릴 때는 「학생 동의 받음」 체크(face_staff_save p_agree) · 학생이 올릴 때는 안내 문구 확인 체크(me_photo_save 네 칸 · 예전 세 칸짜리는 지우기만) · 동의한 때(consent_at) · 올린 사람(photo_by: 직원 이름 · 「학생」) · 학생 카드에 「동의 11/10 · 올린 사람 김선생」 · 지우면 함께 지움
 - 함수는 다시 배포하지 않는다 (사진은 035 의 student_profile 그대로 — 직원만 읽는 표 · 공개 주소 없음)
 - 러닝노트 홈(hub-home.js) — 프로필 카드 · 이번 주 퀘스트 · 새 레포트 · 최근 모의고사 · 루틴 배지 요약 · 최근 수업 영상 · 새 데이터 없이 앱 과제 기록으로
 - XP · 레벨 · 해금 표는 `assets/game.js` 한 곳 (CONFIG.game 으로 바꿀 수 있음)

@@ -141,6 +141,13 @@
 .gm-face__b { display: flex; gap: 6px; flex-wrap: wrap; }
 .gm-face__s { font-size: 12.5px; color: var(--ink-mid); margin: 6px 0 0; }
 .gm-file { position: relative; }
+.gm-file.is-off { opacity: .5; cursor: not-allowed; }
+.gm-agree { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 8px; font-size: 13px; color: var(--ink-deep); min-height: 32px; cursor: pointer; }
+.gm-agree input { width: 20px; height: 20px; flex: none; margin: 0; }
+/* 내 정보 사진 — 확인 체크 (me-info.js) */
+.mi-agree { display: flex; align-items: flex-start; gap: 8px; margin: 8px 0; font-size: 13px; color: var(--ink-deep); cursor: pointer; }
+.mi-agree input { width: 20px; height: 20px; flex: none; margin: 0; }
+.mi-file.is-off { opacity: .5; cursor: not-allowed; }
 .gm-sheet__f { display: flex; gap: 8px; margin-top: 16px; }
 .gm-sheet__f .gm-btn { flex: 1; }
 .gm-btn { appearance: none; border: 0; border-radius: 12px; background: var(--grad-strong); color: #fff; font: inherit; font-weight: 800; padding: 10px 14px; min-height: 44px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }

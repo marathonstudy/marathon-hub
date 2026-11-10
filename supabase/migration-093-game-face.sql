@@ -7,7 +7,9 @@
 --       잠긴 꾸미기(레벨)는 화면이 거른다 (레벨은 앱 과제 기록으로 화면이 센다) · 서버는 이름이 목록에 있는지만 본다
 --       코치룸(직원)은 읽기만 — 학생 목록 · 학생 카드에 사진이 없으면 고른 캐릭터
 --  2. 학생 얼굴 사진 (035 의 student_profile.photo · thumb 그대로 — 정사각 400px JPEG · 작은 사진 96px · 직원만 읽음 · 공개 주소 없음)
---       face_staff_save(학생, 사진, 작은 사진) — 코치룸(직원)이 올리기 · 바꾸기 · 지우기(빈 값 = 지움 · 표에서 지운다)
+--       face_staff_save(학생, 사진, 작은 사진, 동의) — 코치룸(직원)이 올리기(「학생 동의 받음」 체크가 있어야) · 바꾸기 · 지우기(빈 값 = 지움)
+--       me_photo_save(코드, 사진, 작은 사진, 확인) — 학생이 올리기(안내 문구 확인 체크가 있어야) · 예전 세 칸짜리는 지우기만
+--       동의한 때(consent_at) · 올린 사람(photo_by — 직원 이름 · 「학생」)을 남긴다 · 사진을 지우면 함께 지운다
 --       me_info_get — 이제 사진은 돌려주지 않는다 (「사진 있음」 참 · 거짓만 · 학생 화면엔 올린 직후 이 기기 미리보기만)
 --       hub_face(code) — 러닝노트 홈 「내 사진 올리기」 칸: 학생 링크만 · 사진 있음 참 · 거짓만
 --       학생이 올리고 지우기는 035 의 me_photo_save 그대로 (학생 링크만 · 비우면 지움)
@@ -77,23 +79,60 @@ grant execute on function public.hub_profile_save(text, jsonb) to anon, authenti
 -- ------------------------------------------------------------
 --  2. 얼굴 사진 — 코치룸에만
 -- ------------------------------------------------------------
-/* 코치룸(직원) 올리기 · 바꾸기 · 지우기 — 사진이 비면 사진 · 작은 사진 모두 지운다 (표에서 완전히) */
-create or replace function public.face_staff_save(p_student uuid, p_photo text, p_thumb text)
+/* 동의 · 올린 사람 — 동의한 때(consent_at) · 누가 올렸는지(photo_by: 직원 이름 · 「학생」) · 사진을 지우면 함께 지운다 */
+alter table public.student_profile add column if not exists consent_at timestamptz;
+alter table public.student_profile add column if not exists photo_by text;
+
+/* 코치룸(직원) 올리기 · 바꾸기 · 지우기 — 올릴 때는 「학생 동의 받음」(p_agree) 이 있어야 한다
+   사진이 비면 사진 · 작은 사진 · 동의 기록을 모두 지운다 (표에서 완전히) */
+drop function if exists public.face_staff_save(uuid, text, text);
+create or replace function public.face_staff_save(p_student uuid, p_photo text, p_thumb text, p_agree boolean)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare ph text := nullif(btrim(coalesce(p_photo, '')), ''); th text := nullif(btrim(coalesce(p_thumb, '')), '');
+  me text := lower(coalesce(auth.jwt() ->> 'email', '')); who text;
 begin
   if not public.is_staff() then raise exception '직원만 할 수 있습니다.'; end if;
   if not exists (select 1 from public.students where id = p_student) then return jsonb_build_object('ok', false, 'reason', 'notfound'); end if;
+  if ph is not null and p_agree is not true then return jsonb_build_object('ok', false, 'reason', 'agree'); end if;
   if ph is not null and (ph not like 'data:image/jpeg;base64,%' or length(ph) > 200000) then return jsonb_build_object('ok', false, 'reason', 'photo'); end if;
   if th is not null and (th not like 'data:image/jpeg;base64,%' or length(th) > 30000) then return jsonb_build_object('ok', false, 'reason', 'photo'); end if;
   if ph is null then th := null; end if;
-  insert into public.student_profile (student_id, photo, thumb, updated_at) values (p_student, ph, th, now())
-  on conflict (student_id) do update set photo = excluded.photo, thumb = excluded.thumb, updated_at = now();
+  who := coalesce((select nullif(btrim(s.name), '') from public.staff s where lower(s.email) = me limit 1), nullif(split_part(me, '@', 1), ''), '직원');
+  insert into public.student_profile (student_id, photo, thumb, consent_at, photo_by, updated_at)
+  values (p_student, ph, th, case when ph is not null then now() end, case when ph is not null then who end, now())
+  on conflict (student_id) do update set photo = excluded.photo, thumb = excluded.thumb, consent_at = excluded.consent_at, photo_by = excluded.photo_by, updated_at = now();
   return jsonb_build_object('ok', true, 'photo', ph is not null);
 end;
 $$;
-revoke all on function public.face_staff_save(uuid, text, text) from public, anon;
-grant execute on function public.face_staff_save(uuid, text, text) to authenticated;
+revoke all on function public.face_staff_save(uuid, text, text, boolean) from public, anon;
+grant execute on function public.face_staff_save(uuid, text, text, boolean) to authenticated;
+
+/* 학생이 올리기 — 안내 문구 확인 체크(p_agree) 가 있어야 올라간다 · 지우기는 언제든 (사진 · 동의 기록 모두) */
+create or replace function public.me_photo_save(p_code text, p_photo text, p_thumb text, p_agree boolean)
+returns jsonb language plpgsql volatile security definer set search_path = public as $$
+declare sid uuid := public._me_student(p_code);
+  ph text := nullif(btrim(coalesce(p_photo, '')), ''); th text := nullif(btrim(coalesce(p_thumb, '')), '');
+begin
+  if sid is null then return jsonb_build_object('ok', false, 'reason', 'notstudent'); end if;
+  if ph is not null and p_agree is not true then return jsonb_build_object('ok', false, 'reason', 'agree'); end if;
+  if ph is not null and (ph not like 'data:image/jpeg;base64,%' or length(ph) > 200000) then return jsonb_build_object('ok', false, 'reason', 'photo'); end if;
+  if th is not null and (th not like 'data:image/jpeg;base64,%' or length(th) > 30000) then return jsonb_build_object('ok', false, 'reason', 'photo'); end if;
+  if ph is null then th := null; end if;
+  insert into public.student_profile (student_id, photo, thumb, consent_at, photo_by, student_at, updated_at)
+  values (sid, ph, th, case when ph is not null then now() end, case when ph is not null then '학생' end, now(), now())
+  on conflict (student_id) do update set photo = excluded.photo, thumb = excluded.thumb, consent_at = excluded.consent_at, photo_by = excluded.photo_by, student_at = now(), updated_at = now();
+  return jsonb_build_object('ok', true, 'photo', ph is not null);
+end;
+$$;
+revoke all on function public.me_photo_save(text, text, text, boolean) from public;
+grant execute on function public.me_photo_save(text, text, text, boolean) to anon, authenticated;
+/* 예전(035) 세 칸짜리 — 확인 체크 없이는 올리지 않는다 (지우기만) */
+create or replace function public.me_photo_save(p_code text, p_photo text, p_thumb text)
+returns jsonb language sql volatile security definer set search_path = public as $$
+  select public.me_photo_save(p_code, p_photo, p_thumb, false);
+$$;
+revoke all on function public.me_photo_save(text, text, text) from public;
+grant execute on function public.me_photo_save(text, text, text) to anon, authenticated;
 
 /* 「내 정보」 — 사진은 더 이상 돌려주지 않는다 (있음 · 없음만) */
 create or replace function public.me_info_get(p_code text)
@@ -133,4 +172,7 @@ union all select '게임 프로필 — 직원만 읽음', (not exists (select 1 
 union all select '얼굴 사진 — 직원만 읽음(공개 주소 없음)', (not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'student_profile' and not ('authenticated' = any(roles))))::text
 union all select '코치룸 사진 올리기 · 지우기(face_staff_save)', exists (select 1 from pg_proc where proname = 'face_staff_save')::text
 union all select '학생 화면에 사진 안 감(me_info_get)', (position('''photo'', null' in pg_get_functiondef('public.me_info_get(text)'::regprocedure)) > 0)::text
-union all select '학부모 링크는 사진 칸 없음(hub_face)', ((public.hub_face('xxxxxxxxxxxxxxxxxxxxxxxx') ->> 'can') = 'false')::text;
+union all select '학부모 링크는 사진 칸 없음(hub_face)', ((public.hub_face('xxxxxxxxxxxxxxxxxxxxxxxx') ->> 'can') = 'false')::text
+union all select '사진 동의 날짜 · 올린 사람 칸', ((select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'student_profile' and column_name in ('consent_at', 'photo_by')) = 2)::text
+union all select '동의 체크 없이는 안 올라감(직원 · 학생)', (exists (select 1 from pg_proc where proname = 'face_staff_save' and pronargs = 4) and exists (select 1 from pg_proc where proname = 'me_photo_save' and pronargs = 4)
+                                                     and not exists (select 1 from pg_proc where proname = 'face_staff_save' and pronargs = 3))::text;
