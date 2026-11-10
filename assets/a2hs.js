@@ -76,6 +76,7 @@
     s.textContent =
       '.a2hs-band{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 12px;padding:10px 12px;border-radius:12px;background:#F1EEFD;color:#2B2550;font-size:14px;line-height:1.4}' +
       '.a2hs-band__t{flex:1 1 180px}' +
+      '.a2hs-band__l{display:block;font-size:11.5px;font-weight:500;opacity:.8;margin-top:2px}' +
       '.a2hs-band button,.a2hs-sheet button,.a2hs-sheet a.a2hs-btn{appearance:none;border:0;font:inherit;cursor:pointer;border-radius:10px;padding:8px 12px;font-weight:700;text-decoration:none;display:inline-block}' +
       '.a2hs-band__go,.a2hs-btn--go{background:#7858E8;color:#fff}' +
       '.a2hs-band__later,.a2hs-btn{background:#fff;color:#4B4380;border:1px solid #D9D3F5 !important}' +
@@ -202,7 +203,11 @@
     style();
     var b = doc.createElement('div');
     b.className = 'a2hs-band'; b.id = 'a2hsBand';
-    b.innerHTML = '<span class="a2hs-band__t">📱 홈 화면에 추가하면 앱처럼 바로 열려요</span>' +
+    /* 안드로이드 · 아이폰 한 줄씩 (20261110b · 이 기기에 맞는 줄만 · 모르면 둘 다) */
+    var e0 = env(), lines = [];
+    if (!e0.ios) lines.push('안드로이드: 크롬 메뉴 ⋮ → 홈 화면에 추가');
+    if (e0.ios || !e0.android) lines.push('아이폰: 사파리 공유 ↑ → 홈 화면에 추가');
+    b.innerHTML = '<span class="a2hs-band__t">📱 홈 화면에 추가하면 앱처럼 바로 열려요' + lines.map(function (l) { return '<small class="a2hs-band__l">' + l + '</small>'; }).join('') + '</span>' +
       '<button type="button" class="a2hs-band__go" data-a2hs-add>추가하기</button>' +
       '<button type="button" class="a2hs-band__later" data-a2hs-later>다음에</button>';
     b.addEventListener('click', function (ev) {

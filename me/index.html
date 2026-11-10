@@ -18,7 +18,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="icon" type="image/png" sizes="192x192" href="../assets/icon-192.png">
-<meta name="apple-mobile-web-app-title" content="러닝노트">
+<meta name="apple-mobile-web-app-title" content="마라톤 러닝노트">
 
 <meta property="og:type" content="website">
 <meta property="og:title" content="마라톤국어 러닝노트">
@@ -36,9 +36,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../assets/report.css?v=20261110a">
-<link rel="stylesheet" href="../assets/hub.css?v=20261110a">
-<link rel="stylesheet" href="../assets/award.css?v=20261110a">
+<link rel="stylesheet" href="../assets/report.css?v=20261110b">
+<link rel="stylesheet" href="../assets/hub.css?v=20261110b">
+<link rel="stylesheet" href="../assets/award.css?v=20261110b">
+<link rel="stylesheet" href="../assets/game.css?v=20261110b">
 </head>
 <body>
 
@@ -58,21 +59,30 @@
   </header>
 
   <nav class="hub-tabs" id="hubTabs" role="tablist" aria-label="보기 선택" hidden>
-    <!-- 탭 네 개 — 레포트 · 수업 영상 · 과제 상세 · 내 필기 (교재비는 청구서가 있을 때만 · 20261029i) -->
-    <button class="hub-tab" id="tabReport" role="tab" type="button" aria-selected="true">레포트</button>
-    <button class="hub-tab" id="tabVideo"  role="tab" type="button" aria-selected="false" hidden>수업 영상</button>
-    <button class="hub-tab" id="tabApp"    role="tab" type="button" aria-selected="false">과제 상세</button>
-    <button class="hub-tab" id="tabPhoto"  role="tab" type="button" aria-selected="false">내 필기</button>
+    <!-- 탭 다섯 개 — [홈][레포트][과제][영상·필기][모의고사] (20261110b) · 휴대폰은 화면 아래 고정 · 넓은 화면은 위
+         영상·필기 = 수업 영상 + 내 필기 한 탭 (#tabPhoto 는 예전 주소 · 버튼만 숨겨 둔다) · 교재비 · 내 정보는 있을 때만 -->
+    <button class="hub-tab" id="tabHome"   role="tab" type="button" aria-selected="false" data-i="🏠">홈</button>
+    <button class="hub-tab" id="tabReport" role="tab" type="button" aria-selected="true" data-i="🗞️">레포트</button>
+    <button class="hub-tab" id="tabApp"    role="tab" type="button" aria-selected="false" data-i="✅">과제</button>
+    <button class="hub-tab" id="tabVideo"  role="tab" type="button" aria-selected="false" hidden data-i="▶️">영상·필기</button>
+    <button class="hub-tab" id="tabPhoto"  role="tab" type="button" aria-selected="false" hidden>내 필기</button>
     <!-- 모의고사 — 모든 학생에게 (기록이 없으면 「아직 받은 모의고사 레포트가 없어요」 · mogo-view.js · 20261109c) -->
-    <button class="hub-tab" id="tabMogo"   role="tab" type="button" aria-selected="false" hidden>모의고사</button>
-    <button class="hub-tab" id="tabBook"   role="tab" type="button" aria-selected="false" hidden>교재비</button>
+    <button class="hub-tab" id="tabMogo"   role="tab" type="button" aria-selected="false" hidden data-i="📝">모의고사</button>
+    <button class="hub-tab" id="tabBook"   role="tab" type="button" aria-selected="false" hidden data-i="📚">교재비</button>
     <!-- 내 정보 — 학생 링크(/s/ 로그인)에서만 · 학부모 링크에는 없다 (me-info.js · migration-035 · 20261031c) -->
-    <button class="hub-tab" id="tabInfo"   role="tab" type="button" aria-selected="false" hidden>내 정보</button>
+    <button class="hub-tab" id="tabInfo"   role="tab" type="button" aria-selected="false" hidden data-i="👤">내 정보</button>
   </nav>
 
   <main id="hubRoot">
     <div class="empty">불러오는 중입니다…</div>
   </main>
+
+  <!-- 이 기기에 기억한 러닝노트 — 다른 학생으로 보기 · 이 기기에서 나가기 (20261110b) -->
+  <div class="hub-exit" id="hubExit" hidden>
+    <button type="button" class="hub-exit__b" id="hubOther">다른 학생으로 보기</button>
+    <span aria-hidden="true">·</span>
+    <button type="button" class="hub-exit__b" id="hubLeave">이 기기에서 나가기</button>
+  </div>
 
   <footer class="footer">
     <div class="footer-sign">
@@ -90,21 +100,24 @@
 
 </div>
 
-<script src="../assets/config.js?v=20261110a"></script>
-<script src="../assets/brand.js?v=20261110a"></script>
-<script src="../assets/report-view.js?v=20261110a"></script>
-<script src="../assets/lesson.js?v=20261110a"></script>
-<script src="../assets/dday.js?v=20261110a"></script>
-<script src="../assets/photos.js?v=20261110a"></script>
-<script src="../assets/review-card.js?v=20261110a"></script>
-<script src="../assets/app-week.js?v=20261110a"></script>
-<script src="../assets/entry.js?v=20261110a"></script>
-<script src="../assets/me-info.js?v=20261110a"></script>
-<script src="../assets/review-note.js?v=20261110a"></script>
-<script src="../assets/a2hs.js?v=20261110a"></script>
-<script src="../assets/award-view.js?v=20261110a"></script>
-<script src="../assets/mogo-view.js?v=20261110a"></script>
-<script src="../assets/hub.js?v=20261110a"></script>
+<script src="../assets/config.js?v=20261110b"></script>
+<script src="../assets/brand.js?v=20261110b"></script>
+<script src="../assets/report-view.js?v=20261110b"></script>
+<script src="../assets/lesson.js?v=20261110b"></script>
+<script src="../assets/dday.js?v=20261110b"></script>
+<script src="../assets/photos.js?v=20261110b"></script>
+<script src="../assets/review-card.js?v=20261110b"></script>
+<script src="../assets/app-week.js?v=20261110b"></script>
+<script src="../assets/entry.js?v=20261110b"></script>
+<script src="../assets/me-info.js?v=20261110b"></script>
+<script src="../assets/review-note.js?v=20261110b"></script>
+<script src="../assets/a2hs.js?v=20261110b"></script>
+<script src="../assets/award-view.js?v=20261110b"></script>
+<script src="../assets/mogo-view.js?v=20261110b"></script>
+<script src="../assets/game.js?v=20261110b"></script>
+<script src="../assets/face-crop.js?v=20261110b"></script>
+<script src="../assets/hub-home.js?v=20261110b"></script>
+<script src="../assets/hub.js?v=20261110b"></script>
 <script>
   if (window.A2HS && !A2HS.env().ios) { var mf = document.createElement('link'); mf.rel = 'manifest'; mf.href = '../s/manifest.webmanifest'; document.head.appendChild(mf); }
   if (window.A2HS) A2HS.register('../sw.js');

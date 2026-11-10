@@ -19,16 +19,26 @@
   var st = { by: {}, loaded: false, missing: false };
   var INFO = [['target', '목표 대학 · 학과'], ['electives', '선택과목'], ['mock', '최근 모의고사 등급'], ['academy', '다니는 학원'], ['message', '선생님께 하고 싶은 말']];
 
+  /* 러닝노트에서 학생이 고른 캐릭터 (student_game · migration-093 · 20261110b) — 사진이 없으면 동그라미에 캐릭터 */
+  var game = {};
+  function loadGame(c) {
+    return Promise.resolve(c.from('student_game').select('student_id,char,frame,prop')).then(function (r) {
+      game = {};
+      if (r && !r.error) (r.data || []).forEach(function (x) { if (x.char) game[x.student_id] = x; });
+    }, function () { game = {}; });
+  }
   function load() {
     var c = sb();
     if (!c) return Promise.resolve();
-    return c.from('student_profile').select('student_id,info,thumb,student_at').then(function (r) {
+    return Promise.all([c.from('student_profile').select('student_id,info,thumb,student_at'), loadGame(c)]).then(function (x) {
+      var r = x[0];
       if (r.error) { st.missing = /does not exist|schema cache/i.test(r.error.message || ''); st.by = {}; }
       else { st.missing = false; st.by = {}; (r.data || []).forEach(function (x) { st.by[x.student_id] = x; }); }
       st.loaded = true;
       global.dispatchEvent(new CustomEvent('jt:profiles'));
     }, function () { st.loaded = true; });
   }
+  function charOf(sid) { return game[sid] || null; }
   function of(sid) { return st.by[sid] || null; }
   /* 「학생이 10/24 수정」 */
   function editedText(sid) {
@@ -43,6 +53,8 @@
   function avatar(s, size) {
     var p = s ? of(s.id) : null, cls = 'av av--' + (size || 's');
     if (p && p.thumb) return '<img class="' + cls + '" src="' + esc(p.thumb) + '" alt="" aria-hidden="true">';
+    var g = s ? charOf(s.id) : null;
+    if (g && global.Game) return '<img class="' + cls + ' av--char" src="' + esc(Game.charSrc(g.char, '../assets/chars/')) + '" alt="" aria-hidden="true" data-av-char="' + esc(g.char) + '">';
     return '<span class="' + cls + ' av--none" aria-hidden="true">' + esc(String((s && s.name) || '?').charAt(0)) + '</span>';
   }
   /* 상담 카드 — 큰 사진 (그때만 읽는다) */
@@ -80,6 +92,8 @@
   global.addEventListener('jt:loaded', load);
   global.addEventListener('jt:remote', function (e) { if (e.detail && e.detail.table === 'student_profile') load(); });
 
-  global.Profile = { load: load, of: of, editedText: editedText, hasInfo: hasInfo, hasPhoto: hasPhoto, avatar: avatar, photo: photo, showBig: showBig, bigBtn: bigBtn,
+  /* 코치룸에서 올리거나 지운 직후 — 다시 읽기 전에 이 화면 값만 바꾼다 (20261110b) */
+  function setThumb(sid, thumb) { st.by[sid] = Object.assign({}, st.by[sid] || { student_id: sid, info: {} }, { thumb: thumb || null }); global.dispatchEvent(new CustomEvent('jt:profiles')); }
+  global.Profile = { load: load, of: of, editedText: editedText, hasInfo: hasInfo, hasPhoto: hasPhoto, avatar: avatar, photo: photo, showBig: showBig, bigBtn: bigBtn, charOf: charOf, setThumb: setThumb,
                      INFO: INFO, missing: function () { return st.missing; }, loaded: function () { return st.loaded; } };
 })(window);

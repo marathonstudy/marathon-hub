@@ -1,8 +1,8 @@
 {
   "id": "/marathon-hub/s/",
-  "name": "러닝노트",
+  "name": "마라톤 러닝노트",
   "short_name": "러닝노트",
-  "description": "마라톤국어 러닝노트 — 레포트 · 과제 · 필기 · 복습테스트",
+  "description": "마라톤 러닝노트 — 홈 · 레포트 · 과제 · 영상 · 필기 · 모의고사",
   "lang": "ko",
   "start_url": "./?app=1",
   "scope": "../",

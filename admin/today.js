@@ -2330,6 +2330,13 @@
     hwInfo: hwInfo, hwCount: hwCount, classNow: classNow,      /* 빠른 상담 창 (quicknote.js · 20261108s) */
     consultInfo: consultInfo, periodAt: periodAt,              /* 빠른 상담 기준 기간 · 예전 과제 상담의 기간 (20261109c) */
     recentWeeks: recentWeeks, hwWeek: hwWeek,                  /* 학생 카드 — 최근 8주 막대 · 날짜별 ✓/✕ (20261109c) */
+    /* 학생 카드 레벨 · XP (20261110b · game.js — 러닝노트 홈과 같은 셈 · 앱 과제 기록이 없으면 null) */
+    gameOf: function (sid) {
+      var a = app[sid];
+      if (!a || !a.ok || !a.data || !window.Game) return null;
+      var s = rowById(sid) || stu(sid), cls = s && (s.class_name || s.className || '');
+      return Game.compute(a.data, { today: DDay.today(), bounds: (cls && lessonDates(cls)) || [] });
+    },
     appFailed: failedIds,
     appWhy: whyText,
     retryMany: retryMany,

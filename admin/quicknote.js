@@ -423,6 +423,8 @@
     m.innerHTML = '<div class="cs-sheet">' + headHtml(sid) +
       '<div class="cs-scroll" id="csScroll">' +
         /* 학생 카드 — 기본 정보 · 과제 · 모의고사 추이 (stucard.js · 20261109c) */
+        /* 머리 — 얼굴 사진(없으면 고른 캐릭터) · [사진 올리기] [사진 지우기] · 레벨 · XP (faces.js · 20261110b) */
+        (SC && window.Faces ? Faces.cardHtml(sid) : '') +
         (SC ? SC.infoHtml(sid) + SC.hwHtml(sid, hwOfFn(sid)) + SC.mogoHtml(sid) : '') +
         '<section class="sc-sec sc-consult" id="scConsult" aria-label="상담"><h3 class="sc-t">상담</h3>' +
         tabsHtml() + (st.kind === 'hw' ? prevHtml(sid) : '') + formHtml(sid) +

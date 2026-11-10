@@ -41,6 +41,8 @@
     return c.toDataURL('image/jpeg', q);
   }
   function makePhotos(file) {
+    /* 5MB 넘는 파일 · 이미지가 아닌 파일은 받지 않고, 세로 사진은 위쪽(얼굴)으로 자른다 (face-crop.js · 20261110b) */
+    if (global.FaceCrop) return FaceCrop.makeData(file);
     return new Promise(function (resolve, reject) {
       var url = URL.createObjectURL(file);
       var img = new Image();
@@ -65,6 +67,7 @@
         st.d = d; draw();
       }, function () { host.innerHTML = '<div class="empty">내 정보를 불러오지 못했습니다. 잠시 뒤 다시 열어 주세요.</div>'; });
     }
+    function has() { var d = st.d || {}; return !!(d.has_photo || d.photo); }
     function val(k) { var d = st.d || {}; return k === 'school' || k === 'grade' ? d[k] : k === 'phone' ? phoneFmt(d.phone) : ((d.info || {})[k] || ''); }
     function draw(note) {
       var d = st.d;
@@ -86,12 +89,13 @@
           '</form>' +
         '</div>' +
         '<div class="card mi-card">' +
-          '<h2 class="card-title">📷 얼굴 사진</h2>' +
-          '<p class="mi-consent">선생님이 얼굴을 기억하고 관리하는 데만 씁니다. 다른 사람에게 보이지 않고 언제든 지울 수 있습니다.</p>' +
-          '<div class="mi-photo">' + (d.photo ? '<img class="mi-photo__img" src="' + esc(d.photo) + '" alt="내 얼굴 사진">' : '<span class="mi-photo__none">' + esc(String(d.name || '?').charAt(0)) + '</span>') +
-            '<div class="mi-photo__btns"><label class="hub-btn hub-btn--sm mi-file">' + (d.photo ? '사진 바꾸기' : '사진 올리기') + '<input type="file" accept="image/*" data-mi-file hidden></label>' +
-              (d.photo ? '<button type="button" class="hub-btn hub-btn--sm hub-btn--ghost" data-mi-del>사진 지우기</button>' : '') + '</div></div>' +
-          '<p class="mi-muted">가운데를 정사각으로 잘라 작게 줄여 저장합니다.</p>' +
+          /* 얼굴 사진 — 서버 사진은 이 화면에 오지 않는다 (093 · 있음 · 없음만) · 방금 올린 사진만 이 기기 미리보기 (20261110b) */
+          '<h2 class="card-title">📷 선생님이 이름을 익힐 수 있게 내 사진 올리기</h2>' +
+          '<p class="mi-consent">' + esc(global.FaceCrop ? FaceCrop.NOTE : '선생님이 이름을 익히는 용도로만 쓰고, 선생님만 볼 수 있어요 · 언제든 지울 수 있어요') + '</p>' +
+          '<div class="mi-photo">' + (st.pv ? '<img class="mi-photo__img" src="' + esc(st.pv) + '" alt="방금 올린 내 사진 (확인용)">' : '<span class="mi-photo__none">' + (has() ? '✓' : esc(String(d.name || '?').charAt(0))) + '</span>') +
+            '<div class="mi-photo__btns"><label class="hub-btn hub-btn--sm mi-file">' + (has() ? '사진 바꾸기' : '사진 올리기') + '<input type="file" accept="image/*" data-mi-file hidden></label>' +
+              (has() ? '<button type="button" class="hub-btn hub-btn--sm hub-btn--ghost" data-mi-del>사진 지우기</button>' : '') + '</div></div>' +
+          '<p class="mi-muted">' + (has() ? '사진이 올라가 있어요 · ' : '') + '얼굴이 보이게 정사각형으로 잘라 작게 줄여 저장해요 (5MB까지).</p>' +
         '</div>';
     }
     function fields() {
@@ -124,7 +128,7 @@
     function savePhoto(p) {
       return rpc('me_photo_save', { p_code: code, p_photo: p ? p.photo : '', p_thumb: p ? p.thumb : '' }).then(function (r) {
         if (!r || !r.ok) { alertMsg((r && REASON[r.reason]) || '사진을 저장하지 못했습니다'); return; }
-        st.d.photo = p ? p.photo : null;
+        st.d.has_photo = !!p; st.d.photo = null; st.pv = p ? p.thumb : '';
         draw(p ? '사진을 저장했습니다' : '사진을 지웠습니다');
       });
     }

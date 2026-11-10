@@ -59,7 +59,8 @@
   var WANT = qp('todo') ? 'todo' : qp('review') ? 'review' : qp('note') ? 'note' : '';
   var NOTE = WANT ? qp(WANT) : '';
   function kstToday() { return new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10); }
-  function go(code) { global.location.replace('../me/#' + code + (WANT === 'note' ? '/photo/' + kstToday() : WANT === 'review' ? '/review' : WANT === 'todo' ? '/todo/' + kstToday() : '')); }
+  /* 입구 · 홈 화면 앱으로 들어오면 러닝노트 홈부터 (20261110b) */
+  function go(code) { global.location.replace('../me/#' + code + (WANT === 'note' ? '/photo/' + kstToday() : WANT === 'review' ? '/review' : WANT === 'todo' ? '/todo/' + kstToday() : '/home')); }
   function msg(t, kind) {
     var el = $('#enMsg');
     el.hidden = !t;

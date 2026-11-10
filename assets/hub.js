@@ -1225,7 +1225,8 @@
 
   function stopScreen(root, kind) {
     var msg = {
-      nocode:   '주소가 올바르지 않습니다.<br>받으신 링크를 다시 눌러 주세요.<br><a class="hub-btn hub-entry-link" href="../s/">학생은 여기에서 로그인</a>',
+      /* 코드가 없는 기기 — 아이디 · 비밀번호 로그인은 만들지 않는다 (20261110b) */
+      nocode:   '<span class="hub-nocode">선생님께 받은 링크로 들어와 주세요</span>',
       notfound: '링크를 찾을 수 없습니다.<br>받으신 링크가 맞는지 확인해 주세요.',
       closed:   '더 이상 열 수 없는 링크입니다.<br>궁금한 점은 아래 문의처로 연락해 주세요.',
       network:  '불러오지 못했습니다.<br>인터넷 연결을 확인하고 새로고침해 주세요.'
@@ -1281,8 +1282,12 @@
 
     /* 학생 입구(/s/)에서 로그인해 둔 기기 — 주소에 코드가 없으면 남겨 둔 학생 링크로 (migration-024) */
     var EL = PV ? null : global.EntryLogin;
-    if (!PV && !/^[A-Za-z0-9]{20,64}$/.test(h.code) && EL && EL.get()) {
-      try { history.replaceState(null, '', global.location.pathname + '#' + EL.get()); } catch (e) { global.location.hash = EL.get(); }
+    /* 링크로 들어왔나(주소에 코드) · 이 기기에 기억한 것으로 들어왔나 (20261110b — 기억한 것이면 홈부터)
+       개인 링크(?c= · #코드)로 한 번 들어오면 이 기기에 기억(EntryLogin.last) — 다음부터 /me 만 열어도 내 홈 */
+    var linked = /^[A-Za-z0-9]{20,64}$/.test(h.code);
+    var kept = !PV && !linked && EL ? (EL.get() || (EL.last ? EL.last() : '')) : '';
+    if (kept) {
+      try { history.replaceState(null, '', global.location.pathname + '#' + kept + (h.view ? '/' + h.view + (h.arg ? '/' + h.arg : '') : '/home')); } catch (e) { global.location.hash = kept + '/home'; }
       h = parseHash();
     }
 
@@ -1302,7 +1307,20 @@
       var canWrite = d.can_write !== false;
       roleTag(d.role);
       if (EL && EL.get() === h.code) logoutButton(EL);
-      if (!PV && EL && EL.last) EL.last(h.code);           /* 홈 화면 앱 시작 주소(/s/?app=1)가 이 러닝노트로 (20261101k) */
+      if (!PV && EL && EL.last) EL.last(h.code);           /* 홈 화면 앱 시작 주소(/s/?app=1)가 이 러닝노트로 (20261101k) · /me 만 열어도 (20261110b) */
+      /* 맨 아래 「다른 학생으로 보기 · 이 기기에서 나가기」 — 이 기기에 기억한 코드를 지운다 */
+      var exitBox = $('#hubExit');
+      if (exitBox && !PV && EL) {
+        exitBox.hidden = false;
+        var forget = function () { try { EL.clear(); if (EL.last) EL.last(''); } catch (e) {} };
+        $('#hubOther').onclick = function () { forget(); global.location.replace('../s/?out=1'); };
+        $('#hubLeave').onclick = function () {
+          forget();
+          try { history.replaceState(null, '', global.location.pathname); } catch (e) {}
+          head.hidden = true; tabs.hidden = true; exitBox.hidden = true;
+          stopScreen(root, 'nocode');
+        };
+      }
 
       var st = d.student || {};
       $('#hubName').textContent = (st.name || '') + ' 학생의 러닝노트';
@@ -1315,6 +1333,7 @@
       /* 탭 네 개 — 레포트 · 수업 영상 · 과제 상세 · 내 필기 (교재비는 청구서가 있을 때만 · 20261029i)
          예전 「이번 주」 · 「내 레포트」는 「레포트」 하나로 합쳤다 */
       root.innerHTML =
+        '<section class="hub-panel" id="panelHome" role="tabpanel" hidden></section>' +
         '<section class="hub-panel" id="panelReport" role="tabpanel"></section>' +
         '<section class="hub-panel" id="panelAward" hidden></section>' +
         '<section class="hub-panel" id="panelVideo" role="tabpanel" hidden></section>' +
@@ -1448,11 +1467,55 @@
       }
       layoutTabs();
 
+      /* 홈 (20261110b · hub-home.js) — 처음 열 때 그린다 */
+      var homeOn = !!(global.HubHome && global.Game), homeDrawn = false;
+      var tabHome = $('#tabHome');
+      if (tabHome) tabHome.hidden = !homeOn;
+      function lessonBounds() {
+        var out = {};
+        ((WEEKLY && WEEKLY.weeks) || []).forEach(function (w) { var L = w.week_start ? lessonOf(mondayOf(w.week_start)) : null; if (L && !L.canceled && L.date) out[L.date] = 1; });
+        reports.forEach(function (r) { var ld = r && !r.draft ? lessonDateOf(r, null) : ''; if (/^\d{4}-\d{2}-\d{2}$/.test(ld || '')) out[ld] = 1; });
+        return Object.keys(out).sort();
+      }
+      function questPeriod() {
+        var L = latestLessonDate(), t = todayISO();
+        if (L) { var p = nextPeriod(L); if (p.to >= t) return { from: p.from, to: p.to }; }
+        var mon = mondayOf(t);
+        return { from: mon, to: plusDays(mon, 6) };
+      }
+      function drawHome() {
+        if (!homeOn) return;
+        homeDrawn = true;
+        HubHome.render($('#panelHome'), {
+          code: h.code, student: st, canWrite: canWrite, role: d.role || '', preview: !!PV, rpc: rpc, base: '../assets/chars/',
+          appData: function () { return appData(h.code); }, today: todayISO(), bounds: lessonBounds(), period: questPeriod,
+          dday: function () {
+            if (!global.DDay || !d.exam) return null;
+            var t = DDay.today(), list = (d.exam.list || [d.exam]).filter(function (x) { return x && x.date >= t; });
+            return list[0] ? { name: list[0].name, badge: DDay.badge(list[0], t) } : null;
+          },
+          latestReport: function () { var r = RP.list[RP.latest]; return r ? { week_start: r.week_start, label: reportLabel(r) } : null; },
+          mogo: function () { return MOGO && !MOGO.failed ? MOGO : null; },
+          latestVideo: function () { var x = videoWeeks()[0]; return x ? { label: weekName(x.w.week_start) } : null; },
+          badges: rpc('hub_badges', { p_code: h.code }).catch(function () { return null; }),
+          go: function (v) {
+            if (v === 'report') { $('#tabReport').classList.remove('has-new'); select('report'); showLatest(); navPush('week'); }
+            else if (v === 'video') { select('video'); navPush('videos'); }
+            else { select(v); navPush(v); }
+            window.scrollTo(0, 0);
+          }
+        });
+      }
+
       function select(which) {
         if (which === 'week') which = 'report';
-        if (which === 'video' && !(tabVideo && !tabVideo.hidden)) which = 'report';
+        if (which === 'home' && !homeOn) which = 'report';
+        /* 영상 · 필기는 한 탭 — 수업 영상 위 · 내 필기 아래 (20261110b) */
+        var media = which === 'video' || which === 'photo';
+        if (media && !(tabVideo && !tabVideo.hidden)) { which = which === 'photo' ? 'photo' : 'report'; media = which === 'photo'; }
         closePlayers(null);
-        [['report', '#tabReport', '#panelReport'],
+        [['home',   '#tabHome',   '#panelHome'],
+         ['report', '#tabReport', '#panelReport'],
          ['video',  '#tabVideo',  '#panelVideo'],
          ['app',    '#tabApp',    '#panelApp'],
          ['photo',  '#tabPhoto',  '#panelPhoto'],
@@ -1460,10 +1523,13 @@
          ['book',   '#tabBook',   '#panelBook'],
          ['info',   '#tabInfo',   '#panelInfo']].forEach(function (t) {
           if (!$(t[1]) || !$(t[2])) return;
-          var on = t[0] === which;
-          $(t[1]).setAttribute('aria-selected', on ? 'true' : 'false');
+          var on = t[0] === which || (media && (t[0] === 'video' || t[0] === 'photo'));
+          $(t[1]).setAttribute('aria-selected', on ? 'true' : 'false');      /* 숨긴 #tabPhoto 도 (예전 주소 · 영상·필기) */
           $(t[2]).hidden = !on;
         });
+        document.body.classList.toggle('hub-on-home', which === 'home');
+        if (which === 'home' && !homeDrawn) drawHome();
+        else if (which === 'home' && global.HubHome) HubHome.refresh();
         /* 루틴 우수자 화면 (#코드/award/2026-10 · 20261108i) — 레포트 탭 안의 한 화면 */
         var pa = $('#panelAward');
         if (pa) {
@@ -1471,8 +1537,7 @@
           if (which === 'award') { $('#panelReport').hidden = true; $('#tabReport').setAttribute('aria-selected', 'true'); }
         }
         if (which === 'app') openApp();
-        if (which === 'photo') openPhoto('');
-        if (which === 'video') openVideos();
+        if (media) { openPhoto(''); if (tabVideo && !tabVideo.hidden) openVideos(); }
         if (which === 'info') openInfo();
         if (which === 'mogo' && $('#panelMogo') && global.MogoView) $('#panelMogo').innerHTML = MOGO && MOGO.failed ? MogoView.failHtml() : MogoView.panelHtml(MOGO);
       }
@@ -1484,6 +1549,7 @@
         $('#tabReport').classList.remove('has-new');
         select('report'); showLatest(); navPush('week');
       };
+      if (tabHome) tabHome.onclick = function () { select('home'); navPush('home'); window.scrollTo(0, 0); };
       if (tabVideo) tabVideo.onclick = function () { select('video'); navPush('videos'); };
       $('#tabApp').onclick    = function () { select('app'); navPush('app'); };
       $('#tabBook').onclick   = function () { select('book'); navPush('book'); };
@@ -1517,6 +1583,7 @@
       nav.code = h.code;
       nav.on = !PV;
       nav.apply = function (v, arg) {
+        if (v === 'home') { select('home'); return; }
         if (v === 'report' && arg) {
           select('report');
           var rr = reports.find(function (x) { return x.week_start === arg; });
@@ -1538,7 +1605,13 @@
       };
       if (/^(notice|week|this-week|thisweek)$/.test(h.view)) { h.view = ''; h.arg = ''; if (nav.on) history.replaceState(null, '', navHash('week')); }
       if (h.view === 'report' && !h.arg) h.view = '';
-      if (nav.on) history.replaceState({ hub: { v: h.view || 'week', arg: h.arg || '' } }, '', location.hash);
+      /* 문자 · 알림톡 링크(#코드 · ?c=코드 · #코드/report/주차 …)로 들어오면 그 화면을 바로 열고, 뒤로 가면 홈 (20261110b)
+         홈을 아래에 한 칸 깔고(replace) 그 화면을 위에(push). 기억한 기기로 /me 만 열면 홈부터 */
+      if (nav.on && homeOn && linked && h.view !== 'home') {
+        var want = location.hash;
+        history.replaceState({ hub: { v: 'home', arg: '' } }, '', navHash('home'));
+        history.pushState({ hub: { v: h.view || 'week', arg: h.arg || '' }, p: 1 }, '', want);
+      } else if (nav.on) history.replaceState({ hub: { v: h.view || (homeOn && !PV ? 'home' : 'week'), arg: h.arg || '' } }, '', location.hash);
       nav.apply(h.view || 'week', h.arg || '');
 
       /* 교재비 — 청구서가 있는 학생에게만 탭이 보인다.
@@ -1707,6 +1780,14 @@
       '<div id="reportView">' +
         '<div class="rw-nav" id="reportNav"></div>' +
         '<div id="reportBody">' + (reports.length ? '' : firstHtml()) + '</div>' +
+        /* 지난 레포트 목록(주차별 · 최신 먼저) — 레포트 탭 아래 (20261110b) */
+        (reports.filter(function (r) { return !r.draft; }).length > 1
+          ? '<div class="card rp-past" id="rpPast"><h2 class="card-title">🗂️ 지난 레포트<span class="card-note">' + reports.filter(function (r) { return !r.draft; }).length + '편</span></h2>' +
+              '<ul class="rp-list">' + reports.map(function (r, i) {
+                if (r.draft) return '';
+                return '<li><button type="button" class="rp-item" data-i="' + i + '"><span class="rp-item__week num">' + esc(reportLabel(r)) + '</span><span class="rp-item__label">레포트</span><span class="rp-item__go" aria-hidden="true">›</span></button></li>';
+              }).join('') + '</ul></div>'
+          : '') +
       '</div>' +
       /* 「🏅 내 루틴 배지」 — 레포트 아래 · 접어 둠 (078 · 20261108j → 20261109c) */
       '<details class="bdg-fold" id="badgeFold" hidden><summary class="bdg-fold__s">🏅 내 루틴 배지</summary><div id="badgeBox" class="bdg-host"></div></details>' +
@@ -1853,6 +1934,7 @@
   }
 
   function openReport(code, r) {
+    if (r && !r.draft && !PV && global.HubHome) HubHome.markSeen(code, r.week_start);       /* 홈 「새 레포트 NEW」 — 연 레포트는 본 것으로 (이 기기) */
     var body = $('#reportBody');
     var ov = $('#reportOverview');
     if (ov) ov.hidden = true;

@@ -92,6 +92,11 @@
         return sb().rpc('staff_hub_hw_fix', { p_student: cur.sid }).then(function (r) { return r.error ? {} : (r.data || {}); }, function () { return {}; });
       }
       if (name === 'hub_textbook') return sb().rpc('staff_hub_textbook', { p_student: cur.sid }).then(unwrap);
+      /* 러닝노트 홈 (20261110b · 093) — 학생이 고른 캐릭터 그대로 보기만 · 미리보기에서는 고르기 · 사진 올리기 없음 */
+      if (name === 'hub_profile') return Promise.resolve(sb().from('student_game').select('char,frame,prop,seen_level,seen_perfect').eq('student_id', cur.sid))
+        .then(function (r) { var x = (r && !r.error && r.data && r.data[0]) || {}; return Object.assign({ char: '', frame: 'violet', prop: 'headband', seen_level: 0, seen_perfect: '' }, x, { can_edit: false }); }, function () { return { can_edit: false }; });
+      if (name === 'hub_profile_save' || name === 'me_photo_save') return Promise.resolve({ ok: false, reason: 'preview' });
+      if (name === 'hub_face') return Promise.resolve({ has: false, can: false });
       /* 루틴 배지 · 우수자 화면 (078 · 077) — 학부모가 보는 것 그대로 (우수자 화면은 보내기 전에도) */
       if (name === 'hub_badges') return sb().rpc('staff_badges', { p_student: cur.sid }).then(function (r) { return r.error ? null : r.data; }, function () { return null; });
       if (name === 'hub_award') return sb().rpc('staff_award_view', { p_student: cur.sid, p_month: String(args && args.p_month || '') + '-01' }).then(function (r) { return r.error ? null : r.data; }, function () { return null; });

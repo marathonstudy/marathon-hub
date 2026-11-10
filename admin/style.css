@@ -2955,6 +2955,39 @@ dialog > .toast-host { position: fixed; }
 .av--none { display: inline-grid; place-items: center; color: #4A34B8; font-weight: 900; font-size: 12px; line-height: 1; }
 .av--l.av--none { font-size: 22px; }
 .av--xl.av--none { font-size: 28px; }
+/* 20261110b — 사진이 없으면 학생이 고른 캐릭터 · 이름 외우기 큰 카드 */
+.av--char { object-fit: contain; background: #F3F0FF; }
+.av--xxl { width: min(240px, 64vw); height: min(240px, 64vw); }
+.av--xxl.av--none { font-size: 64px; }
+.fc-head { display: flex; gap: 14px; align-items: center; }
+.fc-pic { flex: none; display: inline-flex; }
+.fc-side { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.fc-lv { margin: 0; font-size: 13px; font-weight: 800; color: #4A34B8; }
+.fc-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.fc-btns .btn, .fd-none__list .btn { min-height: 40px; }
+.fc-note, .fd-note { margin: 0; font-size: 12px; color: var(--ink-light); overflow-wrap: anywhere; }
+.fc-busy { font-size: 13px; color: var(--ink-mid); }
+.fc-file { position: relative; cursor: pointer; }
+.fd-modal { width: min(560px, calc(100vw - 24px)); }
+.fd-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.fd-note { padding: 0 16px; }
+.fd-cls { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.fd-cls .chip { min-height: 40px; }
+.fd-stat { margin: 4px 0; font-size: 14px; }
+.fd-none { margin: 4px 0 10px; font-size: 13.5px; }
+.fd-none summary { cursor: pointer; font-weight: 700; color: var(--ink-mid); min-height: 32px; }
+.fd-none__list { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
+.fd-none__list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.fd-none__n { display: inline-flex; align-items: center; min-width: 0; overflow-wrap: anywhere; }
+.fd-prog { margin: 8px 0 4px; font-size: 13px; color: var(--ink-light); text-align: center; }
+.fd-card { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px 0; }
+.fd-photo { appearance: none; border: 0; background: none; padding: 0; cursor: pointer; border-radius: 50%; }
+.fd-name { margin: 4px 0 0; font-size: 26px; font-weight: 900; color: var(--ink-deep); text-align: center; overflow-wrap: anywhere; }
+.fd-school { margin: 0; font-size: 14px; color: var(--ink-mid); }
+.fd-hint, .fd-empty { margin: 4px 0; font-size: 14px; color: var(--ink-light); text-align: center; }
+.fd-acts { display: flex; gap: 8px; width: 100%; max-width: 320px; }
+.fd-acts .btn { flex: 1; min-height: 48px; font-size: 16px; }
+.fd-end { text-align: center; display: flex; flex-direction: column; gap: 8px; align-items: center; padding: 12px 0; }
 .cd-head { align-items: center; }
 .cd-avatar { flex: none; display: inline-flex; margin-right: 8px; }
 .cd-mine { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; margin: 0; font-size: 14px; }
