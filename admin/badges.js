@@ -1,7 +1,7 @@
 /* ============================================================
    badges.js — 코치룸 배지 표시 (20261108j · migration-078)
-     반 카드 학생 줄 이름 옆 작게 「⭐6」 (퍼펙트 배지 수 · staff_badge_counts · 30초 기억)
-     학생 상세(상담 카드) 이름 옆 「⭐ 퍼펙트 6개 · 🏅 루틴 배지 2개(10월 · 9월) · 3주 연속」 (staff_badges)
+     반 카드 학생 줄 이름 옆 작게 「⭐6」 (주간 배지 수 · staff_badge_counts · 30초 기억)
+     학생 상세(상담 카드) 이름 옆 「⭐ 주간 배지 6개 · 🏅 월간 배지 2개(10월 · 9월) · 3주 연속」 (staff_badges · 20261110g 이름 바꿈)
    078 전이면 아무것도 안 보인다.
    ============================================================ */
 (function () {
@@ -28,7 +28,7 @@
     return st.busy;
   }
   function textOf(sid) { var x = st.c && st.c[sid]; return x && x.p > 0 ? '⭐' + x.p : ''; }
-  function titleOf(sid) { var x = st.c && st.c[sid]; return x ? '퍼펙트 배지 ' + (x.p || 0) + '개' + (x.m ? ' · 루틴 배지 ' + x.m + '개' : '') : ''; }
+  function titleOf(sid) { var x = st.c && st.c[sid]; return x ? '주간 배지 ' + (x.p || 0) + '개' + (x.m ? ' · 월간 배지 ' + x.m + '개' : '') : ''; }
   /* 반 카드 이름 옆 — 처음 그릴 때 값이 없어도 자리만 두고, 불러오면 채운다 */
   function tag(sid) {
     if (st.off) return '';

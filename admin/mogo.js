@@ -92,16 +92,25 @@
   var FAIL = '모의고사 기록을 불러오지 못했어요';
   /* 일치 없음 — 모고 연동 주소는 「이름 + 번호」가 함께 맞는지만 알려 줘서 「이름이 없음」과 「이름은 같고 번호가 다름」을 가를 수 없다 (모고 쪽은 고치지 않음) */
   var NONE_WHY = '모고 사이트에 이름 · 번호가 맞는 학생이 없어요 — 이름이 없거나 번호가 달라요';
+  /* 옛 연결 (migration-098) — 연결됐던 번호가 모고에서 없어짐(같은 학생 기록 합치기 등) · extra.old = { reports, notebookUrl, at } */
+  function oldOf(r) { var o = r && r.extra && r.extra.old; return o && typeof o === 'object' && Array.isArray(o.reports) ? o : null; }
+  var OLD_WHY = '예전에 연결됐던 번호로 모고 사이트에서 학생을 찾을 수 없어요(모고 쪽에서 같은 학생 기록을 합쳤을 수 있어요) — 다음 받기 때 이름 + 번호로 다시 찾아요';
+  function oldHtml(o, sid) {
+    var list = (o.reports || []).slice().sort(function (a, b) { return String(b.date || '').localeCompare(String(a.date || '')); });
+    return '<details class="mg-old" data-mg-old="' + esc(sid) + '"><summary><small>옛 연결 ' + list.length + '개' + (o.at ? ' · ' + esc(mdw(o.at)) + ' 끊김' : '') + '</small></summary>' +
+      (list.length ? '<ol class="mg-list">' + list.map(rowHtml).join('') + '</ol>' : '') + '</details>';
+  }
   /* 학생 카드 · 숫자 줄 — 연결 상태 한 단어 */
   function linkState(sid) {
     if (st.sql === false) return { k: 'fail', t: '불러오지 못함' };
     var r = st.rec[sid];
     if (!r) return { k: 'wait', t: '아직 안 받음' };
+    if (r.state === 'none' && oldOf(r)) return { k: 'old', t: '학생 없음(옛 번호)' };
     return ({ ok: { k: 'ok', t: '연결됨' }, none: { k: 'none', t: '일치 없음' }, nophone: { k: 'nophone', t: '번호 없음' }, check: { k: 'check', t: '확인 필요' } })[r.state] ||
       { k: 'fail', t: '아직 못 받음' };
   }
   function counts(list) {
-    var c = { all: list.length, ok: 0, none: 0, nophone: 0, check: 0, wait: 0, fail: 0 };
+    var c = { all: list.length, ok: 0, none: 0, old: 0, nophone: 0, check: 0, wait: 0, fail: 0 };
     list.forEach(function (s) { c[linkState(s.id).k]++; });
     return c;
   }
@@ -117,6 +126,7 @@
     var body;
     if (s === 'nokey' && !r) body = '<p class="mg-muted">모의고사 연동 설정 필요</p>';
     else if (!r) body = '<p class="mg-muted">아직 받지 않았어요 — ↻ 로 받기</p>';
+    else if (r.state === 'none' && oldOf(r)) body = '<p class="mg-check">학생 없음(옛 번호)</p><p class="mg-muted"><small>' + esc(OLD_WHY) + '</small></p>' + oldHtml(oldOf(r), sid);
     else if (r.state === 'none') body = '<p class="mg-muted">모의고사 기록 없음 <small>(' + esc(NONE_WHY) + ')</small></p>';
     else if (r.state === 'nophone') body = '<p class="mg-muted">모의고사 기록 없음 <small>(번호 없음 — 학생 · 학부모 번호가 없어 찾을 수 없어요)</small></p>';
     else if (r.state === 'check') body = '<p class="mg-check">모의고사 기록 연결 확인 필요</p><p class="mg-muted"><small>' + esc(CHECK_WHY[r.reason] || '찾은 기록이 이 학생 것인지 애매해요') + ' — 학생 번호를 확인하면 다음 받기 때 다시 찾아요</small></p>';
@@ -132,7 +142,8 @@
         (list.length ? '<ol class="mg-list">' + (lim && !st.moreOpen[sid] ? list.slice(0, lim) : list).map(rowHtml).join('') + '</ol>' +
           (lim && list.length > lim ? '<button type="button" class="mg-more" data-mg-more="' + esc(sid) + '" aria-expanded="' + !!st.moreOpen[sid] + '">' + (st.moreOpen[sid] ? '최근 ' + lim + '개만 ▴' : '더 보기 (' + list.length + '개) ▾') + '</button>' : '')
           : '<p class="mg-muted">모의고사 기록 없음</p>') +
-        (r.reason === 'parent' ? '<p class="mg-via"><small>학부모 번호 + 이름으로 찾음</small></p>' : '');
+        (r.reason === 'parent' ? '<p class="mg-via"><small>학부모 번호 + 이름으로 찾음</small></p>' : '') +
+        (oldOf(r) ? oldHtml(oldOf(r), sid) : '');
     }
     /* 마지막 받기가 실패했으면 — 예전 저장본은 그대로 보여 주고 작게 한 줄 */
     if (r && r.fails > 0 && r.state !== 'error') body += '<p class="mg-muted mg-fail"><small>' + FAIL + ' — 예전에 받은 것을 보여 줘요</small></p>';
@@ -258,7 +269,7 @@
     var all = window.UI && UI.activeStudents ? UI.activeStudents() : [];
     if (all.length) {
       var c = counts(all);
-      parts.push('<span class="mg-ops__sum num" id="mgSum">모고 기록 · 대상 ' + c.all + '명 · 연결 ' + c.ok + '명 · 일치 없음 ' + c.none + '명 · 번호 없음 ' + c.nophone + '명' +
+      parts.push('<span class="mg-ops__sum num" id="mgSum">모고 기록 · 대상 ' + c.all + '명 · 연결 ' + c.ok + '명 · 일치 없음 ' + c.none + '명' + (c.old ? ' · 학생 없음(옛 번호) ' + c.old + '명' : '') + ' · 번호 없음 ' + c.nophone + '명' +
         (c.wait ? ' · 아직 안 받음 ' + c.wait + '명' : '') + '</span>');
     }
     if (s === 'down' || s === 'badkey') parts.push('<span class="mg-ops__bad" id="mgDown" title="' + esc(s === 'badkey' ? '연동 키가 맞지 않아요 — Supabase Secrets 의 MOGO_HUB_KEY 를 확인해 주세요' : '모의고사 분석 레포트 사이트에 연결되지 않아요 — 다른 기능은 그대로입니다') + '">모고 레포트 연결 끊김</span>');

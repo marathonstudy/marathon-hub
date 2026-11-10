@@ -1,10 +1,10 @@
 /* ============================================================
-   award.js — 월간 과제 루틴 우수자 🏅 (20261108i · migration-077 · 함수 note-remind)
+   award.js — 월간 배지 🏅 (예전 이름 「월간 과제 루틴 우수자」 · 20261110g 화면 글만 바꿈 · 알림톡 템플릿 이름 그대로) (20261108i · migration-077 · 함수 note-remind)
 
-   매달 1일 08:00 note-remind 가 지난달 후보를 계산하고 같은 날 10:00 자동으로 보낸다 (083 · 설정 「월간 루틴 우수자 자동 발송」 · 끄면 원장이 [보내기])
-     08:00~10:00 띠 「10월 루틴 우수자 7명 · 10:00 자동 발송 예정 · [미리보기·고치기]」 · 보낸 뒤 「10월 루틴 우수자 7명 · 10:00 보냄」(누르면 받은 학생)
-     문자 발송 → 연결 상태에도 「월간 루틴 우수자」 설정(자동 발송 · 발송 방식 · 알림톡 템플릿 코드 — 후보 계산 전에도)
-   「오늘」 맨 위 띠 「10월 루틴 우수자 후보 7명 · 확인하고 보내기」 → 확인 창
+   매달 1일 08:00 note-remind 가 지난달 후보를 계산하고 같은 날 10:00 자동으로 보낸다 (083 · 설정 「월간 배지 자동 발송」 · 끄면 원장이 [보내기])
+     08:00~10:00 띠 「10월 월간 배지 7명 · 10:00 자동 발송 예정 · [미리보기·고치기]」 · 보낸 뒤 「10월 월간 배지 7명 · 10:00 보냄」(누르면 받은 학생)
+     문자 발송 → 연결 상태에도 「월간 배지」 설정(자동 발송 · 발송 방식 · 알림톡 템플릿 코드 — 후보 계산 전에도)
+   「오늘」 맨 위 띠 「10월 월간 배지 후보 7명 · 확인하고 보내기」 → 확인 창
      반별 후보 — 이름 · 제출률 · 상위 %(기준 안일 때) · 연속 제출 최장 일수 · 과제 n개 중 m개
      학생별 체크 빼기 · 「선생님 한마디」 한 줄(비워도 됨) · [미리보기] = 학생 · 학부모가 볼 화면 그대로 (AwardView)
      [보내기]는 원장만 (서버도 원장인지 본다) · 같은 달은 한 학생에게 한 번만 · [우수자 다시 계산](보낸 학생은 그대로)
@@ -60,12 +60,12 @@
     b.hidden = !mode;
     if (!mode) { b.innerHTML = ''; return; }
     if (mode === 'wait') {
-      b.innerHTML = '<span class="awd-bar__t">🏅 ' + monOf(d.month) + '월 루틴 우수자 <b class="num">' + ws + '명</b> · 10:00 자동 발송 예정 · </span>' +
+      b.innerHTML = '<span class="awd-bar__t">🏅 ' + monOf(d.month) + '월 월간 배지 <b class="num">' + ws + '명</b> · 10:00 자동 발송 예정 · </span>' +
         '<button type="button" class="btn btn--sm btn--primary" data-awd-open>미리보기·고치기</button>';
     } else if (mode === 'sent') {
-      b.innerHTML = '<button type="button" class="awd-bar__t awd-bar__link" data-awd-open>🏅 ' + monOf(d.month) + '월 루틴 우수자 <b class="num">' + sent + '명</b> · ' + esc(d.sentAt || '') + ' 보냄</button>';
+      b.innerHTML = '<button type="button" class="awd-bar__t awd-bar__link" data-awd-open>🏅 ' + monOf(d.month) + '월 월간 배지 <b class="num">' + sent + '명</b> · ' + esc(d.sentAt || '') + ' 보냄</button>';
     } else {
-      b.innerHTML = '<span class="awd-bar__t">🏅 ' + monOf(d.month) + '월 루틴 우수자 후보 <b class="num">' + n + '명</b> · </span>' +
+      b.innerHTML = '<span class="awd-bar__t">🏅 ' + monOf(d.month) + '월 월간 배지 후보 <b class="num">' + n + '명</b> · </span>' +
         '<button type="button" class="btn btn--sm btn--primary" data-awd-open>확인하고 보내기</button>';
     }
   }
@@ -77,7 +77,7 @@
     d = document.createElement('dialog');
     d.className = 'modal awd-modal'; d.id = 'awdModal';
     d.setAttribute('aria-labelledby', 'awdTitle');
-    d.innerHTML = '<div class="modal__head"><h2 class="modal__title" id="awdTitle">루틴 우수자</h2><p class="modal__desc" id="awdDesc"></p></div>' +
+    d.innerHTML = '<div class="modal__head"><h2 class="modal__title" id="awdTitle">월간 배지</h2><p class="modal__desc" id="awdDesc"></p></div>' +
       '<div class="modal__body awd-mbody" id="awdBody"></div>' +
       '<div class="modal__foot awd-foot" id="awdFoot"></div>';
     document.body.appendChild(d);
@@ -104,7 +104,7 @@
           '<label><input type="radio" name="awdVia" value="sms"' + (c.via !== 'kakao' ? ' checked' : '') + '> 문자(LMS)</label>' +
           '<label><input type="radio" name="awdVia" value="kakao"' + (c.via === 'kakao' ? ' checked' : '') + '> 알림톡</label></fieldset>' +
         '<label class="awd-cfg__tpl">알림톡 템플릿 코드 <input class="input" id="awdCfgTpl" maxlength="80" placeholder="비어 있으면 문자로 보냅니다" value="' + esc(c.tpl || '') + '"></label>' +
-        '<label class="awd-cfg__auto"><input type="checkbox" id="awdCfgAuto"' + (c.auto !== false ? ' checked' : '') + '> 월간 루틴 우수자 자동 발송 (매달 1일 08:00 계산 → 10:00 자동으로 보냄 · 끄면 [보내기]를 눌러야 나감)</label>' +
+        '<label class="awd-cfg__auto"><input type="checkbox" id="awdCfgAuto"' + (c.auto !== false ? ' checked' : '') + '> 월간 배지 자동 발송 (매달 1일 08:00 계산 → 10:00 자동으로 보냄 · 끄면 [보내기]를 눌러야 나감)</label>' +
         '<p class="muted-note">알림톡 템플릿 「과제루틴우수자」 — 변수 #{이름} #{월} #{코드} #{년월} · 버튼 [리포트 보기] https://marathonstudy.github.io/marathon-hub/me/?c=#{코드}&amp;a=#{년월} (본문에 링크 없음) · 템플릿 코드가 비어 있으면 알림톡을 골라도 문자(본문에 링크)로 보냅니다</p>' +
         '<button type="button" class="btn btn--sm btn--primary" data-awd-cfg-save>설정 저장</button>' +
       '</div></details>';
@@ -126,15 +126,15 @@
   function render() {
     var dlg = dialog(), d = st.d;
     if (!d || !d.month) {
-      $('#awdTitle', dlg).textContent = '루틴 우수자';
+      $('#awdTitle', dlg).textContent = '월간 배지';
       $('#awdDesc', dlg).textContent = '아직 계산한 달이 없습니다 — 매달 1일 08:00 에 지난달 후보를 계산합니다';
       $('#awdBody', dlg).innerHTML = d && d.cfg ? cfgHtml(d.cfg, !!d.owner) : '';       /* 계산 전에도 설정 · 템플릿 코드 칸 (083) */
       $('#awdFoot', dlg).innerHTML = (d && d.owner ? '<button type="button" class="btn" data-awd-calc>지난달 우수자 계산</button>' : '') + '<button type="button" class="btn" data-awd-close>닫기</button>';
       return;
     }
     var list = d.list || [], owner = !!d.owner, n = left().length, ws = willSend();
-    $('#awdTitle', dlg).textContent = n ? monOf(d.month) + '월 루틴 우수자 후보 ' + n + '명' + (list.length > n ? ' · 보냄 ' + (list.length - n) + '명' : '')
-      : monOf(d.month) + '월 루틴 우수자 ' + list.length + '명 · ' + (d.sentAt || '') + ' 보냄';
+    $('#awdTitle', dlg).textContent = n ? monOf(d.month) + '월 월간 배지 후보 ' + n + '명' + (list.length > n ? ' · 보냄 ' + (list.length - n) + '명' : '')
+      : monOf(d.month) + '월 월간 배지 ' + list.length + '명 · ' + (d.sentAt || '') + ' 보냄';
     $('#awdDesc', dlg).textContent = (d.computed ? md(d.computed) + ' 계산(' + (d.by || '자동') + ')' : '') + ' · 전체 수강생(과제 ' + d.cfg.min + '개 이상) ' + d.eligible + '명 중' +
       (d.autoWait ? ' · 아무것도 안 하면 10:00 에 그대로 나갑니다 (빼기 · 한마디는 바로 반영)' : '');
     var by = {};
@@ -192,7 +192,7 @@
       if ($('#awdCfgAuto')) pa.auto = !!$('#awdCfgAuto').checked;
       Promise.resolve(sb().rpc('award_cfg_set', { p: pa })).then(function (r) {
         if (r.error) { toast(r.error.message, 'bad'); return; }
-        toast('루틴 우수자 설정을 저장했습니다 — 기준을 바꿨으면 [우수자 다시 계산]을 눌러 주세요', 'good');
+        toast('월간 배지 설정을 저장했습니다 — 기준을 바꿨으면 [우수자 다시 계산]을 눌러 주세요', 'good');
         return load().then(render);
       });
       return;
@@ -213,27 +213,27 @@
       if (!ws.length || st.busy) return;
       var nst = ws.filter(function (x) { return x.phone; }).length, npa = ws.filter(function (x) { return x.parent; }).length;
       var via = st.d.cfg.via === 'kakao' && st.d.cfg.tpl ? '알림톡' : '문자';
-      UI.confirmAsk(monOf(st.d.month) + '월 루틴 우수자', ws.length + '명에게 ' + via + '를 보냅니다 (학생 ' + nst + '명 · 학부모 ' + npa + '명 · 같은 달은 한 번만).', '보내기').then(function (ok) {
+      UI.confirmAsk(monOf(st.d.month) + '월 월간 배지', ws.length + '명에게 ' + via + '를 보냅니다 (학생 ' + nst + '명 · 학부모 ' + npa + '명 · 같은 달은 한 번만).', '보내기').then(function (ok) {
         if (!ok) return;
         st.busy = true; render();
         return fn({ action: 'award', op: 'send', month: ym(st.d.month) }).then(function (d) {
           st.busy = false;
           if (!d.ok) { toast(d.message || '보내지 못했습니다', 'bad'); render(); return; }
-          toast(monOf(st.d.month) + '월 루틴 우수자 ' + (d.students || 0) + '명에게 보냈습니다 (' + (d.sent || 0) + '통' + (d.failed ? ' · 실패 ' + d.failed : '') + ')', d.failed ? 'bad' : 'good');
+          toast(monOf(st.d.month) + '월 월간 배지 ' + (d.students || 0) + '명에게 보냈습니다 (' + (d.sent || 0) + '통' + (d.failed ? ' · 실패 ' + d.failed : '') + ')', d.failed ? 'bad' : 'good');
           return load().then(function () { render(); paintBar(); });
         });
       });
     }
   }
 
-  /* 문자 발송 → 연결 상태 「월간 루틴 우수자」 — 자동 발송 · 발송 방식 · 알림톡 템플릿 코드 (후보 계산 전에도 · 원장만 바꿈 · 083) */
+  /* 문자 발송 → 연결 상태 「월간 배지」 — 자동 발송 · 발송 방식 · 알림톡 템플릿 코드 (후보 계산 전에도 · 원장만 바꿈 · 083) */
   function settingsHtml() {
     var d = st.d;
     if (st.off || !d || !d.cfg) return '';
     var c = d.cfg, owner = !!d.owner;
-    if (!owner) return '<div class="kk-tpl" id="awdSettings"><p class="field__label">월간 루틴 우수자</p><p class="field__hint">자동 발송 ' + (c.auto !== false ? '켜짐(매달 1일 10:00)' : '꺼짐') + ' · 발송 ' + (c.via === 'kakao' && c.tplSet ? '알림톡' : '문자') + ' <span class="muted-note">원장 계정만 바꿀 수 있습니다</span></p></div>';
-    return '<div class="kk-tpl" id="awdSettings"><p class="field__label">월간 루틴 우수자</p>' +
-      '<label class="awd-cfg__auto"><input type="checkbox" id="awdSetAuto"' + (c.auto !== false ? ' checked' : '') + '> 월간 루틴 우수자 자동 발송 (매달 1일 08:00 계산 → 10:00 자동 발송)</label>' +
+    if (!owner) return '<div class="kk-tpl" id="awdSettings"><p class="field__label">월간 배지</p><p class="field__hint">자동 발송 ' + (c.auto !== false ? '켜짐(매달 1일 10:00)' : '꺼짐') + ' · 발송 ' + (c.via === 'kakao' && c.tplSet ? '알림톡' : '문자') + ' <span class="muted-note">원장 계정만 바꿀 수 있습니다</span></p></div>';
+    return '<div class="kk-tpl" id="awdSettings"><p class="field__label">월간 배지</p>' +
+      '<label class="awd-cfg__auto"><input type="checkbox" id="awdSetAuto"' + (c.auto !== false ? ' checked' : '') + '> 월간 배지 자동 발송 (매달 1일 08:00 계산 → 10:00 자동 발송)</label>' +
       '<span class="kk-tpl__row"><label><input type="radio" name="awdSetVia" value="sms"' + (c.via !== 'kakao' ? ' checked' : '') + '> 문자</label> <label><input type="radio" name="awdSetVia" value="kakao"' + (c.via === 'kakao' ? ' checked' : '') + '> 알림톡</label></span>' +
       '<label class="field"><span class="field__label">알림톡 템플릿 코드 <span class="field__opt">「과제루틴우수자」 · 비우면 문자</span></span>' +
       '<span class="kk-tpl__row"><input class="input" id="awdSetTpl" maxlength="80" autocomplete="off" spellcheck="false" placeholder="솔라피 템플릿 코드 (예: KA01TP…)" value="' + esc(c.tpl || '') + '">' +
@@ -252,7 +252,7 @@
       var via = (document.querySelector('input[name="awdSetVia"]:checked') || {}).value || 'sms';
       Promise.resolve(sb().rpc('award_cfg_set', { p: { auto: !!$('#awdSetAuto').checked, via: via, tpl: $('#awdSetTpl').value.trim() } })).then(function (r) {
         if (r.error) { toast(r.error.message, 'bad'); return; }
-        toast('월간 루틴 우수자 설정을 저장했습니다', 'good');
+        toast('월간 배지 설정을 저장했습니다', 'good');
         return load().then(function () { paintSettings(); paintBar(); });
       });
     }

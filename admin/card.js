@@ -116,7 +116,7 @@
     /* 이름 옆 「마지막 로그인 10/24」 · 학생 한 명 [문자] (20261031e) */
     $('#cardLogin').textContent = '';
     $('#cardWelcome').textContent = '';
-    if (window.Badges) Badges.paintCard(sid);                 /* 배지 줄 「⭐ 퍼펙트 6개 · 🏅 루틴 배지 2개(10월 · 9월)」 (078 · 20261108j) */
+    if (window.Badges) Badges.paintCard(sid);                 /* 배지 줄 「⭐ 주간 배지 6개 · 🏅 월간 배지 2개(10월 · 9월)」 (078 · 20261108j → 20261110g) */
     $('#btnCardSms').setAttribute('data-sms-sid', sid);
     $('#btnCardSms').hidden = !!s.archived;
     /* [웰컴·앱 설치 안내 다시 보내기] — 학생 / 학부모 / 둘 다 · 미리보기 (welcome.js · 20261101e · 예전 [앱 안내 문자]) */

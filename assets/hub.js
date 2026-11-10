@@ -1761,16 +1761,18 @@
       teacherNoticeHtml(noticeItems());
   }
 
-  /* 「🏅 내 루틴 배지」 — 레포트 탭 위쪽 · 그 학생 것만 (hub_badges · migration-078 · 20261108j)
-     그달 우수자면 맨 위 「🏅 10월 루틴 우수자」(한 달 동안) · 받은 달 배지를 누르면 그달 우수자 화면 */
+  /* 「🏅 내 배지」(주간 배지 · 월간 배지) — 레포트 탭 아래 · 그 학생 것만 (hub_badges · migration-078 · 097 · 20261108j → 20261110g)
+     그달 월간 배지를 받았으면 맨 위 「🏅 10월 월간 배지」(한 달 동안) · 받은 달 배지를 누르면 그달 화면 */
   function loadBadges(code) {
     var host = $('#badgeBox');
     if (!host || !global.BadgeView) return;
     rpc('hub_badges', { p_code: code }).then(function (v) {
       var el = $('#badgeBox');
       if (!el || !v) return;
-      BadgeView.mount(el, v, function (m) { if (global.HubAward) HubAward.open(m); }, { since: '2026-11' });   /* 2026-11 앞 달은 안 보임 (20261109c) */
-      var fold = $('#badgeFold');
+      /* 제목은 접는 칸 「🏅 내 배지」 하나만 · 칸은 시작한 주와 기록이 있는 첫 주 중 늦은 쪽부터 (20261110g) */
+      BadgeView.mount(el, v, function (m) { if (global.HubAward) HubAward.open(m); }, { noTitle: true });
+      var fold = $('#badgeFold'), sum = $('#badgeFoldSum');
+      if (sum && BadgeView.sumText) sum.textContent = BadgeView.sumText(v);
       if (fold) fold.hidden = false;
     }).catch(function () {});
   }
@@ -1794,8 +1796,8 @@
               }).join('') + '</ul></div>'
           : '') +
       '</div>' +
-      /* 「🏅 내 루틴 배지」 — 레포트 아래 · 접어 둠 (078 · 20261108j → 20261109c) */
-      '<details class="bdg-fold" id="badgeFold" hidden><summary class="bdg-fold__s">🏅 내 루틴 배지</summary><div id="badgeBox" class="bdg-host"></div></details>' +
+      /* 「🏅 내 배지」 — 레포트 아래 · 접어 둠 · 옆에 작게 「⭐ 주간 n · 🏅 월간 n」 (078 · 20261108j → 20261109c → 20261110g) */
+      '<details class="bdg-fold" id="badgeFold" hidden><summary class="bdg-fold__s">🏅 내 배지 <span class="bdg-fold__n num" id="badgeFoldSum"></span></summary><div id="badgeBox" class="bdg-host"></div></details>' +
       '<div id="reportNotes" class="rn-all" hidden>' +
         '<button type="button" class="hub-back" id="notesBack">‹ 레포트로</button>' +
         '<div class="card"><h2 class="card-title">📒 복습 노트 모음<span class="card-note">수업일 순서</span></h2><div id="reportNotesBody"></div></div>' +

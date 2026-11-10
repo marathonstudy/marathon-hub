@@ -184,7 +184,7 @@
   /* 수업 전 과제 현황 (migration-069) — 069 전이면 칸이 없어 아무것도 안 보인다 */
   function hwsHead() {
     if (!data || data.hwCut == null) return '';
-    return '<div class="op-hws"><span class="op-hws__t">수업 전 과제 현황 문자</span><span class="muted-note">수업 30분 전 · 운영진에게만 · 이번 주 퍼펙트 · 학생 완료율 명단</span>' +
+    return '<div class="op-hws"><span class="op-hws__t">수업 전 과제 현황 문자</span><span class="muted-note">수업 30분 전 · 운영진에게만 · 이번 주 주간 배지 · 학생 완료율 명단</span>' +
       '<label class="tdc-tedit__f tdc-tedit__f--min"><span>상담 기준</span><input type="number" class="input" id="opHwsCut" inputmode="numeric" min="1" max="100" value="' + esc(data.hwCut) + '"><span>% 미만</span></label>' +
       '<button class="btn btn--sm" type="button" id="opHwsCutSave">저장</button></div>';
   }

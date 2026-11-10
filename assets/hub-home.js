@@ -2,8 +2,8 @@
    hub-home.js — 러닝노트(/me) 홈 + 게임 프로필 + 캐릭터 고르기 + 내 사진 올리기 (20261110b)
 
    위에서 아래로 — 프로필 카드(캐릭터 · 레벨 · XP 막대 · 숫자 4개) → 이번 주 퀘스트 → 새 레포트 → 최근 모의고사 레포트 1개
-                    → 루틴 배지 요약(이번 달 한 줄 · 누르면 펼침) → 최근 수업 영상 1개
-   새 데이터는 모으지 않는다 — 앱 과제 기록(hub.js appData) · 공개 레포트 · 모의고사 저장본 · 루틴 배지 · 수업 영상만
+                    → 「🏅 내 배지」(주간 배지 · 월간 배지 · 누르면 펼침) → 최근 수업 영상 1개
+   새 데이터는 모으지 않는다 — 앱 과제 기록(hub.js appData) · 공개 레포트 · 모의고사 저장본 · 배지(주간 · 월간) · 수업 영상만
    XP · 레벨 · 해금은 game.js 한 곳. 다른 학생과 비교 · 순위 없음. 상담 · 약속 · 금액 · 번호 · 모의고사 점수 그래프 · 얼굴 사진은 여기 없다
    (내 사진은 올릴 때 이 기기에서 만든 미리보기만 잠깐 — 서버 사진 주소는 받지 않는다)
    고른 캐릭터 · 꾸미기 · 이미 본 레벨 · 이미 본 퍼펙트는 학생 기록(student_game · migration-093) — 093 전이면 이 기기에만
@@ -52,11 +52,11 @@
   function statTile(icon, n, label, extra) {
     return '<div class="gm-stat' + (extra || '') + '"><span class="gm-stat__n num">' + icon + ' ' + n + '</span><span class="gm-stat__l">' + esc(label) + '</span></div>';
   }
-  /* 숫자가 0 이면 기죽지 않게 — 「오늘 내면 🔥1일 시작!」 · 「이번 주 첫 퍼펙트 도전!」 (학부모 링크는 학부모 시점 · 20261110d) */
+  /* 숫자가 0 이면 기죽지 않게 — 「오늘 내면 🔥1일 시작!」 · 「이번 주 첫 주간 배지 도전!」 (학부모 링크는 학부모 시점 · 20261110d) */
   function zeroTile(kind) {
     var pa = isParent();
-    var t = kind === 'streak' ? (pa ? '오늘 제출하면 🔥1일 시작' : '오늘 내면 🔥1일 시작!') : (pa ? '이번 주 첫 퍼펙트 도전 중' : '이번 주 첫 퍼펙트 도전!');
-    return '<div class="gm-stat gm-stat--zero" data-gm-zero="' + kind + '"><span class="gm-stat__z">' + esc(t) + '</span><span class="gm-stat__l">' + (kind === 'streak' ? '연속 제출' : '퍼펙트 주') + '</span></div>';
+    var t = kind === 'streak' ? (pa ? '오늘 제출하면 🔥1일 시작' : '오늘 내면 🔥1일 시작!') : (pa ? '이번 주 첫 주간 배지 도전 중' : '이번 주 첫 주간 배지 도전!');
+    return '<div class="gm-stat gm-stat--zero" data-gm-zero="' + kind + '"><span class="gm-stat__z">' + esc(t) + '</span><span class="gm-stat__l">' + (kind === 'streak' ? '연속 제출' : '주간 배지') + '</span></div>';
   }
   function isParent() { return !!H && H.ctx.role === 'parent'; }
   var LV_ICON = ['🌱', '👟', '⚡', '🏃', '🥈', '🥇', '🏆'];
@@ -84,7 +84,7 @@
       '</div>' +
       '<div class="gm-stats">' +
         (g && g.streak > 0 ? statTile('🔥', g.streak + '일', '연속 제출') : g ? zeroTile('streak') : statTile('🔥', '–', '연속 제출')) +
-        (g && g.perfect > 0 ? statTile('⭐', g.perfect + '번', '퍼펙트 주') : g ? zeroTile('perfect') : statTile('⭐', '–', '퍼펙트 주')) +
+        (g && g.perfect > 0 ? statTile('⭐', g.perfect + '개', '주간 배지') : g ? zeroTile('perfect') : statTile('⭐', '–', '주간 배지')) +
         statTile('', g ? g.total + '개' : '–', '총 제출') +
         (dd ? statTile('', esc(dd.badge), dd.name, ' gm-stat--dday') : '') +
       '</div>' +
@@ -100,7 +100,7 @@
     var pct = q.m ? Math.round(q.done / q.m * 100) : 0;
     return '<section class="gm-card gm-quest' + (q.perfect ? ' is-perfect' : '') + '" id="gmQuest" aria-label="이번 주 퀘스트">' +
       '<div class="gm-quest__h"><h2 class="gm-h" id="gmQuestT">' + esc(questTitle()) + '</h2><span class="gm-quest__p num">' + esc(md(q.from) + '~' + md(q.to)) + '</span></div>' +
-      '<div class="gm-quest__sum num"><b>' + q.done + '/' + q.m + ' 완료</b><span>' + (q.perfect ? '퍼펙트 위크! +' + G().RULES.perfect + 'XP' : '퍼펙트까지 ' + q.toPerfect + '개') + '</span></div>' +
+      '<div class="gm-quest__sum num"><b>' + q.done + '/' + q.m + ' 완료</b><span>' + (q.perfect ? '주간 배지 달성! +' + G().RULES.perfect + 'XP' : '주간 배지까지 ' + q.toPerfect + '개') + '</span></div>' +
       '<div class="gm-bar"><i style="width:' + pct + '%"></i></div>' +
       '<div class="gm-days" style="grid-template-columns:repeat(' + q.cells.length + ', minmax(0, 1fr))">' + q.cells.map(function (x) {
         return '<button type="button" class="gm-day gm-day--' + x.state + (x.today ? ' is-today' : '') + (H.open === x.date ? ' is-open' : '') + '" data-gm-day="' + x.date + '" aria-label="' + esc(mdw(x.date) + ' ' + (x.state === 'done' ? '냈어요' : x.state === 'todo' ? '아직 안 냈어요' : x.state === 'today' ? '오늘 과제' : x.state === 'future' ? '예정' : x.state === 'exempt' ? '면제' : '과제 없음')) + '">' +
@@ -134,11 +134,9 @@
   function badgeHtml() {
     var v = H.badges;
     if (!v) return '';
-    var ym = String(v.today || '').slice(0, 7), mm = ym ? +ym.slice(5, 7) : 0;
-    var weeks = (v.weeks || []).filter(function (w) { return String(w.to || '').slice(0, 7) === ym; });
-    var stars = weeks.filter(function (w) { return w.perfect; }).length;
-    var got = (v.months || []).indexOf(ym) !== -1;
-    return '<details class="gm-card gm-fold" id="gmBadge"><summary class="gm-fold__s"><span aria-hidden="true">🏅</span> <b>' + (mm ? mm + '월' : '이번 달') + ' 루틴 배지</b> <span class="num">⭐ ' + stars + '/' + weeks.length + '주' + (got ? ' · 🏅 받음' : '') + '</span></summary><div class="gm-fold__b" id="gmBadgeBox"></div></details>';
+    /* 제목은 「🏅 내 배지」 하나 · 옆에 작게 「⭐ 주간 n · 🏅 월간 n」 (「0/0주」 같은 셈은 없앰 · 20261110g) */
+    var sum = global.BadgeView && BadgeView.sumText ? BadgeView.sumText(v) : '';
+    return '<details class="gm-card gm-fold" id="gmBadge"><summary class="gm-fold__s"><span aria-hidden="true">🏅</span> <b>내 배지</b> <span class="num">' + esc(sum) + '</span></summary><div class="gm-fold__b" id="gmBadgeBox"></div></details>';
   }
   function videoHtml() {
     var v = H.ctx.latestVideo ? H.ctx.latestVideo() : null;
@@ -175,7 +173,7 @@
       return;
     }
     if (H.q && H.q.perfect && String(H.prof.seen_perfect || '') < H.q.from) {
-      pop('퍼펙트 위크!', '이번 주 과제를 모두 냈어요 · +' + G().RULES.perfect + 'XP', []);
+      pop('주간 배지 ⭐', '이번 주 과제를 모두 냈어요 · +' + G().RULES.perfect + 'XP', []);
       saveProfile({ seen_perfect: H.q.from });
     }
   }
@@ -326,7 +324,7 @@
     document.addEventListener('toggle', function (e) {
       if (!H || !e.target || e.target.id !== 'gmBadge' || !e.target.open) return;
       var box = document.getElementById('gmBadgeBox');
-      if (box && global.BadgeView && !box.childNodes.length) BadgeView.mount(box, H.badges, function (m) { if (global.HubAward) HubAward.open(m); }, { since: '2026-11', noNow: false });
+      if (box && global.BadgeView && !box.childNodes.length) BadgeView.mount(box, H.badges, function (m) { if (global.HubAward) HubAward.open(m); }, { noTitle: true, noNow: false });
     }, true);
   }
 
