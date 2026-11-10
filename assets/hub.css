@@ -1332,6 +1332,8 @@ html.rn-lock, html.rn-lock body { overflow: hidden; }
 .hub-tabs[hidden] { display: none !important; }
 .hub-tabs .hub-tab { flex: 1 0 auto; min-width: 64px; white-space: nowrap; padding-left: 10px; padding-right: 10px; scroll-snap-align: start; }
 /* 「🏅 내 배지」 — 레포트 아래 접어 둠 (20261109c → 20261110g) */
+/* 능력치에서 누르면 내려오는 「🎯 영역별 정답률」 — 위 얇은 바에 제목이 가리지 않게 (20261110h) */
+#rpCats { scroll-margin-top: 80px; }
 .bdg-fold__n { margin-left: 8px; font-size: 12.5px; font-weight: 700; color: var(--ink-light, #8A8EA6); }
 .bdg-fold { margin: 12px 0; }
 .bdg-fold[hidden] { display: none; }

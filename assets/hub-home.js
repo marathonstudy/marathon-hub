@@ -154,9 +154,20 @@
       (c.role ? '<span class="hub-bar__role">' + (c.role === 'student' ? '학생용' : '학부모용') + '</span>' : '') +
     '</div>';
   }
+  /* 능력치 — 과제 기록을 받은 뒤에만(그 전에는 빈칸) · 누르면 레포트 탭 「🎯 영역별 정답률」로 */
+  function paintAbility() {
+    var host = document.getElementById('gmAbilityHost');
+    if (!host || !global.Ability || H.loading || H.data === undefined) return;
+    if (H.abState) host._ab = H.abState;
+    Ability.mount(host, H.data || {}, { today: H.ctx.today, parent: isParent(), name: (H.ctx.student || {}).name || '',
+      onGo: function () { if (H.ctx.go) H.ctx.go('report-cats'); } });
+    H.abState = host._ab;
+  }
   function paint() {
     if (!H) return;
-    H.host.innerHTML = '<div class="gm-home">' + profileHtml() + questHtml() + reportCardHtml() + mogoHtml() + badgeHtml() + videoHtml() + '</div>';
+    /* 「⚔️ 내 능력치」 — 프로필 카드 바로 아래 · 이번 주 퀘스트보다 위 (ability.js · 20261110h) · 기간 · 그래프 상태는 H.abHost 에 남김 */
+    H.host.innerHTML = '<div class="gm-home">' + profileHtml() + '<div id="gmAbilityHost"></div>' + questHtml() + reportCardHtml() + mogoHtml() + badgeHtml() + videoHtml() + '</div>';
+    paintAbility();
     var bar = document.getElementById('hubBar');
     if (bar) { bar.innerHTML = barHtml(); bar.hidden = false; }
   }
@@ -348,6 +359,7 @@
     Promise.resolve().then(function () { return ctx.appData(); }).then(function (data) {
       if (H !== mine) return;
       H.loading = false;
+      H.data = data || null;
       var period = typeof ctx.period === 'function' ? ctx.period() : ctx.period;
       H.g = data ? G().compute(data, { today: ctx.today, bounds: ctx.bounds || [], period: period }) : null;
       H.q = H.g ? H.g.quest : null;
@@ -355,7 +367,7 @@
       if (!H.g) H.g = G().compute({ calendar: [] }, { today: ctx.today });
       paint();
       if (!ctx.preview) celebrate();
-    }, function () { if (H !== mine) return; H.loading = false; H.g = G().compute({ calendar: [] }, { today: ctx.today }); H.empty = true; paint(); });
+    }, function () { if (H !== mine) return; H.loading = false; H.data = null; H.g = G().compute({ calendar: [] }, { today: ctx.today }); H.empty = true; paint(); });
   }
   function refresh() { paint(); }
   function markSeen(code, week) { if (code && week) store('mhub.seenrep.' + code, week); }

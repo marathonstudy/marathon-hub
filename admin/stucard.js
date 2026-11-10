@@ -177,8 +177,38 @@
       '<div class="cs-mogo" data-mg-host="' + esc(sid) + '" data-mg-limit="3">' + Mogo.sectionHtml(sid, { limit: 3 }) + '</div></section>';
   }
 
+  /* ---------- 2-1) 능력치 (ability.js · 러닝노트 홈과 같은 계산 · 20261110h) ----------
+     과제 기록 저장본(app_records.data — 직원만 읽음)을 그 학생 것만 한 번 읽어 기억 · 기간 [이번 달][최근 4주][1년] · 성장 그래프 */
+  var AB = { sid: '', data: null, busy: false, st: { kind: 'w4', graph: false } };
+  function abLoad(sid) {
+    var c = window.SB && SB.client;
+    if (!c || AB.busy) return;
+    AB.busy = true;
+    Promise.resolve(c.from('app_records').select('data').eq('student_id', sid)).then(function (r) {
+      AB.busy = false;
+      if (AB.sid !== sid) return;
+      AB.data = (!r.error && r.data && r.data[0] && r.data[0].data) || {};
+      if (window.QuickNote && QuickNote.state().open) QuickNote.repaint();
+    }, function () { AB.busy = false; if (AB.sid === sid) { AB.data = {}; if (window.QuickNote && QuickNote.state().open) QuickNote.repaint(); } });
+  }
+  function abilityHtml(sid) {
+    if (!window.Ability || !sid) return '';
+    if (AB.sid !== sid) { AB = { sid: sid, data: null, busy: false, st: { kind: 'w4', graph: false } }; }
+    if (AB.data === null) { abLoad(sid); return '<section class="sc-sec sc-ab" id="scAbility" aria-label="능력치"><p class="ab-note">능력치 불러오는 중…</p></section>'; }
+    return '<section class="sc-sec sc-ab" id="scAbility" aria-label="능력치">' +
+      Ability.html(AB.data, AB.st, { today: today(), small: true, card: false, id: 'scAb' }) + '</section>';
+  }
+
   /* ---------- 클릭 (창 안) — 처리했으면 true ---------- */
   function onClick(t, sid, root) {
+    var ab = t.closest('#scAbility [data-ab-k], #scAbility [data-ab-graph], #scAbility [data-ab-go]');
+    if (ab) {
+      if (ab.hasAttribute('data-ab-k')) AB.st.kind = ab.getAttribute('data-ab-k');
+      else if (ab.hasAttribute('data-ab-graph')) AB.st.graph = !AB.st.graph;
+      else { if (window.Preview) Preview.open(sid, 'parent', 'app'); return true; }
+      if (window.QuickNote) QuickNote.repaint();
+      return true;
+    }
     var b = t.closest('[data-sc-tg], [data-sc-wk], [data-sc-mode], [data-sc-pt], [data-sc-edit], [data-sc-save], [data-sc-pv], [data-sc-hwall], [data-sc-pin]');
     if (!b) return false;
     if (b.hasAttribute('data-sc-tg')) { var k = b.getAttribute('data-sc-tg'); ui[k] = !ui[k]; if (k === 'hwMore' && !ui[k]) ui.wk = -1; }
@@ -194,7 +224,7 @@
     return true;
   }
 
-  window.StuCard = { reset: reset, infoHtml: infoHtml, hwHtml: hwHtml, mogoHtml: mogoHtml, onClick: onClick, state: function () { return ui; },
+  window.StuCard = { reset: reset, infoHtml: infoHtml, hwHtml: hwHtml, abilityHtml: abilityHtml, mogoHtml: mogoHtml, onClick: onClick, state: function () { return ui; },
     mogoChanged: function () { if (window.QuickNote && QuickNote.state().open) QuickNote.repaint(true); } };
   window.StudentCard = window.StuCard;
 })();

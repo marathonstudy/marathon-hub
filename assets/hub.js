@@ -1118,6 +1118,9 @@
       /* 과제 요약 칸 아래 작은 한 줄 — 「앱에서 자세히 보기 ↗」 */
       if (box.innerHTML) box.innerHTML += appMoreHtml(APP.info, true);
       animateRings(box);
+      /* 🎯 영역별 정답률 — 레포트 탭에도 (과제 탭과 같은 앱 영역 값 · 없으면 빈칸 · 능력치에서 누르면 여기로) */
+      var cb = $('#rwCats');
+      if (cb) cb.innerHTML = apCatsHtml(dd.categories || [], 'rpCats');
     });
   }
 
@@ -1193,6 +1196,7 @@
       sumHtml(r, d2) +
       '<div id="rwNotes"></div>' +
       '<div id="rwApp"></div>' +
+      '<div id="rwCats"></div>' +                 /* 🎯 영역별 정답률 — 과제 요약 바로 아래 (과제 탭과 같은 카드 · 20261110h) */
       (hasLessons ? ReportView.partsHtml(d2, ['lessons']) : learnHtml(w)) +
       ReportView.partsHtml(d2, ['comment']) +
       weekVideosHtml(w) +                         /* 이 수업 영상 — 선생님 한마디 바로 아래 (영상이 없으면 안내 한 줄 · 20261101o) */
@@ -1502,7 +1506,17 @@
           latestVideo: function () { var x = videoWeeks()[0]; return x ? { label: weekName(x.w.week_start) } : null; },
           badges: rpc('hub_badges', { p_code: h.code }).catch(function () { return null; }),
           go: function (v) {
-            if (v === 'report') { $('#tabReport').classList.remove('has-new'); select('report'); showLatest(); navPush('week'); }
+            if (v === 'report' || v === 'report-cats') { $('#tabReport').classList.remove('has-new'); select('report'); showLatest(); navPush('week'); }
+            /* 능력치를 누르면 — 레포트 탭 「🎯 영역별 정답률」까지 내려 준다 (과제 기록은 이미 받아 둠 · 칸이 그려질 때까지 잠깐 기다림 · 20261110h) */
+            if (v === 'report-cats') {
+              var tries = 0;
+              (function seek() {
+                var el = document.getElementById('rpCats');
+                if (el && el.scrollIntoView) { el.scrollIntoView({ block: 'start' }); return; }
+                if (++tries < 25) setTimeout(seek, 120);
+              })();
+              return;
+            }
             else if (v === 'video') { select('video'); navPush('videos'); }
             else { select(v); navPush(v); }
             window.scrollTo(0, 0);
@@ -2303,10 +2317,10 @@
   }
 
   /* 영역별 정답률 막대 + 자주 틀리는 영역 TOP 3 (정답률이 낮은 순) */
-  function apCatsHtml(cats) {
+  function apCatsHtml(cats, id) {
     if (!cats.length) return '';
     var low = cats.filter(function (c) { return c.count == null || c.count > 0; }).slice().sort(function (a, b) { return a.rate - b.rate; }).slice(0, 3);
-    return '<div class="card ap-cats"><h2 class="card-title">🎯 영역별 정답률<span class="card-note">전체 기간</span></h2>' +
+    return '<div class="card ap-cats"' + (id ? ' id="' + id + '"' : '') + '><h2 class="card-title">🎯 영역별 정답률<span class="card-note">전체 기간</span></h2>' +
       (cats.length > 1 && low.length ? '<div class="ap-top"><div class="ap-top__t">자주 틀리는 영역 TOP ' + low.length + '</div><ol class="ap-top__list">' + low.map(function (c) {
         return '<li><b>' + esc(c.name) + '</b> <span class="num">' + c.rate + '%</span>' + (c.count ? ' <span class="ap-muted num">' + c.count + '회</span>' : '') + '</li>';
       }).join('') + '</ol></div>' : '') +

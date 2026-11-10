@@ -1,0 +1,62 @@
+/* ============================================================
+   ability.css — 「⚔️ 내 능력치」 (ability.js · 러닝노트 홈 · 코치룸 학생 카드 · 20261110h)
+   마라톤국어 보라(#5A3FD0 · #2E2266) · 오름 ▲ 초록(은은하게 반짝) · 내림 ▼ 회색(빨강 없음)
+   ============================================================ */
+.ab { display: grid; gap: 8px; }
+.ab-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; }
+.ab-t { margin: 0; font-size: 16px; font-weight: 900; color: #2E2266; letter-spacing: -.01em; }
+.ab-seg { display: inline-flex; padding: 2px; border-radius: 999px; background: #F1EEFF; }
+.ab-seg__b { appearance: none; border: 0; background: none; font: inherit; font-size: 12.5px; font-weight: 800; color: #6B6F86; padding: 0 10px; min-height: 32px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
+.ab-seg__b.is-on { background: #fff; color: #5A3FD0; box-shadow: 0 1px 3px rgba(46, 34, 102, .15); }
+.ab-range { margin: -2px 0 0; font-size: 11.5px; color: #8A8EA6; }
+.ab-empty, .ab-note { margin: 0; font-size: 13px; color: #7D8199; }
+.ab-bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.ab-row { appearance: none; border: 0; background: #FAF9FF; font: inherit; width: 100%; text-align: left; cursor: pointer; border-radius: 12px; padding: 7px 10px;
+  display: grid; grid-template-columns: minmax(72px, auto) 1fr auto; align-items: center; gap: 8px; min-height: 44px; }
+.ab-row:hover { background: #F3EFFF; }
+.ab-row__n { display: grid; gap: 1px; font-size: 13.5px; color: #2E2266; }
+.ab-tag { justify-self: start; font-size: 10px; font-weight: 900; padding: 1px 6px; border-radius: 999px; line-height: 1.5; white-space: nowrap; }
+.ab-tag--top { background: #FFF1C9; color: #7A5300; }
+.ab-tag--low { background: #E9F6EF; color: #1F6B4E; }
+.ab-row__bar { height: 10px; border-radius: 999px; background: #ECEAF5; overflow: hidden; }
+.ab-row__bar > i { display: block; height: 100%; border-radius: 999px; transition: width .5s ease; }
+.ab-row__v { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.ab-row__v > b { font-size: 20px; font-weight: 900; color: #2E2266; line-height: 1; min-width: 28px; text-align: right; }
+.ab-gr { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 7px; font-size: 12px; font-weight: 900; color: #fff; background: #9A9DB0; }
+.ab-gr--S { background: linear-gradient(135deg, #F2C14E, #E0A920); color: #2E2266; }
+.ab-gr--A { background: #5A3FD0; }
+.ab-gr--B { background: #7C69E0; }
+.ab-gr--C { background: #A79BE8; }
+.ab-gr--D { background: #B9BCCB; }
+.ab-up { font-size: 11.5px; font-weight: 900; color: #1F9D74; animation: ab-glow 2.4s ease-in-out infinite; }
+.ab-down { font-size: 11.5px; font-weight: 800; color: #9A9DB0; }
+@keyframes ab-glow { 0%, 100% { text-shadow: none; } 50% { text-shadow: 0 0 6px rgba(31, 157, 116, .55); } }
+.ab-row.is-few { background: #FBFBFD; }
+.ab-row.is-few .ab-row__n, .ab-few { color: #A2A5B8; }
+.ab-few { font-size: 11.5px; font-weight: 700; }
+.ab-radar { display: block; width: 100%; max-width: 260px; height: auto; margin: 0 auto; }
+.ab-rd__ring { fill: none; stroke: #E6E2F6; stroke-width: 1; }
+.ab-rd__spoke { stroke: #E6E2F6; stroke-width: 1; }
+.ab-rd__val { fill: rgba(90, 63, 208, .18); stroke: #5A3FD0; stroke-width: 2; stroke-linejoin: round; }
+.ab-rd__lb { font-size: 11px; font-weight: 800; fill: #4A4F68; }
+.ab-rd__lb.is-few { fill: #B5B8C8; }
+.ab-more { appearance: none; border: 0; background: none; font: inherit; justify-self: start; color: #5A3FD0; font-weight: 800; font-size: 13px; min-height: 40px; cursor: pointer; padding: 0 2px; }
+.ab-graph { display: grid; gap: 6px; }
+.ab-sum { margin: 0; font-size: 13px; font-weight: 800; color: #2E2266; }
+.ab-line { display: block; width: 100%; height: auto; max-width: 100%; }
+.ab-ln__g { stroke: #ECEAF5; stroke-width: 1; }
+.ab-ln__y, .ab-ln__x { font-size: 10px; fill: #8A8EA6; }
+.ab-ln__l { fill: none; stroke-width: 2.2; stroke-linejoin: round; stroke-linecap: round; }
+.ab-lg { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 11.5px; color: #4A4F68; }
+.ab-lg i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
+/* 코치룸 학생 카드 — 작게 */
+.ab--small .ab-t { font-size: 14px; }
+.ab--small .ab-row { min-height: 36px; padding: 5px 8px; }
+.ab--small .ab-row__v > b { font-size: 16px; }
+.ab--small .ab-radar { max-width: 200px; }
+@media (max-width: 380px) {
+  .ab-seg__b { padding: 0 8px; font-size: 12px; }
+  .ab-row { grid-template-columns: minmax(62px, auto) 1fr auto; gap: 6px; padding: 6px 8px; }
+  .ab-row__v > b { font-size: 18px; }
+}
+@media (prefers-reduced-motion: reduce) { .ab-up { animation: none; } .ab-row__bar > i { transition: none; } }
