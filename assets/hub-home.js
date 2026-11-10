@@ -52,39 +52,54 @@
   function statTile(icon, n, label, extra) {
     return '<div class="gm-stat' + (extra || '') + '"><span class="gm-stat__n num">' + icon + ' ' + n + '</span><span class="gm-stat__l">' + esc(label) + '</span></div>';
   }
+  /* 숫자가 0 이면 기죽지 않게 — 「오늘 내면 🔥1일 시작!」 · 「이번 주 첫 퍼펙트 도전!」 (학부모 링크는 학부모 시점 · 20261110d) */
+  function zeroTile(kind) {
+    var pa = isParent();
+    var t = kind === 'streak' ? (pa ? '오늘 제출하면 🔥1일 시작' : '오늘 내면 🔥1일 시작!') : (pa ? '이번 주 첫 퍼펙트 도전 중' : '이번 주 첫 퍼펙트 도전!');
+    return '<div class="gm-stat gm-stat--zero" data-gm-zero="' + kind + '"><span class="gm-stat__z">' + esc(t) + '</span><span class="gm-stat__l">' + (kind === 'streak' ? '연속 제출' : '퍼펙트 주') + '</span></div>';
+  }
+  function isParent() { return !!H && H.ctx.role === 'parent'; }
+  var LV_ICON = ['🌱', '👟', '⚡', '🏃', '🥈', '🥇', '🏆'];
   function profileHtml() {
     var c = H.ctx, st = c.student || {}, g = H.g, lv = g ? g.level : G().levelOf(0), p = G().clean(H.prof, lv.i);
-    var dd = c.dday ? c.dday() : null;
-    var ava = G().avatarHtml(p, { size: 84, label: '내 캐릭터 ' + G().charOf(p.char).name });
-    return '<section class="gm-card gm-profile" id="gmProfile" aria-label="내 프로필">' +
+    /* D-day — 「D-day 문자」 목록(hub_dday)이 있으면 그것 · 그 학생에게 남은 D-day 가 없으면 숨김 · 094 전이면 예전 시험 */
+    var dd = H.dd ? H.dd : H.dd === false ? null : (c.dday ? c.dday() : null);
+    var ava = G().avatarHtml(p, { size: 104, label: (isParent() ? (st.name || '') + ' 학생의 캐릭터 ' : '내 캐릭터 ') + G().charOf(p.char).name });
+    var nx = G().LEVELS[lv.i + 1];
+    /* 홈의 주인공 — 맨 위 작게 RUN 로고 · 학생용/학부모용 (큰 보라 머리는 홈에서 숨김) */
+    return '<section class="gm-card gm-profile" id="gmProfile" aria-label="' + (isParent() ? esc((st.name || '') + ' 학생의 프로필') : '내 프로필') + '">' +
+      '<div class="gm-brand"><img class="gm-brand__logo" src="' + esc((c.base || '../assets/chars/').replace(/chars\/$/, '') + 'logo.png') + '" alt="마라톤국어" width="44" height="25">' +
+        (c.role ? '<span class="gm-brand__role">' + (c.role === 'student' ? '학생용' : '학부모용') + '</span>' : '') + '</div>' +
       '<div class="gm-top">' +
         (H.prof.can_edit ? '<button type="button" class="gm-ava-btn" data-gm-pick aria-label="캐릭터 고르기">' + ava + '<span class="gm-ava-edit" aria-hidden="true">✎</span></button>' : '<span class="gm-ava-btn is-static">' + ava + '</span>') +
         '<div class="gm-id">' +
           '<b class="gm-name">' + esc(st.name || '') + '</b>' +
           (st.class_name ? '<span class="gm-cls">' + esc(st.class_name) + '</span>' : '') +
-          '<span class="gm-lv" id="gmLevel"><b class="num">Lv.' + (lv.i + 1) + '</b> ' + esc(lv.name) + '</span>' +
+          '<span class="gm-lv" id="gmLevel"><i class="gm-lv__i" aria-hidden="true">' + LV_ICON[lv.i] + '</i><b class="num">Lv.' + (lv.i + 1) + '</b> <span class="gm-lv__n">' + esc(lv.name) + '</span></span>' +
         '</div>' +
       '</div>' +
       '<div class="gm-xp" aria-label="경험치">' +
+        '<div class="gm-xp__t num"><b id="gmXp">' + (nx ? lv.xp + ' / ' + nx.xp + ' XP' : lv.xp + ' XP') + '</b><span id="gmToNext">' + (lv.next ? lv.next + '까지 ' + lv.toNext + ' XP' : '최고 레벨이에요') + '</span></div>' +
         '<div class="gm-xp__bar"><i style="width:' + lv.pct + '%"></i></div>' +
-        '<div class="gm-xp__t num"><b id="gmXp">' + lv.xp + ' XP</b><span id="gmToNext">' + (lv.next ? '다음 레벨까지 ' + lv.toNext + ' XP' : '최고 레벨이에요') + '</span></div>' +
       '</div>' +
       '<div class="gm-stats">' +
-        statTile('🔥', g ? g.streak + '일' : '–', '연속 제출') +
-        statTile('⭐', g ? g.perfect + '번' : '–', '퍼펙트 주') +
+        (g && g.streak > 0 ? statTile('🔥', g.streak + '일', '연속 제출') : g ? zeroTile('streak') : statTile('🔥', '–', '연속 제출')) +
+        (g && g.perfect > 0 ? statTile('⭐', g.perfect + '번', '퍼펙트 주') : g ? zeroTile('perfect') : statTile('⭐', '–', '퍼펙트 주')) +
         statTile('', g ? g.total + '개' : '–', '총 제출') +
         (dd ? statTile('', esc(dd.badge), dd.name, ' gm-stat--dday') : '') +
       '</div>' +
-      (H.empty ? '<p class="gm-hint">과제를 내면 XP가 쌓여요</p>' : '') +
+      (H.empty ? '<p class="gm-hint">' + (isParent() ? esc((st.name || '') + ' 학생이 과제를 내면 XP가 쌓여요') : '과제를 내면 XP가 쌓여요') + '</p>' : '') +
     '</section>';
   }
+  /* 학부모 링크 — 「예진 학생의 이번 주」 */
+  function questTitle() { return isParent() ? ((H.ctx.student || {}).name || '') + ' 학생의 이번 주' : '이번 주 퀘스트'; }
   var Q_TEXT = { done: '✓', todo: '아직', today: '오늘', future: '예정', exempt: '면제', off: '—' };
   function questHtml() {
     var q = H.q;
-    if (!q) return '<section class="gm-card gm-quest" id="gmQuest"><h2 class="gm-h">이번 주 퀘스트</h2><p class="gm-hint">' + (H.loading ? '과제 기록을 불러오는 중…' : '이번 주 과제가 나오면 여기에 보여요') + '</p></section>';
+    if (!q) return '<section class="gm-card gm-quest" id="gmQuest"><h2 class="gm-h" id="gmQuestT">' + esc(questTitle()) + '</h2><p class="gm-hint">' + (H.loading ? '과제 기록을 불러오는 중…' : '이번 주 과제가 나오면 여기에 보여요') + '</p></section>';
     var pct = q.m ? Math.round(q.done / q.m * 100) : 0;
     return '<section class="gm-card gm-quest' + (q.perfect ? ' is-perfect' : '') + '" id="gmQuest" aria-label="이번 주 퀘스트">' +
-      '<div class="gm-quest__h"><h2 class="gm-h">이번 주 퀘스트</h2><span class="gm-quest__p num">' + esc(md(q.from) + '~' + md(q.to)) + '</span></div>' +
+      '<div class="gm-quest__h"><h2 class="gm-h" id="gmQuestT">' + esc(questTitle()) + '</h2><span class="gm-quest__p num">' + esc(md(q.from) + '~' + md(q.to)) + '</span></div>' +
       '<div class="gm-quest__sum num"><b>' + q.done + '/' + q.m + ' 완료</b><span>' + (q.perfect ? '퍼펙트 위크! +' + G().RULES.perfect + 'XP' : '퍼펙트까지 ' + q.toPerfect + '개') + '</span></div>' +
       '<div class="gm-bar"><i style="width:' + pct + '%"></i></div>' +
       '<div class="gm-days" style="grid-template-columns:repeat(' + q.cells.length + ', minmax(0, 1fr))">' + q.cells.map(function (x) {
@@ -307,6 +322,12 @@
     paint();
     loadProfile(ctx).then(function (p) { if (H !== mine) return; H.prof = p || { can_edit: false }; paint(); });
     if (ctx.badges) ctx.badges.then(function (v) { if (H !== mine || !v) return; H.badges = v; paint(); }, function () {});
+    H.dd = null;
+    if (ctx.ddayP) ctx.ddayP.then(function (v) {
+      if (H !== mine || !v || typeof v !== 'object') return;
+      H.dd = v.none ? false : { name: v.short || v.name, badge: v.n === 0 ? 'D-DAY' : 'D-' + v.n };
+      paint();
+    }, function () {});
     Promise.resolve().then(function () { return ctx.appData(); }).then(function (data) {
       if (H !== mine) return;
       H.loading = false;

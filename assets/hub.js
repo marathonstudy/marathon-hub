@@ -1489,6 +1489,8 @@
         HubHome.render($('#panelHome'), {
           code: h.code, student: st, canWrite: canWrite, role: d.role || '', preview: !!PV, rpc: rpc, base: '../assets/chars/',
           appData: function () { return appData(h.code); }, today: todayISO(), bounds: lessonBounds(), period: questPeriod,
+          /* D-day — 코치룸 「D-day 문자」 목록(그 학생 학년 · 오늘 이후 가장 먼저 · hub_dday · 094) · 094 전이면 예전 반 시험 */
+          ddayP: rpc('hub_dday', { p_code: h.code }).catch(function () { return null; }),
           dday: function () {
             if (!global.DDay || !d.exam) return null;
             var t = DDay.today(), list = (d.exam.list || [d.exam]).filter(function (x) { return x && x.date >= t; });

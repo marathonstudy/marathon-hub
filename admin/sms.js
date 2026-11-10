@@ -978,7 +978,7 @@
   /* ---------- 안쪽 작은 탭 ---------- */
   function showPane(name) {
     st.pane = name;
-    ['send', 'tpl', 'log', 'conn'].forEach(function (p) {
+    ['send', 'tpl', 'log', 'conn', 'dday'].forEach(function (p) {
       var el = $('#smsPane' + p.charAt(0).toUpperCase() + p.slice(1));
       if (el) el.hidden = p !== name;
     });
@@ -987,6 +987,7 @@
     if (name === 'tpl') { if (!st.templates.length) loadTemplates(); else renderTplList(); }
     if (name === 'log') openLog();
     if (name === 'conn') loadConn();
+    if (name === 'dday' && window.Dday) Dday.open();          /* D-day 문자 (dday.js · 20261110c) */
   }
   function goTab() {
     var cur = (window.RTabs && RTabs.current) ? RTabs.current() : -1;

@@ -29,6 +29,8 @@
 //    모아 한 통 (밤 10시 ~ 아침 8시는 8시 · 하루 두 번까지 · 반마다 끄기) → 받은 학생(학부모는 설정을 켰을 때만 · 일반 문자)
 //    「업데이트 문자 지금 보내기」 { action: "rupd", week, class } — 로그인한 운영진 · 그 반 그 주 기다리는 것을 바로
 //         모든 발송의 사본을 여기 한 곳에서 보낸다. 사본이 실패해도 원래 발송에는 영향이 없다. 064 전이면 조용히 넘어간다.
+//  D-day 문자 (migration-094 · 20261110c) — 같은 매분 실행에서 dday_due → 발신번호 솔라피 등록 확인 → dday_prepare → 솔라피(설정의 D-day 발신번호) → dday_record
+//    [시험 발송] { action: "dday", op: "test" } · [등록 다시 확인] { action: "dday", op: "check" } — 운영진 · 다른 문자의 발신번호(SOLAPI_SENDER)는 그대로
 //  키 — sms-send 와 같은 솔라피 Secrets(SOLAPI_API_KEY · SOLAPI_API_SECRET · SOLAPI_SENDER).
 //       DB 는 Supabase 가 함수에 기본으로 주는 SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY 로 (이 함수 안에서만). 새로 넣을 키는 없다.
 //
@@ -95,11 +97,12 @@ export function leftOf(text: string): string[] {
 export const leftMsg = (left: string[]) => "바뀌지 않은 칸이 있어 보내지 않음: " + left.join(" ");
 
 /* rows → 솔라피 → 결과 기록 (바뀌지 않은 칸이 남은 줄은 보내지 않고 실패로 · 20261101m) */
-async function sendRows(all: Any[], record = "note_remind_record", copy = true, keep?: (results: Any[]) => void) {
+async function sendRows(all: Any[], record = "note_remind_record", copy = true, keep?: (results: Any[]) => void, fromOver?: string) {
   if (!all.length) return { sent: 0, failed: 0 };
   const blocked = all.filter((r) => leftOf(r.text).length);
   const rows = all.filter((r) => !leftOf(r.text).length);
-  const from = env("SOLAPI_SENDER").replace(/\D/g, "");
+  /* D-day 문자만 설정(DB)의 발신번호로 · 다른 문자는 지금처럼 SOLAPI_SENDER (20261110c) */
+  const from = (fromOver || env("SOLAPI_SENDER")).replace(/\D/g, "");
   const results: Any[] = rows.map((r) => ({ log_id: r.log_id, ok: true, error: "", message_id: "" }));
   if (rows.length) try {
     const res = await fetch(SOLAPI, {
@@ -135,6 +138,48 @@ async function sendRows(all: Any[], record = "note_remind_record", copy = true, 
   if (copy) await rpc("msg_copy_note", { p_rows: all.map((r) => ({ log_id: r.log_id, text: r.text, name: r.name })) }).catch(() => {});
   const sent = results.filter((x) => x.ok).length;
   return { sent, failed: results.length - sent, blocked: blocked.length };
+}
+
+/* ============================================================
+   D-day 문자 (migration-094 · 20261110c) — 매일 정해진 시각(기본 06:00 · 밤 쉬기 규칙 예외) 재원 학생 본인에게 「수능 D-80 {명언}」
+     dday_due → 발신번호가 솔라피에 등록됐는지 확인(10분에 한 번까지) → dday_prepare(오늘 한 번 · 학생마다 한 번) → 솔라피(D-day 발신번호) → dday_record
+     등록 안 된 번호면 D-day 문자만 막고(설정 화면에 안내) 다음 확인 때 승인됐으면 그대로 보낸다 · 다른 문자의 발신번호는 그대로
+   ============================================================ */
+const SENDER_CHECK = "https://api.solapi.com/senderid/v1/numbers/active";
+/* 'ok' · 'unregistered' · 'unknown'(확인 주소가 답하지 않음 → 보내 보고 결과로 판단) */
+export async function senderState(sender: string, fetcher: typeof fetch = fetch): Promise<string> {
+  const want = sender.replace(/\D/g, "");
+  if (!want) return "unregistered";
+  try {
+    const res = await fetcher(SENDER_CHECK, { headers: { Authorization: await solapiAuth(env("SOLAPI_API_KEY"), env("SOLAPI_API_SECRET")) } });
+    if (!res.ok) return "unknown";
+    const text = JSON.stringify(await res.json().catch(() => null) ?? "");
+    const nums = new Set((text.match(/0\d[\d-]{7,12}\d/g) || []).map((x) => x.replace(/\D/g, "")));
+    return nums.has(want) ? "ok" : "unregistered";
+  } catch { return "unknown"; }
+}
+const SENDER_FAIL = /발신번호|발신 번호|sender|senderid|3059|1062|1022/i;
+async function ddayRun(now: string) {
+  const due: Any = await rpc("dday_due", { p_now: now });
+  if (!due?.due) return { reason: due?.reason || "no" };
+  let state = String(due.sender_state || "unknown");
+  if (due.recheck !== false) {            /* 등록 안 된 번호는 10분에 한 번만 다시 묻는다 (DB 가 정함) */
+    state = await senderState(String(due.sender || ""));
+    await rpc("dday_sender_set", { p_state: state, p_now: now }).catch(() => {});
+  }
+  if (state === "unregistered") return { reason: "unregistered" };
+  const prep: Any = await rpc("dday_prepare", { p_now: now });
+  const rows: Any[] = prep?.rows || [];
+  if (!rows.length) return { reason: prep?.reason || "empty", nophone: prep?.nophone || 0 };
+  let res: Any[] = [];
+  const r = await sendRows(rows, "dday_record", true, (x) => { res = x; }, String(prep.from || due.sender || ""));
+  /* 모두 발신번호 때문에 실패 — 막고, 그날 기록을 지워 승인되면 다시 */
+  if (res.length && res.every((x) => !x.ok && SENDER_FAIL.test(String(x.error || "")))) {
+    await rpc("dday_sender_set", { p_state: "unregistered", p_now: now }).catch(() => {});
+    await rpc("dday_reset_day", { p_day: prep.day }).catch(() => {});
+    return { reason: "unregistered", rows: rows.length };
+  }
+  return { day: prep.day, rows: rows.length, ...r, nophone: prep.nophone || 0 };
 }
 
 /* 사본 — 보낼 때가 된 것을 한 번에 (모든 발송 · sms-send · kakao-send 포함) */
@@ -546,17 +591,44 @@ async function handle(req: Request, cors: Record<string, string>) {
     /* 알림톡 대체 문자 — 실패한 사람만 링크 든 문자로 (084 전이면 조용히 넘어간다) */
     let alt: Any = null;
     if (!missing.length) { try { alt = await altCheck(now); } catch (e) { alt = { error: String((e as Error).message || e).slice(0, 160) }; } }
+    /* D-day 문자 — 094 를 아직 안 돌렸거나 오류가 나도 다른 일은 그대로 (사본보다 먼저 · 같은 분에 사본) */
+    let dday: Any = null;
+    try { dday = await ddayRun(now); } catch (e) { dday = { error: String((e as Error).message || e).slice(0, 160) }; }
     /* 사본 — 064 를 아직 안 돌렸거나 오류가 나도 다른 일은 그대로 */
     let copy: Any = null;
     try { copy = await copyFlush(now); } catch (e) { copy = { error: String((e as Error).message || e).slice(0, 160) }; }
-    return json({ ok: true, day: prep?.day, rows: rows.length, ...r, hws, badge, pre, rupd, award, awardAuto, alt, copy }, cors);
+    return json({ ok: true, day: prep?.day, rows: rows.length, ...r, hws, badge, pre, rupd, award, awardAuto, alt, dday, copy }, cors);
   }
 
   /* 2) 「지금 다시 보내기」 — 로그인한 운영진 */
   const auth = req.headers.get("authorization") ?? "";
   const apikey = req.headers.get("apikey") ?? "";
-  if (body.action !== "now" && body.action !== "hwstat" && body.action !== "rupd" && body.action !== "award") return json({ ok: false, reason: "input" }, cors, 400);
+  if (body.action !== "now" && body.action !== "hwstat" && body.action !== "rupd" && body.action !== "award" && body.action !== "dday") return json({ ok: false, reason: "input" }, cors, 400);
   if (!/^Bearer\s+\S+/.test(auth) || !apikey) return json({ ok: false, reason: "login", message: "코치룸에 다시 로그인해 주세요." }, cors, 401);
+  /* D-day 문자 [시험 발송](내 시험 번호로만 · 오늘 글 한 통) · [발신번호 다시 확인] — 운영진 */
+  if (body.action === "dday") {
+    let staff = false;
+    try { staff = (await rpc("is_staff", {}, auth, apikey)) === true; } catch { staff = false; }
+    if (!staff) return json({ ok: false, reason: "auth", message: "운영진 계정으로 다시 로그인해 주세요." }, cors, 403);
+    if (missing.length) return json({ ok: false, reason: "nokeys", missing, message: "문자 키가 아직 다 들어가지 않았습니다 (" + missing.join(", ") + ")." }, cors);
+    let st: Any;
+    try { st = await rpc("dday_status", {}, auth, apikey); } catch (e) {
+      return json({ ok: false, reason: "nosql", message: "migration-094 SQL 을 먼저 실행해 주세요 — " + String((e as Error).message || e).slice(0, 120) }, cors);
+    }
+    const sender = String(st?.cfg?.sender || "");
+    if (!sender) return json({ ok: false, reason: "nosender", message: "D-day 문자 발신번호를 먼저 넣어 주세요." }, cors);
+    const state = await senderState(sender);
+    await rpc("dday_sender_set", { p_state: state }).catch(() => {});
+    if (body.op === "check") return json({ ok: true, sender_state: state }, cors);
+    if (state === "unregistered") return json({ ok: false, reason: "unregistered", message: "솔라피에 등록되지 않은 발신번호예요 · 등록 후 보낼 수 있어요" }, cors);
+    const prep: Any = await rpc("dday_test_prepare", {}, auth, apikey);
+    if (!prep?.ok) return json({ ok: false, reason: prep?.reason || "test", message: prep?.message || "보내지 못했습니다." }, cors);
+    const rows: Any[] = prep.rows || [];
+    let res: Any[] = [];
+    const r = await sendRows(rows, "dday_record", false, (x) => { res = x; }, String(prep.from || sender));
+    if (res.length && res.every((x) => !x.ok && SENDER_FAIL.test(String(x.error || "")))) await rpc("dday_sender_set", { p_state: "unregistered" }).catch(() => {});
+    return json({ ok: r.sent > 0, ...r, results: res, text: rows[0]?.text || "", message: r.sent > 0 ? "" : (res[0]?.error || "보내지 못했습니다.") }, cors);
+  }
   /* 루틴 우수자 [우수자 다시 계산] · [보내기] — 원장만 (award_list 의 owner 를 로그인 토큰으로 본다 · 077) */
   if (body.action === "award") {
     let list: Any = null;
