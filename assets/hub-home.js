@@ -146,9 +146,21 @@
     return '<button type="button" class="gm-card gm-row gm-row--btn" id="gmVideo" data-gm-go="video"><span class="gm-row__i" aria-hidden="true">▶️</span>' +
       '<div class="gm-row__t"><b>최근 수업 영상</b><span>' + esc(v.label || '') + '</span></div><span class="gm-row__go" aria-hidden="true">›</span></button>';
   }
+  /* 홈이 아닌 탭의 얇은 상단 바 (20261110f) — 작은 캐릭터 · 이름 · Lv.n 레벨 이름 · 작은 XP 막대 · 오른쪽 학생용/학부모용 */
+  function barHtml() {
+    var c = H.ctx, st = c.student || {}, lv = H.g ? H.g.level : G().levelOf(0), p = G().clean(H.prof, lv.i);
+    return '<div class="hub-bar__in">' +
+      '<span class="hub-bar__ava">' + G().avatarHtml({ char: p.char, frame: p.frame, prop: 'none' }, { size: 36, label: G().charOf(p.char).name }) + '</span>' +
+      '<span class="hub-bar__id"><b class="hub-bar__n">' + esc(st.name || '') + '</b><span class="hub-bar__lv num" id="hubBarLv">Lv.' + (lv.i + 1) + ' ' + esc(lv.name) + '</span></span>' +
+      '<span class="hub-bar__xp" aria-label="경험치 ' + lv.pct + '%"><i style="width:' + lv.pct + '%"></i></span>' +
+      (c.role ? '<span class="hub-bar__role">' + (c.role === 'student' ? '학생용' : '학부모용') + '</span>' : '') +
+    '</div>';
+  }
   function paint() {
     if (!H) return;
     H.host.innerHTML = '<div class="gm-home">' + profileHtml() + questHtml() + reportCardHtml() + mogoHtml() + badgeHtml() + videoHtml() + '</div>';
+    var bar = document.getElementById('hubBar');
+    if (bar) { bar.innerHTML = barHtml(); bar.hidden = false; }
   }
 
   /* ---------- 레벨 업 · 퍼펙트 위크 연출 — 처음 한 번만 (학생 기록 · 093 전이면 이 기기) ---------- */
@@ -194,11 +206,18 @@
     return '<div class="gm-sheet__in" role="dialog" aria-modal="true" aria-label="캐릭터 고르기">' +
       '<div class="gm-sheet__h"><b>캐릭터 고르기</b><button type="button" class="gm-x" data-gm-close aria-label="닫기">✕</button></div>' +
       '<div class="gm-sheet__pv">' + G().avatarHtml(d, { size: 112 }) + '<span class="gm-sheet__nm">' + esc(G().charOf(d.char).name) + '</span></div>' +
-      '<div class="gm-chars" role="listbox" aria-label="캐릭터 14종">' + G().CHARS.map(function (c) {
-        var on = d.char === c.id;
-        return '<button type="button" class="gm-char' + (on ? ' is-on' : '') + '" data-gm-char-pick="' + c.id + '" role="option" aria-selected="' + on + '">' +
-          '<img src="' + esc(G().charSrc(c.id, H.ctx.base)) + '" alt="" width="56" height="56" loading="lazy"><span>' + esc(c.name) + '</span></button>';
-      }).join('') + '</div>' +
+      /* 맨 앞 「마라톤국어 대표」 — 마라토니 · 마라부기 크게 (20261110f) · 그 아래 동물 러너 12종 */
+      (function () {
+        var btn = function (c, big) {
+          var on = d.char === c.id, sz = big ? 96 : 56;
+          return '<button type="button" class="gm-char' + (big ? ' gm-char--big' : '') + (on ? ' is-on' : '') + '" data-gm-char-pick="' + c.id + '" role="option" aria-selected="' + on + '">' +
+            '<img src="' + esc(G().charSrc(c.id, H.ctx.base)) + '" alt="" width="' + sz + '" height="' + sz + '" loading="lazy"><span>' + esc(c.name) + '</span></button>';
+        };
+        var ms = G().CHARS.filter(function (c) { return c.mascot; }), rs = G().CHARS.filter(function (c) { return !c.mascot; });
+        return '<div class="gm-chars-wrap" role="listbox" aria-label="캐릭터 14종">' +
+          '<h3 class="gm-sub gm-sub--rep">마라톤국어 대표</h3><div class="gm-chars gm-chars--rep">' + ms.map(function (c) { return btn(c, true); }).join('') + '</div>' +
+          '<h3 class="gm-sub">동물 러너</h3><div class="gm-chars">' + rs.map(function (c) { return btn(c, false); }).join('') + '</div></div>';
+      })() +
       '<h3 class="gm-sub">테두리</h3><div class="gm-opts">' + row('frame', G().ITEMS.frame) + '</div>' +
       '<h3 class="gm-sub">소품</h3><div class="gm-opts">' + row('prop', G().ITEMS.prop) + '</div>' +
       faceHtml() +

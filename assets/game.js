@@ -32,14 +32,17 @@
   function levelIndex(key) { for (var i = 0; i < LEVELS.length; i++) if (LEVELS[i].key === key) return i; return 0; }
 
   /* ---------- 캐릭터 14종 (마스코트 2 + 동물 러너 12) ---------- */
+  /* 마스코트 마라토니(토끼) · 마라부기(거북) — 진짜 그림 PNG (20261110f) · 동물 러너에서 토끼 · 거북은 빼고 사슴 · 코알라 */
   var CHARS = [
     { id: 'maratoni', name: '마라토니', mascot: true }, { id: 'marabugi', name: '마라부기', mascot: true },
-    { id: 'rabbit', name: '토끼' }, { id: 'turtle', name: '거북' }, { id: 'cheetah', name: '치타' }, { id: 'penguin', name: '펭귄' },
+    { id: 'deer', name: '사슴' }, { id: 'koala', name: '코알라' }, { id: 'cheetah', name: '치타' }, { id: 'penguin', name: '펭귄' },
     { id: 'fox', name: '여우' }, { id: 'bear', name: '곰' }, { id: 'cat', name: '고양이' }, { id: 'dog', name: '강아지' },
     { id: 'otter', name: '수달' }, { id: 'owl', name: '부엉이' }, { id: 'squirrel', name: '다람쥐' }, { id: 'hedgehog', name: '고슴도치' }
   ];
-  var CHAR_FILES = Object.assign({}, CFG.charFiles || {});      /* { maratoni: 'maratoni.png' } — 진짜 그림으로 바꿀 때 */
-  function charOf(id) { return CHARS.filter(function (c) { return c.id === id; })[0] || CHARS[0]; }
+  var CHAR_FILES = Object.assign({ maratoni: 'maratoni.png', marabugi: 'marabugi.png' }, CFG.charFiles || {});
+  /* 예전에 토끼 · 거북을 고른 학생 → 마라토니 · 마라부기 (서버도 migration-096 이 옮긴다) */
+  var MOVED = { rabbit: 'maratoni', turtle: 'marabugi' };
+  function charOf(id) { id = MOVED[id] || id; return CHARS.filter(function (c) { return c.id === id; })[0] || CHARS[0]; }
 
   /* ---------- 꾸미기 해금 표 (테두리 색 · 소품) — at = 그 레벨부터 열림 ---------- */
   var ITEMS = {
@@ -73,7 +76,8 @@
   /* 저장된 고르기를 레벨에 맞게 — 잠긴 것은 기본으로 (서버에도 같은 규칙 · hub_profile_save) */
   function clean(p, lvl) {
     p = p || {};
-    var ch = CHARS.some(function (c) { return c.id === p.char; }) ? p.char : '';
+    var pc = MOVED[p.char] || p.char;
+    var ch = CHARS.some(function (c) { return c.id === pc; }) ? pc : '';
     return { char: ch, frame: isOpen('frame', p.frame, lvl) ? p.frame : 'violet', prop: isOpen('prop', p.prop, lvl) ? p.prop : 'headband' };
   }
 
@@ -181,16 +185,23 @@
   };
   /* 별 머리띠 — 기본 머리띠 위에 노란 별 */
   PROP_SVG.headband = '<path d="M100 44 L104 54 L115 54 L106 60 L110 71 L100 64 L90 71 L94 60 L85 54 L96 54 Z" fill="#F5C842" stroke="' + INK + '" stroke-width="2" stroke-linejoin="round"/>';
+  var PROP_BADGE = { headband: '⭐', cap: '🧢', shoes: '👟', silver: '🥈', gold: '🥇', trophy: '🏆' };
   function escA(v) { return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
   /* p = { char, frame, prop } · o = { size, base, cls, label } */
   function avatarHtml(p, o) {
     p = p || {}; o = o || {};
     var c = charOf(p.char), fr = item('frame', p.frame) || ITEMS.frame[0], pr = PROP_SVG[p.prop] || '';
     var size = o.size || 96;
-    return '<span class="gm-ava' + (o.cls ? ' ' + o.cls : '') + '" style="--gm-ring:' + fr.color + ';width:' + size + 'px;height:' + size + 'px" data-gm-char="' + escA(c.id) + '">' +
+    var ava = '<span class="gm-ava' + (c.mascot ? ' gm-ava--mascot' : '') + (o.cls ? ' ' + o.cls : '') + '" style="--gm-ring:' + fr.color + ';width:' + size + 'px;height:' + size + 'px" data-gm-char="' + escA(c.id) + '">' +
       '<img class="gm-ava__img" src="' + escA(global.Game.charSrc(c.id, o.base)) + '" alt="' + escA(o.label || c.name) + '" width="' + size + '" height="' + size + '" draggable="false">' +
-      (pr ? '<svg class="gm-ava__prop" viewBox="0 0 200 200" aria-hidden="true" data-gm-prop="' + escA(p.prop) + '">' + pr + '</svg>' : '') +
+      (pr && !c.mascot ? '<svg class="gm-ava__prop" viewBox="0 0 200 200" aria-hidden="true" data-gm-prop="' + escA(p.prop) + '">' + pr + '</svg>' : '') +
     '</span>';
+    /* 마스코트(진짜 그림)는 소품을 그림 위에 겹치지 않고 테두리 오른쪽 아래 작은 배지로 */
+    if (c.mascot && p.prop && p.prop !== 'none') {
+      return '<span class="gm-ava-wrap" style="--gm-ring:' + fr.color + ';width:' + size + 'px;height:' + size + 'px">' + ava +
+        '<span class="gm-ava__badge" data-gm-prop="' + escA(p.prop) + '" title="' + escA((item('prop', p.prop) || {}).name || '') + '" aria-hidden="true">' + (PROP_BADGE[p.prop] || '') + '</span></span>';
+    }
+    return ava;
   }
 
   global.Game = {

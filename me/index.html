@@ -36,10 +36,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../assets/report.css?v=20261110c">
-<link rel="stylesheet" href="../assets/hub.css?v=20261110c">
-<link rel="stylesheet" href="../assets/award.css?v=20261110c">
-<link rel="stylesheet" href="../assets/game.css?v=20261110c">
+<link rel="stylesheet" href="../assets/report.css?v=20261110f">
+<link rel="stylesheet" href="../assets/hub.css?v=20261110f">
+<link rel="stylesheet" href="../assets/award.css?v=20261110f">
+<link rel="stylesheet" href="../assets/game.css?v=20261110f">
 </head>
 <body>
 
@@ -57,6 +57,9 @@
     <div class="hub-head__meta" id="hubMeta"></div>
     <div class="hub-head__dday" id="hubDday" hidden></div>
   </header>
+
+  <!-- 홈이 아닌 탭의 얇은 상단 바 (hub-home.js · 20261110f) — 큰 보라 머리 대신 · 홈 탭에서는 숨김 -->
+  <div class="hub-bar" id="hubBar" hidden></div>
 
   <nav class="hub-tabs" id="hubTabs" role="tablist" aria-label="보기 선택" hidden>
     <!-- 탭 다섯 개 — [홈][레포트][과제][영상·필기][모의고사] (20261110b) · 휴대폰은 화면 아래 고정 · 넓은 화면은 위
@@ -100,24 +103,24 @@
 
 </div>
 
-<script src="../assets/config.js?v=20261110c"></script>
-<script src="../assets/brand.js?v=20261110c"></script>
-<script src="../assets/report-view.js?v=20261110c"></script>
-<script src="../assets/lesson.js?v=20261110c"></script>
-<script src="../assets/dday.js?v=20261110c"></script>
-<script src="../assets/photos.js?v=20261110c"></script>
-<script src="../assets/review-card.js?v=20261110c"></script>
-<script src="../assets/app-week.js?v=20261110c"></script>
-<script src="../assets/entry.js?v=20261110c"></script>
-<script src="../assets/me-info.js?v=20261110c"></script>
-<script src="../assets/review-note.js?v=20261110c"></script>
-<script src="../assets/a2hs.js?v=20261110c"></script>
-<script src="../assets/award-view.js?v=20261110c"></script>
-<script src="../assets/mogo-view.js?v=20261110c"></script>
-<script src="../assets/game.js?v=20261110c"></script>
-<script src="../assets/face-crop.js?v=20261110c"></script>
-<script src="../assets/hub-home.js?v=20261110c"></script>
-<script src="../assets/hub.js?v=20261110c"></script>
+<script src="../assets/config.js?v=20261110f"></script>
+<script src="../assets/brand.js?v=20261110f"></script>
+<script src="../assets/report-view.js?v=20261110f"></script>
+<script src="../assets/lesson.js?v=20261110f"></script>
+<script src="../assets/dday.js?v=20261110f"></script>
+<script src="../assets/photos.js?v=20261110f"></script>
+<script src="../assets/review-card.js?v=20261110f"></script>
+<script src="../assets/app-week.js?v=20261110f"></script>
+<script src="../assets/entry.js?v=20261110f"></script>
+<script src="../assets/me-info.js?v=20261110f"></script>
+<script src="../assets/review-note.js?v=20261110f"></script>
+<script src="../assets/a2hs.js?v=20261110f"></script>
+<script src="../assets/award-view.js?v=20261110f"></script>
+<script src="../assets/mogo-view.js?v=20261110f"></script>
+<script src="../assets/game.js?v=20261110f"></script>
+<script src="../assets/face-crop.js?v=20261110f"></script>
+<script src="../assets/hub-home.js?v=20261110f"></script>
+<script src="../assets/hub.js?v=20261110f"></script>
 <script>
   if (window.A2HS && !A2HS.env().ios) { var mf = document.createElement('link'); mf.rel = 'manifest'; mf.href = '../s/manifest.webmanifest'; document.head.appendChild(mf); }
   if (window.A2HS) A2HS.register('../sw.js');

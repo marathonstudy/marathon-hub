@@ -1187,7 +1187,8 @@
     var hasLessons = (d2.lessons || []).some(function (t) { return String(t || '').trim(); });
     var files = filesOf(w);
     return (r.draft ? '<div class="pv-draft">아직 공개 전 — 지금 작성 내용으로 공개하면 이렇게 보입니다</div>' : '') +
-      ReportView.partsHtml(d2, ['header'], { noPeriod: true }) +
+      /* 큰 표지(로고 · 주간 학습 레포트 · 수업일)는 위 한 줄로 합쳤다 (20261110f · 홈이 있는 러닝노트) */
+      (global.HubHome && global.Game ? '' : ReportView.partsHtml(d2, ['header'], { noPeriod: true })) +
       updHtml(d2._upd) +
       sumHtml(r, d2) +
       '<div id="rwNotes"></div>' +
@@ -1552,6 +1553,8 @@
         select('report'); showLatest(); navPush('week');
       };
       if (tabHome) tabHome.onclick = function () { select('home'); navPush('home'); window.scrollTo(0, 0); };
+      /* 홈이 아닌 탭은 큰 머리 대신 얇은 상단 바 (20261110f) — 바에 레벨 · XP 가 있어 홈 계산을 먼저 해 둔다 (문자 · 알림톡 링크로 바로 들어와도) */
+      if (homeOn) { document.body.classList.add('hub-bar-on'); drawHome(); }
       if (tabVideo) tabVideo.onclick = function () { select('video'); navPush('videos'); };
       $('#tabApp').onclick    = function () { select('app'); navPush('app'); };
       $('#tabBook').onclick   = function () { select('book'); navPush('book'); };
@@ -1918,6 +1921,22 @@
     if (!n) return '';
     var cur = L[i] || L[0];
     var name = function (r) { return (r.draft ? '공개 전 · ' : '') + reportLabel(r); };
+    /* 한 줄 (20261110f) — 「◀ 11/7(토) 수업 주간 레포트 ▶ · 과제 10/31~11/6 · 누적 추이」 */
+    if (global.HubHome && global.Game) {
+      var ld = lessonDateOf(cur, null), pw = ld && global.AppWeek ? AppWeek.lastWeek(ld) : null;
+      return '<div class="rw-one">' +
+          '<button type="button" class="rw-arrow" data-rw="' + (i + 1) + '"' + (i + 1 >= n ? ' disabled' : '') + ' aria-label="지난 수업 레포트">◀</button>' +
+          '<div class="rw-one__mid"><button type="button" class="rw-now num" id="rwNow" aria-haspopup="listbox" aria-expanded="false"' + (n < 2 ? ' disabled' : '') + '>' +
+            esc(name(cur)) + ' 주간 레포트' + (n > 1 ? '<span class="rw-caret" aria-hidden="true">▾</span>' : '') + '</button>' +
+            '<span class="rw-one__p num">' + (pw ? '<span id="rwPeriod">과제 ' + esc(Lesson.md(pw.from, false) + '~' + Lesson.md(pw.to, false)) + '</span>' : '') +
+            '<button type="button" class="rw-trend" data-rw-trend>누적 추이</button></span></div>' +
+          '<button type="button" class="rw-arrow" data-rw="' + (i - 1) + '"' + (i - 1 < 0 ? ' disabled' : '') + ' aria-label="다음 수업 레포트">▶</button>' +
+        '</div>' +
+        (RN.list.length ? '<div class="rw-bar2"><button type="button" class="rw-notes" data-rw-notes>📒 복습 노트 모음</button></div>' : '') +
+        (n > 1 ? '<div class="rw-pick" id="rwPick" role="listbox" aria-label="공개된 수업 레포트" hidden>' + L.map(function (r, k) {
+          return '<button type="button" class="rw-pick__i num' + (k === i ? ' is-on' : '') + '" role="option" aria-selected="' + (k === i) + '" data-rw="' + k + '">' + esc(name(r)) + '</button>';
+        }).join('') + '</div>' : '');
+    }
     return '<div class="rw-bar">' +
              '<button type="button" class="rw-arrow" data-rw="' + (i + 1) + '"' + (i + 1 >= n ? ' disabled' : '') + ' aria-label="지난 수업 레포트">◀ 지난주</button>' +
              '<button type="button" class="rw-now num" id="rwNow" aria-haspopup="listbox" aria-expanded="false"' + (n < 2 ? ' disabled' : '') + '>' +
