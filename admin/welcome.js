@@ -49,7 +49,24 @@
   var PRAISE_ST = '[마라톤국어] {학생이름} 학생, 이번 주 지금까지 나온 과제 {전체수}개를 모두 제출했어요! 매일 루틴을 지켜 내느라 정말 수고했어요. 이 루틴 그대로 이어가 봐요!';
   /* 「이번 주」라고 쓰지 않는다 — 직전 주 날짜도 들어간다 (migration-055 와 같다 · 20261101h) */
   var NUDGE_ST = '[마라톤국어] {학생이름} 학생, 지난 수업 이후 과제 {밀린날짜}이 아직 제출 안 됐어요. 오늘 안에 마라톤 앱에서 제출해 주세요!';
-  var NUDGE_PA = '[마라톤국어] {학생이름} 학생의 지난 수업 이후 과제 중 {밀린날짜}이 아직 제출되지 않았습니다. 확인 부탁드립니다.';
+  /* 학부모 독려 · 칭찬 다섯 가지 (20261110a · migration-092 와 같다) — 「과제 독려(학부모) 1」~「5」 · 「과제 칭찬(학부모) 1」~「5」
+     학생 쪽과 같이 학생마다 돌린다 · 예전 기본 글(054 · 055 「확인 부탁드립니다」)은 쓰지 않는다 · 사람이 고친 예전 글은 092 전에는 그대로 쓴다 */
+  var NUDGE_PA_OLD = [
+    '[마라톤국어] {학생이름} 학생의 이번 주 과제 중 {밀린날짜}이 아직 제출되지 않았습니다. 확인 부탁드립니다.',
+    '[마라톤국어] {학생이름} 학생의 지난 수업 이후 과제 중 {밀린날짜}이 아직 제출되지 않았습니다. 확인 부탁드립니다.'];
+  var NUDGE_PA_DEF = [
+    '[마라톤국어] {학생이름} 학생 학부모님, 안녕하세요. 이번 주 과제 중 {밀린날짜} 과제가 아직 제출되지 않아 안내드립니다. 바쁜 주에는 밀릴 수 있어 수업에서도 함께 챙기고 있습니다. 할 수 있는 만큼 이어 갈 수 있도록 따뜻한 응원 한마디 부탁드립니다.',
+    '[마라톤국어] {학생이름} 학생 학부모님, 안녕하세요. {밀린날짜} 과제가 아직 제출되지 않았습니다. 수업에서 함께 살피며 다시 루틴을 잡아 가겠습니다. 가정에서도 격려 한마디 부탁드립니다.',
+    '[마라톤국어] {학생이름} 학생 학부모님, 안녕하세요. {밀린날짜} 과제가 아직 남아 있어 알려 드립니다. 조금씩 이어 갈 수 있도록 저희가 함께 챙기겠습니다. 따뜻한 응원 부탁드립니다.',
+    '[마라톤국어] {학생이름} 학생 학부모님, 안녕하세요. {밀린날짜} 과제가 아직 제출 전입니다. 한 번에 다 하지 않아도 되도록 수업에서 함께 돕고 있습니다. 응원의 한마디 부탁드립니다.',
+    '[마라톤국어] {학생이름} 학생 학부모님, 안녕하세요. 바쁜 한 주라 {밀린날짜} 과제가 조금 밀렸습니다. 다시 리듬을 찾도록 학원에서 함께 챙기고 있습니다. 가정에서도 힘이 되는 한마디 부탁드립니다.'];
+  var PRAISE_PA_DEF = [
+    '[마라톤국어] {학생이름} 학생이 이번 주 지금까지 나온 과제 {전체}개를 모두 제출했습니다. 매일 루틴을 꾸준히 지켜 내고 있습니다. 가정에서도 칭찬 한마디 부탁드립니다.',
+    '[마라톤국어] {학생이름} 학생이 이번 주 과제 {전체}개를 빠짐없이 제출했습니다. 하루하루 꾸준히 해내는 모습이 대견합니다. 가정에서도 칭찬 한마디 부탁드립니다.',
+    '[마라톤국어] {학생이름} 학생이 과제 {전체}개를 모두 제출했습니다. 바쁜 중에도 루틴을 지켜 낸 노력이 돋보입니다. 따뜻한 칭찬 부탁드립니다.',
+    '[마라톤국어] {학생이름} 학생이 이번 주 과제를 하나도 빠뜨리지 않고 제출했습니다({전체}개). 이 꾸준함이 큰 힘이 될 것입니다. 가정에서도 격려 한마디 부탁드립니다.',
+    '[마라톤국어] {학생이름} 학생이 과제 {전체}개를 모두 해냈습니다. 매일 조금씩 쌓은 노력이 잘 보이고 있습니다. 가정에서도 응원의 말 부탁드립니다.'];
+  var NUDGE_PA = NUDGE_PA_DEF[0];
   /* 과제 문자 문구 다섯 가지 (20261108r · migration-086 과 같다) — 「과제 독려(학생) 1」~「5」 · 「과제 칭찬(학생) 1」~「5」
      학생마다 지난번 번호 다음 번호로 돌린다 (처음이면 무작위) · 문구 칸을 직접 고치면 그 글을 모두에게 (돌림 안 함)
      086 을 아직 안 돌려 번호 문구가 없으면 예전 「과제 독려(학생)」 · 「과제 칭찬(학생)」 하나만 쓴다 */
@@ -65,7 +82,9 @@
     '[마라톤국어] {학생이름} 학생, 이번 주 과제를 빠짐없이 다 냈어요. 꾸준함이 제일 큰 실력이에요. 정말 수고 많았어요!',
     '[마라톤국어] {학생이름} 학생, 과제 {전체}개 퍼펙트! 이렇게 쌓은 매일이 시험장에서 힘이 될 거예요. 수고했어요!',
     '[마라톤국어] {학생이름} 학생, 이번 주도 루틴 완주! 과제 {전체}개를 모두 해낸 노력, 선생님이 잘 보고 있어요. 수고했어요!'];
-  var HW_BASE = { nudge: '과제 독려(학생)', praise: '과제 칭찬(학생)' };
+  var HW_BASE = { nudge: '과제 독려(학생)', praise: '과제 칭찬(학생)', nudgePa: '과제 독려(학부모)', praisePa: '과제 칭찬(학부모)' };
+  var HW_DEF = { nudge: NUDGE_DEF, praise: PRAISE_DEF, nudgePa: NUDGE_PA_DEF, praisePa: PRAISE_PA_DEF };
+  var HW_KINDS = ['nudge', 'praise', 'nudgePa', 'praisePa'];
   var DOWK = ['일', '월', '화', '수', '목', '금', '토'];
   var ENTRY_BODY = '[마라톤국어] {학생이름} 학생, 러닝노트 입구입니다. {러닝노트주소} 반과 이름을 고르고 휴대폰 번호 010 뺀 8자리로 들어오세요. 홈 화면에 추가해 두면 앱처럼 바로 열려요.';
   /* 웰컴 · 입구 기본 글 끝 「홈 화면에 추가해 두면 앱처럼 바로 열려요.」 (20261101k · migration-057 과 같다) */
@@ -126,11 +145,12 @@
   /* {밀린날짜} — 과제 독려 (학생마다 「10/27(화)·10/29(목)」) · 모르면 칸을 그대로 둔다 → 보내지 않음 (20261101m) */
   function missOf(s) { return (st && st.miss && st.miss[s.id]) || '{밀린날짜}'; }
   /* 함수에 넘기는 글 — {밀린날짜}만 여기서 채운다 (나머지 칸은 서버가) */
-  function outBody(x) { return x.pr ? prBody(x.s) : bodyFor(x.t, x.s).split('{밀린날짜}').join(missOf(x.s)); }
-  /* 칭찬 — {전체}({전체수})만 여기서 채운다 (나머지 칸은 서버가) · 직접 고친 글이 없으면 그 학생 차례 문구 */
-  function prBody(s) {
+  function outBody(x) { return x.pr ? prBody(x.s, x.t) : bodyFor(x.t, x.s).split('{밀린날짜}').join(missOf(x.s)); }
+  /* 칭찬 — {전체}({전체수})만 여기서 채운다 (나머지 칸은 서버가) · 직접 고친 글이 없으면 그 학생 차례 문구 · 학부모는 「과제 칭찬(학부모)」 (20261110a) */
+  function prBody(s, t) {
     var n = String((st.pr.total || {})[s.id] || '');
-    var b = st.custom && !st.custom.praise && st.pick ? tplOf('praise', s.id) : st.pr.body;
+    var pa = !!t && t !== 'student', k = pa ? 'praisePa' : 'praise';
+    var b = st.custom && !st.custom[k] && st.pick ? tplOf(k, s.id) : (pa ? st.pr.bodyPa : st.pr.body);
     return String(b).split('{전체수}').join(n || '{전체수}').split('{전체}').join(n || '{전체}');
   }
 
@@ -146,8 +166,8 @@
     });
     if (out.length) return out.sort(function (a, b) { return a.no - b.no; });
     var old = tplBody(base, '');
-    if (old) return [{ no: null, body: old }];
-    return (kind === 'nudge' ? NUDGE_DEF : PRAISE_DEF).map(function (b, i) { return { no: i + 1, body: b }; });
+    if (old && !(kind === 'nudgePa' && NUDGE_PA_OLD.indexOf(String(old).trim()) !== -1)) return [{ no: null, body: old }];
+    return HW_DEF[kind].map(function (b, i) { return { no: i + 1, body: b }; });
   }
   function rotating(kind) { return hwTpls(kind).length > 1; }
   function rangeText(kind) { var L = hwTpls(kind); return L.length > 1 ? '문구 ' + L[0].no + '~' + L[L.length - 1].no + '번' : ''; }
@@ -168,9 +188,11 @@
   /* 그 학생에게 갈 문구 번호 (직접 고친 글이면 없음) */
   function noOf(x) {
     if (!st.pick || !st.custom) return null;
-    if (x.pr) return st.custom.praise ? null : st.pick.praise[x.s.id];
-    return x.t === 'student' && !st.custom.nudge ? st.pick.nudge[x.s.id] : null;
+    var k = (x.pr ? 'praise' : 'nudge') + (x.t === 'student' ? '' : 'Pa');
+    return st.custom[k] ? null : st.pick[k][x.s.id];
   }
+  /* 학생 · 학부모로 나눈 수 — 「학부모 5명 포함」 (같은 학생의 학부모 1 · 2 는 한 명) */
+  function sideCount(items, pa) { var m = {}; items.forEach(function (x) { if ((x.t !== 'student') === pa) m[x.s.id] = 1; }); return Object.keys(m).length; }
   /* 기준 기간이 이번 주(아직 수업 전)면 독려 문구의 「지난주」 → 「이번 주」 (직접 고친 글은 그대로) */
   function weekWord(t) { return st.period && st.period.word === '이번 주' ? String(t).split('지난주').join('이번 주') : t; }
   function kst(at) { var d = new Date(new Date(at).getTime() + 9 * 3600000); return { day: d.toISOString().slice(0, 10), hm: d.toISOString().slice(11, 16) }; }
@@ -202,7 +224,7 @@
     if (!rows.length) return '<p class="wc-hist__none">이번 기간에 받은 과제 문자가 없습니다.</p>';
     return '<ol class="wc-hist__list">' + rows.map(function (r) {
       var to = r.to || [];
-      return '<li class="num">' + esc(whenText(r) + ' · ' + KW[r.kind] + ' · ' + byText(r) + (r.no ? ' · 문구 ' + r.no + '번' : '') +
+      return '<li class="num">' + esc(whenText(r) + ' · ' + KW[r.kind] + ' · ' + byText(r) + (r.no ? ' · 문구 ' + r.no + '번' : '') + (r.pno ? ' · 학부모 문구 ' + r.pno + '번' : '') +
         (to.indexOf('parent1') !== -1 || to.indexOf('parent2') !== -1 ? (to.indexOf('student') !== -1 ? ' · 학생 · 학부모' : ' · 학부모') : '')) + '</li>';
     }).join('') + '</ol>';
   }
@@ -249,7 +271,7 @@
   function targetsOf(to) { return to === 'none' ? [] : to === 'student' ? ['student'] : to === 'parent' ? ['parent1', 'parent2'] : ['parent1', 'parent2', 'student']; }
   function bodyFor(t, s) {
     if (st.kind !== 'nudge') return t === 'student' ? st.bodySt : st.bodyPa;
-    if (t !== 'student') return weekWord(st.bodyPa);
+    if (t !== 'student') return weekWord(st.custom && !st.custom.nudgePa && s && st.pick ? tplOf('nudgePa', s.id) : st.bodyPa);
     if (st.custom && st.custom.nudge) return st.bodySt;
     return weekWord(s && st.pick ? tplOf('nudge', s.id) : st.bodySt);
   }
@@ -308,7 +330,7 @@
       if (!groups[b]) { groups[b] = []; order.push(b); }
       groups[b].push(x);
     });
-    var all = { ok: true, sent: 0, failed: 0, results: [], skipped: [], message: '' }, marks = [];
+    var all = { ok: true, sent: 0, failed: 0, results: [], skipped: [], message: '' }, marks = [], marksPa = [];
     return order.reduce(function (p, key) {
       return p.then(function () {
         if (!all.ok) return null;
@@ -321,17 +343,23 @@
           if (!r || !r.ok) { all.ok = all.sent > 0; all.message = (r && r.message) || '보내지 못했습니다.'; all.failed += g.length; g.forEach(function (x) { all.results.push({ student_id: x.s.id, to: x.t, name: x.s.name, ok: false, error: all.message }); }); return; }
           all.sent += r.sent || 0; all.failed += r.failed || 0;
           all.results = all.results.concat(r.results || []); all.skipped = all.skipped.concat(r.skipped || []);
-          /* 학생에게 간 줄의 문구 번호 (다음엔 다른 번호 · 20261108r) */
+          /* 간 줄의 문구 번호 (다음엔 다른 번호 · 20261108r) — 학부모 줄은 hw_tpl_mark_pa (092 · 20261110a) */
           (r.results || []).forEach(function (y) {
-            if (!y.ok || y.to !== 'student') return;
-            var x = g.find(function (z) { return z.s.id === y.student_id && z.t === 'student'; });
-            if (x && x.no) marks.push({ student_id: y.student_id, kind: pr ? 'praise' : 'nudge', no: x.no });
+            if (!y.ok) return;
+            var x = g.find(function (z) { return z.s.id === y.student_id && z.t === y.to; });
+            if (!x || !x.no) return;
+            var row = { student_id: y.student_id, kind: pr ? 'praise' : 'nudge', no: x.no };
+            if (y.to === 'student') marks.push(row);
+            else if (!marksPa.some(function (m) { return m.student_id === row.student_id && m.kind === row.kind; })) marksPa.push(row);
           });
         });
       });
     }, Promise.resolve()).then(function () {
       if (!marks.length) return null;
       return rpc('hw_tpl_mark', { p_rows: marks }).catch(function () { return null; });
+    }).then(function () {
+      if (!marksPa.length) return null;
+      return rpc('hw_tpl_mark_pa', { p_rows: marksPa }).catch(function () { return null; });
     }).then(function () {
       window.dispatchEvent(new CustomEvent('jt:welcome-sent', { detail: { kind: st.kind } }));
       return all;
@@ -364,9 +392,9 @@
       to: o.kind === 'entry' ? 'student' : (o.to || 'both'), onlyNew: true, onlyNoApp: o.kind === 'welcome' && !!o.cls,
       again: false, code: o.code || '', bodySt: '', bodyPa: '', busy: false, res: null, loading: true,
       miss: o.miss || null, off: {}, toSt: true, toPa: false,
-      pr: o.kind === 'nudge' ? { ids: o.praise || [], total: o.total || {}, on: true, off: {}, body: '' } : null,
+      pr: o.kind === 'nudge' ? { ids: o.praise || [], total: o.total || {}, on: true, off: {}, body: '', bodyPa: '', toSt: true, toPa: false } : null,
       period: o.period || null, hist: null, tab: (o.ids || []).length ? 'nudge' : 'praise', open: {},
-      custom: o.kind === 'nudge' ? { nudge: false, praise: false } : null, pick: null, lastNo: null
+      custom: o.kind === 'nudge' ? { nudge: false, praise: false, nudgePa: false, praisePa: false } : null, pick: null, lastNo: null
     };
     if (o.kind === 'nudge') { st.to = 'student'; st.again = true; }      /* 오늘 이미 받은 학생은 체크를 풀어 두고 시작 — 다시 체크하면 보낸다 (20261108r) */
     var dlg = modal(); if (dlg) dlg.classList.toggle('wc-modal--hw', o.kind === 'nudge');
@@ -385,18 +413,23 @@
 
   /* 과제 문자 창을 열 때 — 문구 칸(첫 번호 글) · 학생마다 차례 번호 · 오늘 이미 받은 학생 체크 풀기 */
   function hwSetup() {
-    st.bodyPa = tplBody('과제 독려(학부모)', NUDGE_PA);
+    st.bodyPa = st.bodyPaInit = hwTpls('nudgePa')[0].body;
     st.bodySt = st.bodyStInit = hwTpls('nudge')[0].body;
     st.pr.body = st.prInit = hwTpls('praise')[0].body;
+    st.pr.bodyPa = st.prPaInit = hwTpls('praisePa')[0].body;
     hwRefresh();
   }
   /* 보낸 뒤 다시 — 번호 차례 · 오늘 받은 학생 체크 풀기 (고친 글 · 직접 고른 체크는 그대로) */
   function hwRefresh() {
-    st.lastNo = { nudge: {}, praise: {} };
-    (st.hist || []).forEach(function (r) { if (r.how === 'manual' && r.no != null && st.lastNo[r.kind]) st.lastNo[r.kind][r.student_id] = r.no; });   /* 시각 순 — 마지막이 남는다 */
-    st.pick = { nudge: {}, praise: {} };
-    st.ids.forEach(function (id) { st.pick.nudge[id] = nextNo('nudge', id); if (gotToday('nudge', id)) st.off[id] = true; });
-    st.pr.ids.forEach(function (id) { st.pick.praise[id] = nextNo('praise', id); if (gotToday('praise', id)) st.pr.off[id] = true; });
+    st.lastNo = {}; st.pick = {};
+    HW_KINDS.forEach(function (k) { st.lastNo[k] = {}; st.pick[k] = {}; });
+    (st.hist || []).forEach(function (r) {         /* 시각 순 — 마지막이 남는다 · 학부모는 pno (092) */
+      if (r.how !== 'manual' || !st.lastNo[r.kind]) return;
+      if (r.no != null) st.lastNo[r.kind][r.student_id] = r.no;
+      if (r.pno != null) st.lastNo[r.kind + 'Pa'][r.student_id] = r.pno;
+    });
+    st.ids.forEach(function (id) { st.pick.nudge[id] = nextNo('nudge', id); st.pick.nudgePa[id] = nextNo('nudgePa', id); if (gotToday('nudge', id)) st.off[id] = true; });
+    st.pr.ids.forEach(function (id) { st.pick.praise[id] = nextNo('praise', id); st.pick.praisePa[id] = nextNo('praisePa', id); if (gotToday('praise', id)) st.pr.off[id] = true; });
   }
   function whoHtml() {
     if (st.kind === 'nudge') return picksHtml('nudge');
@@ -412,14 +445,16 @@
   }
   function toHtml() {
     if (st.kind === 'entry') return '<p class="wc-note">학생 본인 번호로만 보냅니다.</p>';
-    if (st.kind === 'nudge') {
-      return '<div class="wc-to" role="group" aria-label="받는 사람">' +
-        '<label class="wc-to__opt' + (st.toSt ? ' is-on' : '') + '"><input type="checkbox" id="wcToSt"' + (st.toSt ? ' checked' : '') + '> 학생에게</label>' +
-        '<label class="wc-to__opt' + (st.toPa ? ' is-on' : '') + '"><input type="checkbox" id="wcToPa"' + (st.toPa ? ' checked' : '') + '> 학부모에게도</label></div>';
-    }
+    if (st.kind === 'nudge') return hwToHtml('wc', st.toSt, st.toPa, '독려 받는 사람');
     return '<div class="wc-to" role="radiogroup" aria-label="받는 사람">' + [['student', '학생'], ['parent', '학부모'], ['both', '둘 다']].map(function (x) {
       return '<label class="wc-to__opt' + (st.to === x[0] ? ' is-on' : '') + '"><input type="radio" name="wcTo" value="' + x[0] + '"' + (st.to === x[0] ? ' checked' : '') + '> ' + x[1] + '</label>';
     }).join('') + '</div>';
+  }
+  /* 과제 문자 받는 사람 두 칸 — 독려(wcToSt · wcToPa) · 칭찬(wcPrToSt · wcPrToPa) 같은 모양 (20261110a) */
+  function hwToHtml(pre, s, p, label) {
+    return '<div class="wc-to wc-to--hw" role="group" aria-label="' + label + '">' +
+      '<label class="wc-to__opt' + (s ? ' is-on' : '') + '"><input type="checkbox" id="' + pre + 'ToSt"' + (s ? ' checked' : '') + '> 학생에게</label>' +
+      '<label class="wc-to__opt' + (p ? ' is-on' : '') + '"><input type="checkbox" id="' + pre + 'ToPa"' + (p ? ' checked' : '') + '> 학부모에게도</label></div>';
   }
   function filterHtml() {
     if (st.kind === 'entry') return '<label class="check-line wc-filter"><input type="checkbox" id="wcOnlyNew"' + (st.onlyNew ? ' checked' : '') + '> <span>아직 한 번도 로그인 안 한 학생만</span></label>';
@@ -434,10 +469,11 @@
     if (st.kind === 'entry') html += area('wcBodySt', '문구 <span class="field__opt">이 창에서 고친 글은 이번에만 · 기본 문구는 「문자 발송 → 자주 쓰는 문구」의 「입구 안내」</span>', st.bodySt);
     else if (st.kind === 'nudge') {
       if (ts.indexOf('student') !== -1) html += area('wcBodySt', '학생에게 갈 문구' + rotLabel('nudge'), st.bodySt) + rotBack('nudge');
-      if (ts.indexOf('parent1') !== -1) html += area('wcBodyPa', '학부모에게 갈 문구', st.bodyPa);
+      if (ts.indexOf('parent1') !== -1) html += area('wcBodyPa', '학부모에게 갈 문구' + rotLabel('nudgePa'), st.bodyPa) + rotBack('nudgePa');
       html += rotating('nudge')
-        ? '<p class="field__hint">문구는 「문자 발송 → 자주 쓰는 문구」의 「과제 독려(학생) 1~' + hwTpls('nudge').slice(-1)[0].no + '」에서 고치거나 더하거나 뺍니다' +
-          (ts.indexOf('parent1') !== -1 ? ' · 학부모 글은 <button type="button" class="btn btn--sm btn--ghost" data-wc-savetpl>문구 관리에 저장</button> (「과제 독려(학부모)」)' : '') + ' · {밀린날짜}는 학생마다 바뀝니다' + (st.period && st.period.word === '이번 주' ? ' · 이번 주 기준이라 「지난주」는 「이번 주」로 바꿔 보냅니다' : '') + '</p>'
+        ? '<p class="field__hint">문구는 「문자 발송 → 자주 쓰는 문구」의 「과제 독려(학생) 1~' + hwTpls('nudge').slice(-1)[0].no + '」' +
+          (ts.indexOf('parent1') !== -1 && rotating('nudgePa') ? ' · 「과제 독려(학부모) 1~' + hwTpls('nudgePa').slice(-1)[0].no + '」' : '') + '에서 고치거나 더하거나 뺍니다' +
+          (ts.indexOf('parent1') !== -1 && !rotating('nudgePa') ? ' · 학부모 글은 <button type="button" class="btn btn--sm btn--ghost" data-wc-savetpl>문구 관리에 저장</button> (「과제 독려(학부모)」)' : '') + ' · {밀린날짜}는 학생마다 바뀝니다' + (st.period && st.period.word === '이번 주' ? ' · 이번 주 기준이라 「지난주」는 「이번 주」로 바꿔 보냅니다' : '') + '</p>'
         : '<p class="field__hint">고친 글은 <button type="button" class="btn btn--sm btn--ghost" data-wc-savetpl>문구 관리에 저장</button>을 누르면 다음부터 기본 문구가 됩니다 (「과제 독려(학생)」 · 「과제 독려(학부모)」) · {밀린날짜}는 학생마다 바뀝니다</p>';
     } else {
       if (ts.indexOf('student') !== -1) html += area('wcBodySt', '학생용 문구', st.bodySt);
@@ -450,30 +486,50 @@
     if (ctx.smsMissing) return 'migration-023 · 040 SQL 을 실행하고 sms-send 를 배포해야 문자를 보낼 수 있습니다.';
     if (ctx.missing) return 'migration-052 SQL 을 먼저 실행해 주세요 (입구 · 웰컴 문자 칸 · 「오늘 이미 보냄」).';
     var ts = targetsOf(st.to);
-    if (st.kind === 'nudge' && !st.ids.length) return st.pr && st.pr.on && !String(st.pr.body).trim() ? '칭찬 문구를 적어 주세요.' : '';
+    if (st.kind === 'nudge' && !st.ids.length) return prEmpty();
     if (st.kind === 'nudge' && !ts.length && st.pr && st.pr.ids.length) return '';         /* 독려 받는 사람을 다 끄면 칭찬만 */
     if (!ts.length) return '받는 사람(학생에게 · 학부모에게도)을 하나 이상 골라 주세요.';
-    if (st.kind === 'nudge' && st.pr && st.pr.on && st.pr.ids.length && !String(st.pr.body).trim()) return '칭찬 문구를 적어 주세요.';
+    if (st.kind === 'nudge' && prEmpty()) return prEmpty();
     var bodies = [ts.indexOf('student') !== -1 ? st.bodySt : '', ts.indexOf('parent1') !== -1 ? st.bodyPa : ''].filter(function (b) { return b !== ''; });
     if (bodies.some(function (b) { return !String(b).trim(); })) return '문구를 적어 주세요.';
     if (bodies.some(needApp) && !ctx.links) return '「문자 발송 → 연결 상태」에서 앱 설치 링크를 먼저 넣어 주세요.';
     return '';
   }
-  /* ---------- 과제 문자 — 칭찬 묶음 ---------- */
+  /* 칭찬 문구가 비었는지 — 고른 받는 사람 쪽만 본다 */
+  function prEmpty() {
+    if (!st.pr || !st.pr.on || !st.pr.ids.length) return '';
+    if (st.pr.toSt && !String(st.pr.body).trim()) return '칭찬 문구를 적어 주세요.';
+    if (st.pr.toPa && !String(st.pr.bodyPa).trim()) return '학부모에게 갈 칭찬 문구를 적어 주세요.';
+    return '';
+  }
+  /* ---------- 과제 문자 — 칭찬 묶음 ----------
+     받는 사람 [학생에게](기본) [학부모에게도] (20261110a) — 독려와 같은 규칙: 학부모 2 가 1 과 같으면 한 번 · 학생 번호가 학부모 번호와 같으면 학생 줄은 뺀다
+     학부모 번호가 없는 학생은 학부모 쪽에서만 빠진다 (이름 옆 「학부모 번호 없음」) */
   function planPraise() {
     var out = { items: [], noPhone: [], praised: [], left: [], people: 0, lms: 0 };
     if (!st.pr) return out;
+    var ts = (st.pr.toPa ? ['parent1', 'parent2'] : []).concat(st.pr.toSt ? ['student'] : []);
     st.pr.ids.map(byId).filter(Boolean).forEach(function (s) {
-      if (!st.pr.on || st.pr.off[s.id]) return;                          /* 오늘 이미 받은 학생은 처음에 체크가 풀려 있다 — 다시 체크하면 보낸다 (20261108r) */
-      var d = digits(s.studentPhone);
-      if (!mobile(d)) { out.noPhone.push({ s: s, what: '학생', none: true }); return; }
-      var text = fill(prBody(s), s), b = bytes(text), lf = leftOf(text);
-      if (lf.length) { out.left.push({ s: s, t: 'student', left: lf }); return; }
-      var it = { s: s, t: 'student', d: d, text: text, bytes: b, kind: b <= 90 ? 'SMS' : 'LMS', pr: true };
-      it.no = noOf(it);
-      out.items.push(it);
+      if (!st.pr.on || st.pr.off[s.id] || !ts.length) return;            /* 오늘 이미 받은 학생은 처음에 체크가 풀려 있다 — 다시 체크하면 보낸다 (20261108r) */
+      var pa = [digits(s.parentPhone), digits(s.parentPhone2)], mine = {}, missing = [], anyNum = false;
+      if (st.pr.toPa && !mobile(pa[0]) && !mobile(pa[1])) missing.push('학부모');
+      if (st.pr.toSt && !mobile(digits(s.studentPhone))) missing.push('학생');
+      ts.forEach(function (t) {
+        var d = digits(numberOf(s, t));
+        if (!mobile(d)) return;
+        anyNum = true;
+        if (mine[d]) return;
+        if (t === 'student' && st.pr.toPa && pa.indexOf(d) !== -1) return;
+        mine[d] = 1;
+        var text = fill(prBody(s, t), s), b = bytes(text), lf = leftOf(text);
+        if (lf.length) { out.left.push({ s: s, t: t, left: lf }); return; }
+        var it = { s: s, t: t, d: d, text: text, bytes: b, kind: b <= 90 ? 'SMS' : 'LMS', pr: true };
+        it.no = noOf(it);
+        out.items.push(it);
+      });
+      if (missing.length) out.noPhone.push({ s: s, what: missing.join(' · '), none: !anyNum });
     });
-    out.people = out.items.length;
+    out.people = uniq(out.items);
     out.lms = out.items.filter(function (x) { return x.kind === 'LMS'; }).length;
     return out;
   }
@@ -504,13 +560,16 @@
     return '<ul class="wc-picks wc-picks--hw" aria-label="' + (isN ? '독려 받는 학생' : '칭찬 받는 학생') + '">' + ids.map(byId).filter(Boolean).map(function (s) {
       var off = isN ? st.off[s.id] : st.pr.off[s.id];
       var today = gotToday(kind, s.id), many = st.hist && winRows(s.id, 'nudge').length >= 3;
-      var noNum = (isN ? st.toSt : true) && !mobile(digits(s.studentPhone));
+      var toS = isN ? st.toSt : st.pr.toSt, toP = isN ? st.toPa : st.pr.toPa;
+      var noNum = toS && !mobile(digits(s.studentPhone));
+      var noPa = toP && !mobile(digits(s.parentPhone)) && !mobile(digits(s.parentPhone2));
       var key = kind + ':' + s.id, open = !!st.open[key];
       return '<li class="wc-row" data-wc-row="' + esc(s.id) + '"><label class="wc-pick' + (off ? ' is-off' : '') + '"><input type="checkbox" ' + (isN ? 'data-wc-off' : 'data-wc-proff') + '="' + esc(s.id) + '"' + (off ? '' : ' checked') + '>' +
         '<span class="wc-pick__n">' + esc(s.name) + '</span>' +
         (many ? '<small class="wc-pick__tag is-many" title="이번 기간 독려를 3번 이상 받았어요 — 문자 대신 상담이 필요한지 봐 주세요">독려 많음</small>' : '') +
         '<span class="wc-pick__d num">' + esc(isN ? (st.miss[s.id] || '') : (st.pr.total[s.id] || 0) + '개 모두') + '</span>' +
-        (today ? '<small class="wc-pick__tag is-today">오늘 이미 받음</small>' : '') + (noNum ? '<small class="wc-pick__tag is-mute">번호 없음</small>' : '') + '</label>' +
+        (today ? '<small class="wc-pick__tag is-today">오늘 이미 받음</small>' : '') + (noNum ? '<small class="wc-pick__tag is-mute">' + (toP ? '학생 번호 없음' : '번호 없음') + '</small>' : '') +
+        (noPa ? '<small class="wc-pick__tag is-mute" data-wc-nopa>학부모 번호 없음</small>' : '') + '</label>' +
         (st.hist ? '<button type="button" class="wc-hist num" data-wc-hist="' + esc(key) + '" aria-expanded="' + open + '">' + esc(histLine(kind, s.id)) + '<span class="wc-hist__arrow" aria-hidden="true">' + (open ? '▴' : '▾') + '</span></button>' +
           (open ? '<div class="wc-hist__box">' + histList(s.id) + '</div>' : '') : '') + '</li>';
     }).join('') + '</ul>';
@@ -545,17 +604,22 @@
         toHtml() + whoHtml() + bodyHtml() + (p.items[0] ? pvHtml(p.items[0], '독려', 'wcPreview') + pvAllHtml(p.items, 'nudge') : '<p class="panel__hint">독려를 보낼 사람이 없습니다.</p>') + '</section>';
     }
     if (pN) {
-      html += '<section class="wc-sec wc-grp' + (st.tab === 'praise' ? ' is-on' : '') + '" data-wc-grp="praise"><h3 class="wc-grp__t">칭찬 <b class="num">' + pN + '</b>명 <small class="muted-note">이번 기간 지금까지 나온 과제를 모두 냄 · 학생 본인에게</small></h3>' +
+      var prHint = [];
+      if (st.pr.toSt) prHint.push(rotating('praise') ? '「과제 칭찬(학생) 1~' + hwTpls('praise').slice(-1)[0].no + '」' : '「과제 칭찬(학생)」');
+      if (st.pr.toPa) prHint.push(rotating('praisePa') ? '「과제 칭찬(학부모) 1~' + hwTpls('praisePa').slice(-1)[0].no + '」' : '「과제 칭찬(학부모)」');
+      html += '<section class="wc-sec wc-grp' + (st.tab === 'praise' ? ' is-on' : '') + '" data-wc-grp="praise"><h3 class="wc-grp__t">칭찬 <b class="num">' + pN + '</b>명 <small class="muted-note">나온 과제를 모두 낸 학생</small></h3>' +
+        hwToHtml('wcPr', st.pr.toSt, st.pr.toPa, '칭찬 받는 사람') +
         picksHtml('praise') +
-        '<label class="field wc-text"><span class="field__label">칭찬 문구' + rotLabel('praise') + '</span><textarea class="input" id="wcBodyPr" rows="4">' + esc(st.pr.body) + '</textarea></label>' + rotBack('praise') +
-        '<p class="field__hint">{전체}는 학생마다 그 기간 지금까지 나온 과제 수 · ' + (rotating('praise') ? '문구는 「과제 칭찬(학생) 1~' + hwTpls('praise').slice(-1)[0].no + '」에서 고칩니다' : '기본 문구는 「과제 칭찬(학생)」 (위 [문구 관리에 저장]으로 함께 저장)') + '</p>' +
+        (st.pr.toSt ? '<label class="field wc-text"><span class="field__label">' + (st.pr.toPa ? '학생에게 갈 문구' : '칭찬 문구') + rotLabel('praise') + '</span><textarea class="input" id="wcBodyPr" rows="4">' + esc(st.pr.body) + '</textarea></label>' + rotBack('praise') : '') +
+        (st.pr.toPa ? '<label class="field wc-text"><span class="field__label">학부모에게 갈 문구' + rotLabel('praisePa') + '</span><textarea class="input" id="wcBodyPrPa" rows="4">' + esc(st.pr.bodyPa) + '</textarea></label>' + rotBack('praisePa') : '') +
+        '<p class="field__hint">{전체}는 학생마다 그 기간 지금까지 나온 과제 수' + (prHint.length ? ' · 문구는 「문자 발송 → 자주 쓰는 문구」의 ' + prHint.join(' · ') + '에서 고칩니다' : ' · 받는 사람(학생에게 · 학부모에게도)을 고르면 칭찬을 보냅니다') + '</p>' +
         (q.items[0] ? pvHtml(q.items[0], '칭찬', 'wcPreviewPr') + pvAllHtml(q.items, 'praise') : '<p class="panel__hint">칭찬을 보낼 사람이 없습니다.</p>') + '</section>';
     }
     html += '</div>';
     var people = p.people + q.people, n = p.items.length + q.items.length, lms = p.lms + q.lms;
     html += '<p class="wc-sum"><b class="num">' + people + '</b>명 · 문자 <b class="num">' + n + '</b>건' + (lms ? ' (장문 ' + lms + ')' : '') +
       (nN ? ' · 독려 <b class="num">' + p.people + '</b>' : '') + (pN ? ' · 칭찬 <b class="num">' + q.people + '</b>' : '') +
-      (p.noPhone.length + q.noPhone.length ? ' · 번호 없음 <b class="num">' + (p.noPhone.length + q.noPhone.length) + '</b>명' : '') + '</p>';
+      sumNoPhone(p.noPhone.concat(q.noPhone)) + '</p>';
     var left = p.left.concat(q.left);
     if (left.length) {
       var lk = [], ln = [];
@@ -565,16 +629,35 @@
     if (block) html += '<p class="cp-warn" id="wcBlock">' + esc(block) + '</p>';
     if (st.res) html += '<p class="wc-res ' + (st.res.failed || !st.res.ok ? 'is-bad' : 'is-ok') + '" id="wcResult">' + esc(st.resText) + '</p>';
     html += '<div class="wc-foot"><button type="button" class="btn" id="wcCancel">닫기</button>' +
-      '<button type="button" class="btn btn--primary" id="wcSend"' + (!n || block || st.busy ? ' disabled' : '') + '>' + (st.busy ? '보내는 중…' : sendLabel(p.people, q.people)) + '</button></div>';
+      '<button type="button" class="btn btn--primary" id="wcSend"' + (!n || block || st.busy ? ' disabled' : '') + '>' + (st.busy ? '보내는 중…' : sendLabel(p, q)) + '</button></div>';
     var focus = document.activeElement && document.activeElement.id, pos = focus && document.activeElement.selectionStart;
     $('#wcBody').innerHTML = html;
     if (focus && $('#' + focus)) { var el = $('#' + focus); el.focus(); try { if (pos != null && el.setSelectionRange) el.setSelectionRange(pos, pos); } catch (e) {} }
     st.plan = { items: p.items.concat(q.items), people: people, lms: lms, noPhone: p.noPhone.concat(q.noPhone), dup: p.dup, left: left, nudge: p, praise: q };
   }
-  /* 「독려 7명 · 칭찬 5명 보내기」 — 실제 보낼 학생 수 (체크 · 번호 있음) */
-  function sendLabel(a, b) {
-    var parts = [a ? '독려 ' + a + '명' : '', b ? '칭찬 ' + b + '명' : ''].filter(Boolean);
+  /* 맨 아래 한 줄 — 「번호 없음 n명」(아무 번호도 없음) · 「학부모 번호 없음 n명」(학부모 쪽만 빠짐) */
+  function sumNoPhone(list) {
+    var none = {}, part = {};
+    list.forEach(function (x) { if (x.none) none[x.s.id] = 1; else if (x.what === '학부모') part[x.s.id] = 1; });
+    var n = Object.keys(none).length, a = Object.keys(part).filter(function (k) { return !none[k]; }).length;
+    var other = list.filter(function (x) { return !x.none && x.what !== '학부모'; }).length;
+    return (n + other ? ' · 번호 없음 <b class="num">' + (n + other) + '</b>명' : '') + (a ? ' · 학부모 번호 없음 <b class="num">' + a + '</b>명' : '');
+  }
+  /* 「독려 5명 · 칭찬 5명(학부모 5명 포함) 보내기」 — 실제 보낼 학생 수 (체크 · 번호 있음) · 학부모에게 가는 학생 수 (20261110a) */
+  function sendLabel(p, q) {
+    var one = function (w, x) {
+      if (!x.people) return '';
+      var pa = sideCount(x.items, true);
+      return w + ' ' + x.people + '명' + (pa ? '(학부모 ' + pa + '명 포함)' : '');
+    };
+    var parts = [one('독려', p), one('칭찬', q)].filter(Boolean);
     return parts.length ? parts.join(' · ') + ' 보내기' : '보낼 사람 없음';
+  }
+  /* 확인 창 — 「독려: 학생 5명 · 학부모 3명」 */
+  function sideText(w, x) {
+    if (!x || !x.people) return '';
+    var a = sideCount(x.items, false), b = sideCount(x.items, true);
+    return w + ': ' + [a ? '학생 ' + a + '명' : '', b ? '학부모 ' + b + '명' : ''].filter(Boolean).join(' · ');
   }
 
   function paint() {
@@ -611,13 +694,24 @@
     st.plan = p;
   }
   function uniq(list) { var m = {}; list.forEach(function (x) { m[x.s.id] = 1; }); return Object.keys(m).length; }
+  /* 확인 창 — 번호가 하나도 없는 사람은 「뺍니다」 · 학부모 번호만 없는 사람은 「학부모 쪽만 뺍니다」 (20261110a) */
+  function noPhoneText(list) {
+    var none = {}, pa = {}, other = {};
+    (list || []).forEach(function (x) {
+      if (x.none) none[x.s.id] = 1;
+      else if (x.what === '학부모') pa[x.s.id] = 1;
+      else other[x.s.id] = 1;
+    });
+    var n = Object.keys(none).length, a = Object.keys(pa).filter(function (k) { return !none[k]; }).length, o = Object.keys(other).filter(function (k) { return !none[k]; }).length;
+    return (n ? ' 번호 없음 ' + n + '명은 뺍니다.' : '') + (a ? ' 학부모 번호 없음 ' + a + '명은 학부모 쪽만 뺍니다.' : '') + (o ? ' 학생 번호 없음 ' + o + '명은 학생 쪽만 뺍니다.' : '');
+  }
 
   function send() {
     var p = st.plan;
     if (!p || !p.items.length || st.busy) return;
     var desc = p.people + '명에게 보냅니다 — 문자 ' + p.items.length + '건' + (p.lms ? ' (장문 ' + p.lms + ')' : '') + '.' +
-      (p.praise ? ' 독려 ' + p.nudge.people + '명 · 칭찬 ' + p.praise.people + '명.' + (rotating('nudge') || rotating('praise') ? ' 문구는 학생마다 돌려 씁니다.' : '') : '') +
-      (p.noPhone.length ? ' 번호 없음 ' + p.noPhone.length + '명은 뺍니다.' : '') +
+      (p.praise ? ' ' + [sideText('독려', p.nudge), sideText('칭찬', p.praise)].filter(Boolean).join(' / ') + '.' + (rotating('nudge') || rotating('praise') ? ' 문구는 학생마다 돌려 씁니다.' : '') : '') +
+      noPhoneText(p.noPhone) +
       (p.dup.length ? ' 오늘 이미 보낸 ' + p.dup.length + '건은 뺍니다.' : '') +
       (p.items.some(function (x) { return x.again; }) ? ' 오늘 이미 보낸 사람에게 한 번 더 보냅니다.' : '') +
       (p.left.length ? ' ⚠ 바뀌지 않은 칸이 있어 ' + uniq(p.left) + '명에게는 보내지 않습니다.' : '') +
@@ -693,7 +787,7 @@
     /* 과제 문자 — 번호 문구(1~5)는 문구 관리에서 고친다 · 여기서는 학부모 글만 (번호 문구가 없을 때는 예전처럼) */
     var rotN = st.kind === 'nudge' && rotating('nudge'), rotP = st.kind === 'nudge' && rotating('praise');
     if ((ts.indexOf('student') !== -1 && !rotN) || st.kind === 'entry') jobs.push(put(titles[0], st.bodySt));
-    if (titles[1] && ts.indexOf('parent1') !== -1) jobs.push(put(titles[1], st.bodyPa));
+    if (titles[1] && ts.indexOf('parent1') !== -1 && !(st.kind === 'nudge' && rotating('nudgePa'))) jobs.push(put(titles[1], st.bodyPa));
     if (st.kind === 'nudge' && st.pr && st.pr.ids.length && st.pr.on && !rotP) jobs.push(put('과제 칭찬(학생)', st.pr.body));
     return Promise.all(jobs).then(function () {
       toast('문구 관리에 저장했습니다 — 다음부터 이 글이 기본입니다', 'good');
@@ -733,7 +827,10 @@
       if (ub && st) {
         var uk = ub.getAttribute('data-wc-unrot');
         st.custom[uk] = false;
-        if (uk === 'nudge') st.bodySt = st.bodyStInit; else st.pr.body = st.prInit;
+        if (uk === 'nudge') st.bodySt = st.bodyStInit;
+        else if (uk === 'nudgePa') st.bodyPa = st.bodyPaInit;
+        else if (uk === 'praisePa') st.pr.bodyPa = st.prPaInit;
+        else st.pr.body = st.prInit;
         paint(); return;
       }
       var c = e.target.closest('[data-wc-cls]');
@@ -756,6 +853,10 @@
         st.to = st.toSt && st.toPa ? 'both' : st.toSt ? 'student' : st.toPa ? 'parent' : 'none';
         paint(); return;
       }
+      if ((t.id === 'wcPrToSt' || t.id === 'wcPrToPa') && st.pr) {
+        if (t.id === 'wcPrToSt') st.pr.toSt = t.checked; else st.pr.toPa = t.checked;
+        paint(); return;
+      }
       if (t.hasAttribute('data-wc-off')) { var sid = t.getAttribute('data-wc-off'); if (t.checked) delete st.off[sid]; else st.off[sid] = true; paint(); return; }
       if (t.id === 'wcPrOn') { st.pr.on = t.checked; paint(); return; }
       if (t.closest && t.closest('[data-wc-pvall]')) return;
@@ -769,8 +870,9 @@
     m.addEventListener('input', function (e) {
       if (!st) return;
       if (e.target.id === 'wcBodySt') { st.bodySt = e.target.value; if (st.custom) st.custom.nudge = st.bodySt !== st.bodyStInit; }
-      else if (e.target.id === 'wcBodyPa') st.bodyPa = e.target.value;
+      else if (e.target.id === 'wcBodyPa') { st.bodyPa = e.target.value; if (st.custom) st.custom.nudgePa = st.bodyPa !== st.bodyPaInit; }
       else if (e.target.id === 'wcBodyPr' && st.pr) { st.pr.body = e.target.value; if (st.custom) st.custom.praise = st.pr.body !== st.prInit; }
+      else if (e.target.id === 'wcBodyPrPa' && st.pr) { st.pr.bodyPa = e.target.value; if (st.custom) st.custom.praisePa = st.pr.bodyPa !== st.prPaInit; }
       else return;
       clearTimeout(tm); tm = setTimeout(paint, 200);
     });

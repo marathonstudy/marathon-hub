@@ -4230,6 +4230,13 @@ dialog.vl-modal[open] { display: flex; flex-direction: column; overflow: hidden;
 .wc-grp__t { font-size: 14px; font-weight: 800; color: var(--ink-deep); margin-bottom: 6px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
 .wc-grp__t .muted-note { font-weight: 400; }
 .wc-pr-on { margin-bottom: 6px; }
+/* 받는 사람 두 칸 — 독려 · 칭찬 같은 모양 · 같은 높이 (20261110a) · 넓은 화면에서 두 칸이 가지런하게 제목 높이도 같게 */
+.wc-grp > .wc-grp__t { min-height: 22px; }
+.wc-to--hw { margin-bottom: 2px; }
+.wc-to--hw .wc-to__opt { min-height: 44px; min-width: 0; padding: 0 8px; text-align: center; }
+/* 보내기 버튼 글이 길어지면(「독려 5명(학부모 5명 포함) · 칭찬 5명(학부모 5명 포함) 보내기」) 버튼 안에서 줄바꿈 · [닫기]는 그대로 */
+.wc-modal--hw .wc-foot #wcSend { flex: 1 1 auto; min-width: 0; white-space: normal; line-height: 1.3; padding-top: 6px; padding-bottom: 6px; }
+.wc-modal--hw .wc-foot #wcCancel { flex: 0 0 auto; }
 
 /* 과제 문자 창 — 기준 기간 · 독려 / 칭찬 탭 · 학생별 발송 이력 · 문구 돌려 쓰기 (20261108r)
    휴대폰 · 보통 화면은 탭 하나씩 · 폭 900px 이상에서만 두 칸 나란히 (탭 숨김) */
