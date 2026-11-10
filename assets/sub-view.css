@@ -1,0 +1,39 @@
+/* ============================================================
+   sub-view.css — 학생 제출물 보기 (sub-view.js · 러닝노트 「✍️ 이번 주 풀이 흔적」 · 코치룸 크게 보기 · 20261110j)
+   ============================================================ */
+.sv-rep { display: grid; gap: 8px; }
+.sv-rep--two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.sv-big, .sv-sm { appearance: none; border: 0; padding: 0; background: #F4F3FA; border-radius: 12px; overflow: hidden; cursor: zoom-in; position: relative; display: block; width: 100%; font: inherit; }
+.sv-big { aspect-ratio: 3 / 4; max-height: 420px; }
+.sv-rep:not(.sv-rep--two) .sv-big { aspect-ratio: 4 / 5; }
+.sv-big .sv-img, .sv-sm .sv-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.sv-cap { position: absolute; left: 6px; bottom: 6px; padding: 1px 8px; border-radius: 999px; background: rgba(46, 34, 102, .78); color: #fff; font-size: 11.5px; font-weight: 800; }
+.sv-days { display: grid; gap: 8px; margin-top: 10px; }
+.sv-day__t { margin: 0 0 4px; font-size: 12.5px; font-weight: 800; color: #4A4F68; }
+.sv-day__t small { color: #8A8EA6; font-weight: 700; }
+.sv-days { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 10px; }
+.sv-day__l { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+.sv-sm { aspect-ratio: 1; }
+.sv-ph { display: grid; place-items: center; align-content: center; gap: 2px; width: 100%; height: 100%; min-height: 64px; padding: 6px; box-sizing: border-box; color: #6B6F86; font-size: 13px; text-align: center; }
+.sv-ph small { font-size: 10.5px; color: #8A8EA6; }
+.sv-ph--big { min-height: 160px; font-size: 18px; }
+.sv-ph--fail { font-size: 12px; background: #F6F6FA; border-radius: 10px; }
+.sv-app { font-size: 11.5px; font-weight: 800; color: #5A3FD0; }
+/* 크게 보기 */
+.sv-lb { position: fixed; inset: 0; z-index: 2000; background: rgba(16, 12, 40, .92); display: grid; grid-template-rows: auto 1fr auto; color: #fff; }
+.sv-lb[hidden] { display: none; }
+.sv-lb__top { display: flex; align-items: center; gap: 10px; padding: 10px 12px; font-size: 14px; font-weight: 800; }
+.sv-lb__t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sv-lb__x { appearance: none; border: 0; background: rgba(255, 255, 255, .14); color: #fff; width: 44px; height: 44px; border-radius: 12px; font-size: 18px; cursor: pointer; }
+.sv-lb__body { overflow: auto; display: grid; place-items: center; touch-action: pinch-zoom pan-x pan-y; -webkit-overflow-scrolling: touch; }
+.sv-lb__img { max-width: 100%; max-height: calc(100vh - 140px); object-fit: contain; cursor: zoom-in; }
+.sv-lb__img.is-zoom { max-width: none; max-height: none; width: 200%; cursor: zoom-out; }
+.sv-lb__none { padding: 24px; text-align: center; }
+.sv-lb__bar { display: flex; justify-content: center; gap: 8px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); }
+.sv-lb__bar .btn, .sv-lb__open { appearance: none; min-height: 44px; min-width: 64px; padding: 0 14px; border: 0; border-radius: 12px; background: #fff; color: #2E2266; font: inherit; font-size: 14px; font-weight: 800;
+  display: inline-flex; align-items: center; justify-content: center; text-decoration: none; cursor: pointer; }
+.sv-lb__bar .btn:disabled { opacity: .35; cursor: default; }
+.sv-lb__open { background: #F2C14E; }
+.sv-lb .sv-ph--fail { background: transparent; color: #fff; font-size: 14px; }
+.sv-lb .sv-app { color: #D9D0FF; }
+@media (max-width: 380px) { .sv-day__l { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

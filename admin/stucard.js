@@ -109,7 +109,12 @@
         var w = ws[ui.wk], days = window.Today && Today.hwWeek ? Today.hwWeek(sid, w.from, w.to) : null, cm2 = hwOf && hwOf(w.from);
         var MARK = { onTime: '✓', late: '△', none: '✕', exempt: '면제', off: '·', today: '오늘', future: '·' };
         more += '<div class="sc-wk"><p class="sc-wk__t num">' + esc(md(w.from) + '~' + md(w.to) + ' · ' + md(w.lesson) + ' 수업 전 주') + '</p>' +
-          (days ? '<ol class="sc-days">' + days.map(function (d) { return '<li class="is-' + esc(d.hw) + '"><span class="num">' + esc(md(d.date)) + ' ' + DOWK[Lesson.dowOf(d.date)] + '</span><b>' + esc(MARK[d.hw] || '·') + '</b></li>'; }).join('') + '</ol>' : '<p class="cs-first">과제 기록을 불러오지 못했어요</p>') +
+          /* 낸 날을 누르면 그날 제출물 (sub-view.js · 20261110j) */
+          (days ? '<ol class="sc-days">' + days.map(function (d) {
+            var inner = '<span class="num">' + esc(md(d.date)) + ' ' + DOWK[Lesson.dowOf(d.date)] + '</span><b>' + esc(MARK[d.hw] || '·') + '</b>';
+            return '<li class="is-' + esc(d.hw) + '">' + ((d.hw === 'onTime' || d.hw === 'late') && window.SubView
+              ? '<button type="button" class="sc-day-b" data-sc-sub="' + esc(d.date) + '" aria-label="' + esc(md(d.date) + ' 제출물 보기') + '">' + inner + '</button>' : inner) + '</li>';
+          }).join('') + '</ol>' : '<p class="cs-first">과제 기록을 불러오지 못했어요</p>') +
           (cm2 ? '<div class="sc-wk__cm"><span class="sc-wk__cmt">💬 그 주 과제 상담</span>' + cm2 + '</div>' : '') + '</div>';
       }
       more += '<button type="button" class="btn btn--sm" data-sc-hwall>과제 상세 전체</button>';
@@ -201,6 +206,8 @@
 
   /* ---------- 클릭 (창 안) — 처리했으면 true ---------- */
   function onClick(t, sid, root) {
+    var sv = t.closest('[data-sc-sub]');
+    if (sv && window.SubView) { var dd = sv.getAttribute('data-sc-sub'), s0 = stu(sid) || {}; SubView.openStaff({ student: sid, from: dd, to: dd, who: s0.name || '', title: (s0.name || '') + ' ' + md(dd) }); return true; }
     var ab = t.closest('#scAbility [data-ab-k], #scAbility [data-ab-graph], #scAbility [data-ab-go]');
     if (ab) {
       if (ab.hasAttribute('data-ab-k')) AB.st.kind = ab.getAttribute('data-ab-k');

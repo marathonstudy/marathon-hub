@@ -1121,6 +1121,9 @@
       /* 🎯 영역별 정답률 — 레포트 탭에도 (과제 탭과 같은 앱 영역 값 · 없으면 빈칸 · 능력치에서 누르면 여기로) */
       var cb = $('#rwCats');
       if (cb) cb.innerHTML = apCatsHtml(dd.categories || [], 'rpCats');
+      /* ✍️ 이번 주 풀이 흔적 — 그 레포트 과제 기간(수업 전 일주일) · 그 학생 링크로만 · 화면에 들어올 때만 부른다 (코치룸 미리보기(PV)에는 없음 — 코치룸은 학생 카드에서) */
+      var sv = $('#rwSubs'), pw = ld && global.AppWeek ? AppWeek.lastWeek(ld) : null;
+      if (sv && pw && global.SubView && !PV) SubView.mountHub(sv, code, pw.from, pw.to, { note: Lesson.md(pw.from, false) + '~' + Lesson.md(pw.to, false) });
     });
   }
 
@@ -1197,6 +1200,7 @@
       '<div id="rwNotes"></div>' +
       '<div id="rwApp"></div>' +
       '<div id="rwCats"></div>' +                 /* 🎯 영역별 정답률 — 과제 요약 바로 아래 (과제 탭과 같은 카드 · 20261110h) */
+      '<div id="rwSubs"></div>' +                 /* ✍️ 이번 주 풀이 흔적 — 그 칸이 화면에 들어올 때만 (sub-view.js · 20261110j) */
       (hasLessons ? ReportView.partsHtml(d2, ['lessons']) : learnHtml(w)) +
       ReportView.partsHtml(d2, ['comment']) +
       weekVideosHtml(w) +                         /* 이 수업 영상 — 선생님 한마디 바로 아래 (영상이 없으면 안내 한 줄 · 20261101o) */

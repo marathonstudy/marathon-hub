@@ -179,7 +179,7 @@ function lite(full: Any) {
 
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-/* 왕 후보용 (20261110i · migration-099) — 최근 120일 낸 과제의 사진 주소(이미지만 · 8장) · 앱 점수(wrongAnswerScore · textComprehensionScore)만
+/* 왕 후보 · 제출물 보기용 (20261110i · 099 · 20261110j · 100) — 최근 120일 낸 과제의 제출물 주소(이미지 · PDF · 8개) · 앱 점수(wrongAnswerScore · textComprehensionScore)만
    학생 글 · 피드백 · 파일 이름은 넣지 않는다 · 사진은 주소만(복사하지 않음) · app_records.subs(직원 · 서버만 · 러닝노트에는 안 나감) */
 const SUB_IMG = /^image\/(jpe?g|png|webp|gif)$/i;
 export function subsOf(src: Any) {
@@ -196,7 +196,8 @@ export function subsOf(src: Any) {
       tc: sc(h?.textComprehensionScore),
       files: (Array.isArray(h?.files) ? h.files : [])
         .filter((x: Any) => typeof x?.url === "string" && x.url.length <= 400 && /^(\/(objects|uploads)\/|https:\/\/(www\.)?marathonstudy\.com\/)/.test(x.url)
-          && (SUB_IMG.test(String(x?.type ?? "")) || (!x?.type && /\.(jpe?g|png|webp|gif)(\?|$)/i.test(x.url))))
+          && (SUB_IMG.test(String(x?.type ?? "")) || String(x?.type ?? "").toLowerCase() === "application/pdf"     /* PDF 도 (20261110j · 대표 쪽 미리보기) */
+              || (!x?.type && /\.(jpe?g|png|webp|gif|pdf)(\?|$)/i.test(x.url))))
         .slice(0, 8).map((x: Any) => ({ url: String(x.url), type: String(x?.type ?? "") })),
     }))
     .slice(-200);

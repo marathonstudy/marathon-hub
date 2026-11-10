@@ -4589,6 +4589,9 @@ dialog.vl-modal[open] { display: flex; flex-direction: column; overflow: hidden;
 .kg-sel { max-width: 220px; }
 .kg-cfg { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--ink-mid); }
 .kg-hours { width: 64px; display: inline-block; }
+/* 제출물 보기 (sub-view.js · 20261110j) — 학생 카드 낸 날 · 반 카드 「오늘 제출물 보기」 */
+.sc-day-b { appearance: none; border: 0; background: none; font: inherit; color: inherit; padding: 0; width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 6px; cursor: zoom-in; min-height: 32px; text-decoration: underline dotted; text-underline-offset: 3px; }
+.sv-clsbox { margin-top: 6px; }
 @media (max-width: 600px) {
   .mg-modal { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; border-radius: 0; }
 }

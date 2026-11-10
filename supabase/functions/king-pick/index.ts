@@ -23,7 +23,7 @@ const APP_BASE = "https://marathonstudy.com";
 const MODEL = "claude-haiku-5-5";
 const PRICE_IN = 0.1 / 1_000_000;   // 달러 / 입력 토큰 (text-polish 와 같은 값)
 const PRICE_OUT = 0.5 / 1_000_000;  // 달러 / 출력 토큰
-const MAX_IMG = 6, MAX_BYTES = 4_500_000, AT_ONCE = 3, BUDGET_MS = 120000, CRON_CLASSES = 2;
+const MAX_IMG = 6, MAX_DOC = 2, MAX_BYTES = 4_500_000, AT_ONCE = 3, BUDGET_MS = 120000, CRON_CLASSES = 2;
 
 function corsHeaders(origin: string | null): Record<string, string> {
   const ok = !!origin && (ALLOWED_ORIGINS.includes(origin) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin));
@@ -75,6 +75,30 @@ export function photosOf(subs: Any[]): string[] {
   });
   return out;
 }
+/* PDF — 같은 AI 호출에 문서로 넣어 「풀이 흔적이 가장 많은 쪽」을 고른다 (20261110j · 추가 호출 없음) · 최근 것 2개까지 */
+export function docsOf(subs: Any[]): string[] {
+  const out: string[] = [];
+  (subs || []).slice().sort((a: Any, b: Any) => String(b?.submittedAt ?? "").localeCompare(String(a?.submittedAt ?? ""))).forEach((s: Any) => {
+    (Array.isArray(s?.files) ? s.files : []).forEach((f: Any) => {
+      const u = absUrl(f?.url), pdf = String(f?.type ?? "").toLowerCase() === "application/pdf" || /\.pdf(\?|$)/i.test(String(f?.url ?? ""));
+      if (u && pdf && out.length < MAX_DOC && !out.includes(u)) out.push(u);
+    });
+  });
+  return out;
+}
+/* 제출물 표(sub_files.src)는 앱이 준 그대로(「/objects/…」) — 보낼 때 앞 주소를 뗀다 */
+export function rawOf(u: string): string { return u.startsWith(APP_BASE + "/objects/") || u.startsWith(APP_BASE + "/uploads/") ? u.slice(APP_BASE.length) : u; }
+async function loadDoc(url: string): Promise<string | null> {
+  try {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 15000);
+    const r = await fetch(url, { signal: ctl.signal });
+    clearTimeout(t);
+    if (!r.ok || !/application\/pdf/i.test(String(r.headers.get("content-type") || ""))) return null;
+    const buf = await r.arrayBuffer();
+    return buf.byteLength && buf.byteLength <= MAX_BYTES ? b64(buf) : null;
+  } catch { return null; }
+}
 function b64(buf: ArrayBuffer): string {
   const bytes = new Uint8Array(buf);
   let s = "";
@@ -107,8 +131,9 @@ export const PROMPT = `아래 사진들은 한 학생이 일주일 동안 낸 �
 
 근거(why)는 40자 이내 한 줄로, 학생이 쓴 글을 그대로 옮기지 말고 무엇이 좋았는지만 적어 주세요.
 best 는 그 점수를 가장 잘 보여 주는 사진 번호(1부터)입니다.
+문서(PDF)가 있으면 문서마다 학생의 풀이 흔적(밑줄 · 메모 · 답 표시)이 가장 많은 쪽 번호를 pages 에 적어 주세요(보통 지문 쪽 · 첫 장이 아니어도 됨).
 JSON 하나만 답하세요:
-{"wrong":{"score":0,"items":{"why_wrong":false,"why_right":false,"insight":false},"why":"","best":1},"text":{"score":0,"why":"","best":1}}`;
+{"wrong":{"score":0,"items":{"why_wrong":false,"why_right":false,"insight":false},"why":"","best":1},"text":{"score":0,"why":"","best":1},"pages":[{"doc":1,"page":1}]}`;
 
 export function parseAi(text: string): Any {
   const m = /\{[\s\S]*\}/.exec(String(text || ""));
@@ -116,16 +141,20 @@ export function parseAi(text: string): Any {
   try {
     const j = JSON.parse(m[0]);
     const one = (x: Any) => ({ score: Math.max(0, Math.min(100, Math.round(Number(x?.score) || 0))), why: String(x?.why ?? "").replace(/\s+/g, " ").trim().slice(0, 60), best: Math.max(1, Math.round(Number(x?.best) || 1)) });
-    return { wrong: one(j.wrong), text: one(j.text) };
+    const pages = (Array.isArray(j.pages) ? j.pages : []).map((p: Any) => ({ doc: Math.round(Number(p?.doc) || 0), page: Math.round(Number(p?.page) || 0) })).filter((p: Any) => p.doc >= 1 && p.page >= 1 && p.page <= 999);
+    return { wrong: one(j.wrong), text: one(j.text), pages };
   } catch { return null; }
 }
 
-async function scoreOne(key: string, urls: string[]): Promise<{ r: Any; cost: number; used: string[] }> {
+async function scoreOne(key: string, urls: string[], docUrls: string[] = []): Promise<{ r: Any; cost: number; used: string[]; docs: string[] }> {
   const imgs: { url: string; img: { type: string; data: string } }[] = [];
   for (const u of urls) { const img = await loadImage(u); if (img) imgs.push({ url: u, img }); }
-  if (!imgs.length) return { r: null, cost: 0, used: [] };
+  const docs: { url: string; data: string }[] = [];
+  for (const u of docUrls) { const d = await loadDoc(u); if (d) docs.push({ url: u, data: d }); }
+  if (!imgs.length && !docs.length) return { r: null, cost: 0, used: [], docs: [] };
   const content: Any[] = [];
   imgs.forEach((x, i) => { content.push({ type: "text", text: "사진 " + (i + 1) }); content.push({ type: "image", source: { type: "base64", media_type: x.img.type, data: x.img.data } }); });
+  docs.forEach((x, i) => { content.push({ type: "text", text: "문서 " + (i + 1) }); content.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: x.data } }); });
   content.push({ type: "text", text: PROMPT });
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -136,31 +165,39 @@ async function scoreOne(key: string, urls: string[]): Promise<{ r: Any; cost: nu
   if (!res.ok) throw new Error(res.status === 401 ? "badkey" : "ai" + res.status);
   const text = (body?.content || []).filter((c: Any) => c?.type === "text").map((c: Any) => c.text).join("\n");
   const inTok = Number(body?.usage?.input_tokens) || 0, outTok = Number(body?.usage?.output_tokens) || 0;
-  return { r: parseAi(text), cost: inTok * PRICE_IN + outTok * PRICE_OUT, used: imgs.map((x) => x.url) };
+  return { r: parseAi(text), cost: inTok * PRICE_IN + outTok * PRICE_OUT, used: imgs.map((x) => x.url), docs: docs.map((x) => x.url) };
 }
 
 /* 반 하나 — 학생마다 점수 → 종류마다 1~3위 · 시간이 모자라면 저장하지 않고 다음 차례로 */
 export async function runClass(key: string, cls: string, lesson: string, started = Date.now()) {
   const inp: Any = await rpc("king_inputs", { p_class: cls, p_lesson: lesson });
-  const studs: Any[] = (inp?.students || []).map((s: Any) => ({ sid: String(s.sid), urls: photosOf(s.subs || []) }));
-  const withPhoto = studs.filter((s) => s.urls.length);
+  const studs: Any[] = (inp?.students || []).map((s: Any) => ({ sid: String(s.sid), urls: photosOf(s.subs || []), docs: docsOf(s.subs || []) }));
+  const withPhoto = studs.filter((s) => s.urls.length || s.docs.length);
   const rows: Any[] = [];
   let cost = 0, failed = 0;
   for (let i = 0; i < withPhoto.length; i += AT_ONCE) {
     if (Date.now() - started > BUDGET_MS) return { ok: false, reason: "time", class: cls };
     const part = withPhoto.slice(i, i + AT_ONCE);
     const got = await Promise.all(part.map(async (s) => {
-      try { return { s, ...(await scoreOne(key, s.urls)) }; } catch (e) {
+      try { return { s, ...(await scoreOne(key, s.urls, s.docs)) }; } catch (e) {
         if (String((e as Error).message) === "badkey") throw e;
-        failed++; return { s, r: null, cost: 0, used: [] };
+        failed++; return { s, r: null, cost: 0, used: [], docs: [] };
       }
     }));
-    got.forEach((g) => { cost += g.cost; if (g.r) rows.push({ sid: g.s.sid, r: g.r, used: g.used }); });
+    got.forEach((g) => { cost += g.cost; if (g.r) rows.push({ sid: g.s.sid, r: g.r, used: g.used, docs: g.docs || [] }); });
   }
   const pickKind = (k: "wrong" | "text") => rows.filter((x) => x.r[k].score > 0)
     .sort((a, b) => b.r[k].score - a.r[k].score).slice(0, 3)
     .map((x) => ({ sid: x.sid, score: x.r[k].score, why: x.r[k].why, img: x.used[Math.min(x.used.length, x.r[k].best) - 1] || x.used[0] || "" }));
   const c = Math.round(cost * 100000) / 100000;
+  /* 제출물 보기(100) — PDF 대표 쪽 · 가장 잘 보이는 사진의 정성 점수(대표 고르기 · 코치룸에만) · 100 전이면 조용히 넘어감 */
+  const pg: Any[] = [];
+  rows.forEach((x) => {
+    (x.r.pages || []).forEach((p: Any) => { const d = x.docs[p.doc - 1]; if (d) pg.push({ sid: x.sid, src: rawOf(d), page: p.page }); });
+    const care = Math.max(x.r.wrong.score, x.r.text.score), bi = x.r.text.score >= x.r.wrong.score ? x.r.text.best : x.r.wrong.best, bu = x.used[Math.min(x.used.length, bi) - 1];
+    if (bu) pg.push({ sid: x.sid, src: rawOf(bu), care });
+  });
+  if (pg.length) await rpc("sub_page_set", { p_rows: pg }).catch(() => 0);
   await rpc("king_save", { p_class: cls, p_lesson: lesson, p_kind: "wrong", p_cands: pickKind("wrong"), p_students: withPhoto.length, p_cost: c });
   await rpc("king_save", { p_class: cls, p_lesson: lesson, p_kind: "text", p_cands: pickKind("text"), p_students: withPhoto.length, p_cost: 0 });
   return { ok: true, class: cls, lesson, students: studs.length, photos: withPhoto.length, scored: rows.length, failed, cost: c };

@@ -1289,6 +1289,16 @@ delete from public.staff where email = '조교이메일@example.com';
 - 코치룸 「오늘」 반 카드 「👑 이번 주 오답정리왕 · 지문 장악왕」 — 1~3위 · 점수 · 근거 · 사진 미리보기 · [확정] [다른 학생으로] [확정 풀기] [후보 다시 계산] · 원장 설정 「n시간 안에 안 누르면 1위 자동 확정」(기본 0 = 끔) · 「매주 후보 자동 계산」
 - 배지 — 확정된 것만 _badge_box.kings { wrong, text, weeks } → 러닝노트 「🏅 내 배지」 [수업 왕 배지] 📝 오답정리 배지 n개 · 🔍 지문장악 배지 n개 · 주(수업일) · 학부모 링크도 · 점수 · 근거 · 사진 · 순위 없음 · 문자 · 알림톡 없음
 
+### 5-126. 20261110j — 학생 제출물 보기 · 작은 미리보기 (migration-100 · 함수 app-sync · king-pick 다시 배포 · sub-view 새로 배포)
+1. SQL Editor → `supabase/migration-100-sub-thumbs.sql` → Run (099 다음 · 맨 끝 확인 표 모두 true)
+2. Edge Functions → **app-sync** · **king-pick** — 각 `index.ts` 전체로 바꿔 Deploy (app-sync 는 PDF 주소도 · king-pick 은 PDF 대표 쪽 · 정성 점수)
+3. Edge Functions → Deploy a new function → 이름 **sub-view** → `supabase/functions/sub-view/index.ts` 전체 → **Verify JWT 끄기** (새 키 없음)
+- 새 데이터는 모으지 않음 — app-sync 가 저장하는 제출물 주소(app_records.subs · 099)를 sub_files 로(king_subs_save 가 같이 · 100 실행 때 이미 받은 것도 한 번)
+- 미리보기 — 제출물마다 긴 변 600px JPEG 하나(보관함 sub-thumbs · 비공개 · 300KB) · 이미지는 10분마다 10장씩(imagescript) · 3번 실패하면 「미리보기 없음」 · 원본은 앱 주소 그대로(복사 안 함 · 누를 때만)
+  - PDF — 서버에서 그리지 않음 · king-pick 이 사진을 볼 때 같은 호출로 「풀이 흔적이 가장 많은 쪽」을 고름(page · ai) · 코치룸이 그 PDF 를 처음 열 때 pdf.js 로 그 쪽을 그려 올림(AI 쪽이 없으면 12쪽까지 작게 그려 잉크가 가장 많은 쪽 · ink)
+- 코치룸 — 학생 카드 과제 칸 낸 날 누르기 · 반 카드 [오늘 제출물 보기](학생별 넘겨 보기) · 크게 보기는 지금 장 하나만 · 탭 확대 · 두 손가락 확대 · [원본 열기 ↗]
+- 러닝노트 레포트 탭 「✍️ 이번 주 풀이 흔적」(영역별 정답률 아래) — 그 칸이 화면에 들어올 때만 sub-view(hub) · 그 학생 링크로만 · 그 학생 것만(hub_sub_list) · 대표 1~2장(정성 점수 · 없으면 최근) + 날짜별 작은 칸 · 점수 · 순위 · AI 근거 · 보관함 경로 없음 · 사진이 안 열리면 「앱에서 열기」
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

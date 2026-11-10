@@ -2112,6 +2112,7 @@
           (window.HwStat && !endedNow ? HwStat.cardHtml(c) : '') +        /* 과제 현황 문자(운영진) 보냄 · [미리보기] [지금 운영진에게 보내기] (hwstat.js · 20261108a) */
           (window.Mogo && Mogo.classHtml && !endedNow && n && c.name !== '(반 없음)' ? Mogo.classHtml(c.name) : '') +   /* [모고 기록 지금 받기] 그 반 전체 (mogo.js · 20261109c) */
           (window.Kings && !endedNow && n && c.name !== '(반 없음)' ? Kings.classHtml(c.name) : '') +   /* 👑 이번 주 오답정리왕 · 지문 장악왕 후보 (kings.js · 099 · 20261110i) */
+          (window.SubView && !endedNow && n && c.name !== '(반 없음)' ? '<div class="sv-clsbox">' + SubView.classBtnHtml(c.name) + '</div>' : '') +   /* 오늘 제출물 보기 — 학생별로 넘겨 봄 (sub-view.js · 100 · 20261110j) */
           (c.name === '(반 없음)' || endedNow ? '' : '<div class="tdc-appbox" data-appcls="' + esc(c.name) + '">' + appClassHtml(c) + '</div>') +   /* 앱 클래스 · 핀번호 (20261101p) */
         '</div>' +
         '<div class="tdc-btns">' +
