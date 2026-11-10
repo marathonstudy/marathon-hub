@@ -1236,7 +1236,9 @@ delete from public.staff where email = '조교이메일@example.com';
 
 ### 5-122. 20261110c — D-day 문자 매일 자동 발송 · 오늘의 명언 · 러닝노트 홈 게임 계정 화면 (migration-094 · 095 · 함수 note-remind 다시 배포)
 1. SQL Editor → `supabase/migration-094-dday-sms.sql` → Run (093 다음 · 맨 아래 줄 모두 true)
-2. SQL Editor → `supabase/migration-095-dday-quotes.sql` → Run (094 다음 · 기본 명언 · 여러 번 실행해도 같은 문장은 한 번)
+2. SQL Editor → `supabase/migration-095-dday-quotes.sql` → Run (094 다음 · 여러 번 실행해도 안전)
+   - 20261110e — 명언은 원장님 마라톤 앱 명언 66개(`supabase/dday-quotes-app.json` · C:\marathon-app\명언목록.csv 를 읽기만 · 문장 그대로 · 분야 비움)
+   - 예전 판 095(웹에서 모은 500개 · `supabase/dday-quotes-old-500.json`)를 이미 실행했으면 그 500개는 지우지 않고 모두 끄기 · 실행 전이면 500개는 아예 안 들어감 (`node tools/read-quotes-csv.cjs <csv> --json …` → `node tools/make-quotes-sql.cjs …`)
 3. Edge Functions → `note-remind` 다시 배포 (이 파일 전체 · Verify JWT 끄기 그대로) — 새 키 없음 · Secrets 그대로
 4. 코치룸 → 문자 발송 → [D-day 문자] → 「D-day 문자 발신번호」에 번호를 넣고 [저장] (번호는 저장소에 넣지 않는다 · DB 설정에만) → D-day 목록 추가
 - 매일 정해진 시각(기본 06:00 · 22시 전까지 · 밤 쉬기 규칙 예외) · 재원 학생 본인만 · 반 끄기 · 학생 받지 않기 · 번호 없음 빠짐 · 같은 날 같은 학생 한 번(dday_log) · 오늘 한 번(dday_runs) · [일시정지]
