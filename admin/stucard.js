@@ -189,9 +189,16 @@
     var c = window.SB && SB.client;
     if (!c || AB.busy) return;
     AB.busy = true;
-    Promise.resolve(c.from('app_records').select('data').eq('student_id', sid)).then(function (r) {
+    /* 학습 분석(20261110l) — 배지 · 오답정리 · 지문 장악 점수(숫자만 · staff_scores · 101 전이면 없음)도 같이 */
+    var side = Promise.all([
+      Promise.resolve(c.rpc('staff_badges', { p_student: sid })).then(function (r) { return r && !r.error ? r.data : null; }, function () { return null; }),
+      Promise.resolve(c.rpc('staff_scores', { p_student: sid })).then(function (r) { return r && !r.error && Array.isArray(r.data) ? r.data : []; }, function () { return []; })
+    ]);
+    Promise.all([Promise.resolve(c.from('app_records').select('data').eq('student_id', sid)), side]).then(function (x) {
+      var r = x[0];
       AB.busy = false;
       if (AB.sid !== sid) return;
+      AB.badges = x[1][0]; AB.scores = x[1][1];
       AB.data = (!r.error && r.data && r.data[0] && r.data[0].data) || {};
       if (window.QuickNote && QuickNote.state().open) QuickNote.repaint();
     }, function () { AB.busy = false; if (AB.sid === sid) { AB.data = {}; if (window.QuickNote && QuickNote.state().open) QuickNote.repaint(); } });
@@ -201,16 +208,26 @@
     if (AB.sid !== sid) { AB = { sid: sid, data: null, busy: false, st: { kind: 'w4', graph: false } }; }
     if (AB.data === null) { abLoad(sid); return '<section class="sc-sec sc-ab" id="scAbility" aria-label="능력치"><p class="ab-note">능력치 불러오는 중…</p></section>'; }
     return '<section class="sc-sec sc-ab" id="scAbility" aria-label="능력치">' +
-      Ability.html(AB.data, AB.st, { today: today(), small: true, card: false, id: 'scAb' }) + '</section>';
+      Ability.html(AB.data, AB.st, { today: today(), small: true, card: false, id: 'scAb' }) +
+      (window.Analysis ? Analysis.summary(anCtx(sid)) : '') + '</section>';
+  }
+  /* 학습 분석 — 러닝노트와 같은 계산 · 기간은 능력치와 같이 (AB.st) */
+  function anCtx(sid) {
+    var s0 = stu(sid) || {};
+    return { data: AB.data || {}, today: today(), state: AB.st, badges: AB.badges || null, scores: AB.scores || [], small: true, id: 'scAn', staff: true,
+      parent: true, name: s0.name || '',
+      onKind: function () { if (window.QuickNote) QuickNote.repaint(); },
+      openSubs: window.SubView ? function (from, to) { SubView.openStaff({ student: sid, from: from, to: to, who: s0.name || '', title: (s0.name || '') + ' ' + md(from) + (from === to ? '' : '~' + md(to)) }); } : null };
   }
 
   /* ---------- 클릭 (창 안) — 처리했으면 true ---------- */
   function onClick(t, sid, root) {
     var sv = t.closest('[data-sc-sub]');
     if (sv && window.SubView) { var dd = sv.getAttribute('data-sc-sub'), s0 = stu(sid) || {}; SubView.openStaff({ student: sid, from: dd, to: dd, who: s0.name || '', title: (s0.name || '') + ' ' + md(dd) }); return true; }
+    if (window.Analysis && t.closest('#scAbility [data-an-root]') && Analysis.click(t, anCtx(sid))) return true;
     var ab = t.closest('#scAbility [data-ab-k], #scAbility [data-ab-graph], #scAbility [data-ab-go]');
     if (ab) {
-      if (ab.hasAttribute('data-ab-k')) AB.st.kind = ab.getAttribute('data-ab-k');
+      if (ab.hasAttribute('data-ab-k')) { AB.st.kind = ab.getAttribute('data-ab-k'); AB.st.picked = true; }
       else if (ab.hasAttribute('data-ab-graph')) AB.st.graph = !AB.st.graph;
       else { if (window.Preview) Preview.open(sid, 'parent', 'app'); return true; }
       if (window.QuickNote) QuickNote.repaint();

@@ -103,7 +103,16 @@ function countOf(h: Any, names: string[]): number | null {
   return null;
 }
 const CORRECT_KEYS = ["correctCount", "correctAnswerCount", "correctAnswers", "correctNum", "correct"];
-const TOTAL_KEYS = ["totalQuestions", "questionCount", "totalQuestionCount", "problemCount", "quizCount", "totalCount"];
+const TOTAL_KEYS = ["correctTotal", "totalQuestions", "questionCount", "totalQuestionCount", "problemCount", "quizCount", "totalCount"];
+/* 과제 한 개 안의 영역별 결과 (앱 categoryResults — 「독서-과학기술 3/4 · 문학-현대시 2/3」) — 영역 이름 · 맞힌 수 · 문제 수만 (20261110l)
+   앱 「영역별 정답률」(categoryStats)과 같은 재료 — 능력치 · 학습 분석이 날짜별로 다시 센다 · 맞힌 수가 비어 있는 칸은 뺀다(앱과 같음) */
+function partsOf(h: Any): { parts?: { c: string; k: number; n: number }[] } {
+  const cr = Array.isArray(h?.categoryResults) ? h.categoryResults : [];
+  const out = cr.map((r: Any) => ({ c: (String(r?.category ?? "").trim() || "기타").slice(0, 30), k: Number(r?.correctCount), n: Number(r?.totalCount ?? r?.totalQuestions) }))
+    .filter((x: Any) => r0(x.k) && r0(x.n) && x.n > 0 && x.k <= x.n).slice(0, 12);
+  return out.length ? { parts: out } : {};
+}
+function r0(v: unknown): boolean { return typeof v === "number" && Number.isFinite(v) && v >= 0; }
 function countsOf(h: Any): { correct?: number; total?: number } {
   const c = countOf(h, CORRECT_KEYS), n = countOf(h, TOTAL_KEYS);
   return c != null && n != null && n > 0 && c <= n ? { correct: c, total: n } : {};
@@ -135,6 +144,7 @@ function pick(src: Any) {
       late: !!h?.isLate,
       correctRate: h?.correctRate == null ? null : Math.round(num(h.correctRate)),
       ...countsOf(h),
+      ...partsOf(h),
     }));
 
   return {

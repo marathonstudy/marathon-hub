@@ -157,19 +157,36 @@
     '</div>';
   }
   /* 능력치 — 과제 기록을 받은 뒤에만(그 전에는 빈칸) · 누르면 레포트 탭 「🎯 영역별 정답률」로 */
+  /* 능력치 · 학습 분석은 기간 상태 하나를 같이 쓴다 (H.per — 한쪽에서 바꾸면 둘 다 · 20261110l) */
   function paintAbility() {
     var host = document.getElementById('gmAbilityHost');
     if (!host || !global.Ability || H.loading || H.data === undefined) return;
-    if (H.abState) host._ab = H.abState;
-    Ability.mount(host, H.data || {}, { today: H.ctx.today, parent: isParent(), name: (H.ctx.student || {}).name || '',
+    Ability.mount(host, H.data || {}, { today: H.ctx.today, parent: isParent(), name: (H.ctx.student || {}).name || '', state: H.per,
+      onKind: function () { paintAnalysis(); if (global.Analysis) Analysis.refresh(); },
       onGo: function () { if (H.ctx.go) H.ctx.go('report-cats'); } });
-    H.abState = host._ab;
+  }
+  /* 「📊 내 학습 분석」 — 능력치 바로 아래 요약 카드 · [자세히 보기] · [▶ 지난주 리캡] (analysis.js · 20261110l) */
+  function anaCtx() {
+    var c = H.ctx, nm = (c.student || {}).name || '';
+    return { data: H.data || {}, today: c.today, state: H.per, badges: H.badges, scores: H.scores || [], streak: H.g ? H.g.streak : null,
+      parent: isParent(), name: nm,
+      onKind: function () { paintAbility(); paintAnalysis(); },
+      openSubs: global.SubView && !c.preview ? function (from, to, host) { if (host) SubView.mountHub(host, c.code, from, to); } : null,
+      share: global.HubShare && !c.preview ? function () { HubShare.open(); HubShare.sharePhoto(); } : null,
+      prepareShare: global.HubShare && !c.preview ? function () { HubShare.prepare(); } : null };
+  }
+  function paintAnalysis() {
+    var host = document.getElementById('gmAnaHost');
+    if (!host || !global.Analysis || H.loading || H.data === undefined) return;
+    Analysis.mountSummary(host, anaCtx());
   }
   function paint() {
     if (!H) return;
-    /* 「⚔️ 내 능력치」 — 프로필 카드 바로 아래 · 이번 주 퀘스트보다 위 (ability.js · 20261110h) · 기간 · 그래프 상태는 H.abHost 에 남김 */
-    H.host.innerHTML = '<div class="gm-home">' + profileHtml() + '<div id="gmAbilityHost"></div>' + questHtml() + reportCardHtml() + mogoHtml() + badgeHtml() + videoHtml() + '</div>';
+    /* 「⚔️ 내 능력치」 — 프로필 카드 바로 아래 · 이번 주 퀘스트보다 위 (ability.js · 20261110h) · 기간 · 그래프 상태는 H.per 에 남김
+       「📊 내 학습 분석」 — 능력치 바로 아래 (20261110l) */
+    H.host.innerHTML = '<div class="gm-home">' + profileHtml() + '<div id="gmAbilityHost"></div><div id="gmAnaHost"></div>' + questHtml() + reportCardHtml() + mogoHtml() + badgeHtml() + videoHtml() + '</div>';
     paintAbility();
+    paintAnalysis();
     var bar = document.getElementById('hubBar');
     if (bar) { bar.innerHTML = barHtml(); bar.hidden = false; }
   }
@@ -347,9 +364,12 @@
   function render(host, ctx) {
     if (!host || !G()) return;
     bind();
-    H = { host: host, ctx: ctx, prof: { can_edit: false }, g: null, q: null, open: '', loading: true, empty: false, badges: null, face: null, facePv: '' };
+    H = { host: host, ctx: ctx, prof: { can_edit: false }, g: null, q: null, open: '', loading: true, empty: false, badges: null, face: null, facePv: '',
+          per: { kind: 'w4', picked: false, graph: false }, scores: [] };
     var mine = H;
     paint();
+    /* 오답정리 · 지문 장악 점수 (숫자만 · hub_scores · migration-101 전이면 없음) */
+    if (ctx.scoresP) ctx.scoresP.then(function (v) { if (H !== mine || !Array.isArray(v) || !v.length) return; H.scores = v; paintAnalysis(); }, function () {});
     loadProfile(ctx).then(function (p) { if (H !== mine) return; H.prof = p || { can_edit: false }; paint(); });
     if (ctx.badges) ctx.badges.then(function (v) { if (H !== mine || !v) return; H.badges = v; paint(); }, function () {});
     H.dd = null;

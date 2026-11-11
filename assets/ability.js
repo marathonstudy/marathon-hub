@@ -13,7 +13,11 @@
      기본은 큰 영역(독서 · 문학 · 화작 · 언매) · 그 기간에 넉넉한(5문제 이상) 세부 파트가 5개 이상이면 세부(인문 · 사회 · 과학기술 · 현대시 · 고전시가 …)
      3개 이하 → 게임 스탯 막대 · 5개 이상 → 육각형(레이더) + 막대 · 4개 → 막대
    숫자 — 정답률(0~100) 크게 · 등급 S(90+) A(80+) B(70+) C(60+) D · 앞 기간보다 오르면 ▲n(초록 · 은은하게 반짝) · 내리면 ▼n(회색 · 빨강 없음)
-     5문제 미만 영역은 「기록 모으는 중」 흐리게 (등급 · ▲▼ · 주력 스킬 · 성장 포인트에서 뺀다)
+     5문제 미만 영역도 정답률 % 만 보인다 (등급 · ▲▼ · 주력 스킬 · 성장 포인트에서 뺀다 · 「기록 모으는 중」 없앰 · 20261110l)
+   재료 (20261110l) — 과제 안 영역별 결과(history[].parts = 앱 categoryResults · app-sync · app-report 가 받음)가 있으면 그것 ·
+     없으면 과제 이름의 영역 + 정답률 · 가진 기록 전체(또는 날짜 있는 기록이 없을 때)는 앱 「영역별 정답률」(categories) 그대로 — 과제 탭 카드와 같은 값
+     [최근 4주]가 비거나 적으면(문제 5개 미만) 고르기 전에는 저절로 전체 기간 · 「최근 기록이 적어 전체 기간으로 보여 줘요」
+     「과제를 내면 능력치가 열려요」는 낸 과제 · 영역 기록이 정말 0개일 때만
    가장 높은 영역 「주력 스킬」 · 가장 낮은 영역 「성장 포인트」 (넉넉한 영역이 2개 이상일 때) · 다른 학생과 비교 · 순위 없음
    [성장 그래프 보기] — 영역별 월별 정답률 꺾은선 + 요약 한 줄 「처음보다 독서 +12 · 가장 많이 큰 달 11월」 · 한 달뿐이면 안내
 
@@ -37,18 +41,38 @@
   var SUB = { '인문예술': '인문', '인문': '인문', '예술': '인문', '사회문화': '사회', '사회': '사회', '문화': '사회', '과학기술': '과학기술', '과학': '과학기술', '기술': '과학기술',
               '주제통합': '주제통합', '현대시가': '현대시', '현대시': '현대시', '고전시가': '고전시가', '고전시': '고전시가', '현대소설': '현대소설', '고전소설': '고전소설', '수필': '수필', '극': '극' };
   var ORDER = ['독서', '문학', '화작', '언매', '인문', '사회', '과학기술', '주제통합', '현대시', '고전시가', '현대소설', '고전소설', '수필', '극'];
+  function topOf(k) { k = k.replace(/\s+/g, ''); return k === '독서' ? '독서' : k === '문학' ? '문학' : /^(화법과작문|화작|화법|작문)$/.test(k) ? '화작' : '언매'; }
+  var TOPS = '화법과\\s*작문|화작|화법|작문|언어와\\s*매체|언매|언어|매체|문법|독서|문학';
   function areaOf(title) {
     var A = AW();
     if (!A) return null;
     var p = A.partOf(title);
     if (p) return { top: p.genre === 'read' ? '독서' : '문학', sub: SUB[p.part] || p.part };
     var t = A.cleanTitle(title);
-    var m = /^(화법과\s*작문|화작|화법|작문|언어와\s*매체|언매|언어|매체|문법|독서|문학)(?=\s|[-–—]|$|["'“‘「『(])/.exec(t);
-    if (!m) return null;
-    var k = m[1].replace(/\s+/g, '');
-    return { top: k === '독서' ? '독서' : k === '문학' ? '문학' : /^(화법과작문|화작|화법|작문)$/.test(k) ? '화작' : '언매', sub: null };
+    var m = new RegExp('^(' + TOPS + ')(?=\\s|[-–—]|$|["\'“‘「『(])').exec(t);
+    if (m) return { top: topOf(m[1]), sub: null };
+    /* 이름 가운데 있어도 (20261110l) — 「수특 독서-과학기술 3강」 · 「목동반 현대시 복습」 · 「고3 문학 6강」 */
+    m = /(?:^|[^가-힣])(독서|문학)\s*[-–—:]\s*([가-힣]{1,6})/.exec(t);
+    if (m) { var gs = A.genreOf(m[2]); return { top: m[1], sub: SUB[m[2]] || (gs ? m[2] : null) }; }
+    var keys = Object.keys(SUB).sort(function (x, y) { return y.length - x.length; });
+    for (var i = 0; i < keys.length; i++) {
+      if (new RegExp('(?:^|[^가-힣])' + keys[i] + '(?![가-힣])').test(t)) { var g = A.genreOf(keys[i]); if (g) return { top: g === 'read' ? '독서' : '문학', sub: SUB[keys[i]] }; }
+    }
+    m = new RegExp('(?:^|[^가-힣])(' + TOPS + ')(?![가-힣])').exec(t);
+    if (m) return { top: topOf(m[1]), sub: null };
+    if (/(?:고전|현대)문학/.test(t)) return { top: '문학', sub: null };
+    return null;
   }
-  /* 기록 → [{ date, top, sub, r(정답률), n(문제 수 · 모르면 4) }] — 낸 과제 · 정답률이 있는 것만 */
+  /* 앱 영역 이름(categories · categoryResults) → 큰 영역 · 세부 — 모르는 이름은 그 이름 그대로 한 영역 */
+  function areaOfName(name) {
+    var a = areaOf(name);
+    if (a) return a;
+    var n = String(name || '').trim();
+    return n ? { top: n, sub: null } : null;
+  }
+  /* 기록 → [{ date, top, sub, r(정답률), n(문제 수 · 모르면 4) }] — 낸 과제 · 정답률이 있는 것만
+     과제 안에 영역별 결과(parts — 앱 categoryResults)가 있으면 그것을 영역마다 (앱 「영역별 정답률」과 같은 재료 · 20261110l)
+     없으면 예전처럼 과제 이름의 영역 + 그 과제 정답률 */
   var Q_UNKNOWN = 4;
   function items(data) {
     var A = AW(), out = [];
@@ -56,17 +80,35 @@
     var by = A.orderDays(data);
     (data.history || data.recent || []).forEach(function (h) {
       if (!h || !h.submittedAt) return;
+      var d = A.hwDateOf(h, by).date;
+      if (!valid(d)) return;
+      if (Array.isArray(h.parts) && h.parts.length) {
+        h.parts.forEach(function (p) {
+          var a = p && +p.n > 0 ? areaOfName(p.c) : null;
+          if (a) out.push({ date: d, top: a.top, sub: a.sub, r: Math.max(0, Math.min(100, +p.k * 100 / +p.n)), n: +p.n });
+        });
+        return;
+      }
       var r = null, n = 0;
       if (typeof h.correct === 'number' && typeof h.total === 'number' && h.total > 0) { r = h.correct * 100 / h.total; n = h.total; }
       else if (h.correctRate != null && isFinite(Number(h.correctRate))) { r = Number(h.correctRate); n = Q_UNKNOWN; }
       if (r == null) return;
       var a = areaOf(h.title);
       if (!a) return;
-      var d = A.hwDateOf(h, by).date;
-      if (!valid(d)) return;
       out.push({ date: d, top: a.top, sub: a.sub, r: Math.max(0, Math.min(100, r)), n: n });
     });
     return out.sort(function (x, y) { return x.date < y.date ? -1 : x.date > y.date ? 1 : 0; });
+  }
+  /* 낸 과제 수 (정답률 · 영역과 상관없이) */
+  function submitted(data) { return ((data && (data.history || data.recent)) || []).filter(function (h) { return h && h.submittedAt; }).length; }
+  /* 앱 「영역별 정답률」(categories · 전체 기간) → 영역 항목 — 과제 탭 카드와 같은 값 · 문제 수는 과제 안 결과에서(없으면 횟수 × 4) */
+  function catItems(data) {
+    var cats = (data && data.categories) || [], qn = {};
+    ((data && data.history) || []).forEach(function (h) { (h && h.submittedAt && h.parts || []).forEach(function (p) { if (p && p.c) qn[p.c] = (qn[p.c] || 0) + (+p.n || 0); }); });
+    return cats.filter(function (c) { return c && c.name && (c.count == null || c.count > 0); }).map(function (c) {
+      var a = areaOfName(c.name);
+      return { date: '', top: a.top, sub: a.sub, r: Math.max(0, Math.min(100, +c.rate || 0)), n: qn[c.name] || Math.max(1, +c.count || 1) * Q_UNKNOWN };
+    });
   }
   function agg(list, keyOf) {
     var g = {};
@@ -105,9 +147,15 @@
 
   /* 고른 기간의 능력치 */
   function compute(data, kind, today) {
-    var all = items(data), first = all.length ? all[0].date : '';
+    var all = items(data), first = all.length ? all[0].date : '', cats = catItems(data);
     var p = range(kind || 'w4', today, first);
-    var cur = within(all, p), prev = p.prev ? within(all, p.prev) : [];
+    var cur = within(all, p), prev = p.prev ? within(all, p.prev) : [], src = 'hw';
+    /* 가진 기록 전체(1년보다 짧음)이거나 날짜가 있는 영역 기록이 없으면 — 앱 「영역별 정답률」 그대로 (과제 탭 카드와 같은 값 · 20261110l) */
+    if (cats.length && (p.all || !all.length)) {
+      cur = cats; prev = []; src = 'app';
+      if (!p.all) p = range('y1', today, first || today);
+      p = { from: p.from, to: p.to, prev: null, all: true, since: p.since, note: '가진 기록 전체' + (first ? ' · ' + mon(first) + '부터' : '') };
+    }
     var subs = agg(cur, function (it) { return it.sub; });
     var richSubs = Object.keys(subs).filter(function (k) { return subs[k].enough; });
     var detail = richSubs.length >= 5;                 /* 세부는 넉넉한 세부 파트가 5개 이상일 때만 (육각형이 되게) */
@@ -125,7 +173,19 @@
       lo = ok.slice().sort(function (a, b) { return a.rate - b.rate; })[0];
       if (hi.rate === lo.rate) lo = null;
     }
-    return { kind: kind || 'w4', range: p, areas: areas, detail: detail, any: all.length > 0, inPeriod: cur.length, first: first, top: hi ? hi.name : '', low: lo ? lo.name : '' };
+    var qSum = areas.reduce(function (s, a) { return s + a.q; }, 0);
+    return { kind: src === 'app' ? 'y1' : (kind || 'w4'), auto: src === 'app' && (kind || 'w4') !== 'y1', range: p, areas: areas, detail: detail, src: src,
+             any: all.length > 0 || cats.length > 0 || submitted(data) > 0, submitted: submitted(data), items: all.length,
+             inPeriod: cur.length, q: qSum, thin: qSum < 5, first: first, top: hi ? hi.name : '', low: lo ? lo.name : '' };
+  }
+  /* 화면에 쓰는 기간 — 학생이 고르기 전에는 [최근 4주]가 비거나 적으면(문제 5개 미만) 저절로 전체 기간 (20261110l) */
+  function view(data, st, today) {
+    var c = compute(data, st.kind, today);
+    if (!st.picked && c.kind !== 'y1' && c.thin && (c.items || c.src === 'app' || catItems(data).length)) {
+      var y = compute(data, 'y1', today);
+      if (y.areas.length) { y.auto = true; return y; }
+    }
+    return c;
   }
 
   /* 영역별 월별 정답률 (큰 영역) — 가진 기록의 첫 달 ~ 이번 달 */
@@ -169,13 +229,13 @@
     var n = areas.length, cx = 110, cy = 104, R = 74, pt = function (i, r) { var a = -Math.PI / 2 + i * 2 * Math.PI / n; return [cx + Math.cos(a) * R * r, cy + Math.sin(a) * R * r]; };
     var rings = [0.25, 0.5, 0.75, 1].map(function (k) { return '<polygon class="ab-rd__ring" points="' + areas.map(function (a, i) { return pt(i, k).map(function (v) { return v.toFixed(1); }).join(','); }).join(' ') + '"/>'; }).join('');
     var spokes = areas.map(function (a, i) { var p = pt(i, 1); return '<line class="ab-rd__spoke" x1="' + cx + '" y1="' + cy + '" x2="' + p[0].toFixed(1) + '" y2="' + p[1].toFixed(1) + '"/>'; }).join('');
-    var poly = '<polygon class="ab-rd__val" points="' + areas.map(function (a, i) { return pt(i, (a.enough ? a.rate : 0) / 100).map(function (v) { return v.toFixed(1); }).join(','); }).join(' ') + '"/>';
+    var poly = '<polygon class="ab-rd__val" points="' + areas.map(function (a, i) { return pt(i, a.rate / 100).map(function (v) { return v.toFixed(1); }).join(','); }).join(' ') + '"/>';
     var dots = areas.map(function (a, i) { if (!a.enough) return ''; var p = pt(i, a.rate / 100); return '<circle class="ab-rd__dot" cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="3" style="fill:' + inkOf(names, a.name) + '"/>'; }).join('');
     var labels = areas.map(function (a, i) {
       var p = pt(i, 1.2), anchor = Math.abs(p[0] - cx) < 6 ? 'middle' : p[0] > cx ? 'start' : 'end';
       return '<text class="ab-rd__lb' + (a.enough ? '' : ' is-few') + '" x="' + p[0].toFixed(1) + '" y="' + (p[1] + 4).toFixed(1) + '" text-anchor="' + anchor + '">' + esc(a.name) + '</text>';
     }).join('');
-    return '<svg class="ab-radar" viewBox="0 0 220 210" role="img" aria-label="' + esc('영역별 능력치 육각형 — ' + areas.map(function (a) { return a.name + (a.enough ? ' ' + a.rate : ' 기록 모으는 중'); }).join(', ')) + '">' + rings + spokes + poly + dots + labels + '</svg>';
+    return '<svg class="ab-radar" viewBox="-24 0 268 210" role="img" aria-label="' + esc('영역별 능력치 육각형 — ' + areas.map(function (a) { return a.name + ' ' + a.rate + '%'; }).join(', ')) + '">' + rings + spokes + poly + dots + labels + '</svg>';
   }
   function deltaHtml(d) {
     if (d == null || d === 0) return '';
@@ -184,11 +244,12 @@
   function barsHtml(c, names) {
     return '<ul class="ab-bars">' + c.areas.map(function (a) {
       var tag = a.name === c.top ? '<span class="ab-tag ab-tag--top">주력 스킬</span>' : a.name === c.low ? '<span class="ab-tag ab-tag--low">성장 포인트</span>' : '';
-      return '<li><button type="button" class="ab-row' + (a.enough ? '' : ' is-few') + '" data-ab-go aria-label="' + esc(a.name + ' ' + (a.enough ? a.rate + '점 ' + a.grade + '등급' : '기록 모으는 중') + ' — 누르면 영역별 정답률') + '">' +
+      /* 문제 수가 적은 영역(5문제 미만)도 정답률 % 만 — 등급 · ▲▼ · 주력 스킬 · 성장 포인트는 넉넉한 영역에만 (20261110l) */
+      return '<li><button type="button" class="ab-row' + (a.enough ? '' : ' is-few') + '" data-ab-go aria-label="' + esc(a.name + ' ' + (a.enough ? a.rate + '점 ' + a.grade + '등급' : '정답률 ' + a.rate + '%') + ' — 누르면 영역별 정답률') + '">' +
         '<span class="ab-row__n"><b>' + esc(a.name) + '</b>' + tag + '</span>' +
-        '<span class="ab-row__bar"><i style="width:' + (a.enough ? a.rate : 0) + '%;background:' + inkOf(names, a.name) + '"></i></span>' +
+        '<span class="ab-row__bar"><i style="width:' + a.rate + '%;background:' + inkOf(names, a.name) + '"></i></span>' +
         (a.enough ? '<span class="ab-row__v"><b class="num">' + a.rate + '</b><span class="ab-gr ab-gr--' + a.grade + '">' + a.grade + '</span>' + deltaHtml(a.delta) + '</span>'
-                  : '<span class="ab-row__v ab-few">기록 모으는 중</span>') +
+                  : '<span class="ab-row__v ab-pct"><b class="num">' + a.rate + '</b><small>%</small></span>') +
       '</button></li>';
     }).join('') + '</ul>';
   }
@@ -218,34 +279,38 @@
   function html(data, st, opt) {
     opt = opt || {};
     var today = opt.today, title = opt.parent ? '⚔️ ' + (opt.name || '') + ' 학생의 능력치' : '⚔️ 내 능력치';
-    var c = compute(data, st.kind, today);
+    var c = view(data, st, today), on = c.kind;
     var head = '<div class="ab-head"><h2 class="ab-t">' + esc(title) + '</h2>' +
       (c.any ? '<div class="ab-seg" role="group" aria-label="기간">' + PERIODS.map(function (p) {
-        return '<button type="button" class="ab-seg__b' + (st.kind === p[0] ? ' is-on' : '') + '" data-ab-k="' + p[0] + '" aria-pressed="' + (st.kind === p[0]) + '">' + p[1] + '</button>';
+        return '<button type="button" class="ab-seg__b' + (on === p[0] ? ' is-on' : '') + '" data-ab-k="' + p[0] + '" aria-pressed="' + (on === p[0]) + '">' + p[1] + '</button>';
       }).join('') + '</div>' : '') + '</div>';
+    /* 「과제를 내면 능력치가 열려요」는 낸 과제 · 영역 기록이 정말 0개일 때만 */
     if (!c.any) return '<section class="ab' + (opt.small ? ' ab--small' : '') + (opt.card === false ? '' : ' gm-card') + '" id="' + (opt.id || 'gmAbility') + '" data-ab-root>' + head +
       '<p class="ab-empty">' + (opt.parent ? esc((opt.name || '') + ' 학생이 과제를 내면 능력치가 열려요') : '과제를 내면 능력치가 열려요') + '</p></section>';
     var names = ORDER.slice();
     c.areas.forEach(function (a) { if (names.indexOf(a.name) < 0) names.push(a.name); });
-    var body = !c.areas.length ? '<p class="ab-note">이 기간에는 정답률이 있는 과제가 없어요</p>'
+    var body = !c.areas.length ? '<p class="ab-note">' + (c.items || c.src === 'app' ? '이 기간에는 정답률이 있는 과제가 없어요' : '낸 과제 ' + c.submitted + '개 · 정답 수가 적힌 과제가 쌓이면 영역별 능력치가 보여요') + '</p>'
       : (c.areas.length >= 5 ? radarHtml(c.areas, names) : '') + barsHtml(c, names);
     return '<section class="ab' + (opt.small ? ' ab--small' : '') + (opt.card === false ? '' : ' gm-card') + '" id="' + (opt.id || 'gmAbility') + '" data-ab-root>' + head +
-      '<p class="ab-range num">' + esc(c.range.note) + (c.range.prev ? ' · 앞 기간과 비교' : '') + '</p>' + body +
-      '<button type="button" class="ab-more" data-ab-graph aria-expanded="' + !!st.graph + '">' + (st.graph ? '성장 그래프 접기 ▴' : '성장 그래프 보기 ▾') + '</button>' +
-      (st.graph ? graphHtml(data, today) : '') + '</section>';
+      '<p class="ab-range num">' + esc(c.range.note) + (c.range.prev ? ' · 앞 기간과 비교' : '') + '</p>' +
+      (c.auto ? '<p class="ab-auto">최근 기록이 적어 전체 기간으로 보여 줘요</p>' : '') + body +
+      (c.items ? '<button type="button" class="ab-more" data-ab-graph aria-expanded="' + !!st.graph + '">' + (st.graph ? '성장 그래프 접기 ▴' : '성장 그래프 보기 ▾') + '</button>' +
+      (st.graph ? graphHtml(data, today) : '') : '') + '</section>';
   }
+  /* opt.state — 기간을 같이 쓰는 칸(학습 분석)과 나눠 쓰는 상태 { kind, picked, graph } · opt.onKind(kind) — 기간을 바꾸면 알림 */
   function mount(host, data, opt) {
     if (!host) return;
-    var st = host._ab || (host._ab = { kind: 'w4', graph: false });
+    var st = (opt && opt.state) || host._ab || (host._ab = { kind: 'w4', graph: false });
+    host._ab = st;
     function paint() { host.innerHTML = html(data, st, opt); }
     paint();
     host.onclick = function (e) {
       var k = e.target.closest('[data-ab-k]');
-      if (k) { st.kind = k.getAttribute('data-ab-k'); paint(); return; }
+      if (k) { st.kind = k.getAttribute('data-ab-k'); st.picked = true; paint(); if (opt && opt.onKind) opt.onKind(st.kind); return; }
       if (e.target.closest('[data-ab-graph]')) { st.graph = !st.graph; paint(); return; }
       if (e.target.closest('[data-ab-go]') && opt && opt.onGo) opt.onGo();
     };
   }
 
-  global.Ability = { mount: mount, html: html, compute: compute, monthly: monthly, items: items, grade: grade, areaOf: areaOf, range: range };
+  global.Ability = { mount: mount, html: html, compute: compute, view: view, monthly: monthly, items: items, catItems: catItems, submitted: submitted, grade: grade, areaOf: areaOf, areaOfName: areaOfName, range: range, PERIODS: PERIODS, ORDER: ORDER };
 })(window);

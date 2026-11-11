@@ -1307,6 +1307,15 @@ delete from public.staff where email = '조교이메일@example.com';
   - 넣지 않는 것 — 점수 · 정답률 · 모의고사 · 상담 · 제출물 사진 · 개인 링크 · QR · 값은 홈이 가진 것만(HubHome.shareData) · 서버에 보내는 것 없음
 - 기기 기억 — 개인 링크를 처음 연 기기는 「📱 이 기기에 기억할까요?」 [기억하기][이번만] · 기본은 기억 안 함(예전: 저절로 기억) · 이미 기억한 기기 · 학생 입구 「로그인 유지」 기기는 묻지 않음 · [이번만]은 그 창(탭)에서 다시 안 물음
 
+### 5-128. 20261110l — 능력치가 비어 보이는 문제 · 「📊 내 학습 분석」 (migration-101 · 함수 app-sync · app-report · king-pick 다시 배포)
+1. SQL Editor → `supabase/migration-101-king-scores.sql` → Run (100 다음 · 맨 끝 확인 표 모두 true)
+2. Edge Functions → **app-sync** · **app-report** · **king-pick** — 각 `index.ts` 전체로 바꿔 Deploy (새 키 없음)
+- 원인 — 능력치는 과제 이름에서 영역을 읽고 과제 정답률(correctRate)만 썼는데, 여러 영역 과제는 앱이 과제 안 영역별 결과(categoryResults)로만 주고 정답률 칸이 비어 0개로 잡힘 · 과제 탭 카드는 앱 categoryStats(categories)라 보였음 · 받기 함수가 categoryResults 와 문제 수(correctTotal)를 버리고 있었음
+- 고침 — app-sync · app-report 가 history[].parts [{ c 영역, k 맞힌 수, n 문제 수 }] · correctTotal 을 받음 · 능력치는 parts(없으면 이름 + 정답률 · 이름 가운데 영역도) · 가진 기록 전체(또는 날짜 있는 기록 없음)는 categories 그대로 · 5문제 미만 영역도 % 만 · 「기록 모으는 중」 없앰 · [최근 4주]가 적으면 저절로 전체 기간 · 「능력치가 열려요」는 기록 0개일 때만
+- 학습 분석 — assets/analysis.js · analysis.css · 홈 능력치 아래 요약 · 전체 분석 · 지난주 리캡 · 코치룸 학생 카드 · 기간은 능력치와 같은 상태 · 데이터 없는 항목은 칸 없음 · 비교 · 순위 · 모의고사 · AI 근거 없음
+- migration-101 — king_scores(학생 · 수업일 · wrong/text · 점수 숫자만 · 직원 · 서버만) · 이미 있던 1~3위 후보 점수 옮김 · king_scores_save(서버) · hub_scores(그 학생 링크로 · 그 학생 것만 · 숫자만) · staff_scores(직원) · king-pick 이 반의 모든 학생 두 점수를 남김(101 전이면 조용히 넘어감)
+- 실제 학생 확인 — tests 폴더 `shots/check-ability-1110l.sql`(읽기만 · 학생별 단계 표)
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

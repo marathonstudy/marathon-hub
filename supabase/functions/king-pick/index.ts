@@ -198,6 +198,8 @@ export async function runClass(key: string, cls: string, lesson: string, started
     if (bu) pg.push({ sid: x.sid, src: rawOf(bu), care });
   });
   if (pg.length) await rpc("sub_page_set", { p_rows: pg }).catch(() => 0);
+  /* 학습 분석(101) — 학생마다 두 점수 숫자만 (근거 · 사진 없음) · 101 전이면 조용히 넘어감 */
+  if (rows.length) await rpc("king_scores_save", { p_class: cls, p_lesson: lesson, p_rows: rows.map((x) => ({ sid: x.sid, wrong: x.r.wrong.score, text: x.r.text.score })) }).catch(() => 0);
   await rpc("king_save", { p_class: cls, p_lesson: lesson, p_kind: "wrong", p_cands: pickKind("wrong"), p_students: withPhoto.length, p_cost: c });
   await rpc("king_save", { p_class: cls, p_lesson: lesson, p_kind: "text", p_cands: pickKind("text"), p_students: withPhoto.length, p_cost: 0 });
   return { ok: true, class: cls, lesson, students: studs.length, photos: withPhoto.length, scored: rows.length, failed, cost: c };

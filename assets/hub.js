@@ -1541,6 +1541,8 @@
           mogo: function () { return MOGO && !MOGO.failed ? MOGO : null; },
           latestVideo: function () { var x = videoWeeks()[0]; return x ? { label: weekName(x.w.week_start) } : null; },
           badges: rpc('hub_badges', { p_code: h.code }).catch(function () { return null; }),
+          /* 학습 분석 — 오답정리 · 지문 장악 점수 숫자만 (migration-101 · 없으면 그 칸 없음 · 20261110l) */
+          scoresP: PV ? null : rpc('hub_scores', { p_code: h.code }).catch(function () { return null; }),
           go: function (v) {
             if (v === 'report' || v === 'report-cats') { $('#tabReport').classList.remove('has-new'); select('report'); showLatest(); navPush('week'); }
             /* 능력치를 누르면 — 레포트 탭 「🎯 영역별 정답률」까지 내려 준다 (과제 기록은 이미 받아 둠 · 칸이 그려질 때까지 잠깐 기다림 · 20261110h) */
