@@ -237,7 +237,7 @@
   function weekInfo(k, w, s) {
     var t = mdOf(k) + '~' + mdOf(addDays(k, 4));
     if (w && num(w.total)) t += ' · ' + num(w.done) + '/' + num(w.total);
-    return t + (s === 'got' ? ' · 주간 배지 ⭐' : s === 'rest' ? ' · 쉼(과제 없음)' : s === 'none' ? ' · 기록 없음' : s === 'now' ? ' · 이번 주 진행 중' : s === 'future' ? ' · 아직' : '');
+    return t + (s === 'got' ? ' · 주간 배지 ⭐' + (w && w.filled ? ' (채움 — 지난 기록으로 다시 셈)' : '') : s === 'rest' ? ' · 쉼(과제 없음)' : s === 'none' ? ' · 기록 없음' : s === 'now' ? ' · 이번 주 진행 중' : s === 'future' ? ' · 아직' : '');
   }
   /* 주간 배지 — 그해 1~4월 · 5~8월 · 9~12월 세 줄(한 줄 18칸) · 위에 작게 달 이름
      칸 시작 주(gridStart) 앞 · 사이에 기록이 없는 지난 주는 도장 없이 빈자리 · 시작 주가 없는 줄은 안 그림 */
@@ -259,7 +259,7 @@
         if (c.m !== lastM) { for (var j = i + 1; j < row.length && row[j].m === c.m; j++) span++; if (row[i + span - 1].k >= st) labels += '<span class="bdg-ml" style="grid-column:' + (i + 1) + ' / span ' + span + '">' + c.m + '월</span>'; lastM = c.m; }
         var w = map[c.k], s = weekState(w, c.k, cur);
         if (c.k < st || s === 'none') { cells += '<span class="bdg-w is-pad" aria-hidden="true"></span>'; return; }
-        cells += '<button type="button" class="bdg-w is-' + s + (c.k === cur && s !== 'now' ? ' is-now' : '') + '" data-bdg-k="' + c.k + '" aria-label="' + esc(weekInfo(c.k, w, s)) + '">' +
+        cells += '<button type="button" class="bdg-w is-' + s + (c.k === cur && s !== 'now' ? ' is-now' : '') + (w && w.filled ? ' is-fill' : '') + '" data-bdg-k="' + c.k + '" aria-label="' + esc(weekInfo(c.k, w, s)) + '">' +
           (s === 'got' ? '⭐' : s === 'rest' ? '쉼' : '') + '</button>';
       });
       return '<div class="bdg-row"><div class="bdg-ml-row">' + labels + '</div><div class="bdg-cells">' + cells + '</div></div>';
@@ -301,7 +301,7 @@
       '<div class="bdg-year"><button type="button" class="bdg-y" data-bdg-y="-1"' + (y <= Y.first ? ' disabled' : '') + ' aria-label="지난해">◀</button><b class="num">' + y + '년</b>' +
         '<button type="button" class="bdg-y" data-bdg-y="1"' + (y >= Y.last ? ' disabled' : '') + ' aria-label="다음 해">▶</button></div>' +
       '<section class="bdg-sec bdg-sec--w"><h3 class="bdg-h">주간 배지</h3>' +
-        '<p class="bdg-sum"><b>⭐ 주간 배지 <span class="num">' + num(v.perfect) + '개</span></b>' +
+        '<p class="bdg-sum"><b>⭐ 주간 배지 <span class="num">' + num(v.perfect) + '개</span></b>' + (num(v.filled) ? ' <span class="bdg-fill">채움 ' + num(v.filled) + '</span>' : '') +
           (best >= 2 ? ' <span class="bdg-dot">·</span> <span>최장 연속 <b class="num">' + best + '주</b></span>' : '') +
           (nowOn && y === Y.last ? ' <span class="bdg-wrun">이번 주 진행 중</span>' : '') + '</p>' +
         weekGridHtml(v, y) +

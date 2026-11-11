@@ -47,7 +47,7 @@
     var wk = start && start <= today() ? Math.floor((Date.parse(today()) - Date.parse(start)) / (7 * 864e5)) + 1 : 0;
     var ln = window.Mogo && Mogo.linkState ? Mogo.linkState(sid) : null;
     var line1 = [cls, whenOf(cls), wk ? wk + '주째' : ''].filter(Boolean).map(esc).join(' · ') +
-      (ln ? ' <span class="sc-mg is-' + esc(ln.k) + '">모고 ' + esc(ln.t) + '</span>' : '');
+      (ln ? ' <span class="sc-mg is-' + esc(ln.k) + '">모고 ' + esc(ln.t) + '</span>' : '') + alTagHtml(sid);
     var p2 = digits(s.parentPhone2) && digits(s.parentPhone2) !== digits(s.parentPhone);
     var line2 = phoneHtml('학생', s.studentPhone) + phoneHtml('학부모', s.parentPhone) + (p2 ? phoneHtml('학부모2', s.parentPhone2) : '') +
       '<button type="button" class="sc-pin" data-sc-pin aria-label="확인 필요로 표시 — 상담 칸의 체크">📌 확인 필요</button>';
@@ -65,9 +65,70 @@
         '<div class="sc-acts"><button type="button" class="btn btn--sm" data-sc-pv>러닝노트 미리보기</button><button type="button" class="btn btn--sm" data-sc-edit>정보 수정</button></div>';
     }
     return '<section class="sc-sec sc-info" id="scInfo" aria-label="기본 정보">' +
-      '<p class="sc-l1">' + line1 + '</p><div class="sc-l2">' + line2 + '</div>' + more +
+      '<p class="sc-l1">' + line1 + '</p>' + alPanelHtml(sid) + '<div class="sc-l2">' + line2 + '</div>' + more +
       (ui.edit ? '' : '<button type="button" class="sc-more" data-sc-tg="infoMore" aria-expanded="' + ui.infoMore + '">' + (ui.infoMore ? '접기 ▴' : '더 보기 ▾') + '</button>') +
       '</section>';
+  }
+  /* ---------- 1-1) 앱 학생 연결 (20261110m · migration-102) ----------
+     앱 학생 id 로 연결된 학생은 반이 바뀌어도 기록을 그대로 받는다 · 못 찾은 학생은 「앱 연결 필요」 → 후보 고르기 · 앱 학생 번호 넣기 · [다시 찾기]
+     열쇠 · 학생 번호(전화)는 화면에 내지 않는다 (찾기는 서버 app-sync 가) */
+  var AL = { sid: '', info: null, busy: false, msg: '', open: false };
+  function alLoad(sid) {
+    var c = window.SB && SB.client;
+    if (!c || AL.busy) return;
+    AL.busy = true;
+    Promise.resolve(c.rpc('app_link_info', { p_student: sid })).then(function (r) {
+      AL.busy = false;
+      if (AL.sid !== sid) return;
+      AL.info = r && !r.error && r.data ? r.data : false;
+      if (window.QuickNote && QuickNote.state().open) QuickNote.repaint();
+    }, function () { AL.busy = false; AL.info = false; });
+  }
+  var AL_BY = { share: '공유 코드로', find: '이름 · 번호로 찾음', staff: '직접 넣음' };
+  function alTagHtml(sid) {
+    if (AL.sid !== sid) { AL = { sid: sid, info: null, busy: false, msg: '', open: false }; }
+    if (AL.info === null) { alLoad(sid); return ''; }
+    if (!AL.info) return '';                                    /* 102 전 · 권한 없음 — 아무것도 안 그림 */
+    return AL.info.uid ? ' <button type="button" class="sc-al is-ok" data-sc-al aria-expanded="' + AL.open + '">앱 연결</button>'
+                       : ' <button type="button" class="sc-al is-need" data-sc-al aria-expanded="' + AL.open + '">앱 연결 필요</button>';
+  }
+  function alPanelHtml(sid) {
+    var i = AL.info;
+    if (!AL.open || !i || AL.sid !== sid) return '';
+    var body = '';
+    if (i.uid) {
+      body = '<p class="sc-al__t">앱 학생 <b class="num">#' + esc(i.uid) + '</b> · ' + esc(AL_BY[i.by] || '연결됨') + (i.src === 'user' ? ' · 반이 바뀌어도 그대로 받는 중' : '') + '</p>' +
+        (i.user_fail ? '<p class="sc-al__w">새 주소로 못 받아 공유 코드로 받았어요 (' + esc(i.user_fail) + ')</p>' : '') +
+        (i.fill ? '<p class="sc-al__s">지난 주간 배지 채움 끝</p>' : '');
+    } else {
+      body = '<p class="sc-al__t">' + (i.state === 'many' ? '같은 이름 · 번호의 앱 학생이 여럿이에요. 맞는 번호를 골라 주세요' : i.state === 'need' ? '앱에서 이 학생을 찾지 못했어요 (이름 + 학생 번호 · 학부모 번호)' : '아직 찾아보기 전이에요') + '</p>' +
+        ((i.cands || []).length ? '<div class="sc-al__c">' + i.cands.map(function (u) { return '<button type="button" class="btn btn--sm" data-sc-al-pick="' + esc(u) + '">#' + esc(u) + '으로 연결</button>'; }).join('') + '</div>' : '');
+    }
+    return '<div class="sc-al__p" role="region" aria-label="앱 학생 연결">' + body +
+      '<div class="sc-al__f"><input class="input" data-sc-al-in inputmode="numeric" placeholder="앱 학생 번호" aria-label="앱 학생 번호"><button type="button" class="btn btn--sm btn--primary" data-sc-al-set>' + (i.uid ? '번호 바꾸기' : '연결') + '</button>' +
+      '<button type="button" class="btn btn--sm" data-sc-al-find>다시 찾기</button>' + (i.uid ? '<button type="button" class="btn btn--sm btn--ghost" data-sc-al-clear>연결 풀기</button>' : '') + '</div>' +
+      (AL.msg ? '<p class="sc-al__m" role="status">' + esc(AL.msg) + '</p>' : '') + '</div>';
+  }
+  function alRepaint() { if (window.QuickNote && QuickNote.state().open) QuickNote.repaint(); }
+  function alSet(sid, uid) {
+    var c = window.SB && SB.client;
+    if (!c) return;
+    AL.msg = '저장하는 중…'; alRepaint();
+    Promise.resolve(c.rpc('app_link_set', { p_student: sid, p_user: uid })).then(function (r) {
+      var d = r && r.data;
+      AL.msg = r && !r.error && d && d.ok ? (uid ? '연결했어요 · 다음 받기 때 새 주소로 받아요' : '연결을 풀었어요') : d && d.reason === 'taken' ? '다른 학생이 이미 쓰는 번호예요' : '저장하지 못했어요';
+      AL.info = null; alRepaint();
+    }, function () { AL.msg = '저장하지 못했어요'; alRepaint(); });
+  }
+  function alFind(sid) {
+    var fns = window.SB && SB.client && SB.client.functions;
+    if (!fns || !fns.invoke) return;
+    AL.msg = '앱에서 찾는 중…'; alRepaint();
+    Promise.resolve(fns.invoke('app-sync', { body: { action: 'link', students: [sid] } })).then(function (r) {
+      var d = r && r.data;
+      AL.msg = d && d.ok ? (d.linked ? '찾아서 연결했어요' : d.many ? '여럿이 나왔어요 · 골라 주세요' : d.stopped ? '앱이 지금 답하지 않아요 (' + d.stopped + ')' : '찾지 못했어요') : (d && d.message) || '찾지 못했어요';
+      AL.info = null; alRepaint();
+    }, function () { AL.msg = '찾지 못했어요'; alRepaint(); });
   }
   function saveInfo(sid, root) {
     var s = stu(sid);
@@ -225,6 +286,12 @@
     var sv = t.closest('[data-sc-sub]');
     if (sv && window.SubView) { var dd = sv.getAttribute('data-sc-sub'), s0 = stu(sid) || {}; SubView.openStaff({ student: sid, from: dd, to: dd, who: s0.name || '', title: (s0.name || '') + ' ' + md(dd) }); return true; }
     if (window.Analysis && t.closest('#scAbility [data-an-root]') && Analysis.click(t, anCtx(sid))) return true;
+    if (t.closest('[data-sc-al]')) { AL.open = !AL.open; AL.msg = ''; alRepaint(); return true; }
+    var alp = t.closest('[data-sc-al-pick]');
+    if (alp) { alSet(sid, +alp.getAttribute('data-sc-al-pick')); return true; }
+    if (t.closest('[data-sc-al-set]')) { var inp = root && root.querySelector('[data-sc-al-in]'), v = inp ? String(inp.value || '').replace(/\D/g, '') : ''; if (!v) { AL.msg = '앱 학생 번호를 넣어 주세요'; alRepaint(); } else alSet(sid, +v); return true; }
+    if (t.closest('[data-sc-al-clear]')) { alSet(sid, null); return true; }
+    if (t.closest('[data-sc-al-find]')) { alFind(sid); return true; }
     var ab = t.closest('#scAbility [data-ab-k], #scAbility [data-ab-graph], #scAbility [data-ab-go]');
     if (ab) {
       if (ab.hasAttribute('data-ab-k')) { AB.st.kind = ab.getAttribute('data-ab-k'); AB.st.picked = true; }

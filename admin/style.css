@@ -4792,3 +4792,13 @@ dialog.vl-modal[open] { display: flex; flex-direction: column; overflow: hidden;
 .fieldline .say-note { white-space: normal; overflow-wrap: anywhere; }
 .fieldline--app .entry__app { flex: 1 1 180px; }
 .fieldline--app .entry__app > * { min-width: 0; overflow-wrap: anywhere; }
+/* 앱 학생 연결 (stucard.js · 20261110m) */
+.sc-al { appearance: none; border: 0; display: inline-block; padding: 0 8px; min-height: 24px; border-radius: 999px; font: inherit; font-size: 11.5px; font-weight: 800; cursor: pointer; white-space: nowrap; vertical-align: middle; }
+.sc-al.is-ok { background: #EAF7EE; color: #135C3B; }
+.sc-al.is-need { background: #FFF1D6; color: #7A4A00; }
+.sc-al__p { display: grid; gap: 6px; margin: 4px 0 6px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); font-size: 13px; }
+.sc-al__t, .sc-al__w, .sc-al__s, .sc-al__m { margin: 0; }
+.sc-al__w { color: #7A4A00; font-size: 12px; }
+.sc-al__s, .sc-al__m { color: var(--ink-mid); font-size: 12px; }
+.sc-al__c, .sc-al__f { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sc-al__f .input { width: 130px; min-height: 36px; }

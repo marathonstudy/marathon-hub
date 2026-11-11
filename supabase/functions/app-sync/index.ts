@@ -10,6 +10,11 @@
 //  앱 서버에 무리가 가지 않게 3명씩 나눠 0.3초 쉬며 받는다. 실패한 학생은 다음 차례에 다시 (5 · 10 · 20 · 30분).
 //  저장하는 것은 app-report 와 같은 모양 (제목 · 날짜 · 지각 · 정답률 · 강의 · 영역별). 사진 · 피드백 · 학생 글은 없다.
 //  과제 칸 수동 수정(hw_fixes)은 건드리지 않는다.
+//  20261110m — 앱 학생 기준 읽기 주소: 앱 학생 id(student_links.app_user_id · migration-102)가 있으면 GET /api/hub/student-records 로 50명씩
+//    (반이 바뀌어도 그대로 · 반 여러 개는 날짜 기준으로 합침) · 실패하면 그 학생은 공유 코드로(이유는 app_records.user_fail)
+//    앱 id 연결 — 공유 응답의 student.id · 없으면 GET /api/hub/find-student(이름 + 학생 번호 → 학부모 번호) · 코치룸 [다시 찾기] { action: "link", students }
+//    연결된 학생은 처음 한 번 지난 주간 배지 채움(app_fill_save · 문자 · 알림톡 없음)
+//    열쇠 — Supabase Secrets HUB_READ_KEY (원장님이 넣음 · 이 함수 안에서만 · 로그 · 응답 · 저장에 남기지 않음 · 없으면 예전 방식만)
 //
 //  키 — 새로 넣을 키 없음. Supabase 가 함수에 기본으로 주는 SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY (이 함수 안에서만)
 //  배포: 대시보드 → Edge Functions → Deploy a new function → Via Editor → 이름 app-sync → 이 파일 전체 → Deploy
@@ -224,7 +229,7 @@ async function fetchShare(share: string): Promise<Any> {
       const r = await fetch(APP_API + encodeURIComponent(share), { headers: { "Accept": "application/json" }, signal: ctl.signal });
       clearTimeout(t);
       if (r.status === 404) return { ok: false, reason: "expired" };
-      if (r.ok) { const raw = await r.json(); const data = pick(raw); return { ok: true, data, lite: lite(data), subs: subsOf(raw) }; }
+      if (r.ok) { const raw = await r.json(); const data = pick(raw); const uid = num(raw?.student?.id); return { ok: true, src: "share", data, lite: lite(data), subs: subsOf(raw), ...(uid > 0 ? { uid } : {}) }; }
       last = { ok: false, reason: r.status === 429 || r.status === 503 ? "busy" : "upstream" };
     } catch (e) {
       last = { ok: false, reason: (e as Error)?.name === "AbortError" ? "timeout" : "upstream" };
@@ -232,25 +237,205 @@ async function fetchShare(share: string): Promise<Any> {
   }
   return last;
 }
-/* 3명씩 · 묶음마다 쉼 · 시간이 모자라면 남은 학생은 다음 차례로 (next_try 10분) · 묶음마다 저장 (중간에 끊겨도 받은 것은 남는다) */
+/* 받기 (20261110m) — 앱 id 가 있는 학생은 새 주소로 50명씩(묶음 사이 1.5초) · 없으면 공유 코드로 3명씩
+   새 주소가 실패하면(403 · 429 · 오류 · 그 학생 없음) 그 학생은 공유 코드로 받고 이유를 남긴다(user_fail) · 공유 코드도 없으면 실패
+   시간이 모자라면 남은 학생은 다음 차례로 (next_try 10분) · 묶음마다 저장 (중간에 끊겨도 받은 것은 남는다) */
 export async function runList(list: Any[], started = Date.now()) {
-  const out = { saved: 0, failed: 0, left: 0, reasons: {} as Record<string, number> };
-  for (let i = 0; i < list.length; i += AT_ONCE) {
-    if (Date.now() - started > BUDGET_MS) { out.left = list.length - i; break; }
-    const part = list.slice(i, i + AT_ONCE).filter((x: Any) => /^[A-Za-z0-9_-]{8,128}$/.test(String(x.share || "")));
-    const results = await Promise.all(part.map(async (x: Any) => ({ id: x.id, ...(await fetchShare(String(x.share))) })));
+  const out = { saved: 0, failed: 0, left: 0, reasons: {} as Record<string, number>, user: 0, fallback: 0, filled: 0 };
+  const userList = list.filter((x: Any) => num(x.uid) > 0 && hubKey());
+  const shareList = list.filter((x: Any) => !(num(x.uid) > 0 && hubKey()));
+  const save = async (results: Any[]) => {
     results.forEach((r: Any) => {
       if (r.ok) out.saved++;
       else { out.failed++; out.reasons[r.reason] = (out.reasons[r.reason] || 0) + 1; console.error("app-sync fail", r.reason); }
     });
-    await rpc("app_sync_save", { p_results: results.map(({ subs: _s, ...x }: Any) => x) });
-    /* 왕 후보용 사진 주소 · 앱 점수 (099 전이면 함수가 없어 조용히 넘어간다) */
-    const subRows = results.filter((x: Any) => x.ok && Array.isArray(x.subs)).map((x: Any) => ({ id: x.id, subs: x.subs }));
+    await rpc("app_sync_save", { p_results: results.map(({ subs: _s, days: _d, fill: _f, ...x }: Any) => x) });
+    /* 왕 후보용 사진 주소 · 앱 점수 (099 전이면 함수가 없어 조용히 넘어간다) · 새 주소가 제출물 주소를 주지 않으면 있던 것을 그대로 둔다 */
+    const subRows = results.filter((x: Any) => x.ok && Array.isArray(x.subs) && (x.src !== "user" || x.subs.some((h: Any) => h.files && h.files.length))).map((x: Any) => ({ id: x.id, subs: x.subs }));
     if (subRows.length) await rpc("king_subs_save", { p_rows: subRows }).catch(() => 0);
-    if (i + AT_ONCE < list.length) await sleep(PAUSE_MS);
+    /* 지난 주간 배지 채움 — 연결된 학생 한 번 (102 · 문자 · 알림톡 없음) */
+    for (const x of results.filter((y: Any) => y.ok && y.fill && Array.isArray(y.days))) {
+      const n = await rpc("app_fill_save", { p_student: x.id, p_days: x.days }).catch(() => 0);
+      out.filled += Number(n) || 0;
+    }
+  };
+  for (let i = 0; i < userList.length; i += USER_AT_ONCE) {
+    if (Date.now() - started > BUDGET_MS) { out.left += userList.length - i; break; }
+    const part = userList.slice(i, i + USER_AT_ONCE);
+    const got = await fetchUsers(part.map((x: Any) => num(x.uid)), fromOf(part), kstToday());
+    const results: Any[] = [];
+    for (const x of part) {
+      const recs = got.ok ? got.by.get(num(x.uid)) : null;
+      if (recs && recs.length) {
+        const raw = mergeClasses(recs), data = pick(raw);
+        results.push({ id: x.id, ok: true, src: "user", data, lite: lite(data), subs: subsOf(raw), fill: !!x.fill, days: daysOf(data) });
+        out.user++;
+        continue;
+      }
+      const why = got.ok ? "notfound" : got.reason;
+      if (/^[A-Za-z0-9_-]{8,128}$/.test(String(x.share || ""))) {
+        const r = await fetchShare(String(x.share));
+        results.push({ id: x.id, ...r, user_fail: why, fill: false });
+        out.fallback++;
+      } else results.push({ id: x.id, ok: false, reason: "user_" + why, user_fail: why });
+    }
+    await save(results);
+    if (i + USER_AT_ONCE < userList.length) await sleep(USER_PAUSE_MS);
+  }
+  for (let i = 0; i < shareList.length; i += AT_ONCE) {
+    if (Date.now() - started > BUDGET_MS) { out.left += shareList.length - i; break; }
+    const part = shareList.slice(i, i + AT_ONCE).filter((x: Any) => /^[A-Za-z0-9_-]{8,128}$/.test(String(x.share || "")));
+    const results = await Promise.all(part.map(async (x: Any) => ({ id: x.id, ...(await fetchShare(String(x.share))) })));
+    await save(results);
+    if (i + AT_ONCE < shareList.length) await sleep(PAUSE_MS);
   }
   return out;
 }
+
+/* ============================================================
+   앱 학생 기준 읽기 주소 (20261110m) — 서버 열쇠는 Supabase Secrets HUB_READ_KEY (이 함수 안에서만 · 로그 · 응답에 남기지 않음)
+   ============================================================ */
+const APP_BASE = APP_API.replace(/\/api\/share\/report\/?$/, "");
+const USER_AT_ONCE = 50, USER_PAUSE_MS = 1500, MAX_DAYS = 400;
+function hubKey(): string { return env("HUB_READ_KEY"); }
+function kstToday(): string { return new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10); }
+function addDaysIso(d: string, n: number): string { const x = new Date(d + "T00:00:00Z"); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); }
+/* 기간 — 묶음 학생 중 가장 이른 수강 시작일부터(없으면 1년) · 앱 한도 400일 */
+function fromOf(part: Any[]): string {
+  const t = kstToday(), lim = addDaysIso(t, -(MAX_DAYS - 1));
+  const st = part.map((x: Any) => String(x.start || "")).filter((d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort()[0] || addDaysIso(t, -364);
+  return st < lim ? lim : st;
+}
+async function hubGet(path: string): Promise<{ ok: boolean; status: number; body: Any }> {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 25000);
+  try {
+    const r = await fetch(APP_BASE + path, { headers: { "Accept": "application/json", "x-hub-key": hubKey() }, signal: ctl.signal });
+    const body = await r.json().catch(() => null);
+    return { ok: r.ok && !(body && body.ok === false), status: r.status, body };
+  } finally { clearTimeout(t); }
+}
+function failWhy(status: number, body: Any): string {
+  if (status === 401 || status === 403) return "http" + status;
+  if (status === 429) return "busy";
+  const rs = String(body?.reason ?? "").toLowerCase().replace(/[^a-z_]/g, "").slice(0, 20);
+  return rs || (status ? "http" + status : "upstream");
+}
+/* 학생마다 반 기록 목록 — 응답 모양이 조금 달라도 읽는다 ({ students | records | data | results: [{ userId, classes | enrollments | records }] } · 학생 id 를 열쇠로 한 모양 · 반 한 개짜리) */
+export function recordsByUser(j: Any): Map<number, Any[]> {
+  const by = new Map<number, Any[]>();
+  const put = (uid: number, recs: Any) => {
+    if (!(uid > 0)) return;
+    const list = (Array.isArray(recs) ? recs : recs ? [recs] : []).filter((c: Any) => c && typeof c === "object" && (c.classInfo || c.calendarData || c.homeworkHistory));
+    if (list.length) by.set(uid, (by.get(uid) || []).concat(list));
+  };
+  const one = (s: Any, key?: string) => {
+    if (!s || typeof s !== "object") return;
+    const uid = num(s.userId ?? s.user_id ?? s.studentId ?? s.student?.id ?? s.id ?? key);
+    const recs = s.classes ?? s.enrollments ?? s.records ?? s.reports ?? (s.classInfo || s.calendarData ? s : null);
+    put(uid, recs);
+  };
+  const arr = Array.isArray(j) ? j : (j?.students ?? j?.records ?? j?.data ?? j?.results ?? j?.users);
+  if (Array.isArray(arr)) arr.forEach((s: Any) => one(s));
+  else if (arr && typeof arr === "object") Object.keys(arr).forEach((k) => one(arr[k], k));
+  return by;
+}
+export async function fetchUsers(ids: number[], from: string, to: string): Promise<{ ok: boolean; reason: string; by: Map<number, Any[]> }> {
+  let last = { ok: false, reason: "upstream", by: new Map<number, Any[]>() };
+  for (let k = 0; k < 2; k++) {
+    if (k) await sleep(2000);
+    try {
+      const q = "/api/hub/student-records?userIds=" + ids.join(",") + "&from=" + from + "&to=" + to;
+      const r = await hubGet(q);
+      if (r.ok) return { ok: true, reason: "", by: recordsByUser(r.body) };
+      last = { ok: false, reason: failWhy(r.status, r.body), by: new Map() };
+      if (r.status === 401 || r.status === 403 || r.status === 400) break;        /* 열쇠 · 입력 문제는 다시 해도 같다 */
+    } catch (e) {
+      last = { ok: false, reason: (e as Error)?.name === "AbortError" ? "timeout" : "upstream", by: new Map() };
+    }
+  }
+  return last;
+}
+/* 반 여러 개 → 공유 리포트 한 개 모양으로 (날짜 기준) — 강 번호는 반마다 1000씩 띄워 겹치지 않게 · 같은 날 여러 반이면 낸 쪽 */
+export function mergeClasses(recs: Any[]): Any {
+  const sorted = recs.slice().sort((a: Any, b: Any) => String(a?.classInfo?.openDate ?? a?.enrolledAt ?? "").localeCompare(String(b?.classInfo?.openDate ?? b?.enrolledAt ?? "")));
+  if (sorted.length === 1) return sorted[0];
+  const rank: Record<string, number> = { onTime: 3, late: 2, none: 1 };
+  const cal = new Map<string, Any>(), hist: Any[] = [], lec: Any[] = [], cats = new Map<string, Any>();
+  const st = { totalSubmitted: 0, totalHomework: 0, totalOnTime: 0, totalCompleted: 0, totalVideos: 0 };
+  const today = kstToday();
+  let cur: Any = null;
+  sorted.forEach((c: Any, i: number) => {
+    const off = i * 1000;
+    const ci = c?.classInfo ?? {};
+    if (!cur || (String(ci.openDate ?? "") <= today && (!ci.closeDate || String(ci.closeDate) >= today))) cur = c;
+    (Array.isArray(c?.calendarData) ? c.calendarData : []).forEach((d: Any) => {
+      const k = String(d?.date ?? ""), x = { ...d, lectureOrder: num(d?.lectureOrder) ? num(d.lectureOrder) + off : 0 };
+      const old = cal.get(k);
+      if (!old || (rank[x.status] || 0) > (rank[old.status] || 0)) cal.set(k, x);
+    });
+    (Array.isArray(c?.homeworkHistory) ? c.homeworkHistory : []).forEach((h: Any) => hist.push({ ...h, lectureOrder: num(h?.lectureOrder) ? num(h.lectureOrder) + off : 0 }));
+    (Array.isArray(c?.lectures) ? c.lectures : []).forEach((l: Any) => lec.push({ ...l, order: num(l?.order) + off }));
+    (Array.isArray(c?.categoryStats) ? c.categoryStats : []).forEach((g: Any) => {
+      const k = String(g?.category ?? ""), n = num(g?.count), o = cats.get(k) || { category: k, w: 0, count: 0 };
+      o.w += num(g?.correctRate) * n; o.count += n; cats.set(k, o);
+    });
+    const s0 = c?.stats ?? {};
+    (Object.keys(st) as (keyof typeof st)[]).forEach((k) => { st[k] += num(s0[k]); });
+  });
+  const pct = (a: number, b: number) => (b > 0 ? Math.round(a * 100 / b) : 0);
+  return {
+    ...(cur || sorted[sorted.length - 1]),
+    stats: { ...st, homeworkSubmissionRate: pct(st.totalSubmitted, st.totalHomework), onTimeSubmissionRate: pct(st.totalOnTime, st.totalHomework), lectureCompletionRate: pct(st.totalCompleted, st.totalVideos) },
+    calendarData: Array.from(cal.values()).sort((a: Any, b: Any) => String(a.date).localeCompare(String(b.date))),
+    homeworkHistory: hist,
+    lectures: lec,
+    categoryStats: Array.from(cats.values()).map((g: Any) => ({ category: g.category, correctRate: g.count ? Math.round(g.w / g.count) : 0, count: g.count })),
+  };
+}
+/* 지난 주간 배지 채움용 — 날짜별 제출 [{ d, s }] (셈은 DB app_fill_save 가 과제 수정값 · 시작일과 같이) */
+function daysOf(data: Any): Any[] { return (data?.calendar || []).map((c: Any) => ({ d: c.date, s: c.status })); }
+/* 학생 찾기 — 앱 학생 id 만 돌려받는다 (모양이 조금 달라도) */
+export function idsOf(j: Any): number[] {
+  const out: number[] = [];
+  const add = (v: unknown) => { const n = num(v); if (n > 0 && !out.includes(n)) out.push(n); };
+  if (Array.isArray(j)) j.forEach((x: Any) => (x && typeof x === "object" ? add(x.id ?? x.userId) : add(x)));
+  else if (j && typeof j === "object") {
+    [j.userIds, j.ids].forEach((a: Any) => Array.isArray(a) && a.forEach(add));
+    [j.students, j.users, j.matches, j.results, j.data].forEach((a: Any) => Array.isArray(a) && a.forEach((x: Any) => (x && typeof x === "object" ? add(x.id ?? x.userId) : add(x))));
+    if (!out.length) add(j.userId ?? j.id);
+  }
+  return out;
+}
+async function findOne(name: string, phone: string): Promise<{ ok: boolean; ids: number[]; reason: string }> {
+  try {
+    const r = await hubGet("/api/hub/find-student?name=" + encodeURIComponent(name) + "&phone=" + encodeURIComponent(phone));
+    if (r.ok) return { ok: true, ids: idsOf(r.body), reason: "" };
+    if (r.status === 404) return { ok: true, ids: [], reason: "" };
+    return { ok: false, ids: [], reason: failWhy(r.status, r.body) };
+  } catch (e) { return { ok: false, ids: [], reason: (e as Error)?.name === "AbortError" ? "timeout" : "upstream" }; }
+}
+/* 앱 id 가 없는 학생 찾기 — 이름 + 학생 번호 → 없으면 이름 + 학부모 번호 · 한 명씩 0.4초 쉼 · 앱이 거절하면 멈춤 */
+export async function runLink(list: Any[], started = Date.now()) {
+  const out = { tried: 0, linked: 0, need: 0, many: 0, stopped: "" };
+  const rows: Any[] = [];
+  for (const x of list) {
+    if (Date.now() - started > BUDGET_MS || !hubKey()) break;
+    const nm = String(x.name || "").trim(), ph = String(x.phone || "").replace(/\D/g, ""), pp = String(x.parent || "").replace(/\D/g, "");
+    let r = ph ? await findOne(nm, ph) : { ok: true, ids: [] as number[], reason: "" };
+    if (r.ok && !r.ids.length && pp) { await sleep(LINK_PAUSE_MS); r = await findOne(nm, pp); }
+    if (!r.ok) { out.stopped = r.reason; break; }
+    rows.push({ id: x.id, ids: r.ids });
+    out.tried++;
+    await sleep(LINK_PAUSE_MS);
+  }
+  if (rows.length) {
+    const s2: Any = await rpc("app_link_save", { p_rows: rows }).catch(() => null);
+    if (s2) { out.linked = num(s2.linked); out.need = num(s2.need); out.many = num(s2.many); }
+  }
+  return out;
+}
+const LINK_PAUSE_MS = 400;
 
 async function handle(req: Request, cors: Record<string, string>) {
   if (!env("SUPABASE_URL") || !env("SUPABASE_SERVICE_ROLE_KEY")) return json({ ok: false, reason: "config", message: "서버 설정을 읽지 못했습니다." }, cors);
@@ -267,12 +452,18 @@ async function handle(req: Request, cors: Record<string, string>) {
     const now = typeof body.now === "string" && /^\d{4}-\d{2}-\d{2}T/.test(body.now) ? body.now : new Date().toISOString();
     const due: Any = await rpc("app_sync_due", { p_now: now, p_limit: 60 });
     const list: Any[] = due?.students || [];
-    const r = await runList(list);
-    return json({ ok: true, night: !!due?.night, due: list.length, ...r }, cors);
+    const started = Date.now();
+    const r = await runList(list, started);
+    let link: Any = null;
+    if (!due?.night && hubKey() && Date.now() - started < BUDGET_MS / 2) {
+      const ll: Any[] = await rpc("app_link_due", { p_limit: 20 }).catch(() => []) || [];
+      if (ll.length) link = await runLink(ll, started);
+    }
+    return json({ ok: true, night: !!due?.night, due: list.length, ...r, ...(link ? { link } : {}) }, cors);
   }
 
   /* 2) 코치룸 [새로고침] — 로그인한 운영진 */
-  if (body.action !== "refresh") return json({ ok: false, reason: "input" }, cors, 400);
+  if (body.action !== "refresh" && body.action !== "link") return json({ ok: false, reason: "input" }, cors, 400);
   const auth = req.headers.get("authorization") ?? "";
   const apikey = req.headers.get("apikey") ?? "";
   if (!/^Bearer\s+\S+/.test(auth) || !apikey) return json({ ok: false, reason: "login", message: "코치룸에 다시 로그인해 주세요." }, cors, 401);
@@ -281,6 +472,14 @@ async function handle(req: Request, cors: Record<string, string>) {
   if (!staff) return json({ ok: false, reason: "auth", message: "운영진만 할 수 있습니다." }, cors, 403);
   const ids: string[] = (Array.isArray(body.students) ? body.students : []).map((x: unknown) => String(x ?? "")).filter((x: string) => /^[0-9a-f-]{36}$/i.test(x)).slice(0, 60);
   const cls = String(body.class ?? "").slice(0, 60);
+  /* 학생 카드 [다시 찾기] — 그 학생만 앱에서 찾기 (20261110m) */
+  if (body.action === "link") {
+    if (!ids.length) return json({ ok: false, reason: "input" }, cors, 400);
+    if (!hubKey()) return json({ ok: false, reason: "nokey", message: "앱 읽기 열쇠(HUB_READ_KEY)가 아직 없습니다." }, cors);
+    const ll: Any[] = await rpc("app_link_due", { p_limit: ids.length, p_students: ids }) || [];
+    const lr = await runLink(ll);
+    return json({ ok: true, ...lr }, cors);
+  }
   if (!ids.length && !cls) return json({ ok: false, reason: "input", message: "반이나 학생을 골라 주세요." }, cors, 400);
   const list: Any[] = await rpc("app_sync_targets", { p_students: ids.length ? ids : null, p_class: cls || null }) || [];
   const r = await runList(list);

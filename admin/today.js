@@ -56,7 +56,7 @@
     st.loading = true;
     st.last = Date.now();
     if (!st.data) $('#tdBody').innerHTML = '<p class="panel__hint">불러오는 중…</p>';
-    Promise.all([sb().rpc('coach_today'), DB.getSettingRow('dashboard').catch(function () { return null; }), loadRecentSent(), loadCare(), loadFails(), loadAppAdmin(), fetchStore()]).then(function (res) {
+    Promise.all([sb().rpc('coach_today'), DB.getSettingRow('dashboard').catch(function () { return null; }), loadRecentSent(), loadCare(), loadFails(), loadAppAdmin(), fetchStore(), loadUserLinks()]).then(function (res) {
       var r = res[0];
       st.loading = false;
       if (r.error) throw new Error(r.error.message);
@@ -115,8 +115,25 @@
   /* 서버 값 그대로 (작성 완료 판정은 없앴다 · 20261030a) */
   /* 퇴원 표시 · 퇴원일이 지난 학생은 「오늘」 학생 목록에서 뺀다 (퇴원일을 지우면 다시 · 20261031i) */
   function prepare(d) {
-    if (d && d.students) { st.allStudents = d.students; d.students = activeOnly(d.students); }
+    if (d && d.students) {
+      /* 앱 학생 id 로 연결된 학생 (20261110m · migration-102) — 공유 코드가 없어도 과제 기록이 있다 · 반 코드 바꾸기 경고에서는 뺀다 */
+      d.students.forEach(function (s) { if (st.appUser[s.id]) { s.appUser = true; if (!s.app) s.app = 'user'; } });
+      st.allStudents = d.students; d.students = activeOnly(d.students);
+    }
     return d;
+  }
+  st.appUser = {};
+  function loadUserLinks() {
+    var c = sb();
+    if (!c || !c.from) return Promise.resolve();
+    var q;
+    /* 칸 이름을 고르지 않고 * 로 — 102 전(app_user_id 없음)에도 오류 없이 빈 값 */
+    try { q = c.from('student_links').select('*'); } catch (e) { return Promise.resolve(); }
+    return Promise.resolve(q).then(function (r) {
+      var m = {};
+      if (r && !r.error && Array.isArray(r.data)) r.data.forEach(function (x) { if (x && x.app_user_id) m[x.student_id] = 1; });
+      st.appUser = m;
+    }, function () {});
   }
   /* 종강한 반 (20261106c) — 종강일이 지나고 마지막 수업 레포트까지 보내거나 건너뛴 뒤에 「오늘」 · 발송 차례에서 뺀다 (기록 · 러닝노트는 그대로)
      그 전까지는 다른 반처럼 할 일 · 배지 · 발송 차례 · 반 카드(「종강 · 마지막 레포트 남음」)에 나온다.
@@ -503,6 +520,7 @@
   function appTitles(c) {
     var list = [], counts = {};
     (c.rows || []).forEach(function (s) {
+      if (s.appUser) return;                                      /* 앱 학생 id 로 받는 학생은 반이 바뀌어도 그대로 — 클래스 바뀜 띠에서 뺀다 (20261110m) */
       var a = app[s.id], t = a && a.ok && a.data ? String(a.data.classTitle || '').trim() : '';
       if (!t) return;
       list.push({ s: s, title: t });
@@ -527,7 +545,8 @@
     if (window.AppWeek && AppWeek.isWeekend(y)) return null;
     if (window.Holidays && Holidays.is(y)) return null;
     if (Store.isArchivedClass(c.name) || (Store.isEnded && Store.isEnded(c.name, y))) return null;
-    var rows = c.rows.filter(function (s) { var so = Store.startOf(stu(s.id)); return !so || so <= y; });
+    /* 앱 학생 id 로 받는 학생은 「링크 다시 연결」 띠 셈에서 뺀다 (20261110m) */
+    var rows = c.rows.filter(function (s) { var so = Store.startOf(stu(s.id)); return !s.appUser && (!so || so <= y); });
     if (rows.length < 3) return null;
     var unknown = 0, loading = 0, sub = 0, hw = 0;
     rows.forEach(function (s) {
