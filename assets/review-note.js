@@ -147,13 +147,9 @@
   function host() {
     var el = document.getElementById('rnReader');
     if (el) return el;
-    el = document.createElement('div');
-    el.id = 'rnReader';
-    el.className = 'rn-reader';
-    el.setAttribute('role', 'dialog');
-    el.setAttribute('aria-modal', 'true');
-    el.setAttribute('aria-label', '복습 노트');
-    el.hidden = true;
+    /* 맨 앞 층 (20261111b) — Layer · <dialog> (Esc · 닫기는 이 창만) */
+    el = Layer.make('rn-reader', 'rnReader', '복습 노트');
+    el.addEventListener('close', function () { if (!el.open) shut(); });
     document.body.appendChild(el);
     el.addEventListener('click', onClick);
     el.addEventListener('scroll', onScroll, { passive: true });
@@ -218,8 +214,6 @@
     }
     if (t.hasAttribute('data-rn-again')) { QZ.last = readLast(R.item); QZ.i = 0; QZ.picks = []; drawQuiz(); }
   }
-  function onKey(e) { if (e.key === 'Escape' && R.el && !R.el.hidden) close(); }
-
   /* item = { week_start, lesson_date, note } · opt = { role: 'student'|'parent', onOpen(item) } */
   function open(item, opt) {
     if (!item || !item.note) return;
@@ -227,10 +221,10 @@
     QZ = { key: item.week_start, i: 0, picks: [], last: readLast(item) };
     var el = R.el = host();
     el.innerHTML = readerHtml(item, R.opt);
-    el.hidden = false;
+    R.on = true;
+    Layer.show(el, { full: true, outside: false });
     el.scrollTop = 0;
     document.documentElement.classList.add('rn-lock');
-    document.addEventListener('keydown', onKey);
     setTimeout(function () { folds(); onScroll(); }, 0);
     var c = el.querySelector('[data-rn-close]');
     if (c) try { c.focus({ preventScroll: true }); } catch (x) { c.focus(); }
@@ -238,10 +232,14 @@
   }
   function close() {
     if (!R.el) return;
-    R.el.hidden = true;
+    Layer.hide(R.el);
+    shut();
+  }
+  function shut() {
+    if (!R.el || !R.on) return;
+    R.on = false;
     R.el.innerHTML = '';
     document.documentElement.classList.remove('rn-lock');
-    document.removeEventListener('keydown', onKey);
     if (R.opt && R.opt.onClose) R.opt.onClose();
   }
   function print() {

@@ -633,7 +633,7 @@
     document.addEventListener('click', function (e) {
       if (!e.target.closest || !e.target.closest('#btnYtbmHelp') || !window.YTBM) return;
       $('#ytbmLink').href = YTBM.href();
-      ym.showModal();
+      Layer.show(ym);
     });
     $('#btnYtbmClose').addEventListener('click', function () { ym.close(); });
     $('#btnYtbmCopy').addEventListener('click', function () {

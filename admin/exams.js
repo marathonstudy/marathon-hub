@@ -104,7 +104,7 @@
     draft.exams.sort(function (a, b) { return (a.date || '9') < (b.date || '9') ? -1 : 1; });
     if (!draft.exams.length) draft.exams.push({ id: Store.newId(), name: '', date: '', memo: '', scope: { all: true } });
     renderModal();
-    modal.showModal();
+    Layer.show(modal);
   }
 
   $('#btnExams').addEventListener('click', function () {

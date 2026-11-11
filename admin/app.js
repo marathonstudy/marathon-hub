@@ -21,11 +21,12 @@
     var el = document.createElement('div');
     el.className = 'toast' + (kind ? ' toast--' + kind : '');
     el.textContent = msg;
-    /* 창(showModal)이 열려 있으면 그 창 안에 — 본문에 붙이면 창이 맨 위 층이라 알림이 창 뒤에 숨는다 (20261030b) */
-    /* 코치룸 창은 모두 showModal() 로 연다 — 열린 창이 곧 맨 위 층 */
+    /* 창이 열려 있으면 맨 앞 창 안에 — 본문에 붙이면 창이 맨 위 층이라 알림이 창 뒤에 숨는다 (20261030b) */
+    /* 코치룸 창은 모두 Layer.show() 로 연다 — 맨 앞 창은 Layer.top() (20261111b) */
     var dlgs = Array.prototype.filter.call(document.querySelectorAll('dialog'), function (d) { return d.open; });
     var act = document.activeElement && document.activeElement.closest ? document.activeElement.closest('dialog') : null;
-    var dlg = act && act.open ? act : dlgs.length ? dlgs[dlgs.length - 1] : null, host = $('#toastHost');
+    var lt = window.Layer && Layer.top();
+    var dlg = lt && lt.open ? lt : act && act.open ? act : dlgs.length ? dlgs[dlgs.length - 1] : null, host = $('#toastHost');
     if (dlg) {
       host = Array.prototype.filter.call(dlg.children, function (c) { return c.classList.contains('toast-host'); })[0];
       if (!host) { host = document.createElement('div'); host.className = 'toast-host'; host.setAttribute('aria-live', 'polite'); dlg.appendChild(host); }
@@ -92,6 +93,7 @@
   }
   function escHtml(v) { return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 
+  var cfPending = null;
   function confirmAsk(title, desc, okLabel, noLabel, opts) {
     return new Promise(function (resolve) {
       $('#confirmTitle').textContent = title;
@@ -99,12 +101,23 @@
       $('#btnConfirmYes').textContent = okLabel || '삭제';
       $('#btnConfirmNo').textContent = noLabel || '취소';
       confirmExtra(opts || null);
+      /* 앞 확인 창이 아직 답을 기다리면 「취소」로 끝내고 새 창으로 (두 창의 [예]가 한꺼번에 눌리지 않게 · 20261111b) */
+      if (cfPending) cfPending(false);
+      var fin = false;
+      cfPending = cleanup;
       function cleanup(result) {
+        if (fin) return;
+        fin = true;
+        if (cfPending === cleanup) cfPending = null;
         $('#btnConfirmYes').removeEventListener('click', onYes);
         $('#btnConfirmNo').removeEventListener('click', onNo);
-        confirmModal.close();
+        confirmModal.removeEventListener('close', onShut);
+        Layer.hide(confirmModal);
         resolve(result);
       }
+      /* Esc 로 닫으면 「취소」 — 예전 단추가 남아 다음 확인 창에서 같이 눌리지 않게 (20261111b) */
+      function onShut() { if (!confirmModal.open) cleanup(false); }   /* 앞 창이 늦게 보낸 close 는 무시 */
+      confirmModal.addEventListener('close', onShut);
       function onYes() {
         var c = opts && opts.choices && opts.choices.length ? confirmModal.querySelector('input[name="cfChoice"]:checked') : null;
         cleanup(c ? c.value : true);
@@ -112,7 +125,7 @@
       function onNo()  { cleanup(false); }
       $('#btnConfirmYes').addEventListener('click', onYes);
       $('#btnConfirmNo').addEventListener('click', onNo);
-      confirmModal.showModal();
+      Layer.show(confirmModal);
     });
   }
 
@@ -158,7 +171,7 @@
         $('#btnConflictMine').onclick = function () { done('overwrite'); };
         $('#btnConflictLater').onclick = function () { done('cancel'); };
         modal.addEventListener('cancel', onCancel);
-        modal.showModal();
+        Layer.show(modal);
       });
     });
     conflictChain = p.catch(function () {});
@@ -1153,7 +1166,7 @@
     /* 새 학생만 — 「웰컴 문자 보내기」 (기본 켜짐 · sms.js · welcome.js · 20261101e) */
     if (window.Sms && Sms.resetInvite) Sms.resetInvite('f', !s);
     showStudentError('');
-    studentModal.showModal();
+    Layer.show(studentModal);
     setTimeout(function () { $('#fName').focus(); }, 30);
   }
 
@@ -1434,7 +1447,7 @@
       grid.appendChild(node);
     });
     host.appendChild(grid);
-    classInfoModal.showModal();
+    Layer.show(classInfoModal);
   }
 
   $('#classInfoList').addEventListener('click', function (e) {
@@ -1575,7 +1588,7 @@
     $('#fdShowInTable').checked = f ? f.showInTable !== false : true;
     syncTypeUi();
     showFieldEditError('');
-    fieldEditModal.showModal();
+    Layer.show(fieldEditModal);
   }
 
   function saveFields(next) {
@@ -1590,7 +1603,7 @@
   function openFieldsModal(scope) {
     fieldScope = scope;
     renderFieldList();
-    fieldsModal.showModal();
+    Layer.show(fieldsModal);
   }
 
   $('#btnManageFields').addEventListener('click', function () { openFieldsModal('student'); });
@@ -1688,7 +1701,7 @@
       $('#fPass1').value = '';
       $('#fPass2').value = '';
       $('#passError').classList.remove('is-on');
-      passModal.showModal();
+      Layer.show(passModal);
     });
   }
 

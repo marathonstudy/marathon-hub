@@ -74,7 +74,7 @@
     img.src = (p && p.thumb) || '';
     img.alt = (name || '') + ' 얼굴 사진';
     document.getElementById('photoBigName').textContent = name || '';
-    m.showModal();
+    Layer.show(m);
     photo(sid).then(function (src) { if (src && m.open) img.src = src; });
   }
   /* 누르면 크게 보이는 동그라미 (사진이 없으면 그냥 동그라미) */

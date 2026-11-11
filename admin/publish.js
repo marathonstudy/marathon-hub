@@ -284,7 +284,7 @@
       $('#pubWarnAll').onclick = function () { done(picked); };
       $('#pubWarnCancel').onclick = function () { done(null); };
       m.onclose = function () { if (m.returnValue !== 'x') resolve(null); };
-      m.showModal();
+      Layer.show(m);
       setTimeout(function () { $('#pubWarnClosed').focus(); }, 0);
     });
   }
@@ -387,7 +387,7 @@
       $('#notifyList').innerHTML = notifyList.map(function (c) {
         return '<label class="notify-row"><input type="checkbox" data-nt="' + esc(c.id) + '" checked> <b>' + esc(c.name) + '</b> <span class="notify-row__what">' + esc(c.what) + '</span></label>';
       }).join('');
-      $('#notifyModal').showModal();
+      Layer.show($('#notifyModal'));
     }, function () {});
   }
   $('#notifyNo').addEventListener('click', function () { $('#notifyModal').close(); toast('알리지 않고 공개만 했습니다'); });

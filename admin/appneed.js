@@ -103,7 +103,7 @@
   function open() {
     var m = modal();
     if (!m) return;
-    if (!m.open) m.showModal();
+    if (!m.open) Layer.show(m);
     paint();
     load();
   }

@@ -123,7 +123,7 @@
     d.querySelector('#hwsTitle').textContent = cls + ' 과제 현황 문자 미리보기';
     d.querySelector('#hwsBody').innerHTML = '<p class="panel__hint">글을 만드는 중…</p>';
     d.querySelector('#hwsSend').disabled = true;
-    if (!d.open) d.showModal();
+    if (!d.open) Layer.show(d);
     call(cls, true).then(function (res) {
       if (d.dataset.cls !== cls) return;
       var p = res && res.preview;

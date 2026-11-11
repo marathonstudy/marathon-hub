@@ -16,6 +16,8 @@
 //    연결된 학생은 처음 한 번 지난 주간 배지 채움(app_fill_save · 문자 · 알림톡 없음)
 //    열쇠 — Supabase Secrets HUB_READ_KEY (원장님이 넣음 · 이 함수 안에서만 · 로그 · 응답 · 저장에 남기지 않음 · 없으면 예전 방식만)
 //  20261111a — 옛 기록 한 번 채우기(runOld · 앱 id 학생 · 2026-01-01부터 · 수강 시작일 앞만 app_records.old · migration-104)
+//  20261111b — 옛 기록 결과를 학생마다(ok · empty · none · fail · 이유 · 요청 기간 · 앱이 준 가장 이른 날짜) · 받기 방법과 상관없이 앱 id 학생 모두
+//    · 실패해도 조용히 넘어가지 않음 · 동기화 기록 app_sync_runs(숫자 · 이유 코드만 · migration-105)
 //    앱 연결 못 찾은 이유(번호 없음 · 번호 불일치 · 이름 불일치 · 앱 계정 없음 · 후보 여러 명 · 짐작 표시) — runLink · whyNone
 //
 //  키 — 새로 넣을 키 없음. Supabase 가 함수에 기본으로 주는 SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY (이 함수 안에서만)
@@ -243,7 +245,7 @@ async function fetchShare(share: string): Promise<Any> {
    새 주소가 실패하면(403 · 429 · 오류 · 그 학생 없음) 그 학생은 공유 코드로 받고 이유를 남긴다(user_fail) · 공유 코드도 없으면 실패
    시간이 모자라면 남은 학생은 다음 차례로 (next_try 10분) · 묶음마다 저장 (중간에 끊겨도 받은 것은 남는다) */
 export async function runList(list: Any[], started = Date.now()) {
-  const out = { saved: 0, failed: 0, left: 0, reasons: {} as Record<string, number>, user: 0, fallback: 0, filled: 0 };
+  const out = { saved: 0, failed: 0, left: 0, reasons: {} as Record<string, number>, user: 0, fallback: 0, filled: 0, userWhy: {} as Record<string, number> };
   const userList = list.filter((x: Any) => num(x.uid) > 0 && hubKey());
   const shareList = list.filter((x: Any) => !(num(x.uid) > 0 && hubKey()));
   const save = async (results: Any[]) => {
@@ -275,6 +277,7 @@ export async function runList(list: Any[], started = Date.now()) {
         continue;
       }
       const why = got.ok ? "notfound" : got.reason;
+      out.userWhy[why] = (out.userWhy[why] || 0) + 1;                 /* 학생 기준 주소로 못 받은 이유 (동기화 기록 · 105) */
       if (/^[A-Za-z0-9_-]{8,128}$/.test(String(x.share || ""))) {
         const r = await fetchShare(String(x.share));
         results.push({ id: x.id, ...r, user_fail: why, fill: false });
@@ -500,34 +503,64 @@ export function oldOf(data: Any, cut: string): { old: Any; n: number; first: str
   const firsts = [hist.map((h: Any) => kstDayOf(h.submittedAt)).sort()[0], cal.filter((c: Any) => c.status === "onTime" || c.status === "late").map((c: Any) => c.date).sort()[0]].filter(Boolean).sort();
   return { old: { history: hist, calendar: cal, cut }, n: hist.length, first: firsts[0] || "" };
 }
+/* 앱이 실제로 준 가장 이른 날짜 — 낸 과제(한국 날짜) · 날짜별 칸 중 가장 이른 것 (「지금 반 기간만 준다」를 가르는 값 · 105) */
+export function spanOf(data: Any): { first: string; n: number } {
+  const ds = [...(data?.history || []).map((h: Any) => kstDayOf(h?.submittedAt)), ...(data?.calendar || []).map((c: Any) => String(c?.date ?? ""))]
+    .filter((d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+  return { first: ds[0] || "", n: (data?.history || []).length };
+}
+/* 오류 글 — 한 줄 · 짧게 (열쇠 · 번호는 들어가지 않는 값만: 앱 실패 이유 코드 · DB 오류 글) */
+function short(e: unknown): string { return String((e as Error)?.message ?? e ?? "").replace(/[\r\n]+/g, " ").slice(0, 120); }
+/* 학생마다 결과를 남긴다 (105) — ok 옛 기록 받음 · empty 받았지만 수강 시작일 앞 기록 없음 · none 앱이 이 학생 기록을 안 줌 · fail 받기 실패(이유)
+   실패한 묶음도 학생마다 「fail · 이유」로 저장(예전에는 아무것도 안 남기고 멈췄다) · 고르기 · 저장이 실패하면 err 로 돌려준다(동기화 기록에 남음) */
 export async function runOld(started = Date.now(), limit = 50) {
-  const out = { tried: 0, saved: 0, records: 0, weeks: 0, failed: 0 };
-  if (!hubKey()) return out;
-  const list: Any[] = await rpc("app_old_due", { p_limit: limit }).catch(() => []) || [];
+  const out: Any = { tried: 0, saved: 0, records: 0, weeks: 0, failed: 0, ok: 0, empty: 0, none: 0, reasons: {} as Record<string, number> };
+  if (!hubKey()) { out.skip = "nokey"; return out; }
+  let list: Any[] = [];
+  try { list = (await rpc("app_old_due", { p_limit: limit })) || []; }
+  catch (e) { out.err = "due: " + short(e); console.error("app-sync old due", out.err); return out; }
+  if (!Array.isArray(list)) list = [];
+  out.due = list.length;
   const t = kstToday(), lim = addDaysIso(t, -(MAX_DAYS - 1)), from = OLD_FROM < lim ? lim : OLD_FROM;
+  out.from = from; out.to = t;
   for (let i = 0; i < list.length; i += OLD_AT_ONCE) {
-    if (Date.now() - started > BUDGET_MS) break;
+    if (Date.now() - started > BUDGET_MS) { out.left = list.length - i; break; }      /* 남은 학생은 다음 차례 (old_try) */
     const part = list.slice(i, i + OLD_AT_ONCE);
     const got = await fetchUsers(part.map((x: Any) => num(x.uid)), from, t);
     out.tried += part.length;
-    if (!got.ok) { out.failed += part.length; console.error("app-sync old fail", got.reason); break; }     /* 30분 뒤 다시 (old_try) */
     const rows: Any[] = [];
-    for (const x of part) {
-      const recs = got.by.get(num(x.uid));
-      const cut = /^\d{4}-\d{2}-\d{2}$/.test(String(x.start || "")) ? String(x.start) : addDaysIso(t, -364);
-      const o = recs && recs.length ? oldOf(pick(mergeClasses(recs)), cut) : { old: null, n: 0, first: "" };
-      rows.push({ id: x.id, old: o.n ? o.old : null, n: o.n, first: o.first });
-      out.records += o.n;
-      if (o.old && o.old.calendar.length) {
-        const n = await rpc("app_fill_old", { p_student: x.id, p_days: o.old.calendar.map((c: Any) => ({ d: c.date, s: c.status })) }).catch(() => 0);
-        out.weeks += Number(n) || 0;
+    if (!got.ok) {
+      out.failed += part.length;
+      out.reasons[got.reason] = (out.reasons[got.reason] || 0) + part.length;
+      console.error("app-sync old fail", got.reason);
+      part.forEach((x: Any) => rows.push({ id: x.id, status: "fail", err: "앱 " + got.reason, from, to: t }));
+    } else {
+      for (const x of part) {
+        const recs = got.by.get(num(x.uid));
+        if (!recs || !recs.length) { rows.push({ id: x.id, status: "none", from, to: t, got_n: 0, classes: 0 }); out.none++; continue; }
+        const cut = /^\d{4}-\d{2}-\d{2}$/.test(String(x.start || "")) ? String(x.start) : addDaysIso(t, -364);
+        const data = pick(mergeClasses(recs)), sp = spanOf(data), o = oldOf(data, cut);
+        const st = o.n ? "ok" : "empty";
+        out[st]++;
+        rows.push({ id: x.id, status: st, old: o.n ? o.old : null, n: o.n, first: o.first, from, to: t, got_first: sp.first, got_n: sp.n, classes: recs.length });
+        out.records += o.n;
+        if (o.old && o.old.calendar.length) {
+          try { out.weeks += Number(await rpc("app_fill_old", { p_student: x.id, p_days: o.old.calendar.map((c: Any) => ({ d: c.date, s: c.status })) })) || 0; }
+          catch (e) { out.fillErr = short(e); }
+        }
       }
     }
-    const s: Any = await rpc("app_old_save", { p_rows: rows }).catch(() => null);
-    out.saved += s ? num(s.saved) : 0;
+    try { const s: Any = await rpc("app_old_save", { p_rows: rows }); out.saved += s ? num(s.saved) : 0; }
+    catch (e) { out.err = "save: " + short(e); console.error("app-sync old save", out.err); break; }
+    if (!got.ok && /^http40[13]$/.test(got.reason)) break;                               /* 열쇠 문제 — 다시 해도 같다 */
     if (i + OLD_AT_ONCE < list.length) await sleep(USER_PAUSE_MS);
   }
   return out;
+}
+/* 동기화 기록 (105) — 숫자 · 이유 코드만 (이름 · 번호 · 열쇠 값 없음) · 105 전이면 함수가 없어 그냥 넘어간다 */
+async function logRun(kind: string, sum: Any) {
+  try { await rpc("app_sync_log", { p_kind: kind, p_sum: { ...sum, hub: !!hubKey() } }); }
+  catch (e) { console.error("app-sync log", short(e)); }
 }
 
 async function handle(req: Request, cors: Record<string, string>) {
@@ -548,13 +581,18 @@ async function handle(req: Request, cors: Record<string, string>) {
     const started = Date.now();
     const r = await runList(list, started);
     let link: Any = null, old: Any = null;
-    /* 옛 기록 한 번 채우기 (104 · 시간이 넉넉할 때만 · 104 전이면 함수가 없어 조용히 넘어감) */
-    if (!due?.night && hubKey() && Date.now() - started < BUDGET_MS / 3) old = await runOld(started).catch(() => null);
+    /* 옛 기록 한 번 채우기 (104 · 시간이 넉넉할 때만) — 건너뛰거나 실패하면 이유를 남긴다 (105) */
+    if (due?.night) old = { skip: "night" };
+    else if (!hubKey()) old = { skip: "nokey" };
+    else if (Date.now() - started >= BUDGET_MS / 3) old = { skip: "time" };
+    else old = await runOld(started).catch((e) => ({ err: "run: " + short(e) }));
     if (!due?.night && hubKey() && Date.now() - started < BUDGET_MS / 2) {
-      const ll: Any[] = await rpc("app_link_due", { p_limit: 20 }).catch(() => []) || [];
+      let ll: Any[] = [];
+      try { ll = (await rpc("app_link_due", { p_limit: 20 })) || []; } catch (e) { link = { err: "due: " + short(e) }; }
       if (ll.length) link = await runLink(ll, started);
     }
-    return json({ ok: true, night: !!due?.night, due: list.length, ...r, ...(link ? { link } : {}), ...(old && old.tried ? { old } : {}) }, cors);
+    await logRun("cron", { night: !!due?.night, due: list.length, ...r, link, old, ms: Date.now() - started });
+    return json({ ok: true, night: !!due?.night, due: list.length, ...r, ...(link ? { link } : {}), ...(old && (old.tried || old.err || old.skip) ? { old } : {}) }, cors);
   }
 
   /* 2) 코치룸 [새로고침] — 로그인한 운영진 */
@@ -578,6 +616,7 @@ async function handle(req: Request, cors: Record<string, string>) {
   if (!ids.length && !cls) return json({ ok: false, reason: "input", message: "반이나 학생을 골라 주세요." }, cors, 400);
   const list: Any[] = await rpc("app_sync_targets", { p_students: ids.length ? ids : null, p_class: cls || null }) || [];
   const r = await runList(list);
+  await logRun("refresh", { due: list.length, ...r });
   return json({ ok: true, due: list.length, ...r }, cors);
 }
 

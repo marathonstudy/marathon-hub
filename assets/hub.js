@@ -2556,7 +2556,7 @@
     if (!nav.on) return;
     if (nav.ignore > 0) { nav.ignore--; return; }
     var lb = lightboxOpen();
-    if (lb) { nav.lbClosing = true; lb.remove(); return; }       /* 크게 보던 사진 닫기 */
+    if (lb) { nav.lbClosing = true; if (global.Layer) Layer.hide(lb); if (lb.parentNode) lb.parentNode.removeChild(lb); return; }       /* 크게 보던 사진 닫기 (Layer 창 · 20261111b) */
     if (parseHash().code !== nav.code) return;
     var st = (e.state && e.state.hub) || { v: parseHash().view, arg: parseHash().arg };
     if (nav.apply) nav.apply(st.v, st.arg);

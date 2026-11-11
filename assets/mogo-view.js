@@ -91,9 +91,10 @@
   function overlay() {
     var o = document.getElementById('mgvOverlay');
     if (o) return o;
-    o = document.createElement('div');
-    o.id = 'mgvOverlay'; o.className = 'mgv-ov'; o.hidden = true;
-    o.setAttribute('role', 'dialog'); o.setAttribute('aria-modal', 'true'); o.setAttribute('aria-labelledby', 'mgvTitle');
+    /* 맨 앞 층 (20261111b) — Layer · <dialog> (Esc · 닫기는 이 창만) */
+    o = Layer.make('mgv-ov', 'mgvOverlay');
+    o.setAttribute('aria-labelledby', 'mgvTitle');
+    o.addEventListener('close', function () { if (!o.open) shut(); });
     o.innerHTML = '<div class="mgv-ov__head"><button type="button" class="mgv-ov__x" id="mgvClose" aria-label="닫기">‹ 닫기</button><h2 class="mgv-ov__t" id="mgvTitle"></h2>' +
       '<a class="mgv-ov__new" id="mgvNewTab" target="_blank" rel="noopener noreferrer">새 탭 ↗</a></div>' +
       '<div class="mgv-ov__body"><iframe id="mgvFrame" class="mgv-frame" title="모의고사 분석 레포트" referrerpolicy="no-referrer"></iframe></div>';
@@ -108,15 +109,18 @@
     document.getElementById('mgvNewTab').href = url;
     f.style.height = '70vh';
     f.src = url;
-    o.hidden = false;
+    Layer.show(o, { full: true, outside: false });
     document.documentElement.classList.add('mgv-open');
+  }
+  function shut() {
+    document.documentElement.classList.remove('mgv-open');
+    var f = document.getElementById('mgvFrame'); if (f && f.src !== 'about:blank') f.src = 'about:blank';
   }
   function close() {
     var o = document.getElementById('mgvOverlay');
-    if (!o || o.hidden) return;
-    o.hidden = true;
-    document.documentElement.classList.remove('mgv-open');
-    var f = document.getElementById('mgvFrame'); if (f) f.src = 'about:blank';
+    if (!o) return;
+    Layer.hide(o);
+    shut();
   }
   global.addEventListener('message', function (e) {
     if (e.origin !== ORIGIN) return;
@@ -124,7 +128,6 @@
     if (!f || !d || d.type !== 'mogo:height' || !Number.isFinite(d.height)) return;
     f.style.height = Math.max(200, Math.min(20000, Math.round(d.height))) + 'px';
   });
-  global.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
   document.addEventListener('click', function (e) {
     var b = e.target.closest && e.target.closest('[data-mgv-id], [data-mgv-url]');
     if (!b) return;

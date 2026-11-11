@@ -15,13 +15,16 @@
   var layer = null, anchor = null, touchy = false, viaTap = false;
 
   function el() {
-    if (layer && layer.isConnected) return layer;
-    layer = document.createElement('div');
-    layer.id = 'tipLayer';
-    layer.className = 'tip-layer';
-    layer.setAttribute('role', 'tooltip');
-    layer.hidden = true;
-    document.body.appendChild(layer);
+    if (!layer) {
+      layer = document.createElement('div');
+      layer.id = 'tipLayer';
+      layer.className = 'tip-layer';
+      layer.setAttribute('role', 'tooltip');
+      layer.hidden = true;
+    }
+    /* 창이 열려 있으면 맨 앞 창 안에 — body 에 두면 창(<dialog>) 뒤에 깔린다 (20261111b) */
+    var host = (window.Layer && Layer.top()) || document.body;
+    if (layer.parentNode !== host) host.appendChild(layer);
     return layer;
   }
   function scoped(t) {

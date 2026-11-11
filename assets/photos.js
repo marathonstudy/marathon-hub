@@ -148,10 +148,8 @@
     items = (items || []).filter(function (p) { return p && (p.url || p.thumb); });
     if (!items.length) return;
     var i = Math.max(0, Math.min(items.length - 1, start || 0));
-    var box = document.createElement('div');
-    box.className = 'ph-light ph-gal';
-    box.setAttribute('role', 'dialog');
-    box.setAttribute('aria-label', '필기 크게 보기');
+    /* 맨 앞 층 (20261111b) — 코치룸 창 안에서 열어도 그 위에 (Layer · <dialog>) */
+    var box = Layer.make('ph-light ph-gal', '', '필기 크게 보기');
     box.innerHTML =
       '<div class="ph-gal__stage"><img class="ph-gal__img" alt="필기 사진" draggable="false"></div>' +
       (items.length > 1
@@ -177,11 +175,11 @@
       var c = box.querySelector('.ph-gal__count');
       if (c) c.textContent = (i + 1) + ' / ' + items.length;
     }
-    function close() { box.remove(); document.removeEventListener('keydown', onKey); }
+    function close() { Layer.hide(box); }
     function onKey(e) {
       if (!document.body.contains(box)) { document.removeEventListener('keydown', onKey); return; }
-      if (e.key === 'Escape') close();
-      else if (e.key === 'ArrowRight' && items.length > 1) show(i + 1);
+      if (!Layer.isTop(box)) return;                                   /* Esc 는 Layer 가 맨 앞 창만 */
+      if (e.key === 'ArrowRight' && items.length > 1) show(i + 1);
       else if (e.key === 'ArrowLeft' && items.length > 1) show(i - 1);
     }
     box.addEventListener('click', function (e) {
@@ -228,7 +226,7 @@
       if (!(e.touches && e.touches.length)) t0 = null;
     });
     document.addEventListener('keydown', onKey);
-    document.body.appendChild(box);
+    Layer.show(box, { full: true, remove: true, onClose: function () { document.removeEventListener('keydown', onKey); } });
     show(i);
   }
 

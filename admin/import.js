@@ -443,7 +443,7 @@
     renderPlan();
     showError('');
     $('#importPreview').textContent = '';
-    $('#importModal').showModal();
+    Layer.show($('#importModal'));
   });
   $('#btnImportCancel').addEventListener('click', function () { $('#importModal').close(); });
   $('#btnImportApply').addEventListener('click', apply);

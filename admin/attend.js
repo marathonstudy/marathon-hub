@@ -139,7 +139,7 @@
     M = { cls: cls, date: date, week: week, list: list, cur: {}, orig: {}, focus: focusSid || '', busy: true, loadErr: '' };
     list.forEach(function (s) { M.cur[s.id] = { s: 'attend', note: '', m: true, k: true }; });
     render();
-    if (!modal().open) modal().showModal();
+    if (!modal().open) Layer.show(modal());
     var ids = list.map(function (s) { return s.id; });
     var mine = M;
     var cols = 'student_id,attend_status,attend_note,focus_score,att_material,att_makeup';

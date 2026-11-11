@@ -328,14 +328,14 @@
   function open() {
     if (!S.on) return;
     close();
-    var dim = global.document.createElement('div');
-    dim.className = 'sh-dim'; dim.id = 'shDim';
+    /* 맨 앞 층 (20261111b) — Layer · <dialog> (Esc · 바깥 · X 는 이 창만) */
+    var dim = global.Layer.make('sh-dim', 'shDim', '공유하기');
     dim.innerHTML = sheetHtml();
-    global.document.body.appendChild(dim);
+    global.Layer.show(dim, { full: true, remove: true });
     var b = dim.querySelector('[data-sh-link]'); if (b && b.focus) b.focus();
     refreshPv();
   }
-  function close() { var d = $('#shDim'); if (d) d.remove(); }
+  function close() { var d = $('#shDim'); if (d) { global.Layer.hide(d); if (d.parentNode) d.parentNode.removeChild(d); } }
   function refreshPv() {
     var fb = $('#shFb'), op = $('.sh-opts');
     if (fb && fb.hidden && op) op.classList.remove('is-fb');
@@ -441,7 +441,6 @@
         refreshPv();
       }
     });
-    D.addEventListener('keydown', function (e) { if (e.key === 'Escape' && $('#shDim')) close(); });
   }
 
   /* hub.js 가 러닝노트를 연 뒤 한 번 — { code, role, data() → 홈 값, base } · 미리보기면 부르지 않는다 */

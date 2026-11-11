@@ -211,16 +211,14 @@
     }
   }
   function pop(title, sub, items) {
-    var old = document.getElementById('gmPop'); if (old) old.remove();
-    var el = document.createElement('div');
-    el.className = 'gm-pop' + (reduced() ? ' is-still' : '');
-    el.id = 'gmPop';
-    el.setAttribute('role', 'status');
-    el.innerHTML = '<div class="gm-pop__in"><b class="gm-pop__t">' + esc(title) + '</b><span class="gm-pop__s">' + esc(sub) + '</span>' +
+    var old = document.getElementById('gmPop'); if (old) { global.Layer.hide(old); if (old.parentNode) old.parentNode.removeChild(old); }
+    /* 맨 앞 층 (20261111b) — Layer · <dialog> (Esc · 바깥 · 좋아요는 이 창만) */
+    var el = global.Layer.make('gm-pop' + (reduced() ? ' is-still' : ''), 'gmPop', title);
+    el.innerHTML = '<div class="gm-pop__in" role="status"><b class="gm-pop__t">' + esc(title) + '</b><span class="gm-pop__s">' + esc(sub) + '</span>' +
       (items.length ? '<span class="gm-pop__i">' + items.map(function (n) { return '<i>' + esc(n) + '</i>'; }).join('') + '</span>' : '') +
       '<button type="button" class="gm-pop__x" data-gm-popx>좋아요</button></div>';
-    document.body.appendChild(el);
-    el.addEventListener('click', function (e) { if (e.target.closest('[data-gm-popx]') || e.target === el) el.remove(); });
+    global.Layer.show(el, { full: true, remove: true });
+    el.addEventListener('click', function (e) { if (e.target.closest('[data-gm-popx]')) global.Layer.hide(el); });
   }
 
   /* ---------- 캐릭터 고르기 ---------- */
@@ -275,19 +273,24 @@
     H.draft = G().clean(H.prof, lv.i);
     if (!H.draft.char) H.draft.char = 'maratoni';
     var el = document.getElementById('gmSheet');
-    if (!el) { el = document.createElement('div'); el.className = 'gm-sheet'; el.id = 'gmSheet'; document.body.appendChild(el); }
+    /* 맨 앞 층 (20261111b) — Layer · <dialog> (Esc · 바깥 · 닫기는 이 창만) */
+    if (!el) {
+      el = global.Layer.make('gm-sheet', 'gmSheet', '캐릭터 고르기');
+      el.addEventListener('close', function () { if (!el.open) document.documentElement.classList.remove('gm-noscroll'); });
+      document.body.appendChild(el);
+    }
     el.innerHTML = pickerHtml();
-    el.hidden = false;
+    global.Layer.show(el, { full: true });
     document.documentElement.classList.add('gm-noscroll');
     if (!H.face && H.ctx.rpc) {
       Promise.resolve().then(function () { return H.ctx.preview ? { has: false, can: false } : H.ctx.rpc('hub_face', { p_code: H.ctx.code }); })
         .then(function (f) { H.face = f || { can: false }; repaintPicker(); }, function () { H.face = { can: false }; });
     }
   }
-  function repaintPicker() { var el = document.getElementById('gmSheet'); if (el && !el.hidden) { var sc = el.querySelector('.gm-sheet__in'), top = sc ? sc.scrollTop : 0; el.innerHTML = pickerHtml(); var s2 = el.querySelector('.gm-sheet__in'); if (s2) s2.scrollTop = top; } }
+  function repaintPicker() { var el = document.getElementById('gmSheet'); if (el && el.open) { var sc = el.querySelector('.gm-sheet__in'), top = sc ? sc.scrollTop : 0; el.innerHTML = pickerHtml(); var s2 = el.querySelector('.gm-sheet__in'); if (s2) s2.scrollTop = top; } }
   function closePicker() {
     var el = document.getElementById('gmSheet');
-    if (el) el.hidden = true;
+    if (el) global.Layer.hide(el);
     document.documentElement.classList.remove('gm-noscroll');
   }
   function msg(t) { var m = document.getElementById('gmMsg'); if (m) { m.hidden = !t; m.textContent = t || ''; } }

@@ -90,7 +90,7 @@
   function paint() { var b = document.getElementById('lvBody'); if (b) b.innerHTML = bodyHtml(); }
   function open() {
     var m = modal();
-    if (!m.open) m.showModal();
+    if (!m.open) Layer.show(m);
     load();
   }
   window.addEventListener('jt:roster-changed', function () { var m = document.getElementById('lvModal'); if (m && m.open) load(); });

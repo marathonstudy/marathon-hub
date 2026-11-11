@@ -99,7 +99,7 @@
     $('#cpText').value = '';
     $('#cpPreview').innerHTML = '<p class="panel__hint">붙여 넣고 [미리 보기]를 누르세요.</p>';
     $('#cpSave').disabled = true;
-    $('#phonePasteModal').showModal();
+    Layer.show($('#phonePasteModal'));
     setTimeout(function () { $('#cpText').focus(); }, 30);
   }
 

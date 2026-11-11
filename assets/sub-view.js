@@ -71,18 +71,17 @@
   function lbOpen(list, i, staff) {
     LB.list = list; LB.i = Math.max(0, Math.min(list.length - 1, i || 0)); LB.staff = staff || null;
     /* 맨 앞 층 (20261111a) — 학생 카드 창 · 학습 분석 창이 <dialog> 라 body 의 div 는 그 뒤에 깔린다 → 이것도 <dialog>(나중에 연 것이 맨 앞) */
+    /* 20261111b — 공통 Layer 로 (Esc · 바깥은 이 창만 · 닫으면 아래 창 스크롤 그대로) */
     if (!LB.el) {
-      LB.el = document.createElement('dialog'); LB.el.className = 'sv-lb'; LB.el.setAttribute('aria-label', '제출물 크게 보기');
-      LB.el.addEventListener('cancel', function (e) { e.preventDefault(); setTimeout(lbClose, 0); });      /* Esc — 이 창만 */
+      LB.el = Layer.make('sv-lb', '', '제출물 크게 보기');
+      LB.el.addEventListener('close', function () { if (!LB.el.open) { LB.el.innerHTML = ''; LB.list = []; } });
     }
-    if (LB.el.parentNode) LB.el.parentNode.removeChild(LB.el);
-    document.body.appendChild(LB.el);                                   /* 다시 열 때도 맨 끝으로 — 맨 앞 */
     LB.el.hidden = false;
-    try { if (typeof LB.el.showModal === 'function') LB.el.showModal(); else LB.el.setAttribute('open', ''); } catch (e) { LB.el.setAttribute('open', ''); }
+    Layer.show(LB.el, { full: true });
     lbPaint();
   }
   function lbClose() {
-    if (LB.el) { LB.el.hidden = true; LB.el.innerHTML = ''; try { if (LB.el.open && typeof LB.el.close === 'function') LB.el.close(); } catch (e) { /* 이미 닫힘 */ } LB.el.removeAttribute('open'); }
+    if (LB.el) { Layer.hide(LB.el); LB.el.hidden = true; LB.el.innerHTML = ''; }
     LB.list = [];
   }
 
@@ -103,9 +102,8 @@
     if (c) { openClass(c.getAttribute('data-sub-cls'), c.getAttribute('data-sub-day') || ''); }
   });
   document.addEventListener('keydown', function (e) {
-    if (!LB.el || LB.el.hidden) return;
-    if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); setTimeout(lbClose, 0); }      /* 뒤의 창(학습 분석 · 학생 카드)은 그대로 */
-    else if (e.key === 'ArrowRight' && LB.i < LB.list.length - 1) { LB.i++; lbPaint(); }
+    if (!LB.el || !Layer.isTop(LB.el)) return;                          /* Esc 는 Layer 가 이 창만 닫는다 */
+    if (e.key === 'ArrowRight' && LB.i < LB.list.length - 1) { LB.i++; lbPaint(); }
     else if (e.key === 'ArrowLeft' && LB.i > 0) { LB.i--; lbPaint(); }
   });
   /* 사진이 안 열리면 — 「앱에서 열기」 안내만 */

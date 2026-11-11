@@ -250,7 +250,7 @@
     adding = false; editing = '';
     $('#staffList').innerHTML = '<p class="panel__hint">운영진 목록을 불러오는 중…</p>';
     $('#staffDesc').textContent = '';
-    $('#staffModal').showModal();
+    Layer.show($('#staffModal'));
     load().catch(function (x) { $('#staffList').innerHTML = '<p class="panel__hint">' + esc(x.message) + '</p>'; });
   }
   $('#staffClose').addEventListener('click', function () { $('#staffModal').close(); });

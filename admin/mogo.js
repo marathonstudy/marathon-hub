@@ -243,7 +243,7 @@
     $('#mgNewTab', m).href = url;
     f.style.height = '70vh';
     f.src = url;
-    if (!m.open) m.showModal();
+    if (!m.open) Layer.show(m);
   }
   function openReport(id, title) { if (okId(id)) openUrl(ORIGIN + '/report.html?id=' + encodeURIComponent(id), title); }
   window.addEventListener('message', function (e) {

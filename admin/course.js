@@ -289,7 +289,7 @@
     $('#cmError').textContent = '';
   }
   function openManage() {
-    $('#courseModal').showModal();
+    Layer.show($('#courseModal'));
     openForm(null);
     renderManage();
     Promise.all([load(), loadStaff(), window.AiPolish ? AiPolish.memAll() : null]).then(renderManage);

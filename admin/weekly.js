@@ -725,7 +725,7 @@
     $('#btnWkCleanGo').disabled = true;
     clean.rows = [];
     loadCleanLog();
-    $('#wkCleanModal').showModal();
+    Layer.show($('#wkCleanModal'));
   }
 
   function findCleanup() {
@@ -761,7 +761,7 @@
     var bytes = list.reduce(function (n, f) { return n + (f.bytes || 0); }, 0);
     $('#wkCleanModal').close();
     UI.confirmAsk('지난 파일 정리', picked.join(', ') + ' — 파일 ' + list.length + '개 (' + sizeText(bytes) + ')를 완전히 지웁니다. 러닝노트에서도 사라지고 되살릴 수 없습니다. 지운 기록은 남습니다.', '모두 지우기').then(function (yes) {
-      if (!yes) { $('#wkCleanModal').showModal(); return; }
+      if (!yes) { Layer.show($('#wkCleanModal')); return; }
       toast('지우는 중입니다…');
       removeFiles(list).then(function (n) {
         toast(n + '개 파일을 지웠습니다', 'good');

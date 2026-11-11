@@ -483,7 +483,7 @@
         '<button class="btn btn--sm" type="button" data-rv="skip-pick" data-tid="' + esc(t.id) + '"' + (n ? ' disabled' : '') + '>빼기</button>' +
       '</div>';
     }).join('');
-    $('#rvSkipModal').showModal();
+    Layer.show($('#rvSkipModal'));
   }
 
   /* 점수 칸에 바로 커서 — 전체 문항 수를 이미 알면 틀린 개수 칸 (20261108t) */
@@ -580,13 +580,13 @@
     sb().storage.from(BUCKET).createSignedUrls(paths, 600).then(function (r) {
       var urls = ((r && r.data) || []).map(function (x) { return x.signedUrl; }).filter(Boolean);
       if (r.error || !urls.length) { toast('사진을 열지 못했습니다', 'bad'); return; }
-      var box = document.createElement('div');
-      box.className = 'rv-light rv-light--many';
+      /* 맨 앞 층 (20261111b) — 창 안에서 열어도 그 위에 (Layer) */
+      var box = Layer.make('rv-light rv-light--many', '', '시험지 사진');
       box.innerHTML = urls.map(function (u, i) { return '<img alt="시험지 사진 ' + (i + 1) + '" src="' + esc(u) + '">'; }).join('') +
         '<button type="button" class="rv-light__close" aria-label="닫기">×</button>';
-      box.addEventListener('click', function (ev) { if (ev.target.tagName !== 'IMG' || urls.length === 1) box.remove(); });
-      box.querySelector('.rv-light__close').addEventListener('click', function () { box.remove(); });
-      document.body.appendChild(box);
+      box.addEventListener('click', function (ev) { if (ev.target !== box && (ev.target.tagName !== 'IMG' || urls.length === 1)) Layer.hide(box); });
+      box.querySelector('.rv-light__close').addEventListener('click', function () { Layer.hide(box); });
+      Layer.show(box, { full: true, remove: true });
     });
   }
 
@@ -632,7 +632,7 @@
   function openLive() {
     if (!st.cls) return;
     st.live = { cls: st.cls, mon: st.mon };
-    $('#rvLive').hidden = false;
+    Layer.show($('#rvLive'), { full: true, outside: false, onClose: function () { if (st.live) closeLive(); } });
     document.body.classList.add('rv-live-open');
     loadLive();
     clearInterval(st.liveTimer);
@@ -640,9 +640,10 @@
   }
 
   function closeLive() {
-    $('#rvLive').hidden = true;
+    st.live = null;
+    Layer.hide($('#rvLive'));
     document.body.classList.remove('rv-live-open');
-    clearInterval(st.liveTimer); st.liveTimer = null; st.live = null;
+    clearInterval(st.liveTimer); st.liveTimer = null;
     if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(function () {});
   }
 
@@ -688,7 +689,7 @@
     if (!st.cls) return;
     $('#rvStatsTitle').textContent = st.cls + ' · 시험별 평균';
     $('#rvStatsBody').innerHTML = '<p class="panel__hint">불러오는 중…</p>';
-    $('#rvStatsModal').showModal();
+    Layer.show($('#rvStatsModal'));
     sb().rpc('review_stats', { p_class: st.cls }).then(function (r) {
       if (r.error) { $('#rvStatsBody').innerHTML = '<p class="panel__hint">' + esc(isMissing(r.error) ? NEED_SQL : r.error.message) + '</p>'; return; }
       var list = r.data || [];
@@ -711,7 +712,7 @@
     document.addEventListener('click', function (e) {
       if (st.menu && !(e.target.closest && e.target.closest('.rv-thc'))) { st.menu = ''; draw(); }
     });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && st.menu) { st.menu = ''; draw(); } });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && st.menu) { e.preventDefault(); st.menu = ''; draw(); } });   /* 메뉴만 닫고 창은 그대로 */
     $('#rvSub').addEventListener('click', onClick);
     $('#rvSkipList').addEventListener('click', onClick);
     $('#rvSkipClose').addEventListener('click', function () { $('#rvSkipModal').close(); });
@@ -723,7 +724,6 @@
       var el = $('#rvLive');
       if (el.requestFullscreen) el.requestFullscreen().catch(function () {});
     });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && st.live) closeLive(); });
     $('#btnRvStats').addEventListener('click', openStats);
     $('#btnRvStatsClose').addEventListener('click', function () { $('#rvStatsModal').close(); });
 

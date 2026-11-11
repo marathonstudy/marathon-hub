@@ -285,7 +285,7 @@
     var m = modal();
     document.getElementById('wyTitle').textContent = st.items.length > 1 ? '걱정 문자 · ' + st.items.length + '명 각각' : '걱정 문자';
     paint();
-    if (!m.open) { if (m.showModal) m.showModal(); else m.setAttribute('open', ''); }
+    if (!m.open) { Layer.show(m); }
     autoDraft(cur());
     if (window.Welcome && Welcome.sentToday) Promise.resolve(Welcome.sentToday('worry')).then(function (l) { st.sent = l || []; paint(); });
   }

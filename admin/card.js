@@ -127,7 +127,7 @@
     $('#cardDesc').textContent = [s.className, s.school, s.grade].filter(Boolean).join(' · ') +
       ' — 선생님·조교만 봅니다. 학부모 화면에는 나가지 않습니다';
     $('#cardBody').innerHTML = '<p class="panel__hint">불러오는 중…</p>';
-    modal.showModal();
+    Layer.show(modal);
     loadAll().then(function () {
       if (opts && opts.compose) {
         var ta = $('#cnBody');
@@ -359,13 +359,12 @@
       el.title = [m && m.welcome ? '신입생 웰컴 · 앱 설치 안내 문자 ' + fmtDT(m.welcome) : '', m && m.nudge ? '과제 독려 문자 ' + fmtDT(m.nudge) : ''].filter(Boolean).join(' · ');
     });
   }
-  /* 맨 위 [학부모 화면 미리보기] [학생 화면 미리보기] — 카드를 닫고 미리보기 (미리보기는 창 위가 아니라 화면 위에 뜬다) */
+  /* 맨 위 [학부모 화면 미리보기] [학생 화면 미리보기] — 카드 위에 미리보기 (20261111b · Layer 로 맨 앞 · 닫으면 같은 카드 · 같은 스크롤 그대로)
+     예전에는 미리보기가 카드 뒤에 깔려 카드를 닫고 열었다 — 닫은 뒤 카드가 다시 열리지 않았다 */
   document.addEventListener('click', function (e) {
     var b = e.target.closest('[data-cdpv]');
     if (!b || !C || !C.sid) return;
-    var sid = C.sid;
-    if (modal.open) modal.close();
-    if (window.Preview) Preview.open(sid, b.dataset.cdpv);
+    if (window.Preview) Preview.open(C.sid, b.dataset.cdpv);
   });
   window.addEventListener('jt:welcome-sent', function () { if ($('#cardModal') && $('#cardModal').open) loadWelcome(); });
   function loadLogin() {

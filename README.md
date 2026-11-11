@@ -1346,6 +1346,22 @@ delete from public.staff where email = '조교이메일@example.com';
   코치룸 학생 → 명단 위 [앱 연결 필요 n명] — 학생별 이유 · 짐작 표시 · 학생 · 학부모 번호 고치기(학생 정보 저장과 같은 길) → DB 트리거가 다음 동기화(5분 안) 때 다시 찾음(「다시 찾는 중」) · 후보 [#번호로 연결] · 직접 연결 · [지금 다시 찾기] · 학생 카드 「앱 연결 필요」 칸도 같은 이유 글
   번호 · 후보 · 이유는 직원(app_link_need_list · app_link_info)만 — 러닝노트(hub_app_record)에는 옛 과제 기록만 나감
 
+### 5-132. 20261111b — 앱 옛 기록 받기가 한 번도 안 돌던 문제 · 창 안에서 여는 창이 뒤에 깔리던 문제 전체 (migration-105 · 함수 app-sync 다시 배포)
+1. SQL Editor → `supabase/migration-105-app-old-log.sql` → Run (104 다음 · 맨 끝 확인 표 모두 true)
+2. Edge Functions → **app-sync** — `index.ts` 전체로 바꿔 Deploy
+3. 10분쯤 뒤 확인 — `supabase/check-app-old-run-1111.sql`(읽기만 · 한 표) · 마지막 동기화 시각 · 5분 예약 · 앱 읽기 열쇠 있음/없음 · 받기 방법(학생 기준 주소 / 공유 코드 · 못 받은 이유) · 옛 기록 받음 · 옛 기록 없음 · 앱이 안 줌 · 실패(이유별) · 「앱이 지금 반 기간만 주나」 · 학생별 받은 가장 이른 날짜(이름은 성 + ○)
+- 옛 기록 — 원인: 104 의 고르기(app_old_due)가 「학생 기준 주소로 받은 학생(app_records.src = 'user')」만 골랐다 → 공유 리포트 응답의 학생 id 로 연결된 학생 · 학생 기준 주소가 실패해 공유 코드로 받는 학생은 앱 id 가 있어도 한 번도 안 골라짐 · 고르기 · 저장 · 받기가 실패해도 함수가 조용히 넘어가 아무 기록이 없었다
+  고친 것 — 앱 id 가 있는 재원 학생 모두(받기 방법 · 저장본과 상관없이) · 학생마다 결과 app_records.old_status(ok · empty · none · fail) · old_err · old_from ~ old_to(요청 기간) · old_got_first(앱이 실제로 준 가장 이른 날짜) · old_got_n · old_classes · old_tries
+  실패하면 30분 · 1시간 · 2시간 … 6시간까지 늘려 다시 · 실패한 묶음도 학생마다 「fail · 이유」 · 건너뛰면 이유(night · nokey · time) · 고르기 · 저장 오류는 err
+  동기화 기록 app_sync_runs — 5분마다 · [새로고침]마다 숫자 · 이유 코드만(이름 · 번호 · 열쇠 값 없음 · 열쇠는 있음/없음만) · 7일 · 서버 · SQL 편집기만
+- 창 — 원인: 학생 카드 등 코치룸 창이 `<dialog>`(맨 위 층)라 body 에 붙인 div 겹창(러닝노트 미리보기 · 레포트 미리보기 · 사진 …)은 그 뒤에 깔림 · 미리보기는 Esc 에 학생 카드까지 닫히고 · 카드 머리의 [학부모 · 학생 화면 미리보기]는 카드를 닫고 다시 안 열었다
+  공통 함수 `assets/layer.js`(Layer.show · hide · make · top) — 모든 창을 body 바로 아래 `<dialog>` 로(나중에 연 것이 맨 앞) · 열린 동안 뒤 화면 스크롤 막음 · Esc · 바깥 · X 는 맨 앞 창만 · 닫으면 아래 창들 스크롤 위치 그대로
+  바꾼 창 — 코치룸 `<dialog>` 54곳(학생 카드 · 정보 · 확인 창 · 문자 · 앱 연결 필요 · 상담 · 모의고사 · 사진 …)을 모두 Layer.show 로 · 미리보기(pv-overlay) · 시험지 사진(rv-light) · 지금 제출 현황(rv-live) · 필기 사진 · 시험지 사진(ph-light) · 복습 노트(rn-reader) · 모의고사 레포트(mgv-ov) · 공유(sh-dim) · 레벨업 알림(gm-pop) · 캐릭터 고르기(gm-sheet) · 홈 화면 추가 안내(a2hs-dim) · 학습 분석 · 리캡 · 제출물 크게 보기를 div → `<dialog>`
+  미리보기는 학생 카드 위에 겹쳐 뜬다(카드를 닫지 않음 · 닫으면 같은 카드 · 같은 스크롤) · 미리보기 안(iframe)에서 누른 Esc 도 러닝노트 쪽 창이 없으면 미리보기를 닫음
+  답을 기다리는 창(확인 · 백업 암호 · 공개 경고 · 다른 분이 먼저 고침 · 파일 정리)은 바깥을 눌러도 안 닫힘(data-ly-keep) · 보통 창은 안에 쓰기 시작했으면 바깥으로 안 닫힘 · 확인 창은 Esc = 취소
+  칸 안에서 먼저 처리한 Esc(편집 취소 · 메뉴 닫기)는 창을 닫지 않음 · 설명 풍선(tip)은 맨 앞 창 안에
+  시험(e2e132) — 직접 showModal 하는 파일이 있거나 화면 전체 겹창(position: fixed · inset: 0)을 div 로 만들면 실패
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

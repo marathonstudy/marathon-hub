@@ -184,7 +184,7 @@
     var s = Store.getStudents().find(function (x) { return x.id === sid; }) || {};
     $('#phGalleryTitle').textContent = (s.name || '') + ' · ' + Store.dateWithDow(date) + ' 수업 필기';
     $('#phGallery').innerHTML = '<p class="panel__hint">불러오는 중…</p>';
-    $('#phGalleryModal').showModal();
+    Layer.show($('#phGalleryModal'));
     renderGallery();
   }
 

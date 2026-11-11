@@ -155,7 +155,7 @@
     var dlg = dialog();
     st.pv = '';
     render();
-    if (!dlg.open) dlg.showModal();
+    if (!dlg.open) Layer.show(dlg);
     load().then(function () { render(); paintBar(); });
   }
   function fn(body) {

@@ -401,7 +401,7 @@
     if (o.cls) st.classes[o.cls] = true;
     $('#wcTitle').textContent = KIND[o.kind].title;
     $('#wcBody').innerHTML = '<p class="panel__hint">불러오는 중…</p>';
-    if (!modal().open) modal().showModal();
+    if (!modal().open) Layer.show(modal());
     return load(o.kind).then(function () {
       if (o.kind === 'entry') st.bodySt = tplBody('입구 안내', ENTRY_BODY);
       else if (o.kind === 'nudge') hwSetup();

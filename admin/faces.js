@@ -198,7 +198,7 @@
     var m = ensureModal();
     drill.open = true;
     if (cls) drill.cls = cls;
-    if (!m.open) m.showModal();
+    if (!m.open) Layer.show(m);
     if (drill.cls) startClass(drill.cls); else paintDrill();
   }
 

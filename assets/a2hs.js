@@ -117,13 +117,13 @@
   var KAKAO = [['dots', '오른쪽 아래(또는 위) <b>⋮ · ⋯</b>를 눌러요'], ['out', '<b>다른 브라우저로 열기</b> (아이폰은 <b>Safari로 열기</b>)'], ['home', '열린 화면에서 다시 <b>[추가하기]</b>']];
 
   /* ---------- 안내 창 ---------- */
-  function closeSheet() { var d = doc.getElementById('a2hsDim'); if (d) d.remove(); }
+  function closeSheet() { var d = doc.getElementById('a2hsDim'); if (d) { global.Layer.hide(d); if (d.parentNode) d.parentNode.removeChild(d); } }
   function sheet(title, body, buttons) {
     style();
     closeSheet();
-    var d = doc.createElement('div');
-    d.className = 'a2hs-dim'; d.id = 'a2hsDim';
-    d.innerHTML = '<div class="a2hs-sheet" role="dialog" aria-modal="true" aria-label="' + title + '">' +
+    /* 맨 앞 층 (20261111b) — Layer · <dialog> (Esc · 바깥 · 닫기는 이 창만) */
+    var d = global.Layer.make('a2hs-dim', 'a2hsDim');
+    d.innerHTML = '<div class="a2hs-sheet" aria-label="' + title + '">' +
       '<button type="button" class="a2hs-close" data-a2hs-close aria-label="닫기">×</button><h3>' + title + '</h3>' + body +
       '<div class="a2hs-row">' + (buttons || '') + '<button type="button" class="a2hs-btn" data-a2hs-close>닫기</button></div></div>';
     d.addEventListener('click', function (e) {
@@ -131,7 +131,7 @@
       var cp = e.target.closest('[data-a2hs-copy]');
       if (cp) copyUrl(cp);
     });
-    doc.body.appendChild(d);
+    global.Layer.show(d, { full: true, remove: true });
     return d;
   }
   function here() { return String(global.location.href || '').replace(/[?&]app=1\b/, ''); }

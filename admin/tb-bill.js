@@ -412,7 +412,7 @@
       ? '지금 첨부: <a href="#" class="tb-link" data-receipt="' + esc(b.receipt_path) + '">📎 캡처 보기</a> (새 파일을 고르면 바뀝니다)'
       : '';
     $('#tbPayError').classList.remove('is-on');
-    $('#tbPayModal').showModal();
+    Layer.show($('#tbPayModal'));
   }
 
   function submitPay(e) {
@@ -447,7 +447,7 @@
       btn.disabled = false;
       if (res && res.ok) toast(b._name + ' 납부 완료로 저장했습니다', 'good');
     }).catch(function (x) {
-      if (!$('#tbPayModal').open) $('#tbPayModal').showModal();
+      if (!$('#tbPayModal').open) Layer.show($('#tbPayModal'));
       btn.disabled = false;
       err.textContent = x.message;
       err.classList.add('is-on');
@@ -471,7 +471,7 @@
     $('#tbBillAdjAmount').value = b.adjust || '';
     $('#tbBillAdjReason').value = b.adjust_reason || '';
     $('#tbBillAdjError').classList.remove('is-on');
-    $('#tbBillAdjModal').showModal();
+    Layer.show($('#tbBillAdjModal'));
   }
 
   function submitAdj(e) {
@@ -535,7 +535,7 @@
       '<button class="btn" type="button" data-nact="copy">문구 복사</button>' +
       '<button class="btn" type="button" data-nact="link"' + (link ? '' : ' disabled') + '>링크만 복사</button>';
     renderNoticeHistory();
-    $('#tbNoticeModal').showModal();
+    Layer.show($('#tbNoticeModal'));
   }
 
   function renderNoticeHistory() {
@@ -675,7 +675,7 @@
     $('#tbRefundStatus').value = r ? (r.status === 'canceled' ? 'requested' : r.status) : 'requested';
     $('#tbRefundMemo').value = r ? r.memo || '' : '';
     $('#tbRefundError').classList.remove('is-on');
-    $('#tbRefundModal').showModal();
+    Layer.show($('#tbRefundModal'));
   }
 
   function submitRefund(e) {

@@ -86,7 +86,7 @@
     $('#dnvTitle').textContent = label(v.kind, v.id, v.key);
     $('#dnvTheirs').textContent = textOf(serverValue(v.kind, v.row, v.key)) || '(비어 있음)';
     $('#dnvMine').textContent = textOf(localValue(v.kind, v.id, v.key)) || '(비어 있음)';
-    dlg.showModal();
+    Layer.show(dlg);
   }
 
   function closeNote(n) {
@@ -184,7 +184,7 @@
     hist = { kind: kind, id: id, key: key, list: [] };
     $('#thTitle').textContent = '이전 내용 — ' + label(kind, id, key);
     $('#thBody').innerHTML = '<p class="panel__hint">불러오는 중…</p>';
-    $('#textHistoryModal').showModal();
+    Layer.show($('#textHistoryModal'));
     sb().rpc('text_history_list', { p_week: week(), p_kind: kind, p_target: id, p_field: key }).then(function (r) {
       if (r.error) {
         $('#thBody').innerHTML = '<p class="panel__hint">' + (/Could not find the function|schema cache/i.test(r.error.message) ? 'migration-014 SQL 을 먼저 실행해 주세요.' : esc(r.error.message)) + '</p>';

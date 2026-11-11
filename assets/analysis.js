@@ -374,46 +374,19 @@
      → 상세 창도 body 바로 아래 <dialog> 로 띄운다(나중에 띄운 것이 맨 앞) · 열린 동안 뒤 화면 스크롤 막음
      · 닫으면 뒤 화면(학생 카드 창 안 스크롤까지) 원래 위치 그대로 · Esc 는 이 창만 닫는다(학생 카드는 그대로)
      ============================================================ */
-  var LOCK = null;
-  function scrollSpots() {
-    var out = [], se = D.scrollingElement || D.documentElement;
-    out.push({ el: se, top: se.scrollTop });
-    Array.prototype.forEach.call(D.querySelectorAll('dialog[open]:not(.an-layer)'), function (dl) {
-      [dl].concat(Array.prototype.slice.call(dl.querySelectorAll('*'))).forEach(function (x) { if (x.scrollTop > 0) out.push({ el: x, id: x.id, top: x.scrollTop }); });
-    });
-    return out;
-  }
-  function lock() {
-    if (LOCK) return;
-    LOCK = scrollSpots();
-    D.documentElement.classList.add('an-lock');
-    D.body.classList.add('an-lock');
-  }
-  function unlock() {
-    if (!LOCK || D.getElementById('anFull') || D.getElementById('anRecap')) return;
-    var spots = LOCK;
-    LOCK = null;
-    D.documentElement.classList.remove('an-lock');
-    D.body.classList.remove('an-lock');
-    spots.forEach(function (s) {
-      var el = s.el && s.el.isConnected ? s.el : (s.id ? D.getElementById(s.id) : null);   /* 뒤 화면을 다시 그렸으면 같은 id 로 */
-      if (el) el.scrollTop = s.top;
-    });
-  }
+  /* 20261111b — 창 띄우기는 공통 Layer(assets/layer.js) 로: 스크롤 막기 · 되돌리기 · Esc · 바깥은 맨 앞 창만 */
+  function lock() { /* Layer 가 한다 */ }
+  function unlock() { /* Layer 가 한다 */ }
   function layer(cls, id) {
-    var el = D.createElement('dialog');
-    el.className = cls + ' an-layer'; el.id = id;
-    /* Esc — 이 창의 cancel 만 막고 닫는다 (학생 카드 창까지 닫히지 않게) */
-    el.addEventListener('cancel', function (e) { e.preventDefault(); setTimeout(function () { if (id === 'anRecap') closeRecap(); else closeFull(); }, 0); });
+    var el = global.Layer.make(cls + ' an-layer', id);
+    /* Esc · 바깥 — Layer 가 닫으면 여기 상태도 정리 (onClose) */
+    el._anClose = function () { if (id === 'anRecap') { if (RC && RC.el === el) closeRecap(); } else if (FULL && FULL.el === el) closeFull(); };
     return el;
   }
-  function show(el) {
-    D.body.appendChild(el);
-    try { if (typeof el.showModal === 'function') el.showModal(); else el.setAttribute('open', ''); } catch (e) { el.setAttribute('open', ''); }
-  }
+  function show(el) { global.Layer.show(el, { full: true, onClose: el._anClose }); }
   function hide(el) {
     if (!el) return;
-    try { if (el.open && typeof el.close === 'function') el.close(); } catch (e) { /* 이미 닫힘 */ }
+    global.Layer.hide(el);
     if (el.parentNode) el.parentNode.removeChild(el);
   }
 
@@ -579,9 +552,7 @@
       if (pt) showPoint(pt);
     });
     D.addEventListener('keydown', function (e) {
-      /* Esc — 이 창만 (기본 동작을 막아 뒤의 학생 카드 창이 같이 닫히지 않게 · 닫기는 한 틱 뒤에) */
-      var opened = D.querySelectorAll('dialog[open]'), topEl = opened[opened.length - 1];
-      if (e.key === 'Escape' && (RC || FULL) && (!topEl || topEl === (RC || FULL).el)) { e.preventDefault();      /* 그 위에 제출물 창이 열려 있으면 그쪽이 닫힘 */ e.stopPropagation(); setTimeout(function () { if (RC) closeRecap(); else if (FULL) closeFull(); }, 0); return; }
+      /* Esc — Layer 가 맨 앞 창만 닫는다 (뒤의 학생 카드 창은 그대로 · 20261111b) */
       if ((e.key === 'Enter' || e.key === ' ') && FULL && e.target && e.target.closest && e.target.closest('#anFull [data-an-pt]')) { e.preventDefault(); showPoint(e.target.closest('[data-an-pt]')); }
     });
   }

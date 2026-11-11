@@ -194,7 +194,7 @@
     $('#vlMore').textContent = '불러오는 중…';
     $('#vlBody').scrollTop = 0;
     paintPut();
-    if (!d.open) d.showModal();
+    if (!d.open) Layer.show(d);
     loadSame(st.run);
     more();
   }

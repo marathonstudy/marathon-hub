@@ -404,7 +404,7 @@
         '<span>' + esc(it.label) + '</span>' + (it.hint ? '<span class="sheet__hint">' + esc(it.hint) + '</span>' : '') + '</button>';
     }).join('');
     menuPick = onPick;
-    $('#sendMenu').showModal();
+    Layer.show($('#sendMenu'));
   }
   $('#sendMenuList').addEventListener('click', function (e) {
     var b = e.target.closest('[data-pick]');
@@ -623,7 +623,7 @@
       });
       host.appendChild(b);
     });
-    modal.showModal();
+    Layer.show(modal);
   }
 
   $('#btnPhonePickCancel').addEventListener('click', function () { $('#phonePickModal').close(); });
@@ -653,7 +653,7 @@
     $('#greetingText').value = state.greeting;
     $('#greetingError').classList.remove('is-on');
     updateGreetPreview();
-    greetModal.showModal();
+    Layer.show(greetModal);
   }
 
   $('#btnGreetingCancel').addEventListener('click', function () { greetModal.close(); });

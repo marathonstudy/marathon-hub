@@ -2605,7 +2605,7 @@
       ['#tdSetMoney', '#tdSetWeeks', '#tdSetMin', '#tdSetAppLow', '#tdSetPhoto', '#tdSetGrace', '#tdSetParentWrite'].forEach(function (s) { $(s).disabled = !teacher; });
       $('#tdSetSave').hidden = !teacher;
       $('#tdSetNote').textContent = teacher ? '' : '직원 정보를 불러오는 중입니다. 잠시 뒤 다시 열어 주세요.';
-      $('#tdSettingsModal').showModal();
+      Layer.show($('#tdSettingsModal'));
     }).catch(function (e) { toast(e.message, 'bad'); });
   });
   $('#tdSetCancel').addEventListener('click', function () { $('#tdSettingsModal').close(); });

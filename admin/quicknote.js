@@ -161,7 +161,7 @@
     d.innerHTML = '<div class="qn-pop__head"><h3 class="qn-pop__t" id="qnHwPopT">' + esc((s.name || '') + ' · ' + perLabel(n._p) + ' 과제 상담') + '</h3>' +
       '<button type="button" class="cs-x" data-qn-popx aria-label="닫기">✕</button></div>' + hwRowBody(sid, n) +
       '<p class="qn-pop__m num">' + esc(mdw(n.note_date) + ' · ' + (n.author_name || '')) + '</p>';
-    if (!d.open) d.showModal();
+    if (!d.open) Layer.show(d);
   }
   /* 학생 줄 — 판정일이 지난 숫자 약속을 과제 기록이 오면 저장 (수업 전 예고를 끈 반 · 한 번씩) */
   var judgeTm = null;
@@ -462,7 +462,7 @@
     var sc0 = document.getElementById('csScroll');
     if (sc0) sc0.scrollTop = 0;
     paint();
-    if (!m.open) m.showModal();
+    if (!m.open) Layer.show(m);
     kb();
     loadCfg().then(paint);
     loadNotes(sid);

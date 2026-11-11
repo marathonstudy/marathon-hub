@@ -1362,7 +1362,7 @@
     renderInfoBar();
     renderSnipBar();
     $('#commentWarn').classList.remove('is-on');
-    commentModal.showModal();
+    Layer.show(commentModal);
     if (window.AiPolish) AiPolish.refresh('commentAi');
     setTimeout(function () { $('#commentText').focus(); }, 40);
   }
@@ -1667,7 +1667,7 @@
 
   $('#btnManageSnips').addEventListener('click', function () {
     renderSnipList();
-    snipModal.showModal();
+    Layer.show(snipModal);
   });
 
   function renderSnipList() {
@@ -1800,7 +1800,7 @@
                '<span class="spell-bad">' + escapeHtml(w.found) + '</span> → ' +
                '<span class="spell-ok">' + escapeHtml(w.suggest) + '</span></div>';
       }).join('');
-      spellModal.showModal();
+      Layer.show(spellModal);
     } else {
       doEnqueue();
     }

@@ -54,7 +54,7 @@
     UI.selectTab(last.report);
   });
   $('#grp-students').addEventListener('click', function () { UI.selectTab(last.students); });
-  $('#grp-more').addEventListener('click', function () { $('#moreMenu').showModal(); });
+  $('#grp-more').addEventListener('click', function () { Layer.show($('#moreMenu')); });
 
   /* ---------- 더보기 ---------- */
   function closeMore(then) {
@@ -88,7 +88,7 @@
   if (window.A2HS) A2HS.register('sw.js');
 
   /* ---------- 주차 띠 ⋯ — 날짜 직접 고르기 · 이번 주로 ---------- */
-  $('#btnWbarMore').addEventListener('click', function () { $('#weekPickModal').showModal(); });
+  $('#btnWbarMore').addEventListener('click', function () { Layer.show($('#weekPickModal')); });
   $('#weekPickClose').addEventListener('click', function () { $('#weekPickModal').close(); });
   $('#btnThisWeek').addEventListener('click', function () { setTimeout(function () { if ($('#weekPickModal').open) $('#weekPickModal').close(); }, 0); });
 

@@ -237,10 +237,9 @@
 
   function build() {
     if (el()) return el();
-    var o = document.createElement('div');
-    o.id = 'pvOverlay';
-    o.className = 'pv-overlay';
-    o.hidden = true;
+    /* 맨 앞 층 (20261111b) — 학생 카드 창(<dialog>) 안에서 열어도 그 위에 · Layer 로 띄우고 닫으면 학생 카드는 같은 스크롤 그대로 */
+    var o = Layer.make('pv-overlay', 'pvOverlay', '러닝노트 미리보기');
+    o.addEventListener('close', function () { if (!o.open) shut(); });
     o.innerHTML =
       '<div class="pv-bar">' +
         '<div class="pv-bar__title" id="pvTitle"></div>' +
@@ -259,6 +258,17 @@
       '</div>' +
       '<div class="pv-frame-wrap" id="pvWrap"><iframe class="pv-frame" id="pvFrame" title="러닝노트 미리보기"></iframe></div>';
     document.body.appendChild(o);
+    /* 미리보기 안(iframe)에서 누른 Esc — 러닝노트 쪽에 열린 창이 없을 때만 미리보기를 닫는다 */
+    o.querySelector('#pvFrame').addEventListener('load', function () {
+      try {
+        var fw = this.contentWindow, fd = fw && fw.document;
+        if (!fd || fd._pvEsc) return;
+        fd._pvEsc = true;
+        fd.addEventListener('keydown', function (e) {
+          if ((e.key === 'Escape' || e.key === 'Esc') && !e.defaultPrevented && !(fw.Layer && fw.Layer.count()) && Layer.isTop(o)) { e.preventDefault(); close(); }
+        });
+      } catch (err) { /* 다른 주소면 그대로 */ }
+    });
     o.addEventListener('click', function (e) {
       var b = e.target.closest('[data-pvset]');
       if (b) { cur.role = b.dataset.pvset; bridge.view = ''; bridge.arg = ''; load(); }
@@ -320,17 +330,22 @@
     cur.role = role === 'student' ? 'student' : 'parent';
     cur.mode = view && view !== 'app' ? 'live' : 'week';   /* 주차 현황 [보기] 처럼 볼 주를 정해 열면 공개된 화면 · [과제 상세 보기]는 그대로 */
     var o = build();
-    o.hidden = false;
+    Layer.show(o, { full: true, outside: false });
     document.body.classList.add('pv-open');
     load();
   }
 
+  function shut() {
+    var o = el();
+    if (!o) return;
+    o.querySelector('#pvFrame').src = 'about:blank';
+    document.body.classList.remove('pv-open');
+  }
   function close() {
     var o = el();
     if (!o) return;
-    o.hidden = true;
-    o.querySelector('#pvFrame').src = 'about:blank';
-    document.body.classList.remove('pv-open');
+    Layer.hide(o);
+    shut();
   }
 
   /* 명단 · 레포트 발송 → 1 작성 · 레포트 발송 → 3 발송의 [학부모 화면] [학생 화면] · [과제 상세 보기](data-pv-view="app") 단추
@@ -343,10 +358,10 @@
     var holder = b.closest('[data-id]');
     open(b.dataset.sid || (holder && holder.dataset.id), b.dataset.pv, b.dataset.pvView || '');
   }, true);
+  /* Esc 는 Layer 가 맨 앞 창만 닫는다 (뒤의 학생 카드는 그대로) · 화살표는 미리보기가 맨 앞일 때만 */
   document.addEventListener('keydown', function (e) {
-    if (!el() || el().hidden) return;
-    if (e.key === 'Escape') close();
-    else if (cur.list && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !(e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName))) step(e.key === 'ArrowRight' ? 1 : -1);
+    if (!el() || !Layer.isTop(el())) return;
+    if (cur.list && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !(e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName))) step(e.key === 'ArrowRight' ? 1 : -1);
   });
 
   window.Preview = { open: open, close: close, state: function () { return { sid: cur.sid, list: cur.list, role: cur.role, view: bridge.view, arg: bridge.arg }; } };

@@ -90,7 +90,7 @@
     $('#cmtRemind').checked = !!m.remind; $('#cmtMin').value = m.min || 5;
     $('#cmtStaff').innerHTML = '<p class="muted-note">운영진 불러오는 중…</p>';
     $('#cmtError').textContent = '';
-    $('#classMetaModal').showModal();
+    Layer.show($('#classMetaModal'));
     sb().rpc('staff_list').then(function (r) {
       staffList = r.error ? [] : ((r.data && r.data.staff) || []).filter(function (s) { return s.active; });
       $('#cmtStaff').innerHTML = staffList.length ? staffList.map(function (s) {
@@ -365,7 +365,7 @@
     editing = '';
     data = null;
     $('#caBody').innerHTML = '<p class="panel__hint">불러오는 중…</p>';
-    modal.showModal();
+    Layer.show(modal);
     load();
   });
 

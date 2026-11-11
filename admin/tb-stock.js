@@ -132,7 +132,7 @@
     $('#tbAdjustQty').value = '';
     $('#tbAdjustReason').value = '';
     $('#tbAdjustError').classList.remove('is-on');
-    $('#tbAdjustModal').showModal();
+    Layer.show($('#tbAdjustModal'));
   }
 
   function submitAdjust(e) {
@@ -375,7 +375,7 @@
              '<input class="input input--num" inputmode="numeric" data-book="' + b.book_id + '" value="' + b.qty + '" aria-label="들어온 부수"></label>';
     }).join('');
     $('#tbReceiveError').classList.remove('is-on');
-    $('#tbReceiveModal').showModal();
+    Layer.show($('#tbReceiveModal'));
   }
 
   function submitReceive(e) {

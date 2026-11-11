@@ -46,12 +46,12 @@
   }
 
   function lightbox(url) {
-    var box = document.createElement('div');
-    box.className = 'ph-light';
+    /* 맨 앞 층 (20261111b) — Layer · <dialog> */
+    var box = Layer.make('ph-light', '', '시험지 사진');
     box.innerHTML = '<img alt="시험지 사진"><button type="button" class="ph-light__close" aria-label="닫기">×</button>';
     box.querySelector('img').src = url;
-    box.addEventListener('click', function () { box.remove(); });
-    document.body.appendChild(box);
+    box.addEventListener('click', function () { Layer.hide(box); });
+    Layer.show(box, { full: true, remove: true });
   }
 
   /* ============================================================
