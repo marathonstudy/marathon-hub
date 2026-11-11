@@ -634,7 +634,10 @@
         var r = x[0];
         APP.why = r && !r.ok ? String(r.reason || '') : '';      /* 'expired' — 링크 만료 (과제 상세 탭 안내 · 20261031n) */
         if (!(r && r.ok)) return null;
-        return global.AppWeek && AppWeek.withFix ? AppWeek.withFix(r.data || {}, x[1]) : (r.data || {});
+        /* 앱 옛 기록(수강 시작일 앞 · 104) — data.old 로 붙여 두면 능력치 · 학습 분석 · 배지 칸만 합친다(경험치 · 퀘스트 · 과제 칸은 안 씀) */
+        var base = r.data || {};
+        if (r.old && typeof r.old === 'object' && Array.isArray(r.old.history)) base = Object.assign({}, base, { old: r.old });
+        return global.AppWeek && AppWeek.withFix ? AppWeek.withFix(base, x[1]) : base;
       }, function () { return null; });
       /* 실패는 남기지 않는다 — [다시 시도]는 새로 부른다 */
       APP.p.then(function (d) { if (!d && APP.code === code) APP.p = null; });

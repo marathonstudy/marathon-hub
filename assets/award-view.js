@@ -210,8 +210,11 @@
   function gridStart(v) {
     var ks = Object.keys(weekMap(v)).sort(), cur = curMon(v);
     if (!ks.length) return cur;
-    var st = monOf(startOf(v)), first = ks[0];
+    var map = weekMap(v), st = monOf(startOf(v)), first = ks[0];
     var k = st > first ? st : first;
+    /* 앱 옛 기록으로 채운 주(수강 시작 전 · 104 · filled)가 있으면 첫 기록 주부터 (20261111a) — 과제가 있던 주만 셈 */
+    var oldFirst = ks.filter(function (x) { var w = map[x]; return x < st && w && w.filled && num(w.total) > 0; })[0];
+    if (oldFirst && oldFirst < k) k = oldFirst;
     return k > cur ? cur : k;
   }
   /* 주간 배지 최장 연속 — 칸 시작 주부터 이번 주까지 · 쉼은 건너뜀 · 기록 없는 주 · 못 받은 주에서 끊김 */

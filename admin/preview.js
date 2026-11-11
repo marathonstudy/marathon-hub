@@ -210,8 +210,11 @@
       var code = Store.linkOf(cur.sid).hubCode;
       if (!code) return Promise.resolve({ ok: false, reason: 'nolink' });
       /* 「오늘」이 이미 불러온 기록이면 그대로 (appfetch.js · 15초 넘으면 실패 · 20261031b) */
-      return window.AppFetch ? AppFetch.get(code) : fetch(CONFIG.supabase.url + '/functions/v1/' + CONFIG.appFunction + '?code=' + encodeURIComponent(code), { headers: { apikey: CONFIG.supabase.key } })
+      var live = window.AppFetch ? AppFetch.get(code) : fetch(CONFIG.supabase.url + '/functions/v1/' + CONFIG.appFunction + '?code=' + encodeURIComponent(code), { headers: { apikey: CONFIG.supabase.key } })
         .then(function (r) { return r.json().catch(function () { return { ok: false }; }); });
+      /* 앱 옛 기록(104 · 저장본의 old) — 러닝노트 저장본(hub_app_record)과 같게 붙인다 · 104 전이면 없음 */
+      var sid = cur.sid, old = window.SB && SB.client && SB.client.from ? Promise.resolve(sb().from('app_records').select('old').eq('student_id', sid)).then(function (r) { return r && !r.error && r.data && r.data[0] ? r.data[0].old : null; }, function () { return null; }) : Promise.resolve(null);
+      return Promise.all([live, old]).then(function (x) { var r = x[0]; return r && r.ok && x[1] && typeof x[1] === 'object' ? Object.assign({}, r, { old: x[1] }) : r; });
     }
   };
   window.HubPreview = bridge;

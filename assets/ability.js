@@ -74,8 +74,32 @@
      과제 안에 영역별 결과(parts — 앱 categoryResults)가 있으면 그것을 영역마다 (앱 「영역별 정답률」과 같은 재료 · 20261110l)
      없으면 예전처럼 과제 이름의 영역 + 그 과제 정답률 */
   var Q_UNKNOWN = 4;
+  /* 앱 옛 기록 합치기 (20261111a · migration-104) — data.old = { history, calendar }(수강 시작일 앞 · 서버가 한 번 받아 둔 것)
+     같은 과제(제출 시각 + 제목) · 같은 날은 한 번만 (지금 기록이 먼저) · 능력치 · 학습 분석 · 배지 칸만 쓴다(경험치 · 퀘스트는 data 그대로) */
+  var OLDM = typeof WeakMap === 'function' ? new WeakMap() : null;
+  function withOld(data) {
+    if (!data || typeof data !== 'object' || data._withOld || !data.old || typeof data.old !== 'object') return data;
+    if (OLDM && OLDM.has(data)) return OLDM.get(data);
+    var o = data.old, out = {}, seenH = {}, seenC = {};
+    Object.keys(data).forEach(function (k) { if (k !== 'old') out[k] = data[k]; });
+    var key = function (h) { return h && h.submittedAt ? String(h.submittedAt) + '|' + String(h.title || '') : ''; };
+    var cur = data.history || data.recent || [];
+    cur.forEach(function (h) { var k = key(h); if (k) seenH[k] = 1; });
+    var addH = (Array.isArray(o.history) ? o.history : []).filter(function (h) { var k = key(h); if (!k || seenH[k]) return false; seenH[k] = 1; return true; });
+    (data.calendar || []).forEach(function (c) { if (c && valid(c.date)) seenC[c.date] = 1; });
+    var addC = (Array.isArray(o.calendar) ? o.calendar : []).filter(function (c) { if (!c || !valid(c.date) || seenC[c.date]) return false; seenC[c.date] = 1; return true; });
+    out.history = addH.concat(cur).sort(function (a, b) { return String(a.submittedAt || '') < String(b.submittedAt || '') ? -1 : String(a.submittedAt || '') > String(b.submittedAt || '') ? 1 : 0; });
+    out.calendar = addC.concat(data.calendar || []).sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+    out.oldN = addH.length;
+    out._withOld = 1;
+    if (OLDM) OLDM.set(data, out);
+    return out;
+  }
+  /* 옛 기록 수 (러닝노트 홈 「이전 기록 n개」) — 지금 기록과 겹치지 않는 것만 */
+  function oldCount(data) { var m = withOld(data); return m && m !== data ? m.oldN || 0 : 0; }
   function items(data) {
     var A = AW(), out = [];
+    data = withOld(data);
     if (!A || !data) return out;
     var by = A.orderDays(data);
     (data.history || data.recent || []).forEach(function (h) {
@@ -100,9 +124,10 @@
     return out.sort(function (x, y) { return x.date < y.date ? -1 : x.date > y.date ? 1 : 0; });
   }
   /* 낸 과제 수 (정답률 · 영역과 상관없이) */
-  function submitted(data) { return ((data && (data.history || data.recent)) || []).filter(function (h) { return h && h.submittedAt; }).length; }
+  function submitted(data) { data = withOld(data); return ((data && (data.history || data.recent)) || []).filter(function (h) { return h && h.submittedAt; }).length; }
   /* 앱 「영역별 정답률」(categories · 전체 기간) → 영역 항목 — 과제 탭 카드와 같은 값 · 문제 수는 과제 안 결과에서(없으면 횟수 × 4) */
   function catItems(data) {
+    data = withOld(data);
     var cats = (data && data.categories) || [], qn = {};
     ((data && data.history) || []).forEach(function (h) { (h && h.submittedAt && h.parts || []).forEach(function (p) { if (p && p.c) qn[p.c] = (qn[p.c] || 0) + (+p.n || 0); }); });
     return cats.filter(function (c) { return c && c.name && (c.count == null || c.count > 0); }).map(function (c) {
@@ -136,7 +161,7 @@
       var y0 = addDays(today, -364);
       if (!first || first >= y0) {
         var st = first || today;
-        return { from: st, to: today, prev: null, all: true, since: st, note: '가진 기록 전체 · ' + mon(st) + '부터' };
+        return { from: st, to: today, prev: null, all: true, since: st, note: first ? '가진 기록 전체 · ' + mon(st) + '부터' : '' };     /* 기록이 없으면 문구 없음 (20261111a) */
       }
       return { from: y0, to: today, prev: { from: addDays(today, -729), to: addDays(today, -365) }, note: '최근 1년' };
     }
@@ -146,15 +171,28 @@
   function within(list, p) { return list.filter(function (it) { return it.date >= p.from && it.date <= p.to; }); }
 
   /* 고른 기간의 능력치 */
+  /* 그 학생의 실제 첫 기록 날 — 낸 과제 중 가장 이른 제출일(한국 날짜) (20261111a)
+     과제 칸 날짜는 강 번호 → 반 수업일이라 반이 먼저 시작했으면 학생이 오기 전 달(예: 7월)이 된다 → 문구 「n월부터」는 제출일로 */
+  function firstSub(data) {
+    data = withOld(data);
+    var ds = ((data && (data.history || data.recent)) || []).map(function (h) {
+      var t = Date.parse(String((h && h.submittedAt) || ''));
+      return isNaN(t) ? '' : new Date(t + 9 * 3600000).toISOString().slice(0, 10);
+    }).filter(valid).sort();
+    return ds[0] || '';
+  }
   function compute(data, kind, today) {
     var all = items(data), first = all.length ? all[0].date : '', cats = catItems(data);
+    var fs = firstSub(data), noteDay = fs || first;          /* 셈하는 기간은 과제 칸 날짜 그대로 · 문구의 달만 실제 첫 제출 */
     var p = range(kind || 'w4', today, first);
+    if (p.all) p.note = noteDay ? '가진 기록 전체 · ' + mon(noteDay) + '부터' : '';
     var cur = within(all, p), prev = p.prev ? within(all, p.prev) : [], src = 'hw';
     /* 가진 기록 전체(1년보다 짧음)이거나 날짜가 있는 영역 기록이 없으면 — 앱 「영역별 정답률」 그대로 (과제 탭 카드와 같은 값 · 20261110l) */
-    if (cats.length && (p.all || !all.length)) {
+    /* 옛 기록을 합쳤으면(104) 앱 「영역별 정답률」(지금 받는 기간만 셈)으로 바꾸지 않는다 — 옛 기록까지 날짜별로 센 값 */
+    if (cats.length && ((p.all && !oldCount(data)) || !all.length)) {
       cur = cats; prev = []; src = 'app';
       if (!p.all) p = range('y1', today, first || today);
-      p = { from: p.from, to: p.to, prev: null, all: true, since: p.since, note: '가진 기록 전체' + (first ? ' · ' + mon(first) + '부터' : '') };
+      p = { from: p.from, to: p.to, prev: null, all: true, since: p.since, note: noteDay ? '가진 기록 전체 · ' + mon(noteDay) + '부터' : '' };
     }
     var subs = agg(cur, function (it) { return it.sub; });
     var richSubs = Object.keys(subs).filter(function (k) { return subs[k].enough; });
@@ -312,5 +350,5 @@
     };
   }
 
-  global.Ability = { mount: mount, html: html, compute: compute, view: view, monthly: monthly, items: items, catItems: catItems, submitted: submitted, grade: grade, areaOf: areaOf, areaOfName: areaOfName, range: range, PERIODS: PERIODS, ORDER: ORDER };
+  global.Ability = { mount: mount, html: html, compute: compute, view: view, monthly: monthly, items: items, catItems: catItems, submitted: submitted, withOld: withOld, oldCount: oldCount, grade: grade, areaOf: areaOf, areaOfName: areaOfName, range: range, PERIODS: PERIODS, ORDER: ORDER };
 })(window);

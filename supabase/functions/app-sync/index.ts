@@ -15,6 +15,8 @@
 //    앱 id 연결 — 공유 응답의 student.id · 없으면 GET /api/hub/find-student(이름 + 학생 번호 → 학부모 번호) · 코치룸 [다시 찾기] { action: "link", students }
 //    연결된 학생은 처음 한 번 지난 주간 배지 채움(app_fill_save · 문자 · 알림톡 없음)
 //    열쇠 — Supabase Secrets HUB_READ_KEY (원장님이 넣음 · 이 함수 안에서만 · 로그 · 응답 · 저장에 남기지 않음 · 없으면 예전 방식만)
+//  20261111a — 옛 기록 한 번 채우기(runOld · 앱 id 학생 · 2026-01-01부터 · 수강 시작일 앞만 app_records.old · migration-104)
+//    앱 연결 못 찾은 이유(번호 없음 · 번호 불일치 · 이름 불일치 · 앱 계정 없음 · 후보 여러 명 · 짐작 표시) — runLink · whyNone
 //
 //  키 — 새로 넣을 키 없음. Supabase 가 함수에 기본으로 주는 SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY (이 함수 안에서만)
 //  배포: 대시보드 → Edge Functions → Deploy a new function → Via Editor → 이름 app-sync → 이 파일 전체 → Deploy
@@ -407,25 +409,68 @@ export function idsOf(j: Any): number[] {
   }
   return out;
 }
-async function findOne(name: string, phone: string): Promise<{ ok: boolean; ids: number[]; reason: string }> {
+/* 못 찾은 이유 — 앱이 응답에 이유를 적어 주면 그것으로 (모양을 모르니 흔한 칸 이름 · 낱말로만 · 20261111a) */
+export function hintOf(body: Any): string {
+  if (!body || typeof body !== "object") return "";
+  const t = [body.reason, body.code, body.error, body.why, body.status, body.message].filter((v) => typeof v === "string").join(" ").toLowerCase();
+  if (!t) return "";
+  if (/name/.test(t) && /(mismatch|wrong|differ|not.?match|invalid)/.test(t)) return "name_mismatch";
+  if (/(phone|tel|mobile|number)/.test(t)) return "phone_mismatch";
+  if (/(no.?(user|account|student|member)|not.?found|unknown|none|not.?exist)/.test(t)) return "no_account";
+  return "";
+}
+async function findOne(name: string, phone: string): Promise<{ ok: boolean; ids: number[]; reason: string; hint: string; bad?: boolean }> {
   try {
     const r = await hubGet("/api/hub/find-student?name=" + encodeURIComponent(name) + "&phone=" + encodeURIComponent(phone));
-    if (r.ok) return { ok: true, ids: idsOf(r.body), reason: "" };
-    if (r.status === 404) return { ok: true, ids: [], reason: "" };
-    return { ok: false, ids: [], reason: failWhy(r.status, r.body) };
-  } catch (e) { return { ok: false, ids: [], reason: (e as Error)?.name === "AbortError" ? "timeout" : "upstream" }; }
+    if (r.ok) return { ok: true, ids: idsOf(r.body), reason: "", hint: hintOf(r.body) };
+    if (r.status === 404) return { ok: true, ids: [], reason: "", hint: hintOf(r.body) };
+    if (r.status === 400 || r.status === 422) return { ok: true, ids: [], reason: "", hint: "", bad: true };   /* 이 모양으로는 못 물음(빈 이름 · 빈 번호) */
+    return { ok: false, ids: [], reason: failWhy(r.status, r.body), hint: "" };
+  } catch (e) { return { ok: false, ids: [], reason: (e as Error)?.name === "AbortError" ? "timeout" : "upstream", hint: "" }; }
 }
-/* 앱 id 가 없는 학생 찾기 — 이름 + 학생 번호 → 없으면 이름 + 학부모 번호 · 한 명씩 0.4초 쉼 · 앱이 거절하면 멈춤 */
+/* 이름 + 번호로 하나도 안 나왔을 때 — 무엇이 틀렸는지 가르기 (앱 응답만으로 확실하지 않으면 가장 가까운 것 + 짐작)
+   1) 앱이 이유를 주면 그대로(확실)
+   2) 번호만으로 물어 나오면 → 번호는 맞고 이름이 다름 「이름 불일치」(확실 · 나온 학생을 후보로)
+   3) 이름만으로 물어 나오면 → 「번호 불일치」(짐작 — 같은 이름의 다른 학생일 수 있음 · 후보로)
+   4) 둘 다 없으면(또는 앱이 그렇게 묻는 것을 받지 않으면) → 「앱 계정 없음」(짐작 — 번호가 다른 계정일 수도) */
+async function whyNone(nm: string, phones: string[], hint: string): Promise<Any> {
+  if (hint) return { why: hint, guess: false };
+  for (const p of phones) {
+    await sleep(LINK_PAUSE_MS);
+    const r = await findOne("", p);
+    if (!r.ok || r.bad) break;
+    if (r.ids.length) return { why: "name_mismatch", guess: false, cands: r.ids.slice(0, 5) };
+  }
+  await sleep(LINK_PAUSE_MS);
+  const n = await findOne(nm, "");
+  if (n.ok && !n.bad && n.ids.length) return { why: "phone_mismatch", guess: true, cands: n.ids.length <= 5 ? n.ids : [] };
+  return { why: "no_account", guess: true };
+}
+/* 앱 id 가 없는 학생 찾기 — 이름 + 학생 번호 → 없으면 이름 + 학부모 번호(→ 학부모 번호 2) · 한 명씩 0.4초 쉼 · 앱이 거절하면 멈춤
+   못 찾으면 이유(번호 없음 · 번호 불일치 · 이름 불일치 · 앱 계정 없음 · 후보 여러 명)를 같이 저장 (20261111a) · 번호 없는 학생은 앱에 묻지 않는다 */
 export async function runLink(list: Any[], started = Date.now()) {
-  const out = { tried: 0, linked: 0, need: 0, many: 0, stopped: "" };
+  const out = { tried: 0, linked: 0, need: 0, many: 0, stopped: "", why: {} as Record<string, number> };
   const rows: Any[] = [];
   for (const x of list) {
     if (Date.now() - started > BUDGET_MS || !hubKey()) break;
-    const nm = String(x.name || "").trim(), ph = String(x.phone || "").replace(/\D/g, ""), pp = String(x.parent || "").replace(/\D/g, "");
-    let r = ph ? await findOne(nm, ph) : { ok: true, ids: [] as number[], reason: "" };
-    if (r.ok && !r.ids.length && pp) { await sleep(LINK_PAUSE_MS); r = await findOne(nm, pp); }
+    const nm = String(x.name || "").trim();
+    const phones = [x.phone, x.parent, x.parent2].map((v) => String(v || "").replace(/\D/g, "")).filter((v, i, a) => v.length >= 9 && a.indexOf(v) === i);
+    if (!phones.length) { rows.push({ id: x.id, ids: [], why: "no_phone", guess: false }); out.why.no_phone = (out.why.no_phone || 0) + 1; out.tried++; continue; }
+    let r = { ok: true, ids: [] as number[], reason: "", hint: "" };
+    for (let i = 0; i < phones.length; i++) {
+      if (i) await sleep(LINK_PAUSE_MS);
+      r = await findOne(nm, phones[i]);
+      if (!r.ok || r.ids.length) break;
+    }
     if (!r.ok) { out.stopped = r.reason; break; }
-    rows.push({ id: x.id, ids: r.ids });
+    let row: Any = { id: x.id, ids: r.ids };
+    if (r.ids.length > 1) row.why = "many";
+    else if (!r.ids.length) {
+      const w = await whyNone(nm, phones, r.hint);
+      row = { ...row, ...w };
+    }
+    if (row.why) out.why[row.why] = (out.why[row.why] || 0) + 1;
+    rows.push(row);
     out.tried++;
     await sleep(LINK_PAUSE_MS);
   }
@@ -436,6 +481,54 @@ export async function runLink(list: Any[], started = Date.now()) {
   return out;
 }
 const LINK_PAUSE_MS = 400;
+
+/* ============================================================
+   옛 기록 한 번 채우기 (20261111a · migration-104) — 앱 id 로 받는 학생만 · 2026-01-01 ~ 오늘(400일 한도 안)
+   수강 시작일(없으면 1년 전) 앞 기록만 app_records.old 에 · 덮어쓰기(겹쳐 쌓이지 않음) · 강 번호는 100000 을 더해 지금 기록과 섞이지 않게
+   옛 주 주간 배지 칸은 app_fill_old(채움 · 문자 · 알림톡 없음) · 한 번에 25명 · 묶음 사이 1.5초 (분당 30회 한도 — 5분에 한두 번)
+   ============================================================ */
+const OLD_FROM = "2026-01-01", OLD_AT_ONCE = 25, OLD_OFF = 100000;
+function kstDayOf(v: unknown): string {
+  const t = Date.parse(String(v ?? ""));
+  return Number.isFinite(t) ? new Date(t + 9 * 3600000).toISOString().slice(0, 10) : "";
+}
+export function oldOf(data: Any, cut: string): { old: Any; n: number; first: string } {
+  const hist = (data?.history || []).filter((h: Any) => { const d = kstDayOf(h?.submittedAt); return d && d < cut; })
+    .map((h: Any) => ({ ...h, order: num(h.order) ? num(h.order) + OLD_OFF : 0 }));
+  const cal = (data?.calendar || []).filter((c: Any) => /^\d{4}-\d{2}-\d{2}$/.test(String(c?.date ?? "")) && c.date < cut)
+    .map((c: Any) => ({ ...c, order: num(c.order) ? num(c.order) + OLD_OFF : 0 }));
+  const firsts = [hist.map((h: Any) => kstDayOf(h.submittedAt)).sort()[0], cal.filter((c: Any) => c.status === "onTime" || c.status === "late").map((c: Any) => c.date).sort()[0]].filter(Boolean).sort();
+  return { old: { history: hist, calendar: cal, cut }, n: hist.length, first: firsts[0] || "" };
+}
+export async function runOld(started = Date.now(), limit = 50) {
+  const out = { tried: 0, saved: 0, records: 0, weeks: 0, failed: 0 };
+  if (!hubKey()) return out;
+  const list: Any[] = await rpc("app_old_due", { p_limit: limit }).catch(() => []) || [];
+  const t = kstToday(), lim = addDaysIso(t, -(MAX_DAYS - 1)), from = OLD_FROM < lim ? lim : OLD_FROM;
+  for (let i = 0; i < list.length; i += OLD_AT_ONCE) {
+    if (Date.now() - started > BUDGET_MS) break;
+    const part = list.slice(i, i + OLD_AT_ONCE);
+    const got = await fetchUsers(part.map((x: Any) => num(x.uid)), from, t);
+    out.tried += part.length;
+    if (!got.ok) { out.failed += part.length; console.error("app-sync old fail", got.reason); break; }     /* 30분 뒤 다시 (old_try) */
+    const rows: Any[] = [];
+    for (const x of part) {
+      const recs = got.by.get(num(x.uid));
+      const cut = /^\d{4}-\d{2}-\d{2}$/.test(String(x.start || "")) ? String(x.start) : addDaysIso(t, -364);
+      const o = recs && recs.length ? oldOf(pick(mergeClasses(recs)), cut) : { old: null, n: 0, first: "" };
+      rows.push({ id: x.id, old: o.n ? o.old : null, n: o.n, first: o.first });
+      out.records += o.n;
+      if (o.old && o.old.calendar.length) {
+        const n = await rpc("app_fill_old", { p_student: x.id, p_days: o.old.calendar.map((c: Any) => ({ d: c.date, s: c.status })) }).catch(() => 0);
+        out.weeks += Number(n) || 0;
+      }
+    }
+    const s: Any = await rpc("app_old_save", { p_rows: rows }).catch(() => null);
+    out.saved += s ? num(s.saved) : 0;
+    if (i + OLD_AT_ONCE < list.length) await sleep(USER_PAUSE_MS);
+  }
+  return out;
+}
 
 async function handle(req: Request, cors: Record<string, string>) {
   if (!env("SUPABASE_URL") || !env("SUPABASE_SERVICE_ROLE_KEY")) return json({ ok: false, reason: "config", message: "서버 설정을 읽지 못했습니다." }, cors);
@@ -454,12 +547,14 @@ async function handle(req: Request, cors: Record<string, string>) {
     const list: Any[] = due?.students || [];
     const started = Date.now();
     const r = await runList(list, started);
-    let link: Any = null;
+    let link: Any = null, old: Any = null;
+    /* 옛 기록 한 번 채우기 (104 · 시간이 넉넉할 때만 · 104 전이면 함수가 없어 조용히 넘어감) */
+    if (!due?.night && hubKey() && Date.now() - started < BUDGET_MS / 3) old = await runOld(started).catch(() => null);
     if (!due?.night && hubKey() && Date.now() - started < BUDGET_MS / 2) {
       const ll: Any[] = await rpc("app_link_due", { p_limit: 20 }).catch(() => []) || [];
       if (ll.length) link = await runLink(ll, started);
     }
-    return json({ ok: true, night: !!due?.night, due: list.length, ...r, ...(link ? { link } : {}) }, cors);
+    return json({ ok: true, night: !!due?.night, due: list.length, ...r, ...(link ? { link } : {}), ...(old && old.tried ? { old } : {}) }, cors);
   }
 
   /* 2) 코치룸 [새로고침] — 로그인한 운영진 */

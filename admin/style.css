@@ -4802,3 +4802,27 @@ dialog.vl-modal[open] { display: flex; flex-direction: column; overflow: hidden;
 .sc-al__s, .sc-al__m { color: var(--ink-mid); font-size: 12px; }
 .sc-al__c, .sc-al__f { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .sc-al__f .input { width: 130px; min-height: 36px; }
+/* 「앱 연결 필요」 목록 · 못 찾은 이유 (appneed.js · 20261111a) */
+.btn--warn { background: #FFF1D6; border-color: #F2C98A; color: #7A4A00; font-weight: 800; }
+.btn--warn:hover { background: #FFE6B8; }
+.an-why { display: inline-block; padding: 0 8px; border-radius: 999px; font-size: 11.5px; font-weight: 800; line-height: 22px; white-space: nowrap; background: #EEF0F6; color: #3D4260; }
+.an-why--no_phone { background: #F1EEFF; color: #4A35B0; }
+.an-why--phone_mismatch, .an-why--name_mismatch { background: #FFF1D6; color: #7A4A00; }
+.an-why--no_account { background: #FDE9EC; color: #8A2433; }
+.an-why--many { background: #E7F3FF; color: #134F86; }
+.an-why--retry { background: #EAF7EE; color: #135C3B; }
+.an-why__g { display: inline-block; padding: 0 6px; border-radius: 999px; border: 1px dashed #B7BACB; font-size: 10.5px; font-weight: 800; color: #6B6F86; line-height: 18px; cursor: help; }
+.an-why__d { font-size: 12px; color: var(--ink-mid); }
+.anl-sum { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 6px; }
+.anl-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+.anl-row { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--line-soft); border-radius: 12px; background: var(--surface); min-width: 0; }
+.anl-h { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.anl-n { font-size: 15px; }
+.anl-c { font-size: 12px; color: var(--ink-mid); }
+.anl-w { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.anl-f, .anl-cands, .anl-more { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-end; }
+.anl-i { display: grid; gap: 2px; font-size: 11.5px; color: var(--ink-mid); flex: 1 1 140px; min-width: 0; }
+.anl-i .input, .anl-uid { min-height: 38px; width: 100%; box-sizing: border-box; }
+.anl-uid { width: 130px; flex: 0 1 130px; }
+.anl-cands__t { font-size: 12px; font-weight: 800; color: var(--ink-mid); align-self: center; }
+.anl-m { margin: 0; font-size: 12px; color: var(--ink-mid); }

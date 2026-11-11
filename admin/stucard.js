@@ -99,9 +99,12 @@
     if (i.uid) {
       body = '<p class="sc-al__t">앱 학생 <b class="num">#' + esc(i.uid) + '</b> · ' + esc(AL_BY[i.by] || '연결됨') + (i.src === 'user' ? ' · 반이 바뀌어도 그대로 받는 중' : '') + '</p>' +
         (i.user_fail ? '<p class="sc-al__w">새 주소로 못 받아 공유 코드로 받았어요 (' + esc(i.user_fail) + ')</p>' : '') +
-        (i.fill ? '<p class="sc-al__s">지난 주간 배지 채움 끝</p>' : '');
+        (i.fill ? '<p class="sc-al__s">지난 주간 배지 채움 끝</p>' : '') +
+        (i.old_n ? '<p class="sc-al__s">옛 기록 ' + esc(i.old_n) + '개 받음' + (i.old_first ? ' · ' + esc(md(String(i.old_first))) + '부터' : '') + ' (분석 · 능력치 · 배지 칸에만)</p>' : '');
     } else {
-      body = '<p class="sc-al__t">' + (i.state === 'many' ? '같은 이름 · 번호의 앱 학생이 여럿이에요. 맞는 번호를 골라 주세요' : i.state === 'need' ? '앱에서 이 학생을 찾지 못했어요 (이름 + 학생 번호 · 학부모 번호)' : '아직 찾아보기 전이에요') + '</p>' +
+      /* 못 찾은 이유 (104 · 번호 없음 · 번호 불일치 · 이름 불일치 · 앱 계정 없음 · 후보 여러 명 · 짐작) — 「앱 연결 필요」 목록과 같은 글 */
+      body = (window.AppNeed && (i.why || i.state === 'retry') ? '<p class="sc-al__t">' + AppNeed.whyHtml(i) + '</p>'
+        : '<p class="sc-al__t">' + (i.state === 'many' ? '같은 이름 · 번호의 앱 학생이 여럿이에요. 맞는 번호를 골라 주세요' : i.state === 'need' ? '앱에서 이 학생을 찾지 못했어요 (이름 + 학생 번호 · 학부모 번호)' : '아직 찾아보기 전이에요') + '</p>') +
         ((i.cands || []).length ? '<div class="sc-al__c">' + i.cands.map(function (u) { return '<button type="button" class="btn btn--sm" data-sc-al-pick="' + esc(u) + '">#' + esc(u) + '으로 연결</button>'; }).join('') + '</div>' : '');
     }
     return '<div class="sc-al__p" role="region" aria-label="앱 학생 연결">' + body +
@@ -255,12 +258,18 @@
       Promise.resolve(c.rpc('staff_badges', { p_student: sid })).then(function (r) { return r && !r.error ? r.data : null; }, function () { return null; }),
       Promise.resolve(c.rpc('staff_scores', { p_student: sid })).then(function (r) { return r && !r.error && Array.isArray(r.data) ? r.data : []; }, function () { return []; })
     ]);
-    Promise.all([Promise.resolve(c.from('app_records').select('data').eq('student_id', sid)), side]).then(function (x) {
+    /* 옛 기록(old · 104)도 같이 — 104 전이면 칸이 없어 오류 → data 만 다시 */
+    var rec = Promise.resolve(c.from('app_records').select('data,old').eq('student_id', sid)).then(function (r) {
+      return r && r.error ? c.from('app_records').select('data').eq('student_id', sid) : r;
+    });
+    Promise.all([rec, side]).then(function (x) {
       var r = x[0];
       AB.busy = false;
       if (AB.sid !== sid) return;
       AB.badges = x[1][0]; AB.scores = x[1][1];
-      AB.data = (!r.error && r.data && r.data[0] && r.data[0].data) || {};
+      var row = (!r.error && r.data && r.data[0]) || null;
+      AB.data = (row && row.data) || {};
+      if (row && row.old && typeof row.old === 'object' && Array.isArray(row.old.history)) AB.data = Object.assign({}, AB.data, { old: row.old });   /* 능력치 · 학습 분석만 합침 */
       if (window.QuickNote && QuickNote.state().open) QuickNote.repaint();
     }, function () { AB.busy = false; if (AB.sid === sid) { AB.data = {}; if (window.QuickNote && QuickNote.state().open) QuickNote.repaint(); } });
   }

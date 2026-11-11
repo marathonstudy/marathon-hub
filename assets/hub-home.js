@@ -91,8 +91,11 @@
         (dd ? statTile('', esc(dd.badge), dd.name, ' gm-stat--dday') : '') +
       '</div>' +
       (H.empty ? '<p class="gm-hint">' + (isParent() ? esc((st.name || '') + ' 학생이 과제를 내면 XP가 쌓여요') : '과제를 내면 XP가 쌓여요') + '</p>' : '') +
+      /* 앱 옛 기록(수강 시작 전 · 104) — XP · 레벨 · 퀘스트에는 안 넣고 작게 수만 (분석 · 능력치 · 배지 칸에는 같이 보임 · 20261111a) */
+      (oldN() ? '<p class="gm-old num" id="gmOld">이전 기록 ' + oldN() + '개 · 학습 분석 · 능력치에 같이 보여요</p>' : '') +
     '</section>';
   }
+  function oldN() { return H && H.data && global.Ability && Ability.oldCount ? Ability.oldCount(H.data) : 0; }
   /* 학부모 링크 — 「예진 학생의 이번 주」 */
   function questTitle() { return isParent() ? ((H.ctx.student || {}).name || '') + ' 학생의 이번 주' : '이번 주 퀘스트'; }
   var Q_TEXT = { done: '✓', todo: '아직', today: '오늘', future: '예정', exempt: '면제', off: '—' };

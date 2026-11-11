@@ -68,15 +68,24 @@
     o = o || {};
     data = data || {};
     var today = o.today, Ab = AB();
+    if (Ab && Ab.withOld) data = Ab.withOld(data);          /* 앱 옛 기록(2026-01-01부터 · 104)도 같이 — 그래프 · 추이선 · NEW 최고 기록 */
     var hist = (data.history || data.recent || []).filter(function (h) { return h && h.submittedAt; });
     var subs = hist.map(function (h) { var k = kst(h.submittedAt); return k ? { date: k.d, h: k.h, late: !!h.late } : null; }).filter(Boolean);
     var cal = calendarOf(data).filter(function (c) { return c.date <= today; });
     var its = Ab ? Ab.items(data) : [];
     var scores = (o.scores || []).filter(function (x) { return x && valid(String(x.d).slice(0, 10)) && (x.k === 'wrong' || x.k === 'text') && isFinite(+x.s); })
       .map(function (x) { return { date: String(x.d).slice(0, 10), k: x.k, s: +x.s }; });
-    var firstAll = [subs[0] && subs[0].date, cal[0] && cal[0].date, its[0] && its[0].date, scores[0] && scores[0].date].filter(Boolean).sort()[0] || today;
+    /* 셈하는 첫날 — 낸 과제 · 낸 날 · 정답률 · 점수 중 가장 이른 날 (반 달력의 수업일만 있고 안 낸 날은 셈하지 않음 · 20261111a)
+       「가진 기록 전체 · n월부터」의 달 — 그 학생의 실제 첫 기록(제출일 · 점수 날짜 · 없으면 낸 날) · 기록이 없으면 문구를 숨긴다
+       (과제 칸 날짜는 강 번호 → 반 수업일이라 반이 먼저 시작했으면 학생이 오기 전 달이 될 수 있다) */
+    var first = function (a) { return a.filter(Boolean).sort()[0] || ''; };
+    var doneCal = cal.filter(function (c) { return c.status === 'onTime' || c.status === 'late'; }).map(function (c) { return c.date; });
+    var firstRec = first([first(subs.map(function (x) { return x.date; })), first(doneCal), its[0] && its[0].date, first(scores.map(function (x) { return x.date; }))]);
+    var noteDay = first(subs.map(function (x) { return x.date; }).concat(scores.map(function (x) { return x.date; }))) || first(doneCal);
+    var firstAll = firstRec || (cal[0] && cal[0].date) || today;
     var kind = o.kind || 'w4';
-    var R = Ab ? Ab.range(kind, today, firstAll) : { from: addDays(today, -27), to: today, prev: null, note: '' };
+    var R = Ab ? Ab.range(kind, today, firstRec) : { from: addDays(today, -27), to: today, prev: null, note: '' };
+    if (R.all) R.note = noteDay ? '가진 기록 전체 · ' + (+noteDay.slice(5, 7)) + '월부터' : '';
     var inR = function (d, r) { return r && d >= r.from && d <= r.to; };
     var weeks = weeksOf(R.from, today), allWeeks = weeksOf(firstAll, today);
     var out = { kind: kind, range: R, weeks: weeks, cards: [], sections: {} };
@@ -361,6 +370,54 @@
   }
 
   /* ============================================================
+     맨 앞 층 (20261111a) — 코치룸 학생 카드가 <dialog>(브라우저 맨 위 층)라서 body 에 붙인 div 는 z-index 가 아무리 커도 그 뒤에 깔린다
+     → 상세 창도 body 바로 아래 <dialog> 로 띄운다(나중에 띄운 것이 맨 앞) · 열린 동안 뒤 화면 스크롤 막음
+     · 닫으면 뒤 화면(학생 카드 창 안 스크롤까지) 원래 위치 그대로 · Esc 는 이 창만 닫는다(학생 카드는 그대로)
+     ============================================================ */
+  var LOCK = null;
+  function scrollSpots() {
+    var out = [], se = D.scrollingElement || D.documentElement;
+    out.push({ el: se, top: se.scrollTop });
+    Array.prototype.forEach.call(D.querySelectorAll('dialog[open]:not(.an-layer)'), function (dl) {
+      [dl].concat(Array.prototype.slice.call(dl.querySelectorAll('*'))).forEach(function (x) { if (x.scrollTop > 0) out.push({ el: x, id: x.id, top: x.scrollTop }); });
+    });
+    return out;
+  }
+  function lock() {
+    if (LOCK) return;
+    LOCK = scrollSpots();
+    D.documentElement.classList.add('an-lock');
+    D.body.classList.add('an-lock');
+  }
+  function unlock() {
+    if (!LOCK || D.getElementById('anFull') || D.getElementById('anRecap')) return;
+    var spots = LOCK;
+    LOCK = null;
+    D.documentElement.classList.remove('an-lock');
+    D.body.classList.remove('an-lock');
+    spots.forEach(function (s) {
+      var el = s.el && s.el.isConnected ? s.el : (s.id ? D.getElementById(s.id) : null);   /* 뒤 화면을 다시 그렸으면 같은 id 로 */
+      if (el) el.scrollTop = s.top;
+    });
+  }
+  function layer(cls, id) {
+    var el = D.createElement('dialog');
+    el.className = cls + ' an-layer'; el.id = id;
+    /* Esc — 이 창의 cancel 만 막고 닫는다 (학생 카드 창까지 닫히지 않게) */
+    el.addEventListener('cancel', function (e) { e.preventDefault(); setTimeout(function () { if (id === 'anRecap') closeRecap(); else closeFull(); }, 0); });
+    return el;
+  }
+  function show(el) {
+    D.body.appendChild(el);
+    try { if (typeof el.showModal === 'function') el.showModal(); else el.setAttribute('open', ''); } catch (e) { el.setAttribute('open', ''); }
+  }
+  function hide(el) {
+    if (!el) return;
+    try { if (el.open && typeof el.close === 'function') el.close(); } catch (e) { /* 이미 닫힘 */ }
+    if (el.parentNode) el.parentNode.removeChild(el);
+  }
+
+  /* ============================================================
      전체 분석 (화면 전체 · 아래에서)
      ============================================================ */
   var FULL = null;
@@ -434,18 +491,17 @@
   }
   function openFull(ctx, focus) {
     closeFull();
-    var a = analyze(ctx), el = D.createElement('div');
-    el.className = 'an-full'; el.id = 'anFull';
+    lock();
+    var a = analyze(ctx), el = layer('an-full', 'anFull');
     el.innerHTML = fullHtml(ctx, a);
-    D.body.appendChild(el);
-    D.body.classList.add('an-lock');
+    show(el);
     FULL = { el: el, ctx: ctx, a: a, off: {} };
     animate(el.querySelector('.an-full__in'), 'full:' + a.kind);
     drawCharts(el, a, FULL.off);
     if (focus) { var s = el.querySelector('#anSec-' + focus); if (s && s.scrollIntoView) s.scrollIntoView({ block: 'start' }); }
     var x = el.querySelector('[data-an-x]'); if (x && x.focus) x.focus();
   }
-  function closeFull() { var e = D.getElementById('anFull'); if (e) e.remove(); D.body.classList.remove('an-lock'); FULL = null; }
+  function closeFull() { hide(D.getElementById('anFull')); FULL = null; unlock(); }
   function repaintFull() {
     if (!FULL) return;
     var top = FULL.el.scrollTop;
@@ -486,14 +542,14 @@
     var a = analyze(ctx);
     if (!a.recap.length) return;
     closeRecap();
-    var el = D.createElement('div');
-    el.className = 'an-rc'; el.id = 'anRecap';
-    D.body.appendChild(el);
+    lock();
+    var el = layer('an-rc', 'anRecap');
     RC = { el: el, ctx: ctx, slides: a.recap, i: 0 };
     el.innerHTML = recapHtml(ctx, RC.slides, 0);
+    show(el);
     if (ctx.prepareShare) ctx.prepareShare();
   }
-  function closeRecap() { var e = D.getElementById('anRecap'); if (e) e.remove(); RC = null; }
+  function closeRecap() { hide(D.getElementById('anRecap')); RC = null; unlock(); }
 
   /* ---------- 누르기 (한 번만) ---------- */
   var bound = false;
@@ -511,7 +567,7 @@
         return;
       }
       if (!FULL || !t.closest('#anFull')) return;
-      if (t.closest('[data-an-x]')) { closeFull(); return; }
+      if (t.closest('[data-an-x]') || t === FULL.el) { closeFull(); return; }        /* X · 바깥(가운데 칸 밖) */
       if (t.closest('[data-an-recap]')) { var cx = FULL.ctx; closeFull(); openRecap(cx); return; }
       var k = t.closest('[data-an-k]');
       if (k) { var st = FULL.ctx.state; if (st) { st.kind = k.getAttribute('data-an-k'); st.picked = true; } if (FULL.ctx.onKind) FULL.ctx.onKind(); repaintFull(); return; }
@@ -523,7 +579,9 @@
       if (pt) showPoint(pt);
     });
     D.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') { if (RC) closeRecap(); else if (FULL) closeFull(); }
+      /* Esc — 이 창만 (기본 동작을 막아 뒤의 학생 카드 창이 같이 닫히지 않게 · 닫기는 한 틱 뒤에) */
+      var opened = D.querySelectorAll('dialog[open]'), topEl = opened[opened.length - 1];
+      if (e.key === 'Escape' && (RC || FULL) && (!topEl || topEl === (RC || FULL).el)) { e.preventDefault();      /* 그 위에 제출물 창이 열려 있으면 그쪽이 닫힘 */ e.stopPropagation(); setTimeout(function () { if (RC) closeRecap(); else if (FULL) closeFull(); }, 0); return; }
       if ((e.key === 'Enter' || e.key === ' ') && FULL && e.target && e.target.closest && e.target.closest('#anFull [data-an-pt]')) { e.preventDefault(); showPoint(e.target.closest('[data-an-pt]')); }
     });
   }

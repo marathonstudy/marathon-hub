@@ -70,6 +70,7 @@ body.hub-bar-on #panelReport .card-title, body.hub-bar-on #panelApp .card-title,
 .gm-card { display: block; width: 100%; background: #fff; border-radius: 20px; box-shadow: var(--card-shadow); padding: 12px 14px; border: 0; text-align: left; font: inherit; color: var(--ink); }
 .gm-h { font-size: 15px; font-weight: 800; color: var(--ink-deep); margin: 0; }
 .gm-hint { margin: 8px 0 0; font-size: 13px; color: var(--ink-light); }
+.gm-old { margin: 6px 0 0; font-size: 11.5px; font-weight: 700; color: var(--ink-light); }      /* 이전 기록 n개 (20261111a) */
 
 /* 프로필 카드 — 진한 보라 HUD · 은은한 빛(오른쪽 위 · 왼쪽 아래) + 가는 격자 무늬 */
 .gm-profile {
