@@ -69,7 +69,9 @@
     /* 홈의 주인공 — 맨 위 작게 RUN 로고 · 학생용/학부모용 (큰 보라 머리는 홈에서 숨김) */
     return '<section class="gm-card gm-profile" id="gmProfile" aria-label="' + (isParent() ? esc((st.name || '') + ' 학생의 프로필') : '내 프로필') + '">' +
       '<div class="gm-brand"><img class="gm-brand__logo" src="' + esc((c.base || '../assets/chars/').replace(/chars\/$/, '') + 'logo.png') + '" alt="마라톤국어" width="44" height="25">' +
-        (c.role ? '<span class="gm-brand__role">' + (c.role === 'student' ? '학생용' : '학부모용') + '</span>' : '') + '</div>' +
+        /* 오른쪽 위 — 학생용/학부모용 · 공유 아이콘 (share.js · 20261110k · 미리보기에는 없음) */
+        '<span class="gm-brand__r">' + (c.role ? '<span class="gm-brand__role">' + (c.role === 'student' ? '학생용' : '학부모용') + '</span>' : '') +
+        (global.HubShare && !c.preview ? HubShare.btnHtml('home') : '') + '</span></div>' +
       '<div class="gm-top">' +
         (H.prof.can_edit ? '<button type="button" class="gm-ava-btn" data-gm-pick aria-label="캐릭터 고르기">' + ava + '<span class="gm-ava-edit" aria-hidden="true">✎</span></button>' : '<span class="gm-ava-btn is-static">' + ava + '</span>') +
         '<div class="gm-id">' +
@@ -370,7 +372,22 @@
     }, function () { if (H !== mine) return; H.loading = false; H.data = null; H.g = G().compute({ calendar: [] }, { today: ctx.today }); H.empty = true; paint(); });
   }
   function refresh() { paint(); }
+  /* 공유 사진에 쓰는 값 (share.js · 20261110k) — 홈이 이미 가진 것 중 캐릭터 · 레벨 · 이번 주 퀘스트 · 연속 제출 · 배지 수 · 이름만
+     점수 · 정답률 · 모의고사 · 상담 · 제출물 · 링크 코드는 넘기지 않는다 */
+  function shareData() {
+    if (!H) return null;
+    var c = H.ctx, st = c.student || {}, g = H.g, lv = g ? g.level : G().levelOf(0), p = G().clean(H.prof, lv.i);
+    var ch = G().charOf(p.char), fr = G().item('frame', p.frame) || G().ITEMS.frame[0], b = H.badges || {}, k = b.kings || {};
+    return {
+      ready: !H.loading, name: st.name || '',
+      char: { name: ch.name, src: G().charSrc(ch.id, c.base), mascot: !!ch.mascot, prop: ch.mascot ? '' : (G().PROP_SVG[p.prop] || ''), ring: fr.color },
+      level: { n: lv.i + 1, name: lv.name, icon: LV_ICON[lv.i] },
+      quest: H.q ? { done: H.q.done, m: H.q.m, perfect: !!H.q.perfect } : null,
+      streak: g ? g.streak || 0 : 0,
+      badges: { weekly: +b.perfect || 0, monthly: (b.months || []).length, wrong: +k.wrong || 0, text: +k.text || 0 }
+    };
+  }
   function markSeen(code, week) { if (code && week) store('mhub.seenrep.' + code, week); }
 
-  global.HubHome = { render: render, refresh: refresh, markSeen: markSeen, openPicker: openPicker, _state: function () { return H; } };
+  global.HubHome = { render: render, refresh: refresh, markSeen: markSeen, openPicker: openPicker, shareData: shareData, _state: function () { return H; } };
 })(window);

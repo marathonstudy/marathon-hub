@@ -548,6 +548,34 @@
     head.appendChild(b);
   }
 
+  /* 이 기기에 기억할까요? (20261110k)
+     이미 기억한 기기 · 학생 입구에서 「로그인 유지」로 들어온 기기 → 그대로 기억(묻지 않음)
+     처음 연 기기 → 맨 위에 묻는 칸 · [기억하기]를 눌러야만 기억 · [이번만]이면 이 창(탭)에서는 다시 묻지 않음 */
+  function rememberAsk(EL, code, kept) {
+    var ls = function (k) { try { return global.localStorage.getItem(k) || ''; } catch (e) { return ''; } };
+    if (kept || EL.last() === code || ls(EL.KEY) === code) { EL.last(code); return; }
+    var SK = 'mhub.memask.' + code;
+    try { if (global.sessionStorage.getItem(SK)) return; } catch (e) {}
+    var root = $('#hubRoot');
+    if (!root || document.getElementById('hubMem')) return;
+    var box = document.createElement('div');
+    box.className = 'hub-mem';
+    box.id = 'hubMem';
+    box.setAttribute('role', 'region');
+    box.setAttribute('aria-label', '이 기기에 기억');
+    box.innerHTML = '<p class="hub-mem__t">📱 이 기기에 기억할까요?</p>' +
+      '<p class="hub-mem__s">기억하면 다음부터 링크 없이 러닝노트가 바로 열려요. 내 휴대폰이 아니면 [이번만]을 눌러 주세요.</p>' +
+      '<div class="hub-mem__b"><button type="button" data-mem="yes">기억하기</button><button type="button" data-mem="no">이번만</button></div>';
+    box.addEventListener('click', function (e) {
+      var b = e.target.closest && e.target.closest('[data-mem]');
+      if (!b) return;
+      if (b.getAttribute('data-mem') === 'yes') EL.last(code);
+      try { global.sessionStorage.setItem(SK, '1'); } catch (er) {}
+      box.remove();
+    });
+    root.parentNode.insertBefore(box, root);
+  }
+
   /* 코치룸 미리보기 띠 */
   /* 띠 글은 코치룸(preview.js)이 정한다 — 「이 주차 · 아직 공개 전입니다 · 공개하면 학부모에게 이렇게 보입니다」 등 (20261029g) */
   function previewBand() {
@@ -1316,7 +1344,11 @@
       var canWrite = d.can_write !== false;
       roleTag(d.role);
       if (EL && EL.get() === h.code) logoutButton(EL);
-      if (!PV && EL && EL.last) EL.last(h.code);           /* 홈 화면 앱 시작 주소(/s/?app=1)가 이 러닝노트로 (20261101k) · /me 만 열어도 (20261110b) */
+      /* 이 기기에 기억 — 홈 화면 앱 시작 주소(/s/?app=1) · /me 만 열어도 이 러닝노트로 (20261101k · 20261110b)
+         개인 링크를 이 기기에서 처음 열면 「이 기기에 기억할까요?」 — 기본은 기억하지 않음 (가족 · 친구 휴대폰에 저절로 남지 않게 · 20261110k) */
+      if (!PV && EL && EL.last) rememberAsk(EL, h.code, !!kept);
+      /* 공유하기 (share.js · 20261110k) — 홈 프로필 카드 · 레포트 「주간 레포트」 줄 끝 · 미리보기에는 없음 */
+      if (!PV && global.HubShare) HubShare.init({ code: h.code, role: d.role || '', base: '../assets/', data: function () { return global.HubHome && HubHome.shareData ? HubHome.shareData() : null; } });
       /* 맨 아래 「다른 학생으로 보기 · 이 기기에서 나가기」 — 이 기기에 기억한 코드를 지운다 */
       var exitBox = $('#hubExit');
       if (exitBox && !PV && EL) {
@@ -1944,13 +1976,14 @@
     /* 한 줄 (20261110f) — 「◀ 11/7(토) 수업 주간 레포트 ▶ · 과제 10/31~11/6 · 누적 추이」 */
     if (global.HubHome && global.Game) {
       var ld = lessonDateOf(cur, null), pw = ld && global.AppWeek ? AppWeek.lastWeek(ld) : null;
-      return '<div class="rw-one">' +
+      return '<div class="rw-one' + (global.HubShare && !PV && HubShare.btnHtml('report') ? ' rw-one--sh' : '') + '">' +
           '<button type="button" class="rw-arrow" data-rw="' + (i + 1) + '"' + (i + 1 >= n ? ' disabled' : '') + ' aria-label="지난 수업 레포트">◀</button>' +
           '<div class="rw-one__mid"><button type="button" class="rw-now num" id="rwNow" aria-haspopup="listbox" aria-expanded="false"' + (n < 2 ? ' disabled' : '') + '>' +
             esc(name(cur)) + ' 주간 레포트' + (n > 1 ? '<span class="rw-caret" aria-hidden="true">▾</span>' : '') + '</button>' +
             '<span class="rw-one__p num">' + (pw ? '<span id="rwPeriod">과제 ' + esc(Lesson.md(pw.from, false) + '~' + Lesson.md(pw.to, false)) + '</span>' : '') +
             '<button type="button" class="rw-trend" data-rw-trend>누적 추이</button></span></div>' +
           '<button type="button" class="rw-arrow" data-rw="' + (i - 1) + '"' + (i - 1 < 0 ? ' disabled' : '') + ' aria-label="다음 수업 레포트">▶</button>' +
+          (global.HubShare && !PV ? HubShare.btnHtml('report') : '') +          /* 공유하기 (20261110k) */
         '</div>' +
         (RN.list.length ? '<div class="rw-bar2"><button type="button" class="rw-notes" data-rw-notes>📒 복습 노트 모음</button></div>' : '') +
         (n > 1 ? '<div class="rw-pick" id="rwPick" role="listbox" aria-label="공개된 수업 레포트" hidden>' + L.map(function (r, k) {

@@ -1,0 +1,63 @@
+/* ============================================================
+   share.css — 러닝노트 「공유하기」 (share.js · 20261110k)
+   ============================================================ */
+/* 공유 아이콘 — 홈 프로필 카드 오른쪽 위 · 레포트 「주간 레포트」 줄 끝 */
+.sh-open { appearance: none; flex: none; display: inline-grid; place-items: center; width: 40px; height: 40px; padding: 0; border-radius: 12px; cursor: pointer; font: inherit; }
+.sh-open--home { background: rgba(255, 255, 255, .16); border: 1px solid rgba(255, 255, 255, .3); color: #fff; }
+.sh-open--report { background: #F1EEFF; border: 1px solid #DCD5FA; color: #4B36C9; margin-left: 4px; }
+.sh-open:focus-visible { outline: 3px solid #F5C842; outline-offset: 2px; }
+.gm-brand__r { display: inline-flex; align-items: center; gap: 8px; }
+.rw-one.rw-one--sh { grid-template-columns: 40px minmax(0, 1fr) 40px 40px; }
+.rw-one .sh-open--report { margin-left: 0; }
+
+/* 아래에서 올라오는 창 */
+.sh-dim { position: fixed; inset: 0; z-index: 2100; background: rgba(16, 12, 40, .55); display: flex; align-items: flex-end; justify-content: center; }
+.sh-sheet { width: 100%; max-width: 480px; max-height: 92vh; overflow: auto; box-sizing: border-box; background: #fff; color: #23214A; border-radius: 22px 22px 0 0;
+  padding: 14px 16px calc(16px + env(safe-area-inset-bottom)); display: grid; gap: 10px; box-shadow: 0 -10px 30px rgba(16, 12, 40, .25); }
+@media (min-width: 560px) { .sh-dim { align-items: center; } .sh-sheet { border-radius: 22px; } }
+.sh-h { display: flex; align-items: center; justify-content: space-between; font-size: 17px; }
+.sh-x { appearance: none; border: 0; background: #F1F0F8; color: #4A4F68; width: 44px; height: 44px; border-radius: 12px; font-size: 16px; cursor: pointer; }
+.sh-big { appearance: none; display: flex; align-items: center; gap: 10px; width: 100%; min-height: 64px; padding: 10px 16px; border-radius: 16px; cursor: pointer; text-align: left; font: inherit;
+  border: 1px solid #DCD5FA; background: #F6F4FF; color: #2E2266; }
+.sh-big--photo { border: 0; color: #fff; background: linear-gradient(135deg, #5B42D6 0%, #3B2A9E 70%, #2A1F73 100%); box-shadow: 0 6px 16px rgba(59, 42, 158, .3); }
+.sh-big__t { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.sh-big__t b { font-size: 17px; font-weight: 900; }
+.sh-big__t small { font-size: 12.5px; font-weight: 700; opacity: .78; }
+.sh-go { font-size: 24px; opacity: .6; }
+.sh-note { margin: -4px 2px 2px; font-size: 12.5px; color: #6B6F86; line-height: 1.45; }
+.sh-copy { display: flex; gap: 6px; }
+.sh-copy[hidden] { display: none; }
+.sh-copy__in { flex: 1; min-width: 0; height: 44px; padding: 0 10px; border: 1px solid #DCD5FA; border-radius: 12px; font: inherit; font-size: 13px; color: #4A4F68; background: #FAFAFE; }
+.sh-btn { appearance: none; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 16px; border: 0; border-radius: 12px; background: #EDEAFE; color: #2E2266;
+  font: inherit; font-size: 14px; font-weight: 800; text-decoration: none; cursor: pointer; white-space: nowrap; }
+.sh-btn--main { background: #F2C14E; color: #2E2266; }
+.sh-opts { display: flex; gap: 12px; align-items: flex-start; padding: 2px; }
+.sh-pv { flex: none; width: 72px; aspect-ratio: 9 / 16; border-radius: 10px; overflow: hidden; background: #2A1F73; display: grid; place-items: center; color: #fff; text-align: center; font-size: 10px; line-height: 1.3; }
+.sh-pv--square { aspect-ratio: 1; width: 96px; }
+.sh-opts.is-fb .sh-pv { display: none; }
+.sh-pv img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.sh-pv i { font-style: normal; opacity: .8; padding: 4px; }
+.sh-opts__r { flex: 1; min-width: 0; display: grid; gap: 8px; }
+.sh-seg { display: flex; gap: 6px; flex-wrap: wrap; }
+.sh-chip { appearance: none; min-height: 40px; padding: 0 12px; border-radius: 999px; border: 1px solid #DCD5FA; background: #fff; color: #4A4F68; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
+.sh-chip.is-on { background: #5B42D6; border-color: #5B42D6; color: #fff; }
+.sh-tog { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; font-size: 14px; font-weight: 800; color: #2E2266; cursor: pointer; }
+.sh-tog input { width: 20px; height: 20px; accent-color: #5B42D6; }
+.sh-mini { font-size: 11.5px; color: #8A8EA6; line-height: 1.4; }
+.sh-fb { display: grid; gap: 8px; justify-items: center; text-align: center; padding: 10px; border-radius: 16px; background: #F6F4FF; }
+.sh-fb[hidden] { display: none; }
+.sh-fb__img { width: auto; max-width: 100%; max-height: 46vh; border-radius: 12px; box-shadow: 0 4px 14px rgba(16, 12, 40, .2); }
+.sh-fb__img--square { max-height: 40vh; }
+.sh-fb .sh-btn { width: 100%; }
+.sh-fb__t { margin: 0; font-size: 14px; font-weight: 800; color: #2E2266; }
+.sh-fb__k { margin: 0; font-size: 12.5px; color: #4A4F68; line-height: 1.5; }
+.sh-msg { margin: 0; min-height: 1em; font-size: 13px; font-weight: 700; color: #5B42D6; text-align: center; }
+.sh-msg:empty { display: none; }
+
+/* 이 기기에 기억할까요? (hub.js · 20261110k) */
+.hub-mem { display: grid; gap: 8px; margin: 8px 0 10px; padding: 12px 14px; border-radius: 16px; background: #FFF8E1; border: 1px solid #F2D27A; color: #3E3420; }
+.hub-mem__t { margin: 0; font-size: 14.5px; font-weight: 800; }
+.hub-mem__s { margin: 0; font-size: 12.5px; color: #6B5B30; line-height: 1.45; }
+.hub-mem__b { display: flex; gap: 8px; }
+.hub-mem__b button { appearance: none; flex: 1; min-height: 44px; border-radius: 12px; font: inherit; font-size: 14px; font-weight: 800; cursor: pointer; border: 1px solid #E3C86A; background: #fff; color: #3E3420; }
+.hub-mem__b button[data-mem="yes"] { background: #5B42D6; border-color: #5B42D6; color: #fff; }
