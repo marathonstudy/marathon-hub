@@ -101,6 +101,19 @@
       if (name === 'hub_badges') return sb().rpc('staff_badges', { p_student: cur.sid }).then(function (r) { return r.error ? null : r.data; }, function () { return null; });
       if (name === 'hub_award') return sb().rpc('staff_award_view', { p_student: cur.sid, p_month: String(args && args.p_month || '') + '-01' }).then(function (r) { return r.error ? null : r.data; }, function () { return null; });
       if (name === 'hub_trend') return sb().rpc('staff_hub_trend', { p_student: cur.sid }).then(unwrap);
+      /* 모의고사 (089 · 103) — 미리보기도 러닝노트와 같은 모양으로 (예전에는 빠져 있어 늘 「아직 받은 모의고사 레포트가 없어요」 · 20261110m)
+         코치룸이 읽는 저장본(mogo_records) 그 학생 줄 · 연결(ok)일 때만 · 모든 회(완성 여부는 done) */
+      if (name === 'hub_mogo') return Promise.resolve(sb().from('mogo_records').select('state,reports,extra').eq('student_id', cur.sid)).then(function (r) {
+        var m = r && !r.error && r.data && r.data[0];
+        if (!m || m.state !== 'ok') return { reports: [] };
+        var list = (Array.isArray(m.reports) ? m.reports : []).filter(function (x) { return x && x.id; }).map(function (x) {
+          return { id: x.id, examName: x.examName, date: x.date, score: x.score, grade: x.grade, attempt: x.attempt, firstAttempt: x.firstAttempt, done: x.done === true };
+        }).sort(function (a, b) { return String(b.date || '').localeCompare(String(a.date || '')); });
+        var ex = m.extra || {};
+        return { reports: list, notebookUrl: ex.notebookUrl || null, analysisUrl: ex.analysisUrl || null };
+      }, function () { return { reports: [] }; });
+      /* 학습 분석 점수 (101) — 직원 함수로 */
+      if (name === 'hub_scores') return sb().rpc('staff_scores', { p_student: cur.sid }).then(function (r) { return r.error ? null : r.data; }, function () { return null; });
       /* 레포트 복습테스트 칸의 낸 것(맞은 수 / 전체) · 미응시 — 직원 표(review_week)에서 그 학생 줄만 hub_review_week(030)와 같은 모양으로 (메모 없이) */
       if (name === 'hub_review_week') {
         var s = student();

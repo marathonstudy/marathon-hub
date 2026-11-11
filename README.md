@@ -1316,6 +1316,22 @@ delete from public.staff where email = '조교이메일@example.com';
 - migration-101 — king_scores(학생 · 수업일 · wrong/text · 점수 숫자만 · 직원 · 서버만) · 이미 있던 1~3위 후보 점수 옮김 · king_scores_save(서버) · hub_scores(그 학생 링크로 · 그 학생 것만 · 숫자만) · staff_scores(직원) · king-pick 이 반의 모든 학생 두 점수를 남김(101 전이면 조용히 넘어감)
 - 실제 학생 확인 — tests 폴더 `shots/check-ability-1110l.sql`(읽기만 · 학생별 단계 표)
 
+### 5-129. 20261110m — 앱 학생 기준 읽기 주소로 학생 기록 받기 · 지난 주간 배지 채움 (migration-102 · 함수 app-sync 다시 배포)
+1. SQL Editor → `supabase/migration-102-app-user.sql` → Run (101 다음 · 맨 끝 확인 표 모두 true)
+2. Edge Functions → **app-sync** — `index.ts` 전체로 바꿔 Deploy · 열쇠는 Secrets 의 HUB_READ_KEY (이미 넣음 · 코드 · 화면 · 기록에 값 없음)
+- 앱 주소 — GET /api/hub/student-records?userIds=…&from=…&to=… (50명 · 400일) · GET /api/hub/find-student?name=&phone= · 헤더 x-hub-key
+- 연결 — student_links.app_user_id · 공유 응답 student.id(by share) → find-student 이름 + 학생 번호 → 학부모 번호(by find · 5분마다 20명 · 하루 한 번 다시) · 하나만이면 연결 · 없으면 need · 여럿이면 many(후보) · 코치룸 학생 카드 「앱 연결 필요」 → 후보 고르기 · 앱 학생 번호 넣기 · [다시 찾기] · [연결 풀기](by staff)
+- 받기 — 앱 id 학생은 새 주소 50명씩(묶음 사이 1.5초 · 기간 = 수강 시작일 또는 1년 · 400일 한도) · 반 여러 개는 날짜 기준으로 합침(강 번호 반마다 1000 띄움 · 같은 날은 낸 쪽 · 영역별은 횟수로 · 통계 합) · 새 주소 403 · 429 · 오류 · 그 학생 없음이면 공유 코드로 받고 app_records.user_fail 에 이유 · 공유 코드도 없으면 실패(user_…) · 열쇠가 없으면 예전 방식만 · 새 주소가 제출물 주소를 주지 않으면 왕 후보 사진 주소는 있던 것 그대로
+- 반 코드 바꾸기 경고 — 「앱 클래스가 바뀌었어요」 · 「어제 반 전체 0명 · 링크 다시 연결」 띠 셈에서 앱 id 학생은 뺌 · 공유 코드를 바꿔도 앱 id 학생 기록은 지우지 않음 · 러닝노트는 공유 코드 없는 앱 id 학생도 저장본으로
+- 지난 주간 배지 채움 — 연결된 학생 처음 한 번(app_fill_at) · 받은 날짜별 기록으로 주(월~금)마다 · 과제 수정값 · 수강 시작일 · 면제 반영 · 이번 주 제외 · 빈 주에만 hw_weeks(filled) · 「🏅 내 배지」 「채움 n」 · 점선 · 문자 · 알림톡 배지 수(_badge_count)에는 안 셈 · 월간 배지는 그대로(원장이 보낸 달만) · 문자 · 알림톡 없음
+- 연결 결과 — tests 폴더 `shots/check-app-link-1110m.sql`(읽기만) · 코치룸 app_link_status()
+
+### 5-130. 20261110m — 러닝노트 모의고사 탭이 비던 문제 (migration-103 · 함수 배포 없음)
+1. SQL Editor → `supabase/migration-103-hub-mogo-all.sql` → Run (맨 끝 표 — 연결된 학생마다 코치룸 회 수 = 학부모 링크 · 학생 링크 회 수 · 이름은 화면에만)
+- 원인 ① 실제 링크 — hub_mogo 가 완성된 레포트(done)만 줬음 · 모고 사이트는 레포트를 열어야 AI 작성이 이어지므로 아무도 안 연 회는 done=false → 0개 · 코치룸 학생 카드는 완성 여부와 상관없이 셈
+- 원인 ② 코치룸 미리보기 — preview.js 가 hub_mogo 를 넘겨주지 않아 늘 빈 값
+- 고침 — hub_mogo 가 연결(ok)된 학생의 모든 회 + done · 러닝노트는 완성 전 회에 「분석 작성 중 · 열면 이어서 만들어져요」 · 미리보기는 코치룸 저장본(mogo_records)을 같은 모양으로 · 「확인 필요」 연결은 예전처럼 안 보임 · 미리보기도 학습 분석 점수(staff_scores)
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

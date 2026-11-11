@@ -1353,3 +1353,5 @@ html.rn-lock, html.rn-lock body { overflow: hidden; }
 .mgv-ov__body { flex: 1 1 auto; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .mgv-frame { display: block; width: 100%; border: 0; min-height: 200px; }
 html.mgv-open, html.mgv-open body { overflow: hidden; }
+/* 모의고사 — 아직 분석 작성 중인 회 (migration-103 · 20261110m) */
+.mgv-wip { grid-column: 1; font-size: 12px; font-weight: 700; color: #7A5300; }

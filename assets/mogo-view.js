@@ -59,6 +59,8 @@
     return '<li><button type="button" class="mgv-row" data-mgv-id="' + esc(x.id) + '" data-mgv-title="' + esc(x.examName || '모의고사') + '">' +
       '<span class="mgv-row__n"><span class="mgv-row__d num">' + esc(mdw(x.date)) + '</span>' + (x.date ? ' · ' : '') + esc(x.examName || '모의고사') + (isNew ? ' <b class="mgv-new">NEW</b>' : '') + '</span>' +
       (sub ? '<span class="mgv-row__m num">' + esc(sub) + '</span>' : '') +
+      /* 아직 완성 전(done=false · migration-103) — 열면 모고 사이트가 이어서 만든다 */
+      (x.done === false ? '<span class="mgv-wip">분석 작성 중 · 열면 이어서 만들어져요</span>' : '') +
       '<span class="mgv-row__go">레포트 보기 ›</span></button></li>';
   }
   /* 저장본을 못 읽었을 때 — 이 한 줄만 (러닝노트 다른 칸은 그대로) */
