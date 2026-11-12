@@ -19,6 +19,9 @@
 //  20261111b — 옛 기록 결과를 학생마다(ok · empty · none · fail · 이유 · 요청 기간 · 앱이 준 가장 이른 날짜) · 받기 방법과 상관없이 앱 id 학생 모두
 //    · 실패해도 조용히 넘어가지 않음 · 동기화 기록 app_sync_runs(숫자 · 이유 코드만 · migration-105)
 //    앱 연결 못 찾은 이유(번호 없음 · 번호 불일치 · 이름 불일치 · 앱 계정 없음 · 후보 여러 명 · 짐작 표시) — runLink · whyNone
+//  20261113a — 옛 기록 timeout(50명 전원 · 11-13): 1명 × 한 달씩 나눠 받고 학생마다 마지막으로 받은 달을 남겨 이어서(runOldMonths · migration-106)
+//    · 옛 기록은 밤 1~6시에도(평소 동기화의 밤 쉼은 그대로) · 분당 28회 한도(hubGate) · 요청마다 걸린 시간(app_hub_calls)
+//    · 평소 동기화 50명 → 10명씩 · 수강 시작일이 비슷한 학생끼리 · timeout 이면 다시 묻지 않고 다음 묶음을 반으로 · 실패하면 지금처럼 공유 코드로
 //
 //  키 — 새로 넣을 키 없음. Supabase 가 함수에 기본으로 주는 SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY (이 함수 안에서만)
 //  배포: 대시보드 → Edge Functions → Deploy a new function → Via Editor → 이름 app-sync → 이 파일 전체 → Deploy
@@ -263,10 +266,15 @@ export async function runList(list: Any[], started = Date.now()) {
       out.filled += Number(n) || 0;
     }
   };
-  for (let i = 0; i < userList.length; i += USER_AT_ONCE) {
+  /* 20261113a — 한 번에 USER_AT_ONCE 명(10) · 수강 시작일이 비슷한 학생끼리 묶어 기간을 짧게 · timeout 이 나면 다음 묶음은 반으로(1명까지) */
+  userList.sort((a: Any, b: Any) => String(b.start || "").localeCompare(String(a.start || "")));
+  let size = USER_AT_ONCE;
+  for (let i = 0; i < userList.length;) {
     if (Date.now() - started > BUDGET_MS) { out.left += userList.length - i; break; }
-    const part = userList.slice(i, i + USER_AT_ONCE);
+    const part = userList.slice(i, i + size);
+    i += part.length;
     const got = await fetchUsers(part.map((x: Any) => num(x.uid)), fromOf(part), kstToday());
+    if (!got.ok && got.reason === "timeout") size = Math.max(1, Math.floor(size / 2));
     const results: Any[] = [];
     for (const x of part) {
       const recs = got.ok ? got.by.get(num(x.uid)) : null;
@@ -285,7 +293,7 @@ export async function runList(list: Any[], started = Date.now()) {
       } else results.push({ id: x.id, ok: false, reason: "user_" + why, user_fail: why });
     }
     await save(results);
-    if (i + USER_AT_ONCE < userList.length) await sleep(USER_PAUSE_MS);
+    if (i < userList.length) await sleep(USER_PAUSE_MS);
   }
   for (let i = 0; i < shareList.length; i += AT_ONCE) {
     if (Date.now() - started > BUDGET_MS) { out.left += shareList.length - i; break; }
@@ -301,7 +309,7 @@ export async function runList(list: Any[], started = Date.now()) {
    앱 학생 기준 읽기 주소 (20261110m) — 서버 열쇠는 Supabase Secrets HUB_READ_KEY (이 함수 안에서만 · 로그 · 응답에 남기지 않음)
    ============================================================ */
 const APP_BASE = APP_API.replace(/\/api\/share\/report\/?$/, "");
-const USER_AT_ONCE = 50, USER_PAUSE_MS = 1500, MAX_DAYS = 400;
+const USER_AT_ONCE = 10, USER_PAUSE_MS = 1500, MAX_DAYS = 400;     /* 50 → 10 (20261113a · 50명 · 긴 기간을 한 번에 물어 timeout) */
 function hubKey(): string { return env("HUB_READ_KEY"); }
 function kstToday(): string { return new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10); }
 function addDaysIso(d: string, n: number): string { const x = new Date(d + "T00:00:00Z"); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); }
@@ -311,13 +319,43 @@ function fromOf(part: Any[]): string {
   const st = part.map((x: Any) => String(x.start || "")).filter((d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort()[0] || addDaysIso(t, -364);
   return st < lim ? lim : st;
 }
-async function hubGet(path: string): Promise<{ ok: boolean; status: number; body: Any }> {
+/* 분당 30회 한도 (20261113a) — 지난 60초 안에 HUB_PER_MIN 번 물었으면 가장 오래된 요청이 60초를 넘길 때까지 기다린다 (찾기 · 받기 · 옛 기록 모두) */
+const HUB_PER_MIN = 28, HUB_TIMEOUT_MS = 25000;
+const hubTimes: number[] = [];
+async function hubGate() {
+  for (;;) {
+    const now = Date.now();
+    while (hubTimes.length && now - hubTimes[0] >= 60000) hubTimes.shift();
+    if (hubTimes.length < HUB_PER_MIN) { hubTimes.push(now); return; }
+    await sleep(60000 - (now - hubTimes[0]) + 50);
+  }
+}
+/* 요청마다 걸린 시간 (106 · app_hub_calls) — 종류 · 학생 수 · 날짜 수 · ms · 성공 · 이유 코드만 (주소 · 이름 · 열쇠 값 없음) · 함수 끝에 한 번에 저장 */
+const hubCalls: Any[] = [];
+function dayCount(from: string, to: string): number {
+  const a = Date.parse(from + "T00:00:00Z"), b = Date.parse(to + "T00:00:00Z");
+  return Number.isFinite(a) && Number.isFinite(b) && b >= a ? Math.round((b - a) / 86400000) + 1 : 0;
+}
+async function flushCalls() {
+  if (!hubCalls.length) return;
+  const rows = hubCalls.splice(0, hubCalls.length);
+  await rpc("app_hub_log", { p_rows: rows }).catch(() => 0);       /* 106 전이면 함수가 없어 그냥 넘어간다 */
+}
+async function hubGet(path: string, meta: { kind?: string; students?: number; days?: number } = {}): Promise<{ ok: boolean; status: number; body: Any; ms: number }> {
+  await hubGate();
   const ctl = new AbortController();
-  const t = setTimeout(() => ctl.abort(), 25000);
+  const t = setTimeout(() => ctl.abort(), HUB_TIMEOUT_MS);
+  const t0 = Date.now();
+  const log = (ok: boolean, reason: string) => hubCalls.push({ kind: meta.kind || "find", students: meta.students || 0, days: meta.days || 0, ms: Date.now() - t0, ok, reason });
   try {
     const r = await fetch(APP_BASE + path, { headers: { "Accept": "application/json", "x-hub-key": hubKey() }, signal: ctl.signal });
     const body = await r.json().catch(() => null);
-    return { ok: r.ok && !(body && body.ok === false), status: r.status, body };
+    const ok = r.ok && !(body && body.ok === false);
+    log(ok, ok ? "" : failWhy(r.status, body));
+    return { ok, status: r.status, body, ms: Date.now() - t0 };
+  } catch (e) {
+    log(false, (e as Error)?.name === "AbortError" ? "timeout" : "upstream");
+    throw e;
   } finally { clearTimeout(t); }
 }
 function failWhy(status: number, body: Any): string {
@@ -345,34 +383,43 @@ export function recordsByUser(j: Any): Map<number, Any[]> {
   else if (arr && typeof arr === "object") Object.keys(arr).forEach((k) => one(arr[k], k));
   return by;
 }
-export async function fetchUsers(ids: number[], from: string, to: string): Promise<{ ok: boolean; reason: string; by: Map<number, Any[]> }> {
+/* timeout 은 다시 묻지 않는다 (20261113a — 같은 요청은 또 25초를 넘겨 함수 시간만 쓴다 · 묶음을 줄이거나 다음 차례로) */
+export async function fetchUsers(ids: number[], from: string, to: string, kind = "sync"): Promise<{ ok: boolean; reason: string; by: Map<number, Any[]> }> {
   let last = { ok: false, reason: "upstream", by: new Map<number, Any[]>() };
   for (let k = 0; k < 2; k++) {
     if (k) await sleep(2000);
     try {
       const q = "/api/hub/student-records?userIds=" + ids.join(",") + "&from=" + from + "&to=" + to;
-      const r = await hubGet(q);
+      const r = await hubGet(q, { kind, students: ids.length, days: dayCount(from, to) });
       if (r.ok) return { ok: true, reason: "", by: recordsByUser(r.body) };
       last = { ok: false, reason: failWhy(r.status, r.body), by: new Map() };
       if (r.status === 401 || r.status === 403 || r.status === 400) break;        /* 열쇠 · 입력 문제는 다시 해도 같다 */
     } catch (e) {
       last = { ok: false, reason: (e as Error)?.name === "AbortError" ? "timeout" : "upstream", by: new Map() };
+      if (last.reason === "timeout") break;
     }
   }
   return last;
 }
 /* 반 여러 개 → 공유 리포트 한 개 모양으로 (날짜 기준) — 강 번호는 반마다 1000씩 띄워 겹치지 않게 · 같은 날 여러 반이면 낸 쪽 */
-export function mergeClasses(recs: Any[]): Any {
+/* stable — 옛 기록을 달마다 받을 때(20261113a): 달마다 오는 반 수가 달라도 같은 반은 같은 강 번호가 되게 반 id(없으면 이름)로 띄움 */
+function classOff(ci: Any): number {
+  const k = String(ci?.id ?? ci?.classId ?? ci?.title ?? "");
+  let h = 0;
+  for (let i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) >>> 0;
+  return (h % 89 + 1) * 1000;
+}
+export function mergeClasses(recs: Any[], stable = false): Any {
   const sorted = recs.slice().sort((a: Any, b: Any) => String(a?.classInfo?.openDate ?? a?.enrolledAt ?? "").localeCompare(String(b?.classInfo?.openDate ?? b?.enrolledAt ?? "")));
-  if (sorted.length === 1) return sorted[0];
+  if (sorted.length === 1 && !stable) return sorted[0];
   const rank: Record<string, number> = { onTime: 3, late: 2, none: 1 };
   const cal = new Map<string, Any>(), hist: Any[] = [], lec: Any[] = [], cats = new Map<string, Any>();
   const st = { totalSubmitted: 0, totalHomework: 0, totalOnTime: 0, totalCompleted: 0, totalVideos: 0 };
   const today = kstToday();
   let cur: Any = null;
   sorted.forEach((c: Any, i: number) => {
-    const off = i * 1000;
     const ci = c?.classInfo ?? {};
+    const off = stable ? classOff(ci) : i * 1000;
     if (!cur || (String(ci.openDate ?? "") <= today && (!ci.closeDate || String(ci.closeDate) >= today))) cur = c;
     (Array.isArray(c?.calendarData) ? c.calendarData : []).forEach((d: Any) => {
       const k = String(d?.date ?? ""), x = { ...d, lectureOrder: num(d?.lectureOrder) ? num(d.lectureOrder) + off : 0 };
@@ -557,6 +604,91 @@ export async function runOld(started = Date.now(), limit = 50) {
   }
   return out;
 }
+/* ============================================================
+   옛 기록 1명 × 한 달씩 (20261113a · migration-106) — 한 번에 10달을 물으면 앱이 25초 안에 답을 못 했다(50명 전원 timeout · 11-13)
+   · 학생마다 마지막으로 받은 달(old_month) 다음 달부터 · 수강 시작일 앞 달까지 · 달마다 저장(app_old_month_save · 통째로 바꿈)
+   · 요청 기간은 그 달 앞뒤로 하루씩 넓혀 묻고(앱이 UTC 날짜로 자를 때 빠지지 않게) 한국 날짜로 그 달 것만 남긴다
+   · 실패하면 그 학생은 그 달에서 멈추고 다음 학생으로 (연속 실패만큼 10분 → 6시간 쉼 · DB 가 정함) · 열쇠 문제면 모두 멈춤
+   · 요청 사이 OLD_GAP_MS 쉼 + 분당 28회 한도(hubGate) · until(함수 시작부터 ms)까지만 새 요청을 시작
+   · 106 전이면(app_old_due2 없음) 예전 방식(runOld · 밤에는 쉼)
+   ============================================================ */
+const OLD_GAP_MS = 1000, OLD_DUE = 40;
+const isDay = (d: unknown) => /^\d{4}-\d{2}-\d{2}$/.test(String(d ?? ""));
+function monthOf(d: string): string { return d.slice(0, 7) + "-01"; }
+function nextMonth(m: string): string { const x = new Date(m + "T00:00:00Z"); x.setUTCMonth(x.getUTCMonth() + 1); return x.toISOString().slice(0, 10); }
+function monthLast(m: string): string { return addDaysIso(nextMonth(m), -1); }
+/* 한 달 몫 — 한국 날짜로 [f, e] 안 · 수강 시작일(cut) 앞만 */
+export function oldMonthOf(data: Any, cut: string, f: string, e: string) {
+  const o = oldOf(data, cut);
+  const hist = o.old.history.filter((h: Any) => { const d = kstDayOf(h?.submittedAt); return d >= f && d <= e; });
+  const cal = o.old.calendar.filter((c: Any) => c.date >= f && c.date <= e);
+  return { history: hist, calendar: cal, n: hist.length };
+}
+export async function runOldMonths(started = Date.now(), until = BUDGET_MS, night = false) {
+  const out: Any = { mode: "month", students: 0, tried: 0, months: 0, done: 0, ok: 0, empty: 0, failed: 0, records: 0, weeks: 0, reasons: {} as Record<string, number> };
+  if (!hubKey()) { out.skip = "nokey"; return out; }
+  let list: Any[] = [];
+  try { list = (await rpc("app_old_due2", { p_limit: OLD_DUE })) || []; }
+  catch (e) {
+    if (/app_old_due2/.test(short(e))) {                                          /* 106 전 — 예전 방식 */
+      if (night) return { skip: "night" };
+      return await runOld(started);
+    }
+    out.err = "due: " + short(e); console.error("app-sync old due", out.err); return out;
+  }
+  if (!Array.isArray(list)) list = [];
+  out.due = list.length;
+  const t = kstToday(), lim = addDaysIso(t, -(MAX_DAYS - 2)), from0 = OLD_FROM < lim ? lim : OLD_FROM;
+  out.from = from0; out.to = t;
+  let stop = false;
+  for (const x of list) {
+    if (stop || Date.now() - started > until) { out.left = (out.left || 0) + 1; continue; }
+    const uid = num(x.uid);
+    const cut = isDay(x.start) ? String(x.start) : addDaysIso(t, -364);
+    const last = addDaysIso(cut, -1);
+    let m = isDay(x.month) ? nextMonth(monthOf(String(x.month))) : monthOf(from0);
+    out.students++;
+    const save = async (row: Any) => {
+      try { return await rpc("app_old_month_save", { p_row: { id: x.id, from: from0, to: t, cut, ...row } }); }
+      catch (e) { out.err = "save: " + short(e); console.error("app-sync old save", out.err); stop = true; return null; }
+    };
+    if (from0 > last || m > last) {                                                /* 받을 달이 없음(수강 시작이 1월 1일 앞 · 이미 다 받음) */
+      const s: Any = await save({ status: "done" });
+      if (s) { out.done++; num(s.n) > 0 ? out.ok++ : out.empty++; }
+      continue;
+    }
+    while (m <= last && !stop) {
+      if (Date.now() - started > until) { out.left = (out.left || 0) + 1; break; }
+      const f = m < from0 ? from0 : m, e = monthLast(m) < last ? monthLast(m) : last;
+      const got = await fetchUsers([uid], addDaysIso(f, -1), addDaysIso(e, 1) > t ? t : addDaysIso(e, 1), "old");
+      out.tried++;
+      if (!got.ok) {
+        out.failed++;
+        out.reasons[got.reason] = (out.reasons[got.reason] || 0) + 1;
+        console.error("app-sync old fail", got.reason);
+        await save({ status: "fail", err: "앱 " + got.reason });
+        if (/^http40[13]$/.test(got.reason)) stop = true;                           /* 열쇠 문제 — 다시 해도 같다 */
+        break;
+      }
+      const recs = got.by.get(uid) || [];
+      const data = recs.length ? pick(mergeClasses(recs, true)) : { history: [], calendar: [] };
+      const part = oldMonthOf(data, cut, f, e), sp = spanOf(data);
+      const end = nextMonth(m) > last;
+      const s: Any = await save({ status: end ? "done" : "month", month: m, history: part.history, calendar: part.calendar, n: part.n, got_n: sp.n, got_first: sp.first, classes: recs.length });
+      if (!s) break;
+      out.months++; out.records += part.n;
+      if (part.calendar.length) {
+        try { out.weeks += Number(await rpc("app_fill_old", { p_student: x.id, p_days: part.calendar.map((c: Any) => ({ d: c.date, s: c.status })) })) || 0; }
+        catch (e2) { out.fillErr = short(e2); }
+      }
+      if (end) { out.done++; num(s.n) > 0 ? out.ok++ : out.empty++; }
+      m = nextMonth(m);
+      await sleep(OLD_GAP_MS);
+    }
+  }
+  return out;
+}
+
 /* 동기화 기록 (105) — 숫자 · 이유 코드만 (이름 · 번호 · 열쇠 값 없음) · 105 전이면 함수가 없어 그냥 넘어간다 */
 async function logRun(kind: string, sum: Any) {
   try { await rpc("app_sync_log", { p_kind: kind, p_sum: { ...sum, hub: !!hubKey() } }); }
@@ -581,16 +713,17 @@ async function handle(req: Request, cors: Record<string, string>) {
     const started = Date.now();
     const r = await runList(list, started);
     let link: Any = null, old: Any = null;
-    /* 옛 기록 한 번 채우기 (104 · 시간이 넉넉할 때만) — 건너뛰거나 실패하면 이유를 남긴다 (105) */
-    if (due?.night) old = { skip: "night" };
-    else if (!hubKey()) old = { skip: "nokey" };
-    else if (Date.now() - started >= BUDGET_MS / 3) old = { skip: "time" };
-    else old = await runOld(started).catch((e) => ({ err: "run: " + short(e) }));
-    if (!due?.night && hubKey() && Date.now() - started < BUDGET_MS / 2) {
+    /* 옛 기록 (104 · 105 · 106) — 1명 × 한 달씩 · 밤 1~6시에도 돈다(평소 동기화는 쉼 · 그 시간을 옛 기록이 다 씀)
+       낮에는 평소 동기화가 먼저 · 옛 기록은 함수 시간의 70% 까지 · 건너뛰거나 실패하면 이유를 남긴다 (105) */
+    if (!hubKey()) old = { skip: "nokey" };
+    else if (!due?.night && Date.now() - started >= BUDGET_MS * 0.6) old = { skip: "time" };
+    else old = await runOldMonths(started, due?.night ? BUDGET_MS : BUDGET_MS * 0.7, !!due?.night).catch((e) => ({ err: "run: " + short(e) }));
+    if (!due?.night && hubKey() && Date.now() - started < BUDGET_MS * 0.75) {
       let ll: Any[] = [];
       try { ll = (await rpc("app_link_due", { p_limit: 20 })) || []; } catch (e) { link = { err: "due: " + short(e) }; }
       if (ll.length) link = await runLink(ll, started);
     }
+    await flushCalls();
     await logRun("cron", { night: !!due?.night, due: list.length, ...r, link, old, ms: Date.now() - started });
     return json({ ok: true, night: !!due?.night, due: list.length, ...r, ...(link ? { link } : {}), ...(old && (old.tried || old.err || old.skip) ? { old } : {}) }, cors);
   }
@@ -611,11 +744,13 @@ async function handle(req: Request, cors: Record<string, string>) {
     if (!hubKey()) return json({ ok: false, reason: "nokey", message: "앱 읽기 열쇠(HUB_READ_KEY)가 아직 없습니다." }, cors);
     const ll: Any[] = await rpc("app_link_due", { p_limit: ids.length, p_students: ids }) || [];
     const lr = await runLink(ll);
+    await flushCalls();
     return json({ ok: true, ...lr }, cors);
   }
   if (!ids.length && !cls) return json({ ok: false, reason: "input", message: "반이나 학생을 골라 주세요." }, cors, 400);
   const list: Any[] = await rpc("app_sync_targets", { p_students: ids.length ? ids : null, p_class: cls || null }) || [];
   const r = await runList(list);
+  await flushCalls();
   await logRun("refresh", { due: list.length, ...r });
   return json({ ok: true, due: list.length, ...r }, cors);
 }

@@ -1362,6 +1362,21 @@ delete from public.staff where email = '조교이메일@example.com';
   칸 안에서 먼저 처리한 Esc(편집 취소 · 메뉴 닫기)는 창을 닫지 않음 · 설명 풍선(tip)은 맨 앞 창 안에
   시험(e2e132) — 직접 showModal 하는 파일이 있거나 화면 전체 겹창(position: fixed · inset: 0)을 div 로 만들면 실패
 
+### 5-133. 20261113a — 앱 옛 기록 timeout · 1명 × 한 달씩 나눠 받기 · 요청 시간 기록 (migration-106 · 함수 app-sync 다시 배포)
+1. SQL Editor → `supabase/migration-106-app-old-month.sql` → Run (105 다음 · 맨 끝 확인 표 모두 true)
+2. Edge Functions → **app-sync** — `index.ts` 전체로 바꿔 Deploy
+3. 30분쯤 뒤 확인 — `supabase/check-app-old-month-1113.sql`(읽기만 · 한 표) · 1명 · 1달 요청 수 · 성공 · 실패 · 평균 · 최대 ms · 실패 이유 · 평소 동기화 요청(학생 수별) · 옛 기록 진행(끝남 · 받는 중 · 실패 · 아직) · 학생별 마지막으로 받은 달(이름은 성 + ○)
+- 원인: check-app-old-run-1111.sql — 옛 기록 받기 50명 전원 「앱 timeout」(11-13 00:26 · 요청 2026-01-01 ~ 11-13 · 받은 과제 0) · 25명 × 10달을 한 번에 물어 앱이 25초 안에 답을 못 함 · 평소 동기화도 학생 기준 주소 39명 timeout(공유 코드로 받는 중) · 「앱이 지금 반 기간만 줌」 0명 → 개강일 문제 아님
+- 옛 기록 — 한 번 요청 = 학생 1명 × 한 달(앞뒤 하루씩 넓혀 묻고 한국 날짜로 그 달 것만) · 학생마다 마지막으로 받은 달(app_records.old_month) · 받은 달 수(old_months) · 다음 차례는 그다음 달부터
+  달마다 app_old_parts(학생 · 달)에 통째로 바꿔 넣고 app_records.old 를 모든 달로 다시 만듦(겹쳐 쌓이지 않음 · 받은 달까지는 바로 러닝노트 분석에) · 수강 시작일 앞 달까지 받으면 끝(old_at · ok / empty)
+  실패하면 그 학생은 그 달에서 멈추고 다음 학생으로 · 연속 실패(old_fails) 1번 10분 · 2번 30분 · 3번 1시간 … 6시간 · 성공하면 0 · 열쇠 문제(401 · 403)면 모두 멈춤
+  밤 1~6시에도 돈다(그 시간은 함수 시간을 옛 기록이 다 씀) · 평소 동기화의 밤 쉼은 그대로 · 낮에는 평소 동기화 다음 · 함수 시간의 70% 까지 · 요청 사이 1초
+  달마다 오는 반 수가 달라도 같은 반은 같은 강 번호(반 id 로 띄움) · 105 때 실패한 학생은 106 실행 때 기다림 없이 다시
+- 평소 동기화 — 학생 기준 주소 한 묶음 50명 → 10명 · 수강 시작일이 비슷한 학생끼리(기간이 짧아짐) · timeout 이면 같은 요청을 다시 묻지 않고(25초 × 2 를 쓰던 것) 다음 묶음을 반으로(1명까지) · 실패하면 지금처럼 공유 코드로
+- 분당 30회 한도 — 앱 요청(받기 · 옛 기록 · 찾기) 모두 hubGate 를 거쳐 지난 60초 안 28번까지
+- 요청 시간 app_hub_calls — 종류(old · sync · find) · 학생 수 · 날짜 수 · ms · 성공 · 이유 코드만(주소 · 이름 · 열쇠 값 없음) · 7일 · 서버 · SQL 편집기만
+- 1명 × 1달로도 timeout 이면 앱 쪽 조회가 느린 것 — Replit 요청문 `.local/replit_합친요청.md`(속도 개선 + 반 명단 · git 에 안 올림)
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.
