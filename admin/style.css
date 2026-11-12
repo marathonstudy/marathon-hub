@@ -4847,8 +4847,9 @@ dialog.vl-modal[open] { display: flex; flex-direction: column; overflow: hidden;
 .ol-need p { margin: 4px 0 0; font-size: 13px; color: var(--ink-mid); }
 .sc-consult.is-off .sc-hint { margin: 0; }
 @media (max-width: 520px) {
-  .ol-tbl thead { display: none; }
-  .ol-tbl, .ol-tbl tbody, .ol-tbl tr, .ol-tbl td { display: block; width: 100%; box-sizing: border-box; }
-  .ol-tbl tr { padding: 8px 0; border-bottom: 1px solid var(--line-soft); }
-  .ol-tbl td { padding: 2px 0; border: 0; }
+  .roster.ol-tbl thead { display: none; }
+  .roster.ol-tbl, .roster.ol-tbl tbody, .roster.ol-tbl tr, .roster.ol-tbl td { display: block; width: 100%; box-sizing: border-box; }
+  .roster.ol-tbl tr { padding: 8px 0; margin: 0; border: 0; border-bottom: 1px solid var(--line-soft); border-radius: 0; background: none; }
+  .roster.ol-tbl td { padding: 2px 0; border: 0; }
+  .roster.ol-tbl td::before { content: none; }
 }

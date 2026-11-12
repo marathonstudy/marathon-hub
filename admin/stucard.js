@@ -45,7 +45,7 @@
   function infoHtml(sid) {
     var s = stu(sid) || {}, cls = s.className || '', start = Store.joinedOf ? Store.joinedOf(s) : (s.startOn || '');
     var wk = start && start <= today() ? Math.floor((Date.parse(today()) - Date.parse(start)) / (7 * 864e5)) + 1 : 0;
-    var ln = window.Mogo && Mogo.linkState ? Mogo.linkState(sid) : null;
+    var ln = window.Mogo && Mogo.linkState && !(window.OnlineClass && OnlineClass.off(cls, 'mogo')) ? Mogo.linkState(sid) : null;   /* 모의고사가 꺼진 온라인 반은 모고 표시 없음 (107) */
     var line1 = [cls, whenOf(cls), wk ? wk + '주째' : ''].filter(Boolean).map(esc).join(' · ') +
       (ln ? ' <span class="sc-mg is-' + esc(ln.k) + '">모고 ' + esc(ln.t) + '</span>' : '') + alTagHtml(sid);
     var p2 = digits(s.parentPhone2) && digits(s.parentPhone2) !== digits(s.parentPhone);

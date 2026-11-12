@@ -150,7 +150,7 @@
           '<p class="field__hint">없는 반 이름이면 온라인 반으로 새로 만들어요(수업 시간 · 상담 · 모의고사 · 발송 꺼짐).</p></div>' +
         (S.busy ? '<p class="panel__hint">미리보기 만드는 중…</p>' :
         '<p class="ol-sum" role="status"><b>새로 추가 ' + (+p.new) + '명</b> · 이미 있음 ' + (+p.have) + '명 · <b class="ol-sus">겹침 의심 ' + (+p.suspect) + '명</b></p>' +
-        '<table class="roster tb-table ol-tbl"><thead><tr><th>앱 학생</th><th>학년</th><th>어떻게</th><th>코치룸</th></tr></thead><tbody>' +
+        '<table class="roster ol-tbl"><thead><tr><th>앱 학생</th><th>학년</th><th>어떻게</th><th>코치룸</th></tr></thead><tbody>' +
         rows.map(function (r) {
           return '<tr class="ol-' + esc(r.status) + '"><td>' + esc(r.name) + ' <span class="muted-note num">#' + esc(r.uid) + '</span></td><td>' + esc(r.grade || '') + '</td>' +
             '<td>' + esc(ST[r.status] || r.status) + (r.why ? ' <span class="muted-note">(' + esc(WHY[r.why] || r.why) + ')</span>' : '') + '</td>' +
