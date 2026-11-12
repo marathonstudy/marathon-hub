@@ -61,6 +61,8 @@
           c.meta = 'end_time' in x ? { start: String(x.start_time || '').slice(0, 5), end: String(x.end_time || '').slice(0, 5), endOn: x.end_on || '', staff: x.staff_emails || [], remind: !!x.note_remind, min: x.remind_min || 5 } : null;
         });
       }, function () {}).then(function () {
+        return window.OnlineClass ? OnlineClass.load() : null;                         /* 반 종류 (online.js · 107) */
+      }).then(function () {
         /* AI 기본 요청 — 「이 요청을 이 반 기본으로 기억하기」 (aipolish.js · migration-043 · 20261031p) · 043 전이면 「—」 */
         return window.AiPolish ? AiPolish.memAll().then(function (m) { aiReq = m; }) : null;
       }).then(render);
@@ -150,10 +152,12 @@
         '<button class="btn btn--sm btn--primary" type="button" data-ca="rename-ok">바꾸기</button>' +
         '<button class="btn btn--sm btn--ghost" type="button" data-ca="rename-cancel">취소</button></div>'
       : '<span class="roster__name">' + esc(c.name) + '</span>' +
+        (window.OnlineClass ? OnlineClass.kindHtml(c.name) : '') +                       /* 온라인 반 표시 (online.js · migration-107 · 20261113b) */
         (like.length ? ' <span class="ca-like" title="이름이 비슷한 반 — 합치지 않습니다">비슷한 이름: ' + esc(like.join(', ')) + '</span>' : '') +
         (c.archived ? '<br><span class="muted-note">보관 — ' + esc(c.archived_by || '') + ' · ' + esc(fmtDT(c.archived_at)) + '</span>' : '');
     var acts = editing === c.name ? '' :
       '<button class="btn btn--sm" type="button" data-ca="rename">이름 바꾸기</button>' +
+      (window.OnlineClass && !c.archived ? '<button class="btn btn--sm" type="button" data-ca="kind">반 종류</button>' : '') +
       (c.archived ? '<button class="btn btn--sm btn--primary" type="button" data-ca="restore">되살리기</button>'
                   : '<button class="btn btn--sm" type="button" data-ca="archive">보관</button>') +
       (canDelete(c) ? '<button class="btn btn--sm btn--danger" type="button" data-ca="delete">삭제</button>' : '');
@@ -297,6 +301,7 @@
     if (!c) return;
     var act = b.dataset.ca;
     if (act === 'meta') { openMeta(c); return; }
+    if (act === 'kind') { OnlineClass.openKind(c.name); return; }
     if (act === 'rename') { editing = c.name; render(); return; }
     if (act === 'rename-cancel') { editing = ''; render(); return; }
     if (act === 'rename-ok') { doRename(c); return; }
@@ -359,6 +364,7 @@
   });
 
   $('#caShowArchived').addEventListener('change', render);
+  window.addEventListener('jt:class-kinds', function () { if (modal.open) render(); });
   $('#btnClassAdminClose').addEventListener('click', function () { modal.close(); });
 
   $('#btnClassAdmin').addEventListener('click', function () {

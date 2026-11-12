@@ -4826,3 +4826,29 @@ dialog.vl-modal[open] { display: flex; flex-direction: column; overflow: hidden;
 .anl-uid { width: 130px; flex: 0 1 130px; }
 .anl-cands__t { font-size: 12px; font-weight: 800; color: var(--ink-mid); align-self: center; }
 .anl-m { margin: 0; font-size: 12px; color: var(--ink-mid); }
+
+/* ---------- 온라인 반 · 앱 반에서 학생 가져오기 (online.js · migration-107 · 20261113b) ---------- */
+.ol-badge { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); color: var(--indigo); font-size: 11.5px; font-weight: 800; vertical-align: middle; white-space: normal; }
+.ol-kinds { display: flex; flex-wrap: wrap; gap: 14px; margin: 0 0 10px; }
+.ol-opts { display: grid; gap: 8px; margin: 0; padding: 10px 12px; border: 1px solid var(--line-soft); border-radius: 12px; }
+.ol-cls { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ol-cls__b { width: 100%; min-height: 44px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; padding: 10px 12px; text-align: left; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink-deep); font: inherit; cursor: pointer; }
+.ol-cls__b:hover, .ol-cls__b:focus-visible { border-color: var(--indigo); }
+.ol-tgt { display: grid; gap: 4px; margin: 0 0 10px; }
+.ol-tgt .input { max-width: 320px; width: 100%; box-sizing: border-box; }
+.ol-sum { margin: 0 0 8px; font-size: 14px; }
+.ol-sus { color: var(--danger); }
+.ol-tbl { width: 100%; }
+.ol-tbl td { overflow-wrap: anywhere; }
+.ol-tbl tr.ol-suspect td { color: var(--danger); }
+.ol-tbl tr.ol-same td { color: var(--ink-light); }
+.ol-need { padding: 12px 14px; border: 1px dashed var(--line); border-radius: 12px; background: var(--surface-2); }
+.ol-need b { display: block; font-size: 15px; margin-bottom: 4px; color: var(--ink-deep); }
+.ol-need p { margin: 4px 0 0; font-size: 13px; color: var(--ink-mid); }
+.sc-consult.is-off .sc-hint { margin: 0; }
+@media (max-width: 520px) {
+  .ol-tbl thead { display: none; }
+  .ol-tbl, .ol-tbl tbody, .ol-tbl tr, .ol-tbl td { display: block; width: 100%; box-sizing: border-box; }
+  .ol-tbl tr { padding: 8px 0; border-bottom: 1px solid var(--line-soft); }
+  .ol-tbl td { padding: 2px 0; border: 0; }
+}

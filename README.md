@@ -1377,6 +1377,23 @@ delete from public.staff where email = '조교이메일@example.com';
 - 요청 시간 app_hub_calls — 종류(old · sync · find) · 학생 수 · 날짜 수 · ms · 성공 · 이유 코드만(주소 · 이름 · 열쇠 값 없음) · 7일 · 서버 · SQL 편집기만
 - 1명 × 1달로도 timeout 이면 앱 쪽 조회가 느린 것 — Replit 요청문 `.local/replit_합친요청.md`(속도 개선 + 반 명단 · git 에 안 올림)
 
+### 5-134. 20261113b — 온라인 반 · 앱 반에서 학생 가져오기 · 온라인 반 발송 막기 (migration-107 · 함수 app-sync · sms-send · kakao-send · note-remind 다시 배포)
+1. SQL Editor → `supabase/migration-107-online-class.sql` → Run (106 다음 · 맨 끝 확인 표 모두 true)
+2. Edge Functions → **app-sync** · **sms-send** · **kakao-send** · **note-remind** — 각 `index.ts` 전체로 바꿔 Deploy (발송 막기는 세 발송 함수가 다 바뀌어야 빈틈이 없음)
+3. 앱에 반 목록 · 명단 주소가 생긴 뒤(Replit `.local/replit_합친요청.md`) — 코치룸 → 학생 → 명단 → [반 관리] → [앱 반에서 학생 가져오기]
+- 반 종류 — classes.kind(현강 '' · 온라인 'online') · use_time · use_consult · use_mogo · send_on · 반 관리 줄 [반 종류](현강 / 온라인 · 하나씩 켜고 끄기 · 직원) · 온라인 반 줄에 「온라인 · 발송 꺼짐」
+  온라인으로 바꾸면 수업 시간 · 상담 · 모의고사 · 발송이 꺼진 채로 시작(현강으로 되돌리면 모두 켬) · 수업 시간을 끄면 필기 알림 · 수업 전 예고도 끔
+  과제 · 학습 분석 · 능력치 · 배지 · 게임 홈은 학생마다(앱 기록)라 현강과 같음
+- 학생 카드 — 그 반에서 상담을 껐으면 상담 칸 대신 「온라인 반이라 상담이 꺼져 있어요」(저장 버튼 없음) · 모의고사를 껐으면 모의고사 추이 칸 없음 · 모고 기록 받기(mogo_due)에서도 뺌
+- 앱 반에서 학생 가져오기 (admin/online.js) — 앱 반 고르기 → 미리보기(새로 추가 n명 · 이미 있음 n명 · 겹침 의심 n명 · 학생마다 이름 · 학년 · 어떻게 · 번호는 안 보임) → [가져오기] → 확인 창 → 실제로 넣음
+  넣을 반 이름 — 기본은 앱 반 이름(고칠 수 있음 · 없는 반이면 온라인 반으로 새로 · 수업 시간 · 상담 · 모의고사 · 발송 꺼짐 · 앱 반 id 남김)
+  새로 추가 — 학생을 만들고 앱 학생 id 로 바로 연결(app_user_by 'roster') · 이미 있음(그 앱 id 로 연결된 재원 학생) — 학생을 새로 만들지 않고 class_members 로 반만 더함(현강 반 · 현강 발송 그대로)
+  겹침 의심(앱 id 는 없고 이름 + 번호 또는 이름이 같은 재원 학생) — 넣지 않음 → 같은 학생이면 학생 카드 「앱 연결」에서 앱 학생 번호로 연결한 뒤 다시 가져오면 반만 더해짐 · 다시 가져와도 겹치지 않음
+  앱에 주소가 아직 없으면(404 · 앱 화면이 옴) 「앱 업데이트 필요」만 · 아무것도 안 넣음 · 앱 주소: GET /api/hub/classes · GET /api/hub/classes/{id}/students (같은 x-hub-key)
+- 온라인 반 발송 막기 — send_quiet()(발송 꺼진 온라인 반에만 있는 재원 학생 · 그 학생들만 쓰는 번호 · 다른 학생도 쓰는 번호는 안 막음 · 직원 · 서버만)
+  sms-send(보내기 직전에 빼고 「온라인 반 · 발송 꺼짐」 실패로 기록) · kakao-send(기록 줄도 안 만들고 건너뜀 이유) · note-remind sendRows(자동 알림 · D-day · 대체 문자 모두) · 107 전이면 함수가 없어 그대로
+  켜기 — 반 관리 → 그 반 [반 종류] → 「문자 · 알림톡 · 링크 발송」
+
 ### 6. GitHub Pages
 저장소 → **Settings → Pages** → Source **Deploy from a branch** → Branch `main` / `(root)` → Save.
 1~2분 뒤 `https://marathonstudy.github.io/marathon-hub/admin/` 이 열린다.

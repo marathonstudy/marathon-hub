@@ -420,12 +420,23 @@
     if (st.notes[sid]) prefill(sid);
     var scroll = document.getElementById('csScroll'), top = scroll ? scroll.scrollTop : 0;
     var SC = window.StuCard;
+    /* 온라인 반 (online.js · migration-107 · 20261113b) — 그 반에서 상담 · 모의고사를 껐으면 칸을 접는다 (반 관리 → [반 종류]에서 켬) */
+    var OC = window.OnlineClass, cOff = !!(OC && OC.off(s.className || s.class_name, 'consult')), mOff = !!(OC && OC.off(s.className || s.class_name, 'mogo'));
+    if (cOff) {
+      m.innerHTML = '<div class="cs-sheet">' + headHtml(sid) + '<div class="cs-scroll" id="csScroll">' +
+        (SC && window.Faces ? Faces.cardHtml(sid) : '') +
+        (SC ? SC.infoHtml(sid) + SC.hwHtml(sid, hwOfFn(sid)) + (SC.abilityHtml ? SC.abilityHtml(sid) : '') + (mOff ? '' : SC.mogoHtml(sid)) : '') +
+        '<section class="sc-sec sc-consult is-off" id="scConsult" aria-label="상담"><h3 class="sc-t">상담</h3>' +
+        '<p class="sc-hint">‘' + esc(s.className || s.class_name || '') + '’ 은 온라인 반이라 상담이 꺼져 있어요 · 반 관리 → [반 종류]에서 켤 수 있어요</p></section></div></div>';
+      m.setAttribute('aria-label', (s.name || '') + ' 학생 카드');
+      return;
+    }
     m.innerHTML = '<div class="cs-sheet">' + headHtml(sid) +
       '<div class="cs-scroll" id="csScroll">' +
         /* 학생 카드 — 기본 정보 · 과제 · 모의고사 추이 (stucard.js · 20261109c) */
         /* 머리 — 얼굴 사진(없으면 고른 캐릭터) · [사진 올리기] [사진 지우기] · 레벨 · XP (faces.js · 20261110b) */
         (SC && window.Faces ? Faces.cardHtml(sid) : '') +
-        (SC ? SC.infoHtml(sid) + SC.hwHtml(sid, hwOfFn(sid)) + (SC.abilityHtml ? SC.abilityHtml(sid) : '') + SC.mogoHtml(sid) : '') +
+        (SC ? SC.infoHtml(sid) + SC.hwHtml(sid, hwOfFn(sid)) + (SC.abilityHtml ? SC.abilityHtml(sid) : '') + (mOff ? '' : SC.mogoHtml(sid)) : '') +
         '<section class="sc-sec sc-consult" id="scConsult" aria-label="상담"><h3 class="sc-t">상담</h3>' +
         tabsHtml() + (st.kind === 'hw' ? prevHtml(sid) : '') + formHtml(sid) +
         (st.err ? '<p class="cs-err" role="alert">' + esc(st.err) + '</p>' : '') +

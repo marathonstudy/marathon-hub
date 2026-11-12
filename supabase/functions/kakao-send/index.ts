@@ -147,12 +147,19 @@ async function handle(req: Request, cors: Record<string, string>) {
     return json({ ok: false, reason: "nokeys", missing, message: "알림톡 키가 아직 다 들어가지 않았습니다 (" + missing.join(", ") + "). Supabase Secrets 에 넣어 주세요." }, cors, 200);
   }
 
+  /* 온라인 반 · 발송 꺼짐 (20261113b · migration-107) — 원장님이 켜기 전까지 보내지 않는다(기록 줄도 안 만듦) · 107 전이면 함수가 없어 그대로 */
+  const quiet: Any = await rpcAs(auth, apikey, "send_quiet", {}).catch(() => null);
+  const qS = new Set<string>((quiet?.students || []).map(String));
+  const quietSkip = students.filter((id) => qS.has(id)).map((id) => ({ id, name: "", reason: "online", label: "온라인 반 · 발송 꺼짐" }));
+  const sendIds = students.filter((id) => !qS.has(id));
+  if (!sendIds.length) return json({ ok: true, sent: 0, failed: 0, skipped: quietSkip, results: [] }, cors);
+
   /* 1) 보낼 줄 — 기록 줄을 먼저 만든다 */
   let prep: Any;
   try {
     prep = who === "student"
-      ? await rpcAs(auth, apikey, "kakao_prepare_student", { p_week: week, p_students: students, p_resend: !!body.resend, p_site: SITE })
-      : await rpcAs(auth, apikey, "kakao_prepare", { p_week: week, p_students: students, p_resend: !!body.resend, p_test: action === "test" });
+      ? await rpcAs(auth, apikey, "kakao_prepare_student", { p_week: week, p_students: sendIds, p_resend: !!body.resend, p_site: SITE })
+      : await rpcAs(auth, apikey, "kakao_prepare", { p_week: week, p_students: sendIds, p_resend: !!body.resend, p_test: action === "test" });
   } catch (e) {
     const m = String((e as Error).message || e);
     if (who === "student" && /Could not find the function|schema cache/i.test(m)) return json({ ok: false, reason: "nosql", message: "migration-071 SQL 을 먼저 실행해 주세요." }, cors, 200);
@@ -160,7 +167,7 @@ async function handle(req: Request, cors: Record<string, string>) {
   }
   const tplId = who === "student" ? String(prep?.tpl || "") : (testTpl || parentTpl || env("SOLAPI_TEMPLATE_ID"));
   if (prep?.ok && !tplId) return json({ ok: false, reason: "notpl", message: "학생용 레포트 알림톡 템플릿 코드가 설정에 없습니다." }, cors, 200);
-  const skipped = (prep?.skipped || []).map((s: Any) => ({ id: s.id, name: s.name, reason: s.reason, label: REASON[s.reason] || s.reason }));
+  const skipped = (prep?.skipped || []).map((s: Any) => ({ id: s.id, name: s.name, reason: s.reason, label: REASON[s.reason] || s.reason })).concat(quietSkip);
   if (!prep?.ok) return json({ ok: false, reason: prep?.reason || "prepare", message: prep?.message || "보낼 수 없습니다.", skipped }, cors, 200);
   const rows: Any[] = prep.rows || [];
   if (!rows.length) return json({ ok: true, sent: 0, failed: 0, skipped, results: [] }, cors);

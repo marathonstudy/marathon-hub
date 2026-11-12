@@ -100,7 +100,12 @@ export const leftMsg = (left: string[]) => "바뀌지 않은 칸이 있어 보�
 async function sendRows(all: Any[], record = "note_remind_record", copy = true, keep?: (results: Any[]) => void, fromOver?: string) {
   if (!all.length) return { sent: 0, failed: 0 };
   const blocked = all.filter((r) => leftOf(r.text).length);
-  const rows = all.filter((r) => !leftOf(r.text).length);
+  /* 온라인 반 · 발송 꺼짐 (20261113b · migration-107) — 그 학생 · 그 학생만 쓰는 번호로 가는 줄은 보내지 않고 실패로 남긴다 · 107 전이면 함수가 없어 그대로 */
+  const quiet: Any = await rpc("send_quiet", {}).catch(() => null);
+  const qS = new Set<string>((quiet?.students || []).map(String)), qP = new Set<string>((quiet?.phones || []).map(String));
+  const isQuiet = (r: Any) => (r.student_id && qS.has(String(r.student_id))) || qP.has(String(r.to ?? "").replace(/\D/g, ""));
+  const quietRows = all.filter((r) => !leftOf(r.text).length && isQuiet(r));
+  const rows = all.filter((r) => !leftOf(r.text).length && !isQuiet(r));
   /* D-day 문자만 설정(DB)의 발신번호로 · 다른 문자는 지금처럼 SOLAPI_SENDER (20261110c) */
   const from = (fromOver || env("SOLAPI_SENDER")).replace(/\D/g, "");
   const results: Any[] = rows.map((r) => ({ log_id: r.log_id, ok: true, error: "", message_id: "" }));
@@ -133,6 +138,7 @@ async function sendRows(all: Any[], record = "note_remind_record", copy = true, 
     results.forEach((x) => { x.ok = false; x.error = "솔라피에 연결하지 못했습니다."; });
   }
   blocked.forEach((r) => results.push({ log_id: r.log_id, ok: false, error: leftMsg(leftOf(r.text)), message_id: "" }));
+  quietRows.forEach((r) => results.push({ log_id: r.log_id, ok: false, error: "온라인 반 · 발송 꺼짐", message_id: "" }));
   await rpc(record, { p_results: results }).catch(() => {});
   if (keep) keep(results);
   if (copy) await rpc("msg_copy_note", { p_rows: all.map((r) => ({ log_id: r.log_id, text: r.text, name: r.name })) }).catch(() => {});

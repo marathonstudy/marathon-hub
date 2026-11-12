@@ -166,7 +166,12 @@ async function handle(req: Request, cors: Record<string, string>) {
   });
   /* 바뀌지 않은 칸이 남은 줄은 보내지 않는다 (20261101m) */
   const blocked: Any[] = all.filter((r) => leftOf(r.text).length);
-  const rows: Any[] = all.filter((r) => !leftOf(r.text).length);
+  /* 온라인 반 · 발송 꺼짐 (20261113b · migration-107) — 원장님이 켜기 전까지 보내지 않는다 · 107 전이면 함수가 없어 그대로 */
+  const quiet: Any = await rpcAs(auth, apikey, "send_quiet", {}).catch(() => null);
+  const qS = new Set<string>((quiet?.students || []).map(String)), qP = new Set<string>((quiet?.phones || []).map(String));
+  const isQuiet = (r: Any) => qS.has(String(r.student_id)) || qP.has(String(r.to).replace(/\D/g, ""));
+  const quietRows: Any[] = all.filter((r) => !leftOf(r.text).length && isQuiet(r));
+  const rows: Any[] = all.filter((r) => !leftOf(r.text).length && !isQuiet(r));
 
   /* 2) 솔라피 — 단문은 SMS, 90바이트를 넘으면 LMS */
   const from = env("SOLAPI_SENDER").replace(/\D/g, "");
@@ -206,6 +211,7 @@ async function handle(req: Request, cors: Record<string, string>) {
   }
 
   blocked.forEach((r) => results.push({ log_id: r.log_id, student_id: r.student_id, to: r.target, name: r.name, ok: false, error: leftMsg(leftOf(r.text)), message_id: "" }));
+  quietRows.forEach((r) => results.push({ log_id: r.log_id, student_id: r.student_id, to: r.target, name: r.name, ok: false, error: "온라인 반 · 발송 꺼짐", message_id: "" }));
 
   /* 3) 기록 (번호는 기록에 뒤 4자리만 — DB 가 처음부터 뒤 4자리만 받았다) */
   await rpcAs(auth, apikey, "sms_record", { p_results: results.map(({ log_id, ok, error, message_id }) => ({ log_id, ok, error, message_id })) }).catch(() => {});
@@ -214,7 +220,7 @@ async function handle(req: Request, cors: Record<string, string>) {
   const sent = results.filter((x) => x.ok).length;
   return json({
     ok: true, test: action === "test", sent, failed: results.length - sent, skipped,
-    lms: rows.filter((r) => r.kind === "LMS").length, blocked: blocked.length,
+    lms: rows.filter((r) => r.kind === "LMS").length, blocked: blocked.length, quiet: quietRows.length,
     results: results.map((x) => ({ student_id: x.student_id, to: x.to, name: x.name, ok: x.ok, error: x.error })),
   }, cors);
 }

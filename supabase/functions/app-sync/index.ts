@@ -22,6 +22,7 @@
 //  20261113a — 옛 기록 timeout(50명 전원 · 11-13): 1명 × 한 달씩 나눠 받고 학생마다 마지막으로 받은 달을 남겨 이어서(runOldMonths · migration-106)
 //    · 옛 기록은 밤 1~6시에도(평소 동기화의 밤 쉼은 그대로) · 분당 28회 한도(hubGate) · 요청마다 걸린 시간(app_hub_calls)
 //    · 평소 동기화 50명 → 10명씩 · 수강 시작일이 비슷한 학생끼리 · timeout 이면 다시 묻지 않고 다음 묶음을 반으로 · 실패하면 지금처럼 공유 코드로
+//  20261113b — 앱 반 목록 · 반 명단 { action: "app_classes" } · { action: "app_roster", classId } (직원만 · 앱에 주소가 없으면 noapi · 온라인 반 가져오기)
 //
 //  키 — 새로 넣을 키 없음. Supabase 가 함수에 기본으로 주는 SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY (이 함수 안에서만)
 //  배포: 대시보드 → Edge Functions → Deploy a new function → Via Editor → 이름 app-sync → 이 파일 전체 → Deploy
@@ -689,6 +690,56 @@ export async function runOldMonths(started = Date.now(), until = BUDGET_MS, nigh
   return out;
 }
 
+/* ============================================================
+   앱 반 목록 · 반 명단 (20261113b · 온라인 반 가져오기 · .local/replit_반명단_요청.md 의 주소)
+     GET /api/hub/classes               → { classes: [{ id, title, openDate, closeDate }] }
+     GET /api/hub/classes/{id}/students → { students: [{ userId, name, grade, phone, parentPhone }] }
+   모양이 조금 달라도 읽는다 · 주소가 없거나(404 · 405 · 501) 앱 화면(html)이 오면 「noapi」
+   ============================================================ */
+const isNoApi = (status: number, body: Any) => status === 404 || status === 405 || status === 501 || body == null || typeof body !== "object";
+const strOf = (v: unknown, n: number) => (typeof v === "string" || typeof v === "number" ? String(v).trim().slice(0, n) : "");
+export function classesOf(j: Any): Any[] {
+  const arr = Array.isArray(j) ? j : (j?.classes ?? j?.data ?? j?.results ?? j?.items);
+  if (!Array.isArray(arr)) return [];
+  return arr.map((c: Any) => ({
+    id: num(c?.id ?? c?.classId),
+    title: strOf(c?.title ?? c?.name ?? c?.className, 80),
+    open: strOf(c?.openDate ?? c?.startDate ?? c?.start ?? c?.startsAt, 10),
+    close: strOf(c?.closeDate ?? c?.endDate ?? c?.end ?? c?.endsAt, 10),
+    count: num(c?.studentCount ?? c?.students ?? c?.count),
+  })).filter((c: Any) => c.id > 0 && c.title).slice(0, 300);
+}
+export function rosterOf(j: Any): Any[] {
+  const arr = Array.isArray(j) ? j : (j?.students ?? j?.data ?? j?.results ?? j?.members ?? j?.users);
+  if (!Array.isArray(arr)) return [];
+  return arr.map((s: Any) => ({
+    uid: num(s?.userId ?? s?.studentId ?? s?.id ?? s?.user?.id),
+    name: strOf(s?.name ?? s?.studentName ?? s?.user?.name, 40),
+    grade: strOf(s?.grade ?? s?.schoolGrade, 10),
+    phone: strOf(s?.phone ?? s?.studentPhone ?? s?.phoneNumber, 20).replace(/\D/g, ""),
+    parent: strOf(s?.parentPhone ?? s?.parent_phone ?? s?.guardianPhone, 20).replace(/\D/g, ""),
+  })).filter((s: Any) => s.uid > 0 && s.name).slice(0, 500);
+}
+async function appClasses(): Promise<Any> {
+  try {
+    const r = await hubGet("/api/hub/classes", { kind: "classes" });
+    if (isNoApi(r.status, r.body)) return { ok: false, reason: "noapi" };
+    if (!r.ok) return { ok: false, reason: failWhy(r.status, r.body) };
+    const list = classesOf(r.body);
+    if (!list.length && !Array.isArray(r.body?.classes ?? r.body?.data ?? r.body)) return { ok: false, reason: "noapi" };
+    return { ok: true, classes: list };
+  } catch (e) { return { ok: false, reason: (e as Error)?.name === "AbortError" ? "timeout" : "upstream" }; }
+}
+async function appRoster(id: number): Promise<Any> {
+  if (!(id > 0)) return { ok: false, reason: "input" };
+  try {
+    const r = await hubGet("/api/hub/classes/" + id + "/students", { kind: "roster" });
+    if (isNoApi(r.status, r.body)) return { ok: false, reason: "noapi" };
+    if (!r.ok) return { ok: false, reason: failWhy(r.status, r.body) };
+    return { ok: true, classId: id, students: rosterOf(r.body) };
+  } catch (e) { return { ok: false, reason: (e as Error)?.name === "AbortError" ? "timeout" : "upstream" }; }
+}
+
 /* 동기화 기록 (105) — 숫자 · 이유 코드만 (이름 · 번호 · 열쇠 값 없음) · 105 전이면 함수가 없어 그냥 넘어간다 */
 async function logRun(kind: string, sum: Any) {
   try { await rpc("app_sync_log", { p_kind: kind, p_sum: { ...sum, hub: !!hubKey() } }); }
@@ -729,7 +780,7 @@ async function handle(req: Request, cors: Record<string, string>) {
   }
 
   /* 2) 코치룸 [새로고침] — 로그인한 운영진 */
-  if (body.action !== "refresh" && body.action !== "link") return json({ ok: false, reason: "input" }, cors, 400);
+  if (body.action !== "refresh" && body.action !== "link" && body.action !== "app_classes" && body.action !== "app_roster") return json({ ok: false, reason: "input" }, cors, 400);
   const auth = req.headers.get("authorization") ?? "";
   const apikey = req.headers.get("apikey") ?? "";
   if (!/^Bearer\s+\S+/.test(auth) || !apikey) return json({ ok: false, reason: "login", message: "코치룸에 다시 로그인해 주세요." }, cors, 401);
@@ -738,6 +789,13 @@ async function handle(req: Request, cors: Record<string, string>) {
   if (!staff) return json({ ok: false, reason: "auth", message: "운영진만 할 수 있습니다." }, cors, 403);
   const ids: string[] = (Array.isArray(body.students) ? body.students : []).map((x: unknown) => String(x ?? "")).filter((x: string) => /^[0-9a-f-]{36}$/i.test(x)).slice(0, 60);
   const cls = String(body.class ?? "").slice(0, 60);
+  /* 앱 반 목록 · 반 명단 (20261113b · 온라인 반 가져오기) — 앱에 주소가 아직 없으면 { ok: false, reason: "noapi" } (화면 「앱 업데이트 필요」 · 아무것도 넣지 않음) */
+  if (body.action === "app_classes" || body.action === "app_roster") {
+    if (!hubKey()) return json({ ok: false, reason: "nokey", message: "앱 읽기 열쇠(HUB_READ_KEY)가 아직 없습니다." }, cors);
+    const r = body.action === "app_classes" ? await appClasses() : await appRoster(num(body.classId));
+    await flushCalls();
+    return json(r, cors);
+  }
   /* 학생 카드 [다시 찾기] — 그 학생만 앱에서 찾기 (20261110m) */
   if (body.action === "link") {
     if (!ids.length) return json({ ok: false, reason: "input" }, cors, 400);
