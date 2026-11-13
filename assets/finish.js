@@ -21,6 +21,7 @@
   function dow(d) { return new Date(d + 'T00:00:00Z').getUTCDay(); }
   function monday(d) { return addDays(d, -((dow(d) + 6) % 7)); }
   function md(d) { return (+d.slice(5, 7)) + '/' + (+d.slice(8, 10)); }
+  function mdK(d) { return (+d.slice(5, 7)) + '월 ' + (+d.slice(8, 10)) + '일'; }          /* 완주증 글 — 「11/12」는 분수처럼 보여 「11월 12일」 (20261114e) */
   function ymd(d) { return d.slice(0, 4) + '. ' + (+d.slice(5, 7)) + '. ' + (+d.slice(8, 10)) + '.'; }
   function mon(d) { return (+String(d).slice(5, 7)) + '월'; }
   function days(a, b) { return Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 864e5); }
@@ -108,12 +109,12 @@
     var by = {};
     dayList.forEach(function (d) { var k = kind === 'year' ? d.slice(0, 7) : monday(d); by[k] = (by[k] || 0) + 1; });
     var top = Object.keys(by).sort(function (x, y) { return by[y] - by[x] || (x < y ? -1 : 1); })[0];
-    if (top && by[top] >= (kind === 'year' ? 8 : 4)) hls.push({ key: 'steadyp', icon: '📅', big: kind === 'year' ? mon(top + '-01') : md(top) + ' 주', desc: kind === 'year' ? '가장 꾸준했던 달' : '가장 꾸준했던 주', text: kind === 'year' ? '가장 꾸준했던 달 · ' + mon(top + '-01') : '가장 꾸준했던 주 · ' + md(top) + ' 주', score: 28 + by[top] });
+    if (top && by[top] >= (kind === 'year' ? 8 : 4)) hls.push({ key: 'steadyp', icon: '📅', big: kind === 'year' ? mon(top + '-01') : mdK(top) + ' 주', desc: kind === 'year' ? '가장 꾸준했던 달' : '가장 꾸준했던 주', text: kind === 'year' ? '가장 꾸준했던 달 · ' + mon(top + '-01') : '가장 꾸준했던 주 · ' + mdK(top) + ' 주', score: 28 + by[top] });
     /* 최고 정답률을 찍은 날 */
     var byDay = {};
     its.forEach(function (x) { (byDay[x.date] = byDay[x.date] || []).push(x); });
     var bd = Object.keys(byDay).filter(function (d) { return qsum(byDay[d]) >= R.dayQ; }).map(function (d) { return { d: d, v: wavg(byDay[d]) }; }).sort(function (x, y) { return y.v - x.v || (x.d < y.d ? 1 : -1); })[0];
-    if (bd && bd.v >= 80) hls.push({ key: 'bestday', icon: '💯', big: bd.v + '%', desc: '최고 정답률 · ' + md(bd.d), text: '최고 정답률 ' + bd.v + '% · ' + md(bd.d), score: bd.v - 45 });
+    if (bd && bd.v >= 80) hls.push({ key: 'bestday', icon: '💯', big: bd.v + '%', desc: '최고 정답률 · ' + mdK(bd.d), text: '최고 정답률 ' + bd.v + '% · ' + mdK(bd.d), score: bd.v - 45 });
     /* 함께한 기간 */
     if (kind === 'year' && dayList.length) { var wks = Math.max(1, Math.round(days(dayList[0], dayList[dayList.length - 1]) / 7) + 1); if (wks >= R.together) hls.push({ key: 'weeks', icon: '🏃', big: wks + '주', desc: '함께 달린 시간', text: '함께 달린 시간 ' + wks + '주', score: 25 + Math.round(wks / 4) }); }
     if (kind === 'month' && dayList.length && days(dayList[0], dayList[dayList.length - 1]) >= 20) hls.push({ key: 'weeks', icon: '🏃', big: '한 달', desc: '내내 함께 달렸어요', text: '한 달 내내 함께 달렸어요', score: 32 });
@@ -136,7 +137,7 @@
     saved = saved || {};
     var t = cert.titles.filter(function (x) { return x.key === saved.title_key; })[0] || cert.titles[0];
     var keys = Array.isArray(saved.hl_keys) ? saved.hl_keys : [];
-    var hl = keys.length ? (keys[0] === '-' ? [] : keys.map(function (k) { return cert.hls.filter(function (x) { return x.key === k; })[0]; }).filter(Boolean)) : cert.hls.slice(0, 3);
+    var hl = keys.length ? (keys[0] === '-' ? [] : keys.map(function (k) { return cert.hls.filter(function (x) { return x.key === k; })[0]; }).filter(Boolean)) : cert.hls.slice();      /* 기본은 후보 전부(점수 높은 순 · 20261114e) */
     return { kind: cert.kind, from: cert.from, to: cert.to, name: cert.name, cls: cert.cls, game: cert.game, level: cert.level,
              title: t ? t.text : '', hls: hl.map(function (x) { return { key: x.key, icon: x.icon || '★', big: x.big || '', desc: x.desc || x.text, text: x.text }; }),
              flow: cert.flow, medals: cert.medals || [], stats: cert.stats || null, low: cert.low,
