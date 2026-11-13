@@ -135,6 +135,39 @@
 /* ---------- 화면에서 보기 (러닝노트 · 코치룸 미리보기) ---------- */
 .fc-page--link .fc-in { border-width: 1.2mm; }
 
+/* ============================================================
+   20261114d — 위아래 여백 같게 · 능력치 칩 · 넘침 자동 맞춤(fc-tight · fc-tighter · fc-compact · 3쪽) · 흐름선 ~
+   ============================================================ */
+.fc-in, .fc-in--y, .fc-in--p2 { padding-top: 9mm; padding-bottom: 9mm; }
+.fc-page--month .fc-in { padding-top: 12mm; padding-bottom: 12mm; }
+/* 능력치 — 묶음마다 한 줄에 칩 4 ~ 5개 */
+.fc-chips { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.6mm; }
+.fc-chip { display: flex; align-items: center; gap: 1.4mm; padding: 1.4mm 2.2mm; border: 0.45mm solid #E6E2F6; border-radius: 1.6mm; min-width: 0; text-align: left; }
+.fc-chip__n { flex: 1 1 auto; min-width: 0; font-size: 9.5pt; font-weight: 800; color: #4A4F68; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fc-chip b { font-size: 12pt; font-weight: 900; color: #2E2266; }
+.fc-chip .fc-gr { width: 4.6mm; height: 4.6mm; font-size: 7.5pt; border-radius: 1.2mm; flex: none; }
+.fc-chip small { font-size: 8pt; color: #8A8EA6; font-weight: 800; }
+.fc-chip--S { border-color: #E0A920; background: #FFF8E1; } .fc-chip--A { border-color: #5A3FD0; } .fc-chip--B { border-color: #7C69E0; } .fc-chip--C { border-color: #A79BE8; } .fc-chip--D { border-color: #C9CBD8; }
+.fc-chip.is-few { border-style: dashed; }
+.fc-sg__t { font-size: 10.5pt; }
+/* 흐름선 — 세로축이 0 에서 시작하지 않을 때 축 아래 ~ */
+.fc-brk { font-size: 12px; font-weight: 900; fill: #8A8EA6; }
+.fc-brkl { fill: none; stroke: #8A8EA6; stroke-width: 1.2; }
+/* 넘칠 때 — 1쪽 */
+.fc-tight .fc-ava--big { width: 44mm !important; height: 44mm !important; }
+.fc-tight .fc-title { font-size: 38pt !important; } .fc-tight .fc-name { font-size: 26pt !important; }
+.fc-tighter .fc-ava--big { width: 34mm !important; height: 34mm !important; }
+.fc-tighter .fc-card { padding-top: 1.6mm !important; padding-bottom: 1.6mm !important; } .fc-tighter .fc-note__t { font-size: 10pt !important; line-height: 1.45 !important; }
+.fc-tighter .fc-mascot { width: 20mm; height: 20mm; }
+/* 넘칠 때 — 2쪽: 능력치 칩 · 메달 · 흐름 칸을 더 작게 */
+.fc-compact .fc-chips { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1.2mm; }
+.fc-compact .fc-chip { padding: 1mm 1.6mm; } .fc-compact .fc-chip b { font-size: 10.5pt; } .fc-compact .fc-chip__n { font-size: 8pt; }
+.fc-compact .fc-sec { padding: 2.6mm 4mm; } .fc-compact .fc-sec--flow { min-height: 40mm; } .fc-compact .fc-md { padding: 1.2mm 0 1mm; } .fc-compact .fc-md i { font-size: 12pt; height: 12pt; }
+.fc-compact .fc-sec--more .fc-card { padding: 1.6mm 3mm; } .fc-compact .fc-in--p2 { gap: 2.4mm; }
+/* 3쪽 — 「더 빛난 기록」만 · 칸을 키워 채움 */
+.fc-p3 .fc-sec--more { flex: 1 1 auto; justify-content: center; }
+.fc-p3 .fc-sec--more .fc-cards { gap: 4mm; }
+.fc-p3 .fc-sec--more .fc-card { padding: 5mm 6mm; } .fc-p3 .fc-sec--more .fc-card__b { font-size: 22pt; } .fc-p3 .fc-sec--more .fc-card__d { font-size: 12pt; }
 /* ---------- 러닝노트 「🏁 완주증 모음」 (finish-hub.js · 20261114b) ---------- */
 .fh-dlg { padding: 0; }
 .fh-in { box-sizing: border-box; width: min(560px, 100vw); max-width: 100vw; margin: 0 auto; padding: 14px 16px 20px; display: grid; gap: 10px; background: #fff; min-height: 100%; }

@@ -175,6 +175,15 @@
   var BIG = null;
   function openBig(s) {
     var pages = Finish.pagesHtml(views([s])[0], { base: '../assets/chars/', p2: p2On() });
+    /* 인쇄와 같게 — 화면 밖에 실제 크기로 그려 넘침을 맞춘 뒤(능력치 칩 줄이기 · 3쪽으로) 쪽들을 다시 모음 (20261114d) */
+    if (Finish.fit) {
+      var tmp = document.createElement('div');
+      tmp.style.cssText = 'position:fixed;left:-10000px;top:0;width:210mm;visibility:hidden';
+      tmp.innerHTML = pages.join('');
+      document.body.appendChild(tmp);
+      try { Finish.fit(tmp); pages = Array.prototype.map.call(tmp.querySelectorAll('.fc-page'), function (p) { return p.outerHTML; }); } catch (e) { /* 그대로 */ }
+      tmp.parentNode.removeChild(tmp);
+    }
     var el = Layer.make('fa-big', 'faBig');
     BIG = { el: el, s: s, pages: pages, i: 0 };
     paintBig();

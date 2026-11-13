@@ -49,11 +49,14 @@
     var p = A.partOf(title);
     if (p) return { top: p.genre === 'read' ? '독서' : '문학', sub: SUB[p.part] || p.part };
     var t = A.cleanTitle(title);
+    /* 「독서-법학」 「문학-현대산문」 — 큰 영역 + 세부를 먼저 (목록에 없는 세부도 이름 그대로 · 20261114d) */
+    var dm = /^(독서|문학)\s*[-–—:]\s*([가-힣]{1,6})(?![가-힣])/.exec(t);
+    if (dm) return { top: dm[1], sub: SUB[dm[2]] || dm[2] };
     var m = new RegExp('^(' + TOPS + ')(?=\\s|[-–—]|$|["\'“‘「『(])').exec(t);
     if (m) return { top: topOf(m[1]), sub: null };
     /* 이름 가운데 있어도 (20261110l) — 「수특 독서-과학기술 3강」 · 「목동반 현대시 복습」 · 「고3 문학 6강」 */
     m = /(?:^|[^가-힣])(독서|문학)\s*[-–—:]\s*([가-힣]{1,6})/.exec(t);
-    if (m) { var gs = A.genreOf(m[2]); return { top: m[1], sub: SUB[m[2]] || (gs ? m[2] : null) }; }
+    if (m) { return { top: m[1], sub: SUB[m[2]] || m[2] }; }          /* 「독서-법학」 「문학-현대산문」처럼 목록에 없는 세부도 이름 그대로 (20261114d · 예전엔 「독서」 하나로 합쳐짐) */
     var keys = Object.keys(SUB).sort(function (x, y) { return y.length - x.length; });
     for (var i = 0; i < keys.length; i++) {
       if (new RegExp('(?:^|[^가-힣])' + keys[i] + '(?![가-힣])').test(t)) { var g = A.genreOf(keys[i]); if (g) return { top: g === 'read' ? '독서' : '문학', sub: SUB[keys[i]] }; }
@@ -169,6 +172,14 @@
       var a = areaOfName(c.name);
       return !!(a && (solved[a.top + '|' + (a.sub || '')] || (!a.sub && solved[a.top])));
     });
+    /* 20261114d — 0 으로 남은 영역은 과제 기록으로 다시 셈(기록에 맞힌 것이 있으면 그 값 · 모두 진짜 0 이면 0) */
+    var itAll = items(data);
+    list = list.map(function (c) {
+      if (+c.rate > 0) return c;
+      var a = areaOfName(c.name), xs = itAll.filter(function (it) { return it.top === a.top && (!a.sub || it.sub === a.sub); });
+      var q = xs.reduce(function (s, x) { return s + x.n; }, 0), r = q ? Math.round(xs.reduce(function (s, x) { return s + x.r * x.n; }, 0) / q) : 0;
+      return Object.assign({}, c, { rate: r });
+    });
     /* 앱 영역별 정답률이 모두 0 이고 과제가 3개 이상이면 정답 정보가 없는 것 (20261113d · 위 blankGroups 와 같은 까닭) */
     if (list.length && list.every(function (c) { return !(+c.rate > 0); }) && list.reduce(function (s, c) { return s + (+c.count || 1); }, 0) >= 3) return [];
     return list.map(function (c) {
@@ -189,11 +200,16 @@
   }
   /* 스탯 묶음 (20261113g) — 독서(인문 · 사회 · 과학기술 · 법학 · 경제 …) / 문학(현대시 · 고전시가 · 소설 · 산문 …) / 선택과목(화작 · 언매) / 기타(분류에 안 맞는 영역) */
   var GROUPS = ['독서', '문학', '선택과목', '기타'];
-  function groupOf(top) {
-    var t = String(top || '').replace(/\s+/g, '');
+  /* 20261114d — 독서 = 인문 · 사회 · 과학기술 · 법학 · 경제 · 기술 …  문학 = 현대시 · 고전시가 · 소설 · 산문 · 극 …  선택과목 = 화작 · 언매 · 현대문법 · 문법 …  어디에도 안 맞는 것만 기타 */
+  var G_SEL = /(화작|화법|작문|언매|언어|매체|문법|선택)/, G_LIT = /(문학|현대시|고전시|시가|소설|산문|수필|희곡|시나리오|극)/, G_READ = /(독서|비문학|인문|사회|과학|기술|법학|법|경제|예술|철학|주제통합|교육|역사|심리)/;
+  function groupOf(top, name) {
+    var t = String(top || '').replace(/\s+/g, ''), n = String(name || '').replace(/\s+/g, '');
     if (t === '독서') return '독서';
     if (t === '문학') return '문학';
-    if (/^(화작|언매|화법과작문|언어와매체|화법|작문|언어|매체|문법|선택과목|선택)$/.test(t)) return '선택과목';
+    var s = t + '|' + n;
+    if (G_SEL.test(s)) return '선택과목';
+    if (G_LIT.test(s) || /^시$/.test(n) || /^시$/.test(t)) return '문학';
+    if (G_READ.test(s)) return '독서';
     return '기타';
   }
   /* 문제 수로 무게를 둔 평균 — 기록이 있는 영역만 (영역 목록에는 기록 있는 영역만 들어온다) */
@@ -247,8 +263,8 @@
     }).filter(valid).sort();
     return ds[0] || '';
   }
-  function compute(data, kind, today) {
-    var all = items(data), first = all.length ? all[0].date : '', cats = catItems(data);
+  function compute(data, kind, today, opt) {
+    var all = items(data), first = all.length ? all[0].date : '', cats = opt && opt.noApp && all.length ? [] : catItems(data);
     var fs = firstSub(data), noteDay = fs || first;          /* 셈하는 기간은 과제 칸 날짜 그대로 · 문구의 달만 실제 첫 제출 */
     var p = range(kind || 'w4', today, first);
     if (p.all) p.note = noteDay ? '가진 기록 전체 · ' + mon(noteDay) + '부터' : '';
@@ -268,7 +284,7 @@
     cur.forEach(function (it) { var k = key(it); if (k && !tk[k]) tk[k] = it.top; });
     var areas = sortAreas(Object.keys(g).map(function (k) {
       var x = g[k], y = gp[k];
-      return { name: k, top: tk[k] || k, group: groupOf(tk[k] || k), rate: x.rate, q: x.q, enough: x.enough, grade: x.enough ? grade(x.rate) : '',
+      return { name: k, top: tk[k] || k, group: groupOf(tk[k] || k, k), rate: x.rate, q: x.q, enough: x.enough, grade: x.enough ? grade(x.rate) : '',
                delta: x.enough && y && y.enough ? x.rate - y.rate : null };
     }));
     var ok = areas.filter(function (a) { return a.enough; });

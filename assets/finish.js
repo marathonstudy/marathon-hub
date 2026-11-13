@@ -124,7 +124,7 @@
 
     var medals = kind === 'year' && b ? (b.months || []).filter(function (m) { return m >= from.slice(0, 7) && m <= to.slice(0, 7); }) : [];
     var stats = null;
-    if (kind === 'year' && Ab && Ab.compute) { try { var cc = Ab.compute(data, 'y1', to); stats = { total: cc.total, groups: (cc.groups || []).map(function (g) { return { name: g.name, rate: g.rate, grade: g.grade, enough: g.enough, areas: g.areas.map(function (a) { return { name: a.name, rate: a.rate, grade: a.grade, enough: a.enough }; }) }; }) }; } catch (e) { stats = null; } }
+    if (kind === 'year' && Ab && Ab.compute) { try { var cc = Ab.compute(data, 'y1', to, { noApp: true }); stats = { total: cc.total, groups: (cc.groups || []).map(function (g) { return { name: g.name, rate: g.rate, grade: g.grade, enough: g.enough, areas: g.areas.map(function (a) { return { name: a.name, rate: a.rate, grade: a.grade, enough: a.enough }; }) }; }) }; } catch (e) { stats = null; } }
     var G = global.Game, lv = G ? G.compute(data, { today: o.today || to }).level : { i: 0, name: '' };
     return { kind: kind, from: from, to: to, name: o.name || '', cls: o.cls || '', game: o.game || {}, level: { i: lv.i, name: lv.name },
              titles: titles.sort(function (a, b2) { return b2.score - a.score; }), hls: hls.sort(function (a, b2) { return b2.score - a.score; }),
@@ -150,7 +150,7 @@
   function flowSvg(flow, big) {
     var pts = (flow || []).map(function (p, i) { return { i: i, v: p.v, m: p.m }; }), n = pts.length, vs = pts.filter(function (p) { return p.v != null; });
     if (vs.length < 2) return '';
-    var W = 520, H = big ? 210 : 96, L = 30, Rr = 12, T = 16, B = 24;
+    var W = 520, H = big ? 165 : 96, L = 30, Rr = 12, T = 16, B = 24;
     var lo = Math.max(0, Math.floor(Math.min.apply(null, vs.map(function (p) { return p.v; })) / 10) * 10 - 10);
     var x = function (i) { return n > 1 ? L + i * (W - L - Rr) / (n - 1) : L; }, y = function (v) { return T + (100 - v) * (H - T - B) / (100 - lo || 1); };
     var segs = [], cur = [];
@@ -160,7 +160,8 @@
     var lines = segs.map(function (s) { return s.length > 1 ? '<polyline class="fc-ln" points="' + s.map(function (p) { return x(p.i).toFixed(1) + ',' + y(p.v).toFixed(1); }).join(' ') + '"/>' : ''; }).join('');
     var dots = pts.map(function (p) { return p.v == null ? '' : '<circle cx="' + x(p.i).toFixed(1) + '" cy="' + y(p.v).toFixed(1) + '" r="' + (big ? 4 : 3.2) + '" class="fc-dot"/>' + (big ? '<text x="' + x(p.i).toFixed(1) + '" y="' + (y(p.v) - 8).toFixed(1) + '" class="fc-ax fc-ax--v" text-anchor="middle">' + p.v + '</text>' : ''); }).join('');
     var xl = pts.map(function (p) { return '<text x="' + x(p.i).toFixed(1) + '" y="' + (H - 7) + '" class="fc-ax" text-anchor="middle">' + (+p.m.slice(5, 7)) + '월</text>'; }).join('');
-    return '<svg class="fc-flow' + (big ? ' fc-flow--big' : '') + '" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet" role="img" aria-label="정답률 월별 흐름">' + grid + lines + dots + xl + '</svg>';
+    var brk = lo > 0 ? '<text x="' + (L - 13) + '" y="' + (H - B + 11) + '" class="fc-ax fc-brk" text-anchor="end">~</text>' : '';      /* 세로축이 0 에서 시작하지 않음 — 「50」 아래 · 「1월」 왼쪽 */
+    return '<svg class="fc-flow' + (big ? ' fc-flow--big' : '') + '" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet" role="img" aria-label="정답률 월별 흐름">' + grid + brk + lines + dots + xl + '</svg>';
   }
   /* 결승선 — 체크무늬 띠 + 리본 · 마라토니 · 마라부기가 통과 */
   function finishLine(base, small) {
@@ -232,8 +233,8 @@
     var gr = function (x) { return x.enough && x.grade ? '<span class="fc-gr fc-gr--' + x.grade + '">' + x.grade + '</span>' : '<small>%</small>'; };
     return '<section class="fc-sec fc-sec--st"><p class="fc-box__t">능력치' + (st.total ? ' <span class="fc-box__n">종합 ' + (st.total.enough && st.total.grade ? st.total.grade + ' · ' : '') + st.total.rate + '</span>' : '') + '</p>' +
       st.groups.map(function (g) {
-        return '<div class="fc-sg"><p class="fc-sg__t">' + esc(g.name) + ' <b>' + g.rate + '</b>' + gr(g) + '</p><div class="fc-sks">' +
-          g.areas.map(function (a) { return '<div class="fc-sk' + (a.enough && a.grade ? ' fc-sk--' + a.grade : ' is-few') + '"><span>' + esc(a.name) + '</span><b>' + a.rate + '</b>' + gr(a) + '</div>'; }).join('') + '</div></div>';
+        return '<div class="fc-sg"><p class="fc-sg__t">' + esc(g.name) + ' <b>' + g.rate + '</b>' + gr(g) + '</p><div class="fc-chips">' +
+          g.areas.map(function (a) { return '<span class="fc-chip' + (a.enough && a.grade ? ' fc-chip--' + a.grade : ' is-few') + '"><span class="fc-chip__n">' + esc(a.name) + '</span><b>' + a.rate + '</b>' + gr(a) + '</span>'; }).join('') + '</div></div>';
       }).join('') + '</section>';
   }
   function page2Html(v, opt, extra, part) {
@@ -258,14 +259,47 @@
     if (rest.length > P2) out.push(page2Html(v, opt, rest.slice(P2, P2 + P3), '이어서'));
     return out;
   }
-  /* 새 창 인쇄 문서 — css 는 링크로 · 그림이 다 뜬 뒤 인쇄 · opt.p2 */
+  /* 넘침 자동 맞춤 (20261114d) — 화면에 그린 뒤 쪽마다 내용이 테두리 안쪽 여백 위에서 끝나는지 재고
+       1쪽: fc-tight → fc-tighter(캐릭터 · 간격 줄임) · 2쪽: ① 능력치 칩을 더 작게(fc-compact) ② 그래도 넘치면 「더 빛난 기록」을 3쪽으로(같은 테두리 · 머리글)
+       root 안의 .fc-page 들 · 인쇄 창 · 코치룸 크게 보기에서 부른다 */
+  function overOf(pg) {
+    var i = pg.querySelector('.fc-in'); if (!i) return 0;
+    var cs = global.getComputedStyle ? getComputedStyle(i) : null, pb = cs ? parseFloat(cs.paddingBottom) || 0 : 0, bb = cs ? parseFloat(cs.borderBottomWidth) || 0 : 0;
+    var limit = i.getBoundingClientRect().bottom - pb - bb, low = 0;
+    Array.prototype.forEach.call(i.children, function (k) { var b = k.getBoundingClientRect().bottom; if (b > low) low = b; });
+    return Math.max(low - limit, i.scrollHeight - i.clientHeight);
+  }
+  function fit(root) {
+    if (!root || !root.querySelectorAll) return 0;
+    var moved = 0;
+    Array.prototype.slice.call(root.querySelectorAll('.fc-page')).forEach(function (pg) {
+      if (overOf(pg) <= 0.5) return;
+      if (pg.classList.contains('fc-y')) { pg.classList.add('fc-tight'); if (overOf(pg) > 0.5) pg.classList.add('fc-tighter'); return; }
+      if (!pg.classList.contains('fc-p2')) return;
+      pg.classList.add('fc-compact');
+      var more = pg.querySelector('.fc-sec--more');
+      if (overOf(pg) <= 0.5 || !more) return;
+      var p3 = pg.cloneNode(true);
+      Array.prototype.forEach.call(p3.querySelectorAll('.fc-sec'), function (x) { x.parentNode.removeChild(x); });
+      var meta = p3.querySelector('.fc-hd .fc-meta'); if (meta) meta.textContent = meta.textContent + ' · 이어서';
+      var foot = p3.querySelector('.fc-in > .fc-foot');
+      p3.querySelector('.fc-in').insertBefore(more, foot);
+      p3.classList.remove('fc-compact'); p3.classList.add('fc-p3');
+      pg.parentNode.insertBefore(p3, pg.nextSibling);
+      moved++;
+    });
+    return moved;
+  }
+  /* 새 창 인쇄 문서 — css 는 링크로 · 그림이 다 뜬 뒤 넘침 맞춤 → 인쇄 · opt.p2 */
   function printDoc(views, opt) {
     opt = opt || {};
     var css = opt.css || '../assets/finish.css';
     return '<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>' + esc(opt.title || '완주증') + '</title>' +
       '<link rel="stylesheet" href="' + esc(css) + '"><style>@page { size: A4 portrait; margin: 0; } html, body { margin: 0; }</style></head><body class="fc-print">' +
-      views.map(function (v) { return pagesHtml(v, opt).join(''); }).join('') + '</body></html>';
+      views.map(function (v) { return pagesHtml(v, opt).join(''); }).join('') +
+      '<script>window.__fcFit = function () { var getComputedStyle = window.getComputedStyle.bind(window); var global = window; ' + overOf.toString() + fit.toString() + ' return fit(document.body); };' +
+      'window.addEventListener("load", function () { window.__fcFitN = window.__fcFit(); window.__fcFitDone = true; });</scr' + 'ipt></body></html>';
   }
 
-  global.Finish = { compute: compute, view: view, pageHtml: pageHtml, pagesHtml: pagesHtml, printDoc: printDoc, flowSvg: flowSvg, RULE: RULE, P1: P1 };
+  global.Finish = { compute: compute, view: view, pageHtml: pageHtml, pagesHtml: pagesHtml, printDoc: printDoc, flowSvg: flowSvg, fit: fit, overOf: overOf, RULE: RULE, P1: P1 };
 })(window);
