@@ -110,7 +110,7 @@
     return '<div class="sc-al__p" role="region" aria-label="앱 학생 연결">' + body +
       '<div class="sc-al__f"><input class="input" data-sc-al-in inputmode="numeric" placeholder="앱 학생 번호" aria-label="앱 학생 번호"><button type="button" class="btn btn--sm btn--primary" data-sc-al-set>' + (i.uid ? '번호 바꾸기' : '연결') + '</button>' +
       '<button type="button" class="btn btn--sm" data-sc-al-find>다시 찾기</button>' + (i.uid ? '<button type="button" class="btn btn--sm btn--ghost" data-sc-al-clear>연결 풀기</button>' : '') + '</div>' +
-      (AL.msg ? '<p class="sc-al__m" role="status">' + esc(AL.msg) + '</p>' : '') + '</div>';
+      (AL.msg ? '<p class="sc-al__m" role="status">' + esc(AL.msg) + (AL.err && window.AppErr ? ' ' + AppErr.retryHtml('data-sc-al-find', AL.err).replace('btn--primary', 'btn--sm') : '') + '</p>' : '') + '</div>';
   }
   function alRepaint() { if (window.QuickNote && QuickNote.state().open) QuickNote.repaint(); }
   function alSet(sid, uid) {
@@ -126,12 +126,12 @@
   function alFind(sid) {
     var fns = window.SB && SB.client && SB.client.functions;
     if (!fns || !fns.invoke) return;
-    AL.msg = '앱에서 찾는 중…'; alRepaint();
-    Promise.resolve(fns.invoke('app-sync', { body: { action: 'link', students: [sid] } })).then(function (r) {
-      var d = r && r.data;
-      AL.msg = d && d.ok ? (d.linked ? '찾아서 연결했어요' : d.many ? '여럿이 나왔어요 · 골라 주세요' : d.stopped ? '앱이 지금 답하지 않아요 (' + d.stopped + ')' : '찾지 못했어요') : (d && d.message) || '찾지 못했어요';
+    AL.msg = '앱에서 찾는 중…'; AL.err = null; alRepaint();
+    (window.AppErr ? AppErr.call({ action: 'link', students: [sid] }) : Promise.resolve(fns.invoke('app-sync', { body: { action: 'link', students: [sid] } })).then(function (r) { return r && r.data; })).then(function (d) {
+      AL.err = !(d && d.ok) ? d : d.stopped ? { reason: d.stopped } : null;           /* 앱에서 받지 못했으면 원인 + 「다시 시도」 (20261113h) */
+      AL.msg = d && d.ok ? (d.linked ? '찾아서 연결했어요' : d.many ? '여럿이 나왔어요 · 골라 주세요' : d.stopped ? (window.AppErr ? AppErr.text({ reason: d.stopped }) : '앱이 지금 답하지 않아요 (' + d.stopped + ')') : '찾지 못했어요') : window.AppErr ? AppErr.text(d) : (d && d.message) || '찾지 못했어요';
       AL.info = null; alRepaint();
-    }, function () { AL.msg = '찾지 못했어요'; alRepaint(); });
+    }, function () { AL.msg = '찾지 못했어요'; AL.err = { reason: 'fnnet' }; alRepaint(); });
   }
   function saveInfo(sid, root) {
     var s = stu(sid);

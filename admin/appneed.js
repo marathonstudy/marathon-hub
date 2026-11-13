@@ -82,7 +82,7 @@
       (cands.length ? '<div class="anl-cands"><span class="anl-cands__t">후보</span>' + cands.map(function (u) { return '<button type="button" class="btn btn--sm" data-anl-pick="' + esc(u) + '">#' + esc(u) + '으로 연결</button>'; }).join('') + '</div>' : '') +
       '<div class="anl-more"><input class="input anl-uid" inputmode="numeric" data-anl-uid placeholder="앱 학생 번호" aria-label="앱 학생 번호 직접 넣기"><button type="button" class="btn btn--sm" data-anl-set>직접 연결</button>' +
         '<button type="button" class="btn btn--sm btn--ghost" data-anl-find>지금 다시 찾기</button></div>' +
-      (m ? '<p class="anl-m" role="status">' + esc(m) + '</p>' : '') + '</li>';
+      (m ? '<p class="anl-m" role="status">' + esc(m) + (S.err && S.err[x.id] && window.AppErr ? ' ' + AppErr.retryHtml('data-anl-find', S.err[x.id]).replace('btn--primary', 'btn--sm') : '') + '</p>' : '') + '</li>';
   }
   function paint() {
     var m = modal();
@@ -137,11 +137,13 @@
     var f = sb() && sb().functions;
     if (!f || !f.invoke) return;
     setMsg(id, '앱에서 찾는 중…');
-    Promise.resolve(f.invoke('app-sync', { body: { action: 'link', students: [id] } })).then(function (r) {
-      var d = r && r.data;
-      S.msg[id] = d && d.ok ? (d.linked ? '찾아서 연결했어요' : d.many ? '여럿이 나왔어요 · 골라 주세요' : d.stopped ? '앱이 지금 답하지 않아요 (' + d.stopped + ')' : '이번에도 찾지 못했어요') : (d && d.message) || '찾지 못했어요';
+    S.err = S.err || {}; delete S.err[id];
+    (window.AppErr ? AppErr.call({ action: 'link', students: [id] }) : Promise.resolve(f.invoke('app-sync', { body: { action: 'link', students: [id] } })).then(function (r) { return r && r.data; })).then(function (d) {
+      var bad = !(d && d.ok) || d.stopped;
+      if (bad) S.err[id] = d && d.stopped ? { reason: d.stopped } : d;
+      S.msg[id] = d && d.ok ? (d.linked ? '찾아서 연결했어요' : d.many ? '여럿이 나왔어요 · 골라 주세요' : d.stopped ? (window.AppErr ? AppErr.text({ reason: d.stopped }) : '앱이 지금 답하지 않아요 (' + d.stopped + ')') : '이번에도 찾지 못했어요') : window.AppErr ? AppErr.text(d) : (d && d.message) || '찾지 못했어요';
       load();
-    }, function () { setMsg(id, '찾지 못했어요'); });
+    }, function () { S.err[id] = { reason: 'fnnet' }; setMsg(id, '찾지 못했어요'); });
   }
 
   document.addEventListener('click', function (e) {

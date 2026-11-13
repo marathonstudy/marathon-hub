@@ -1394,6 +1394,15 @@ delete from public.staff where email = '조교이메일@example.com';
   sms-send(보내기 직전에 빼고 「온라인 반 · 발송 꺼짐」 실패로 기록) · kakao-send(기록 줄도 안 만들고 건너뜀 이유) · note-remind sendRows(자동 알림 · D-day · 대체 문자 모두) · 107 전이면 함수가 없어 그대로
   켜기 — 반 관리 → 그 반 [반 종류] → 「문자 · 알림톡 · 링크 발송」
 
+### 5-139. 20261113h — 「📥 온라인 반 가져오기」 「앱에서 받지 못했어요 (upstream)」 · 다시 시도 · 더보기 가로 넘침 (함수 app-sync 다시 배포)
+- 원인(가장 유력) — 코치룸 화면이 서버 함수 app-sync 의 오류를 모두 「upstream」 한 단어로 덮었음. 배포된 app-sync 가 20261113b 전 버전이면
+  action app_classes 를 모르는 요청으로 보고 400(input) → supabase-js 가 data 없이 error 를 주고 → 화면은 「upstream」. (앱 · Replit 쪽 문제가 아니어도 같은 글이 나옴)
+- 고침 — admin/app-err.js(공통): 함수 응답 번호 · 이유를 살려 직원용 한 줄로 — 「서버 함수 app-sync 가 옛 버전이에요 (함수 응답 400)」 · 「… 찾지 못했어요 (함수 응답 404)」 · 「앱 응답 404 (/api/hub/classes)」 · 「앱 응답 401 · 키 확인」 · 「앱 응답 429 · 잠시 뒤 · n초 뒤」 · 「앱 시간 초과 25초」 · 「앱 응답 모양을 읽지 못했어요 · 받은 칸: …」(칸 이름만) · 키 값 · 학생 정보는 넣지 않음
+  「다시 시도」 — 같은 창에서 바로 다시(반 목록 · 반 명단) · 429 면 앱이 준 Retry-After(없으면 60초)만큼 버튼이 막히고 숫자가 줄어듦 · 앱 연결 필요 목록 「지금 다시 찾기」 · 학생 카드 「앱 연결 → 다시 찾기」 실패에도 같은 버튼
+- app-sync — 반 목록 · 명단: 실패하면 { reason, status, path, retry, sec, ver } · 404 · 405 · 501 은 「앱 업데이트 필요」 대신 상태 번호 그대로(JSON 이 아닌 화면(html)이 오면만 「앱 업데이트 필요」) · 모양 변형 받기(classes · items · results · list · rows · data · { data: { classes } } · id 숫자 / 글자 · title | name | className · openDate | open_date | startDate … · ended · studentCount | student_count … · userId | user_id | studentId … · phone | phone_number … · parentPhone | parent_phone …) · 끝난 반(ended)은 「종료」로 아래 · 반 목록 · 명단은 따로 분당 9회(앱 10회 제한) · 함수 Logs 에 「app-sync hub classes 404 http404 120ms」 한 줄(키 · 이름 없음) · 응답에 ver 20261113h
+- 더보기 「📥 온라인 반 가져오기」 설명 「앱 반 명단으로 학생 가져오기」 · 더보기 메뉴 설명은 길면 아랫줄(가로 스크롤 없음) · 코치룸 모든 창(dialog) 가로 넘침 시험(PC 1280 · 휴대폰 390 · mobile/test_online1113)
+- 함수 Logs 보는 법 — Supabase → Edge Functions → app-sync → Invocations: 코치룸에서 누른 시각의 POST 상태가 400 이면 옛 버전(다시 배포) · 401 로그인 · 403 운영진 아님 · 200 이면 Logs 탭에서 「app-sync hub classes」 줄의 상태 번호(404 · 401 · 429 · 0=네트워크/시간 초과)를 보면 됨
+
 ### 5-138. 20261113g — 러닝노트 홈 「🏅 내 배지」 위로 · 접힌 모양 · 「⚔️ 능력치」 스탯 창 (SQL · 함수 배포 없음)
 - 홈 순서: 프로필 카드 → 🏅 내 배지 → 이번 주 퀘스트 → 📊 학습 분석 → ⚔️ 능력치 → 새 레포트 → 모의고사 → 수업 영상
 - 내 배지(홈) — 접힌 모양: 「⭐ 주간 n · 🏅 월간 n · 최장 연속 n주」(📝 · 🔍 있으면) · 채움 n · 이번 주 진행 중 · 월간 메달 이번 달까지 12칸 한 줄(휴대폰 6칸 × 두 줄) · 주간 최근 8주 칸 · 「전체 보기 ▾」 → 지금의 1년치 전체 화면 · 펼침은 기기에 기억(localStorage mh.bdg.open · 못 쓰면 접힘)

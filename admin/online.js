@@ -133,16 +133,17 @@
   function paintImp() {
     var b = impDlg.querySelector('#olImpBody'), f = impDlg.querySelector('#olImpFoot'), h = '', foot = '';
     if (S.err === 'noapi') {
-      h = '<div class="ol-need" role="status"><b>앱 업데이트 필요</b><p>마라톤 앱에 아직 반 목록 · 반 명단을 읽는 주소가 없어요. 원장님이 Replit 에 요청문(.local/replit_합친요청.md)을 넣어 앱을 게시하면 여기서 바로 가져올 수 있어요.</p><p class="muted-note">아무것도 넣지 않았어요.</p></div>';
+      h = '<div class="ol-need" role="status"><b>앱 업데이트 필요</b><p>앱이 반 목록 · 반 명단 주소에 데이터(JSON) 대신 화면(html)을 돌려줬어요' + (S.errD && S.errD.path ? ' (' + esc(S.errD.path) + ')' : '') + '. 앱에 주소가 없거나 게시 전이에요.</p><p class="muted-note">아무것도 넣지 않았어요.</p></div>';
     } else if (S.err) {
-      h = '<p class="cs-err" role="alert">' + esc(S.err) + '</p>';
+      h = '<p class="cs-err" role="alert">' + esc(S.err) + '</p><p class="muted-note">아무것도 넣지 않았어요.</p>';
     } else if (S.busy && !S.classes) {
       h = '<p class="panel__hint">앱에서 반 목록을 받는 중…</p>';
     } else if (S.step === 'list') {
       var list = S.classes || [];
+      list = list.slice().sort(function (a, b) { return (a.ended ? 1 : 0) - (b.ended ? 1 : 0); });          /* 끝난 반(ended)은 아래로 · 「종료」 (20261113h) */
       h = list.length ? '<ul class="ol-cls">' + list.map(function (c) {
-        return '<li><button type="button" class="ol-cls__b" data-ol-pick="' + c.id + '"><b>' + esc(c.title) + '</b> <span class="muted-note num">' +
-          esc([md(c.open) && md(c.open) + '~' + (md(c.close) || ''), c.count ? c.count + '명' : ''].filter(Boolean).join(' · ')) + '</span></button></li>';
+        return '<li><button type="button" class="ol-cls__b' + (c.ended ? ' is-ended' : '') + '" data-ol-pick="' + esc(c.id) + '"><b>' + esc(c.title) + '</b> <span class="muted-note num">' +
+          esc([c.ended ? '종료' : '', md(c.open) && md(c.open) + '~' + (md(c.close) || ''), c.count ? c.count + '명' : ''].filter(Boolean).join(' · ')) + '</span></button></li>';
       }).join('') + '</ul>' : '<p class="panel__hint">앱에 반이 없어요.</p>';
     } else if (S.step === 'preview') {
       var p = S.preview || { rows: [] }, rows = p.rows || [];
@@ -165,24 +166,26 @@
     }
     b.innerHTML = h;
     var canGo = S.step === 'preview' && !S.busy && S.preview && ((+S.preview.new) + (+S.preview.have)) > 0;
-    f.innerHTML = foot + '<div class="spacer"></div><button class="btn" type="button" data-ol-close>닫기</button>' +
+    /* 앱에서 받지 못했을 때 「다시 시도」(같은 창에서 바로 · 429 면 n초 막힘) (20261113h) */
+    var retry = S.err && S.errD && window.AppErr ? AppErr.retryHtml('data-ol-retry', S.errD) : '';
+    f.innerHTML = foot + '<div class="spacer"></div><button class="btn" type="button" data-ol-close>닫기</button>' + retry +
       (S.step === 'preview' ? '<button class="btn btn--primary" type="button" data-ol-go' + (canGo ? '' : ' disabled') + '>가져오기</button>' : '');
   }
+  /* 함수 오류(옛 버전 400 · 없음 404 · 로그인 · 네트워크)까지 이유를 살린다 — 예전에는 모두 「upstream」 (admin/app-err.js · 20261113h) */
   function invoke(body) {
+    if (window.AppErr) return AppErr.call(body);
     var c = sb();
     if (!c || !c.functions || !c.functions.invoke) return Promise.resolve({ ok: false, reason: 'noclient' });
     return Promise.resolve(c.functions.invoke('app-sync', { body: body })).then(function (r) { return (r && r.data) || { ok: false, reason: 'upstream' }; }, function () { return { ok: false, reason: 'upstream' }; });
   }
   function why(d) {
-    if (!d) return '앱에서 받지 못했어요.';
-    if (d.reason === 'noapi') return 'noapi';
-    if (d.reason === 'nokey') return '앱 읽기 열쇠(HUB_READ_KEY)가 아직 없어요.';
-    if (d.reason === 'timeout') return '앱이 답하지 않아요(timeout). 잠시 뒤 다시 해 주세요.';
-    return (d.message || '앱에서 받지 못했어요') + (d.reason ? ' (' + d.reason + ')' : '');
+    S.errD = d || null;
+    if (d && d.reason === 'noapi') return 'noapi';
+    return window.AppErr ? AppErr.text(d) : (d && d.message) || '앱에서 받지 못했어요.';
   }
   function openImport() {
     var d = impModal();
-    S = { step: 'list', classes: null, pick: null, roster: null, preview: null, target: '', busy: true, err: '', done: null };
+    S = { step: 'list', classes: null, pick: null, roster: null, preview: null, target: '', busy: true, err: '', errD: null, done: null };
     paintImp();
     Layer.show(d);
     invoke({ action: 'app_classes' }).then(function (r) {
@@ -202,12 +205,12 @@
     });
   }
   function pick(id) {
-    var cl = (S.classes || []).filter(function (x) { return x.id === id; })[0];
+    var cl = (S.classes || []).filter(function (x) { return String(x.id) === String(id); })[0];
     if (!cl) return;
-    S.pick = cl; S.step = 'preview'; S.busy = true; S.preview = null;
+    S.pick = cl; S.step = 'preview'; S.busy = true; S.preview = null; S.err = ''; S.errD = null;
     S.target = (cl.title || '').replace(/\s+/g, ' ').trim().slice(0, 30);
     paintImp();
-    invoke({ action: 'app_roster', classId: id }).then(function (r) {
+    invoke({ action: 'app_roster', classId: cl.id }).then(function (r) {
       if (!r.ok) { S.busy = false; S.err = why(r); paintImp(); return; }
       S.roster = r.students || [];
       previewNow();
@@ -236,7 +239,9 @@
     if (t.closest('[data-ol-close]')) { impDlg.close(); return; }
     if (S.busy) return;
     var pk = t.closest('[data-ol-pick]');
-    if (pk) { pick(+pk.getAttribute('data-ol-pick')); return; }
+    if (pk) { pick(pk.getAttribute('data-ol-pick')); return; }
+    var rt = t.closest('[data-ol-retry]');
+    if (rt && !rt.disabled) { if (S.step === 'preview' && S.pick) pick(S.pick.id); else openImport(); return; }
     if (t.closest('[data-ol-back]')) { S.step = 'list'; S.preview = null; S.err = ''; paintImp(); return; }
     if (t.closest('[data-ol-go]')) go();
   }

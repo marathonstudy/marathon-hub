@@ -406,8 +406,20 @@ async function flushCalls() {
   const rows = hubCalls.splice(0, hubCalls.length);
   await rpc("app_hub_log", { p_rows: rows }).catch(() => 0);       /* 106 전이면 함수가 없어 그냥 넘어간다 */
 }
-async function hubGet(path: string, meta: { kind?: string; students?: number; days?: number } = {}): Promise<{ ok: boolean; status: number; body: Any; ms: number }> {
+/* 반 목록 · 반 명단은 앱이 따로 분당 10회 제한 (Replit 작업 #33) → 우리는 분당 9회 (20261113h) */
+const ROSTER_PER_MIN = 9;
+const rosterTimes: number[] = [];
+async function rosterGate() {
+  for (;;) {
+    const now = Date.now();
+    while (rosterTimes.length && now - rosterTimes[0] >= 60000) rosterTimes.shift();
+    if (rosterTimes.length < ROSTER_PER_MIN) { rosterTimes.push(now); return; }
+    await sleep(60000 - (now - rosterTimes[0]) + 50);
+  }
+}
+async function hubGet(path: string, meta: { kind?: string; students?: number; days?: number } = {}): Promise<{ ok: boolean; status: number; body: Any; ms: number; retry?: number; ctype?: string }> {
   await hubGate();
+  if (meta.kind === "classes" || meta.kind === "roster") await rosterGate();
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), HUB_TIMEOUT_MS);
   const t0 = Date.now();
@@ -417,7 +429,8 @@ async function hubGet(path: string, meta: { kind?: string; students?: number; da
     const body = await r.json().catch(() => null);
     const ok = r.ok && !(body && body.ok === false);
     log(ok, ok ? "" : failWhy(r.status, body));
-    return { ok, status: r.status, body, ms: Date.now() - t0 };
+    const ra = Number(r.headers?.get?.("retry-after") ?? "");
+    return { ok, status: r.status, body, ms: Date.now() - t0, retry: Number.isFinite(ra) && ra > 0 ? Math.min(600, Math.round(ra)) : undefined, ctype: String(r.headers?.get?.("content-type") ?? "").slice(0, 40) };
   } catch (e) {
     log(false, (e as Error)?.name === "AbortError" ? "timeout" : "upstream");
     throw e;
@@ -760,48 +773,87 @@ export async function runOldMonths(started = Date.now(), until = BUDGET_MS, nigh
      GET /api/hub/classes/{id}/students → { students: [{ userId, name, grade, phone, parentPhone }] }
    모양이 조금 달라도 읽는다 · 주소가 없거나(404 · 405 · 501) 앱 화면(html)이 오면 「noapi」
    ============================================================ */
-const isNoApi = (status: number, body: Any) => status === 404 || status === 405 || status === 501 || body == null || typeof body !== "object";
+/* 20261113h — 앱이 화면(html)이나 JSON 이 아닌 것을 돌려주면 noapi(주소 없음 · 앱 업데이트 필요) · 404 · 405 · 501 은 상태 번호 그대로(「앱 응답 404 (/api/hub/classes)」)
+   실패하면 { ok:false, reason, status, path, retry?, sec? } — 키 값 · 학생 정보는 넣지 않는다 · 함수 Logs 에 한 줄(종류 · 상태 · 이유 · ms) */
+const APP_VER = "20261113h";
+const isNoApi = (_status: number, body: Any) => body == null || typeof body !== "object";
 const strOf = (v: unknown, n: number) => (typeof v === "string" || typeof v === "number" ? String(v).trim().slice(0, n) : "");
+const pickArr = (j: Any, keys: string[]): Any[] | null => {
+  if (Array.isArray(j)) return j;
+  for (const k of keys) { if (Array.isArray(j?.[k])) return j[k]; }
+  for (const w of ["data", "result", "payload", "body"]) {                 /* { data: { classes: [...] } } 처럼 한 겹 더 감싼 모양 */
+    const x = j?.[w];
+    if (Array.isArray(x)) return x;
+    if (x && typeof x === "object") for (const k of keys) { if (Array.isArray(x[k])) return x[k]; }
+  }
+  return null;
+};
+const shapeKeys = (j: Any) => (j && typeof j === "object" && !Array.isArray(j) ? Object.keys(j).slice(0, 8).map((k) => k.replace(/[^\w]/g, "").slice(0, 20)).join(",") : Array.isArray(j) ? "[배열]" : "");
+const yes = (v: unknown) => v === true || v === 1 || /^(true|y|yes|1|ended|closed|done|finished|archived)$/i.test(String(v ?? ""));
+const dateOf = (v: unknown) => { const s = strOf(v, 40); return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : ""; };
 export function classesOf(j: Any): Any[] {
-  const arr = Array.isArray(j) ? j : (j?.classes ?? j?.data ?? j?.results ?? j?.items);
-  if (!Array.isArray(arr)) return [];
-  return arr.map((c: Any) => ({
-    id: num(c?.id ?? c?.classId),
-    title: strOf(c?.title ?? c?.name ?? c?.className, 80),
-    open: strOf(c?.openDate ?? c?.startDate ?? c?.start ?? c?.startsAt, 10),
-    close: strOf(c?.closeDate ?? c?.endDate ?? c?.end ?? c?.endsAt, 10),
-    count: num(c?.studentCount ?? c?.students ?? c?.count),
-  })).filter((c: Any) => c.id > 0 && c.title).slice(0, 300);
+  const arr = pickArr(j, ["classes", "items", "results", "list", "rows", "data"]);
+  if (!arr) return [];
+  return arr.map((c: Any) => {
+    const idRaw = c?.id ?? c?.classId ?? c?.class_id ?? c?.uuid;
+    const id = typeof idRaw === "number" ? idRaw : strOf(idRaw, 40);
+    return {
+      id: typeof id === "string" && /^\d+$/.test(id) ? Number(id) : id,
+      title: strOf(c?.title ?? c?.name ?? c?.className ?? c?.class_name ?? c?.classTitle, 80),
+      open: dateOf(c?.openDate ?? c?.open_date ?? c?.startDate ?? c?.start_date ?? c?.start ?? c?.startsAt),
+      close: dateOf(c?.closeDate ?? c?.close_date ?? c?.endDate ?? c?.end_date ?? c?.end ?? c?.endsAt),
+      count: num(c?.studentCount ?? c?.student_count ?? c?.studentsCount ?? c?.memberCount ?? (Array.isArray(c?.students) ? c.students.length : c?.students) ?? c?.count),
+      ended: yes(c?.ended ?? c?.isEnded ?? c?.is_ended ?? c?.closed ?? c?.status),
+    };
+  }).filter((c: Any) => (typeof c.id === "number" ? c.id > 0 : /^[\w-]{1,40}$/.test(c.id)) && c.title).slice(0, 300);
 }
 export function rosterOf(j: Any): Any[] {
-  const arr = Array.isArray(j) ? j : (j?.students ?? j?.data ?? j?.results ?? j?.members ?? j?.users);
-  if (!Array.isArray(arr)) return [];
+  const arr = pickArr(j, ["students", "members", "users", "items", "results", "list", "rows", "data"]);
+  if (!arr) return [];
   return arr.map((s: Any) => ({
-    uid: num(s?.userId ?? s?.studentId ?? s?.id ?? s?.user?.id),
-    name: strOf(s?.name ?? s?.studentName ?? s?.user?.name, 40),
-    grade: strOf(s?.grade ?? s?.schoolGrade, 10),
-    phone: strOf(s?.phone ?? s?.studentPhone ?? s?.phoneNumber, 20).replace(/\D/g, ""),
-    parent: strOf(s?.parentPhone ?? s?.parent_phone ?? s?.guardianPhone, 20).replace(/\D/g, ""),
+    uid: num(s?.userId ?? s?.user_id ?? s?.studentId ?? s?.student_id ?? s?.id ?? s?.user?.id),
+    name: strOf(s?.name ?? s?.studentName ?? s?.student_name ?? s?.userName ?? s?.displayName ?? s?.user?.name, 40),
+    grade: strOf(s?.grade ?? s?.schoolGrade ?? s?.school_grade ?? s?.gradeLevel, 10),
+    phone: strOf(s?.phone ?? s?.studentPhone ?? s?.student_phone ?? s?.phoneNumber ?? s?.phone_number ?? s?.mobile, 20).replace(/\D/g, ""),
+    parent: strOf(s?.parentPhone ?? s?.parent_phone ?? s?.guardianPhone ?? s?.parentPhoneNumber ?? s?.parent_phone_number, 20).replace(/\D/g, ""),
   })).filter((s: Any) => s.uid > 0 && s.name).slice(0, 500);
 }
-async function appClasses(): Promise<Any> {
-  try {
-    const r = await hubGet("/api/hub/classes", { kind: "classes" });
-    if (isNoApi(r.status, r.body)) return { ok: false, reason: "noapi" };
-    if (!r.ok) return { ok: false, reason: failWhy(r.status, r.body) };
-    const list = classesOf(r.body);
-    if (!list.length && !Array.isArray(r.body?.classes ?? r.body?.data ?? r.body)) return { ok: false, reason: "noapi" };
-    return { ok: true, classes: list };
-  } catch (e) { return { ok: false, reason: (e as Error)?.name === "AbortError" ? "timeout" : "upstream" }; }
+function hubFail(kind: string, path: string, r: { status: number; body: Any; ms: number; retry?: number; ctype?: string }): Any {
+  const reason = isNoApi(r.status, r.body) ? "noapi" : failWhy(r.status, r.body);
+  console.log("app-sync hub", kind, r.status, reason, r.ms + "ms", r.ctype || "");
+  return { ok: false, reason, status: r.status, path, ...(r.status === 429 || reason === "busy" ? { retry: r.retry || 60 } : {}), ver: APP_VER };
 }
-async function appRoster(id: number): Promise<Any> {
-  if (!(id > 0)) return { ok: false, reason: "input" };
+function hubThrow(kind: string, path: string, e: unknown): Any {
+  const to = (e as Error)?.name === "AbortError";
+  console.log("app-sync hub", kind, 0, to ? "timeout" : "network", short(e));
+  return to ? { ok: false, reason: "timeout", sec: Math.round(HUB_TIMEOUT_MS / 1000), path, ver: APP_VER } : { ok: false, reason: "network", path, ver: APP_VER };
+}
+async function appClasses(): Promise<Any> {
+  const path = "/api/hub/classes";
   try {
-    const r = await hubGet("/api/hub/classes/" + id + "/students", { kind: "roster" });
-    if (isNoApi(r.status, r.body)) return { ok: false, reason: "noapi" };
-    if (!r.ok) return { ok: false, reason: failWhy(r.status, r.body) };
-    return { ok: true, classId: id, students: rosterOf(r.body) };
-  } catch (e) { return { ok: false, reason: (e as Error)?.name === "AbortError" ? "timeout" : "upstream" }; }
+    const r = await hubGet(path, { kind: "classes" });
+    if (isNoApi(r.status, r.body) || !r.ok) return hubFail("classes", path, r);
+    const list = classesOf(r.body);
+    if (!list.length && !pickArr(r.body, ["classes", "items", "results", "list", "rows", "data"])) {
+      console.log("app-sync hub classes shape", shapeKeys(r.body));
+      return { ok: false, reason: "shape", status: r.status, path, keys: shapeKeys(r.body), ver: APP_VER };
+    }
+    return { ok: true, classes: list, ver: APP_VER };
+  } catch (e) { return hubThrow("classes", path, e); }
+}
+async function appRoster(idIn: unknown): Promise<Any> {
+  const id = typeof idIn === "number" ? idIn : strOf(idIn, 40);
+  if (!(typeof id === "number" ? id > 0 : /^[\w-]{1,40}$/.test(id))) return { ok: false, reason: "input", ver: APP_VER };
+  const path = "/api/hub/classes/" + encodeURIComponent(String(id)) + "/students";
+  try {
+    const r = await hubGet(path, { kind: "roster" });
+    if (isNoApi(r.status, r.body) || !r.ok) return hubFail("roster", "/api/hub/classes/{id}/students", r);
+    if (!pickArr(r.body, ["students", "members", "users", "items", "results", "list", "rows", "data"])) {
+      console.log("app-sync hub roster shape", shapeKeys(r.body));
+      return { ok: false, reason: "shape", status: r.status, path: "/api/hub/classes/{id}/students", keys: shapeKeys(r.body), ver: APP_VER };
+    }
+    return { ok: true, classId: id, students: rosterOf(r.body), ver: APP_VER };
+  } catch (e) { return hubThrow("roster", "/api/hub/classes/{id}/students", e); }
 }
 
 /* 동기화 기록 (105) — 숫자 · 이유 코드만 (이름 · 번호 · 열쇠 값 없음) · 105 전이면 함수가 없어 그냥 넘어간다 */
@@ -855,8 +907,8 @@ async function handle(req: Request, cors: Record<string, string>) {
   const cls = String(body.class ?? "").slice(0, 60);
   /* 앱 반 목록 · 반 명단 (20261113b · 온라인 반 가져오기) — 앱에 주소가 아직 없으면 { ok: false, reason: "noapi" } (화면 「앱 업데이트 필요」 · 아무것도 넣지 않음) */
   if (body.action === "app_classes" || body.action === "app_roster") {
-    if (!hubKey()) return json({ ok: false, reason: "nokey", message: "앱 읽기 열쇠(HUB_READ_KEY)가 아직 없습니다." }, cors);
-    const r = body.action === "app_classes" ? await appClasses() : await appRoster(num(body.classId));
+    if (!hubKey()) return json({ ok: false, reason: "nokey", message: "앱 읽기 열쇠(HUB_READ_KEY)가 아직 없습니다.", ver: APP_VER }, cors);
+    const r = body.action === "app_classes" ? await appClasses() : await appRoster(body.classId);
     await flushCalls();
     return json(r, cors);
   }
