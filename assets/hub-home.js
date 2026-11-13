@@ -136,12 +136,15 @@
     return '<button type="button" class="gm-card gm-row gm-row--btn" id="gmMogo" data-gm-go="mogo"><span class="gm-row__i" aria-hidden="true">📝</span>' +
       '<div class="gm-row__t"><b>최근 모의고사 레포트</b><span>' + esc([r.date ? md(String(r.date).slice(0, 10)) : '', r.examName || ''].filter(Boolean).join(' · ')) + '</span></div><span class="gm-row__go" aria-hidden="true">›</span></button>';
   }
+  /* 「🏅 내 배지」 — 프로필 카드 바로 아래 · 접힌 모양(요약 · 월간 12칸 · 최근 8주) · 「전체 보기 ▾」로 1년치 (펼침은 기기에 기억 · 20261113g) */
   function badgeHtml() {
-    var v = H.badges;
-    if (!v) return '';
-    /* 제목은 「🏅 내 배지」 하나 · 옆에 작게 「⭐ 주간 n · 🏅 월간 n」 (「0/0주」 같은 셈은 없앰 · 20261110g) */
-    var sum = global.BadgeView && BadgeView.sumText ? BadgeView.sumText(v) : '';
-    return '<details class="gm-card gm-fold" id="gmBadge"><summary class="gm-fold__s"><span aria-hidden="true">🏅</span> <b>내 배지</b> <span class="num">' + esc(sum) + '</span></summary><div class="gm-fold__b" id="gmBadgeBox"></div></details>';
+    if (!H.badges) return '';
+    return '<section class="gm-card gm-bdg" id="gmBadge" aria-label="내 배지"><div id="gmBadgeBox"></div></section>';
+  }
+  function paintBadge() {
+    var box = document.getElementById('gmBadgeBox');
+    if (!box || !H.badges || !global.BadgeView || !BadgeView.mountHome) return;
+    BadgeView.mountHome(box, H.badges, function (m) { if (global.HubAward) HubAward.open(m); }, { remember: true });
   }
   function videoHtml() {
     var v = H.ctx.latestVideo ? H.ctx.latestVideo() : null;
@@ -164,7 +167,7 @@
   function paintAbility() {
     var host = document.getElementById('gmAbilityHost');
     if (!host || !global.Ability || H.loading || H.data === undefined) return;
-    Ability.mount(host, H.data || {}, { today: H.ctx.today, parent: isParent(), name: (H.ctx.student || {}).name || '', state: H.per,
+    Ability.mount(host, H.data || {}, { today: H.ctx.today, parent: isParent(), name: (H.ctx.student || {}).name || '', state: H.per, remember: true,
       onKind: function () { paintAnalysis(); if (global.Analysis) Analysis.refresh(); },
       onGo: function () { if (H.ctx.go) H.ctx.go('report-cats'); } });
   }
@@ -187,7 +190,9 @@
     if (!H) return;
     /* 「⚔️ 내 능력치」 — 프로필 카드 바로 아래 · 이번 주 퀘스트보다 위 (ability.js · 20261110h) · 기간 · 그래프 상태는 H.per 에 남김
        「📊 내 학습 분석」 — 능력치 바로 아래 (20261110l) */
-    H.host.innerHTML = '<div class="gm-home">' + profileHtml() + '<div id="gmAbilityHost"></div><div id="gmAnaHost"></div>' + questHtml() + reportCardHtml() + mogoHtml() + badgeHtml() + videoHtml() + '</div>';
+    /* 20261113g — 프로필 → 🏅 내 배지(접힌 모양) → 이번 주 퀘스트 → 📊 학습 분석 → ⚔️ 능력치 → 새 레포트 → 모의고사 → 수업 영상 */
+    H.host.innerHTML = '<div class="gm-home">' + profileHtml() + badgeHtml() + questHtml() + '<div id="gmAnaHost"></div><div id="gmAbilityHost"></div>' + reportCardHtml() + mogoHtml() + videoHtml() + '</div>';
+    paintBadge();
     paintAbility();
     paintAnalysis();
     var bar = document.getElementById('hubBar');
@@ -357,11 +362,6 @@
       if (H && e.target.matches && e.target.matches('[data-gm-agree]')) { H.faceAgree = !!e.target.checked; repaintPicker(); return; }
       if (H && e.target.matches && e.target.matches('[data-gm-face]') && e.target.files && e.target.files[0]) uploadFace(e.target.files[0]);
     });
-    document.addEventListener('toggle', function (e) {
-      if (!H || !e.target || e.target.id !== 'gmBadge' || !e.target.open) return;
-      var box = document.getElementById('gmBadgeBox');
-      if (box && global.BadgeView && !box.childNodes.length) BadgeView.mount(box, H.badges, function (m) { if (global.HubAward) HubAward.open(m); }, { noTitle: true, noNow: false });
-    }, true);
   }
 
   /* ---------- 홈 열기 ----------

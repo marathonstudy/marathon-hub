@@ -379,5 +379,73 @@
     var wr = weekRun(v.weeks || []);
     return '⭐ 주간 배지 ' + num(v.perfect) + '개 · 🏅 월간 배지 ' + ms.length + '개' + (ms.length ? '(' + ms.slice(0, 3).join(' · ') + (ms.length > 3 ? ' …' : '') + ')' : '') + (wr >= 3 ? ' · ' + wr + '주 연속' : '');
   }
-  global.BadgeView = { html: boxHtml, nowHtml: nowHtml, mount: mount, lineText: lineText, sumText: sumText, monthRuns: monthRuns, weekRun: weekRun, bestRun: bestRun, gridStart: gridStart };
+  /* ============================================================
+     홈 접힌 모양 (20261113g) — 러닝노트 홈 프로필 카드 바로 아래
+       「🏅 내 배지」 · 「⭐ 주간 n · 🏅 월간 n · 최장 연속 n주」(채움 n · 이번 주 진행 중)
+       월간 배지 메달 — 이번 달까지 12달 한 줄(휴대폰 6칸 × 두 줄) · 주간 배지 — 최근 8주 칸
+       「전체 보기 ▾」 → 지금의 1년치 전체 화면(boxHtml)을 아래에 펼침 · 펼침은 기기에 기억(opt.remember)
+     ============================================================ */
+  var HOME_KEY = 'mh.bdg.open';
+  function homeOpen(opt) { if (!(opt && opt.remember)) return false; try { return global.localStorage.getItem(HOME_KEY) === '1'; } catch (e) { return false; } }
+  function homeSave(on) { try { global.localStorage.setItem(HOME_KEY, on ? '1' : '0'); } catch (e) { /* 기억 못 해도 그대로 */ } }
+  function compactHtml(v, open) {
+    var cur = curMon(v), st = gridStart(v), map = weekMap(v), cw = map[cur], fill = fillMap(v);
+    var nowOn = cur >= monOf(startOf(v)) && !(cw && cw.perfect);
+    var nm = (v.months || []).length, best = bestRun(v), k = v.kings || {};
+    var sum = '⭐ 주간 <b class="num">' + num(v.perfect) + '</b> · 🏅 월간 <b class="num">' + nm + '</b> · 최장 연속 <b class="num">' + best + '주</b>' +
+      (num(k.wrong) ? ' · 📝 <b class="num">' + num(k.wrong) + '</b>' : '') + (num(k.text) ? ' · 🔍 <b class="num">' + num(k.text) + '</b>' : '');
+    var nf = Object.keys(fill).length + num(v.filled);
+    /* 월간 — 이번 달까지 12달 */
+    var today = String(v.today || '').slice(0, 7) || isoOf(new Date()).slice(0, 7), stM = st.slice(0, 7), m0 = (v.months || []).slice().sort()[0] || '';
+    if (m0 && m0 < stM) stM = m0;
+    var got = {}, runs = monthRuns(v.months), mh = '';
+    (v.months || []).forEach(function (m) { got[m] = 1; });
+    for (var i = 11; i >= 0; i--) {
+      var ym = ymAdd(today, -i), mo = +ym.slice(5, 7);
+      if (ym < stM) { mh += '<span class="bdg-m bdg-m--s is-pad" aria-hidden="true"><small>' + mo + '월</small></span>'; continue; }
+      var on = !!got[ym], fut = ym >= today, cls = on ? 'is-got' + (runs.run[ym] >= 3 ? ' is-streak' : '') : fut ? 'is-future' : 'is-miss';
+      if (on && fill[ym]) mh += '<button type="button" class="bdg-m bdg-m--s ' + cls + ' is-fill" data-bdg-mf="' + ym + '" aria-label="' + esc(monthFillInfo(ym, fill[ym])) + '"><span aria-hidden="true">🏅</span><small>' + mo + '월</small></button>';
+      else if (on) mh += '<button type="button" class="bdg-m bdg-m--s ' + cls + '" data-bdg-m="' + ym + '" aria-label="' + esc(mo + '월 월간 배지 — 누르면 그달 화면') + '"><span aria-hidden="true">🏅</span><small>' + mo + '월</small></button>';
+      else mh += '<span class="bdg-m bdg-m--s ' + cls + '" aria-label="' + esc(mo + '월' + (fut ? ' (아직)' : '')) + '"><span aria-hidden="true">🏅</span><small>' + mo + '월</small></span>';
+    }
+    /* 주간 — 최근 8주 */
+    var wh = '';
+    for (var j = 7; j >= 0; j--) {
+      var wk = addDays(cur, -7 * j), w = map[wk], s = weekState(w, wk, cur);
+      if (wk < st || s === 'none') { wh += '<span class="bdg-w is-pad" aria-hidden="true"></span>'; continue; }
+      wh += '<button type="button" class="bdg-w is-' + s + (w && w.filled ? ' is-fill' : '') + '" data-bdg-k="' + wk + '" aria-label="' + esc(weekInfo(wk, w, s)) + '">' + (s === 'got' ? '⭐' : s === 'rest' ? '쉼' : '') + '</button>';
+    }
+    return '<div class="bdg-home">' +
+      '<div class="bdg-home__h"><h2 class="gm-h bdg-home__t"><span aria-hidden="true">🏅</span> 내 배지</h2>' +
+        (nf ? '<span class="bdg-fill">채움 ' + nf + '</span>' : '') + (nowOn ? '<span class="bdg-wrun">이번 주 진행 중</span>' : '') + '</div>' +
+      '<p class="bdg-home__sum">' + sum + '</p>' +
+      '<div class="bdg-home__row"><span class="bdg-home__k">월간</span><div class="bdg-home__ms">' + mh + '</div></div>' +
+      '<div class="bdg-home__row"><span class="bdg-home__k">최근 8주</span><div class="bdg-home__ws">' + wh + '</div></div>' +
+      '<p class="bdg-info" data-bdg-hinfo hidden></p>' +
+      '<button type="button" class="bdg-home__more" data-bdg-open aria-expanded="' + !!open + '">' + (open ? '접기 ▴' : '전체 보기 ▾') + '</button>' +
+      '<div class="bdg-home__full" data-bdg-full' + (open ? '' : ' hidden') + '></div>' +
+    '</div>';
+  }
+  function mountHome(host, v, onMonth, opt) {
+    if (!host || !v) return;
+    var open = homeOpen(opt);
+    function paint() {
+      host.innerHTML = compactHtml(v, open);
+      if (open) mount(host.querySelector('[data-bdg-full]'), v, onMonth, { noTitle: true, noNow: true });
+    }
+    paint();
+    host.onclick = function (e) {
+      if (e.target.closest('[data-bdg-full]')) return;                       /* 펼친 전체 화면은 그쪽(mount)이 맡음 */
+      if (e.target.closest('[data-bdg-open]')) { open = !open; if (opt && opt.remember) homeSave(open); paint(); return; }
+      var info = host.querySelector('[data-bdg-hinfo]');
+      var fb = e.target.closest('[data-bdg-mf]');
+      if (fb) { if (info) { info.hidden = false; info.textContent = monthFillInfo(fb.dataset.bdgMf, fillMap(v)[fb.dataset.bdgMf]); } pick(fb); return; }
+      var mb = e.target.closest('[data-bdg-m]');
+      if (mb && onMonth) { onMonth(mb.dataset.bdgM); return; }
+      var sb = e.target.closest('[data-bdg-k]');
+      if (sb) { var k = sb.dataset.bdgK, w = weekMap(v)[k]; if (info) { info.hidden = false; info.textContent = weekInfo(k, w, weekState(w, k, curMon(v))); } pick(sb); }
+    };
+    function pick(b) { Array.prototype.forEach.call(host.querySelectorAll('.bdg-home [data-bdg-k], .bdg-home [data-bdg-mf]'), function (x) { x.classList.toggle('is-pick', x === b); }); }
+  }
+  global.BadgeView = { html: boxHtml, nowHtml: nowHtml, mount: mount, mountHome: mountHome, compactHtml: compactHtml, lineText: lineText, sumText: sumText, monthRuns: monthRuns, weekRun: weekRun, bestRun: bestRun, gridStart: gridStart };
 })(window);

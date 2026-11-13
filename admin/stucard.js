@@ -278,7 +278,7 @@
     if (AB.sid !== sid) { AB = { sid: sid, data: null, busy: false, st: { kind: 'w4', graph: false } }; }
     if (AB.data === null) { abLoad(sid); return '<section class="sc-sec sc-ab" id="scAbility" aria-label="능력치"><p class="ab-note">능력치 불러오는 중…</p></section>'; }
     return '<section class="sc-sec sc-ab" id="scAbility" aria-label="능력치">' +
-      Ability.html(AB.data, AB.st, { today: today(), small: true, card: false, id: 'scAb' }) +
+      Ability.html(AB.data, AB.st, { today: today(), small: true, card: false, id: 'scAb', open: true }) +
       (window.Analysis ? Analysis.summary(anCtx(sid)) : '') + '</section>';
   }
   /* 학습 분석 — 러닝노트와 같은 계산 · 기간은 능력치와 같이 (AB.st) */
@@ -301,10 +301,11 @@
     if (t.closest('[data-sc-al-set]')) { var inp = root && root.querySelector('[data-sc-al-in]'), v = inp ? String(inp.value || '').replace(/\D/g, '') : ''; if (!v) { AL.msg = '앱 학생 번호를 넣어 주세요'; alRepaint(); } else alSet(sid, +v); return true; }
     if (t.closest('[data-sc-al-clear]')) { alSet(sid, null); return true; }
     if (t.closest('[data-sc-al-find]')) { alFind(sid); return true; }
-    var ab = t.closest('#scAbility [data-ab-k], #scAbility [data-ab-graph], #scAbility [data-ab-go]');
+    var ab = t.closest('#scAbility [data-ab-k], #scAbility [data-ab-graph], #scAbility [data-ab-go], #scAbility [data-ab-open]');
     if (ab) {
       if (ab.hasAttribute('data-ab-k')) { AB.st.kind = ab.getAttribute('data-ab-k'); AB.st.picked = true; }
       else if (ab.hasAttribute('data-ab-graph')) AB.st.graph = !AB.st.graph;
+      else if (ab.hasAttribute('data-ab-open')) AB.st.open = !Ability.isOpen(AB.st, { open: true });         /* 코치룸은 처음부터 펼침 (20261113g) */
       else { if (window.Preview) Preview.open(sid, 'parent', 'app'); return true; }
       if (window.QuickNote) QuickNote.repaint();
       return true;

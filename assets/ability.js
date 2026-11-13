@@ -187,6 +187,31 @@
     Object.keys(g).forEach(function (k) { g[k].rate = Math.round(g[k].sum / g[k].q); g[k].enough = g[k].q >= 5; });
     return g;
   }
+  /* 스탯 묶음 (20261113g) — 독서(인문 · 사회 · 과학기술 · 법학 · 경제 …) / 문학(현대시 · 고전시가 · 소설 · 산문 …) / 선택과목(화작 · 언매) / 기타(분류에 안 맞는 영역) */
+  var GROUPS = ['독서', '문학', '선택과목', '기타'];
+  function groupOf(top) {
+    var t = String(top || '').replace(/\s+/g, '');
+    if (t === '독서') return '독서';
+    if (t === '문학') return '문학';
+    if (/^(화작|언매|화법과작문|언어와매체|화법|작문|언어|매체|문법|선택과목|선택)$/.test(t)) return '선택과목';
+    return '기타';
+  }
+  /* 문제 수로 무게를 둔 평균 — 기록이 있는 영역만 (영역 목록에는 기록 있는 영역만 들어온다) */
+  function sumOf(list) {
+    var q = 0, s = 0;
+    list.forEach(function (a) { q += a.q; s += a.rate * a.q; });
+    if (!q) return null;
+    var r = Math.round(s / q);
+    return { rate: r, q: q, enough: q >= 5, grade: q >= 5 ? grade(r) : '' };
+  }
+  function groupsOf(areas) {
+    return GROUPS.map(function (gn) {
+      var xs = areas.filter(function (a) { return a.group === gn; });
+      if (!xs.length) return null;
+      var t = sumOf(xs);
+      return { name: gn, areas: xs, rate: t.rate, q: t.q, enough: t.enough, grade: t.grade };
+    }).filter(Boolean);
+  }
   function grade(r) { return r >= 90 ? 'S' : r >= 80 ? 'A' : r >= 70 ? 'B' : r >= 60 ? 'C' : 'D'; }
   function sortAreas(a) { return a.sort(function (x, y) { var i = ORDER.indexOf(x.name), j = ORDER.indexOf(y.name); return (i < 0 ? 99 : i) - (j < 0 ? 99 : j) || (x.name < y.name ? -1 : 1); }); }
 
@@ -239,10 +264,11 @@
     var richSubs = Object.keys(subs).filter(function (k) { return subs[k].enough; });
     var detail = richSubs.length >= 5;                 /* 세부는 넉넉한 세부 파트가 5개 이상일 때만 (육각형이 되게) */
     var key = detail ? function (it) { return it.sub || it.top; } : function (it) { return it.top; };
-    var g = agg(cur, key), gp = agg(prev, key);
+    var g = agg(cur, key), gp = agg(prev, key), tk = {};
+    cur.forEach(function (it) { var k = key(it); if (k && !tk[k]) tk[k] = it.top; });
     var areas = sortAreas(Object.keys(g).map(function (k) {
       var x = g[k], y = gp[k];
-      return { name: k, rate: x.rate, q: x.q, enough: x.enough, grade: x.enough ? grade(x.rate) : '',
+      return { name: k, top: tk[k] || k, group: groupOf(tk[k] || k), rate: x.rate, q: x.q, enough: x.enough, grade: x.enough ? grade(x.rate) : '',
                delta: x.enough && y && y.enough ? x.rate - y.rate : null };
     }));
     var ok = areas.filter(function (a) { return a.enough; });
@@ -253,7 +279,7 @@
       if (hi.rate === lo.rate) lo = null;
     }
     var qSum = areas.reduce(function (s, a) { return s + a.q; }, 0);
-    return { kind: src === 'app' ? 'y1' : (kind || 'w4'), auto: src === 'app' && (kind || 'w4') !== 'y1', range: p, areas: areas, detail: detail, src: src,
+    return { groups: groupsOf(areas), total: sumOf(areas), kind: src === 'app' ? 'y1' : (kind || 'w4'), auto: src === 'app' && (kind || 'w4') !== 'y1', range: p, areas: areas, detail: detail, src: src,
              any: all.length > 0 || cats.length > 0 || submitted(data) > 0, submitted: submitted(data), items: all.length,
              inPeriod: cur.length, q: qSum, thin: qSum < 5, first: first, top: hi ? hi.name : '', low: lo ? lo.name : '' };
   }
@@ -320,6 +346,50 @@
     if (d == null || d === 0) return '';
     return d > 0 ? '<span class="ab-up num" title="앞 기간보다 ' + d + ' 올랐어요">▲' + d + '</span>' : '<span class="ab-down num" title="앞 기간보다 ' + (-d) + ' 내렸어요">▼' + (-d) + '</span>';
   }
+  /* ---------- 스탯 창 (20261113g) ----------
+     맨 위 — 레이더(펼쳤을 때 · 축 3개 이상) 옆에(휴대폰은 위) 「종합 A · 86」 · 꼬리표 「주력 스킬: ○○ S」 · 「성장 포인트: ○○ B」
+     아래 — 묶음(독서 · 문학 · 선택과목 · 기타)마다 제목 옆 묶음 평균 · 등급 + 작은 스킬 카드 격자(PC 4칸 · 휴대폰 3칸)
+     카드 — 영역 이름 · 큰 숫자 · 등급 배지 · ▲n / ▼n(변화 없으면 없음) · 테두리는 등급 색 · S 는 금색 + 은은한 반짝임
+     접힌 모양 — 종합 + 묶음 평균만 · 「전체 스탯 보기 ▾」 · 정답 수가 적은 영역(묶음 · 종합도)은 등급 없이 % 만 */
+  function gradeTag(x) { return x.enough ? '<span class="ab-gr ab-gr--' + x.grade + '">' + x.grade + '</span>' : '<small class="ab-pctu">%</small>'; }
+  function overallHtml(c) {
+    var t = c.total, byName = function (n) { return c.areas.filter(function (a) { return a.name === n; })[0]; };
+    var hi = c.top ? byName(c.top) : null, lo = c.low ? byName(c.low) : null;
+    return '<div class="ab-ov' + (t && t.enough ? ' ab-ov--' + t.grade : '') + '">' +
+      '<p class="ab-ov__k">종합</p>' +
+      '<p class="ab-ov__v">' + (t ? (t.enough ? '<b class="ab-ov__g">' + t.grade + '</b><span class="ab-ov__dot">·</span>' : '') + '<b class="ab-ov__n num">' + t.rate + '</b>' + (t.enough ? '' : '<small>%</small>') : '<b class="ab-ov__n">-</b>') + '</p>' +
+      ((hi || lo) ? '<p class="ab-ov__tags">' +
+        (hi ? '<span class="ab-tag ab-tag--top">주력 스킬: ' + esc(hi.name) + ' ' + hi.grade + '</span>' : '') +
+        (lo ? '<span class="ab-tag ab-tag--low">성장 포인트: ' + esc(lo.name) + ' ' + lo.grade + '</span>' : '') + '</p>' : '') +
+    '</div>';
+  }
+  function groupSumHtml(c) {
+    var gs = c.groups.filter(function (g) { return g.name !== '기타'; });
+    if (!gs.length) gs = c.groups;
+    return '<ul class="ab-gsum">' + gs.map(function (g) {
+      return '<li><button type="button" class="ab-gsum__i" data-ab-go aria-label="' + esc(g.name + ' ' + g.rate + (g.enough ? '점 ' + g.grade + '등급' : '%') + ' — 누르면 영역별 정답률') + '"><span class="ab-gsum__n">' + esc(g.name) + '</span><b class="num">' + g.rate + '</b>' + gradeTag(g) + '</button></li>';
+    }).join('') + '</ul>';
+  }
+  function skillHtml(a, c) {
+    var tag = a.name === c.top ? ' is-top' : a.name === c.low ? ' is-low' : '';
+    return '<li><button type="button" class="ab-sk' + (a.enough ? ' ab-sk--' + a.grade : ' is-few') + tag + '" data-ab-go aria-label="' + esc(a.name + ' ' + (a.enough ? a.rate + '점 ' + a.grade + '등급' : '정답률 ' + a.rate + '%') + ' — 누르면 영역별 정답률') + '">' +
+      '<span class="ab-sk__n">' + esc(a.name) + '</span>' +
+      '<span class="ab-sk__v"><b class="num">' + a.rate + '</b>' + gradeTag(a) + '</span>' +
+      (a.enough && a.delta ? '<span class="ab-sk__d">' + deltaHtml(a.delta) + '</span>' : '') +
+    '</button></li>';
+  }
+  function groupsHtml(c) {
+    return c.groups.map(function (g) {
+      return '<section class="ab-grp"><h3 class="ab-grp__t">' + esc(g.name) + ' <span class="ab-grp__a"><b class="num">' + g.rate + '</b>' + gradeTag(g) + '</span></h3>' +
+        '<ul class="ab-cards">' + g.areas.map(function (a) { return skillHtml(a, c); }).join('') + '</ul></section>';
+    }).join('');
+  }
+  function statHtml(c, names, open) {
+    var radar = open && c.areas.length >= 3 ? radarHtml(c.areas, names) : '';
+    return '<div class="ab-top' + (radar ? ' has-radar' : '') + '">' + (radar ? '<div class="ab-top__r">' + radar + '</div>' : '') + overallHtml(c) + '</div>' +
+      (open ? groupsHtml(c) : groupSumHtml(c)) +
+      '<button type="button" class="ab-more ab-open" data-ab-open aria-expanded="' + !!open + '">' + (open ? '스탯 접기 ▴' : '전체 스탯 보기 ▾') + '</button>';
+  }
   function barsHtml(c, names) {
     return '<ul class="ab-bars">' + c.areas.map(function (a) {
       var tag = a.name === c.top ? '<span class="ab-tag ab-tag--top">주력 스킬</span>' : a.name === c.low ? '<span class="ab-tag ab-tag--low">성장 포인트</span>' : '';
@@ -355,6 +425,9 @@
     return '<div class="ab-graph">' + (mm.summary ? '<p class="ab-sum">📈 ' + esc(mm.summary) + '</p>' : '') + lineHtml(mm) + '</div>';
   }
 
+  /* 펼침 — st.open 이 있으면 그것 · 없으면 opt.open(코치룸 true) · 러닝노트는 기기에 기억(mount · opt.remember) */
+  function isOpen(st, opt) { return st && st.open != null ? !!st.open : !!(opt && opt.open); }
+  var OPEN_KEY = 'mh.ab.open';
   function html(data, st, opt) {
     opt = opt || {};
     var today = opt.today, title = opt.parent ? '⚔️ ' + (opt.name || '') + ' 학생의 능력치' : '⚔️ 내 능력치';
@@ -369,7 +442,7 @@
     var names = ORDER.slice();
     c.areas.forEach(function (a) { if (names.indexOf(a.name) < 0) names.push(a.name); });
     var body = !c.areas.length ? '<p class="ab-note">' + (c.items || c.src === 'app' ? '이 기간에는 정답률이 있는 과제가 없어요' : '낸 과제 ' + c.submitted + '개 · 정답 수가 적힌 과제가 쌓이면 영역별 능력치가 보여요') + '</p>'
-      : (c.areas.length >= 3 ? radarHtml(c.areas, names) : '') + barsHtml(c, names);
+      : statHtml(c, names, isOpen(st, opt));
     return '<section class="ab' + (opt.small ? ' ab--small' : '') + (opt.card === false ? '' : ' gm-card') + '" id="' + (opt.id || 'gmAbility') + '" data-ab-root>' + head +
       '<p class="ab-range num">' + esc(c.range.note) + (c.range.prev ? ' · 앞 기간과 비교' : '') + '</p>' +
       (c.auto ? '<p class="ab-auto">최근 기록이 적어 전체 기간으로 보여 줘요</p>' : '') + body +
@@ -381,15 +454,17 @@
     if (!host) return;
     var st = (opt && opt.state) || host._ab || (host._ab = { kind: 'w4', graph: false });
     host._ab = st;
+    if (st.open == null && opt && opt.remember) { try { st.open = global.localStorage.getItem(OPEN_KEY) === '1'; } catch (e) { st.open = false; } }
     function paint() { host.innerHTML = html(data, st, opt); }
     paint();
     host.onclick = function (e) {
       var k = e.target.closest('[data-ab-k]');
       if (k) { st.kind = k.getAttribute('data-ab-k'); st.picked = true; paint(); if (opt && opt.onKind) opt.onKind(st.kind); return; }
       if (e.target.closest('[data-ab-graph]')) { st.graph = !st.graph; paint(); return; }
+      if (e.target.closest('[data-ab-open]')) { st.open = !isOpen(st, opt); if (opt && opt.remember) { try { global.localStorage.setItem(OPEN_KEY, st.open ? '1' : '0'); } catch (e2) { /* 기억 못 해도 그대로 */ } } paint(); return; }
       if (e.target.closest('[data-ab-go]') && opt && opt.onGo) opt.onGo();
     };
   }
 
-  global.Ability = { mount: mount, html: html, compute: compute, view: view, monthly: monthly, items: items, catItems: catItems, submitted: submitted, withOld: withOld, oldCount: oldCount, grade: grade, areaOf: areaOf, areaOfName: areaOfName, range: range, PERIODS: PERIODS, ORDER: ORDER };
+  global.Ability = { mount: mount, html: html, compute: compute, view: view, monthly: monthly, items: items, catItems: catItems, submitted: submitted, withOld: withOld, oldCount: oldCount, grade: grade, groupOf: groupOf, isOpen: isOpen, areaOf: areaOf, areaOfName: areaOfName, range: range, PERIODS: PERIODS, ORDER: ORDER };
 })(window);
