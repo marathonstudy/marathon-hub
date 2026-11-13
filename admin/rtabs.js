@@ -79,6 +79,7 @@
     if (k === 'leaves') closeMore(function () { if (window.Leaves) Leaves.open(); });          /* 퇴원 기록 (leaves.js · 20261101s) */
     if (k === 'course') closeMore(function () { if (window.Course) Course.openManage(); });
     if (k === 'a2hs') closeMore(function () { if (window.A2HS) A2HS.how('coach'); });
+    if (k === 'finish') closeMore(function () { if (window.FinishAdmin) FinishAdmin.open(); });          /* 🏁 완주증 (20261114a) */
     if (k === 'online') closeMore(function () { if (window.OnlineClass) OnlineClass.openImport(); });     /* 📥 온라인 반 가져오기 (20261113f) */
   });
   $('#moreMenuClose').addEventListener('click', function () { $('#moreMenu').close(); });

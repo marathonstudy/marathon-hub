@@ -377,10 +377,11 @@
 
   /* 직원(조교 · 선생님) 계정에 버튼을 보인다 (서버 함수도 직원인지 다시 확인한다) */
   window.addEventListener('jt:loaded', function () {
-    var oi = $('#moreOnlineImport');                                     /* 더보기 「📥 온라인 반 가져오기」 (20261113f) */
+    var oi = $('#moreOnlineImport'), fi = $('#moreFinish');               /* 더보기 「📥 온라인 반 가져오기」 (20261113f) · 「🏁 완주증」 (20261114a) */
     $('#btnClassAdmin').hidden = true;
     if (oi) oi.hidden = true;
-    DB.myStaff().then(function (m) { $('#btnClassAdmin').hidden = !(m && m.role); if (oi) oi.hidden = !(m && m.role); }).catch(function () {});
+    if (fi) fi.hidden = true;
+    DB.myStaff().then(function (m) { $('#btnClassAdmin').hidden = !(m && m.role); if (oi) oi.hidden = !(m && m.role); if (fi) fi.hidden = !(m && m.role); }).catch(function () {});
   });
 
   /* 다른 기기에서 반이 바뀌면 — 이름을 고치는 중이 아니면 새로 */
