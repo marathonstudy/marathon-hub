@@ -2,7 +2,7 @@
    online.js — 온라인 반 (20261113b · migration-107)
    · 반 종류 — 현강 / 온라인 · 온라인 반은 수업 시간 · 상담 · 모의고사가 기본으로 꺼짐 · 문자 · 알림톡 · 링크 발송은 켜기 전까지 꺼짐
      (과제 · 학습 분석 · 능력치 · 배지 · 게임 홈은 현강과 같음) — 반 관리 → 반 줄 [반 종류]
-   · 앱 반에서 학생 가져오기 — 반 관리 → [앱 반에서 학생 가져오기]
+   · 앱 반에서 학생 가져오기 — 더보기 맨 위 「📥 온라인 반 가져오기」(20261113f · 예전엔 반 관리 창 맨 아래 · rtabs.js 가 연다)
      앱 반 고르기 → 미리보기(새로 추가 n명 · 이미 있음 n명 · 겹침 의심 n명) → [가져오기]를 눌러야 실제로 넣음
      앱 학생 id 로 바로 연결 · 이미 연결된 학생은 새로 만들지 않고 반만 더함 · 겹침 의심은 넣지 않음(학생 카드에서 직접 연결)
      앱에 반 목록 · 명단 주소가 아직 없으면 「앱 업데이트 필요」만 보이고 아무것도 넣지 않음
@@ -244,7 +244,7 @@
   document.addEventListener('change', function (e) { if (e.target && e.target.id === 'olTarget' && S.step === 'preview' && S.roster) { S.target = e.target.value.trim(); previewNow(); } });
 
   document.addEventListener('click', function (e) {
-    if (e.target && e.target.closest && e.target.closest('#btnOnlineImport')) openImport();
+    if (e.target && e.target.closest && e.target.closest('#btnOnlineImport')) openImport();       /* 옛 버튼 자리(지금은 없음) — 더보기 메뉴는 rtabs.js */
   });
   window.addEventListener('jt:loaded', function () { load(); });
   window.addEventListener('jt:roster-changed', function () { load(); });
