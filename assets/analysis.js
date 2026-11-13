@@ -39,7 +39,9 @@
   function avg(a) { return a.length ? a.reduce(function (s, x) { return s + x; }, 0) / a.length : null; }
   var WD = ['일', '월', '화', '수', '목', '금', '토'];
   var COLORS = { rate: '#F5C842', sub: '#7EE0C3', wrong: '#FF9F6B', text: '#8FB8FF', streak: '#FF7A59', total: '#C9B8FF' };
-  var AREA_INK = ['#F5C842', '#7EE0C3', '#FF9F6B', '#8FB8FF', '#E58CFF', '#FFD6E0', '#B4F06A', '#6FD3FF'];
+  var AREA_INK = ['#7EE0C3', '#FF9F6B', '#8FB8FF', '#E58CFF', '#FFD6E0', '#B4F06A', '#6FD3FF', '#FF7A8A'];
+  var SLOT_INK = ['#7EE0C3', '#FF8FB1'];             /* 켠 영역 선 — 켠 순서대로 두 색(전체 선 노랑과 잘 갈림 · 20261113e) */
+  var AREA_MAX = 2;
 
   /* ============================================================
      계산
@@ -48,6 +50,37 @@
   /* 주마다 [{ w(월요일), v }] — 값이 없는 주는 v=null */
   function weekly(list, weeks, f) {
     return weeks.map(function (w) { var xs = list.filter(function (x) { return x.date >= w && x.date <= addDays(w, 6); }); return { w: w, v: xs.length ? f(xs) : null }; });
+  }
+  function monthEnd(m) { var x = new Date(m + 'T00:00:00Z'); x.setUTCMonth(x.getUTCMonth() + 1); x.setUTCDate(0); return x.toISOString().slice(0, 10); }
+  function nextMonth(m) { var x = new Date(m + 'T00:00:00Z'); x.setUTCMonth(x.getUTCMonth() + 1); return x.toISOString().slice(0, 10); }
+  function daysBetween(a, b) { return Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 864e5); }
+  /* 달 칸 [{ w(1일), to(말일 · 기간 끝을 넘지 않음), lab 'n월' }] — 최대 13칸 */
+  function monthsOf(from, to) {
+    var out = [], m = from.slice(0, 8) + '01';
+    while (m <= to && out.length < 13) { var e = monthEnd(m); out.push({ w: m, to: e > to ? to : e, lab: (+m.slice(5, 7)) + '월', y: m.slice(0, 4) }); m = nextMonth(m); }
+    return out;
+  }
+  /* 그래프 칸 — 기간이 3개월(92일) 이하면 주 · 더 길면 달 (20261113e) */
+  function bucketsOf(from, to) {
+    if (daysBetween(from, to) <= 92) return { unit: 'week', list: weeksOf(from, to).map(function (w) { return { w: w, to: addDays(w, 6), lab: md(w) }; }) };
+    return { unit: 'month', list: monthsOf(from, to) };
+  }
+  /* 영역 변화 한 줄 — 앞 기간 대비(앞 기간이 없으면 이 기간의 앞 절반 대비) · 양쪽 모두 과제 2개 이상 · 문제 8개 이상인 영역만
+     가장 많이 오른 영역(+1 이상) · 가장 많이 내린 영역(−1 이하) · 셀 영역이 없으면 null(요약 숨김) */
+  function movesOf(cur, R, tops, prv) {
+    var A, B;
+    if (prv && prv.length) { A = prv; B = cur; }
+    else { var mid = addDays(R.from, Math.floor(daysBetween(R.from, R.to) / 2)); A = cur.filter(function (x) { return x.date < mid; }); B = cur.filter(function (x) { return x.date >= mid; }); }
+    var enough = function (xs) { return xs.length >= 2 && xs.reduce(function (s, x) { return s + x.n; }, 0) >= 8; };
+    var ds = [];
+    tops.forEach(function (t) {
+      var a = A.filter(function (x) { return x.top === t; }), b = B.filter(function (x) { return x.top === t; });
+      if (enough(a) && enough(b)) ds.push({ name: t, d: wavg(b) - wavg(a) });
+    });
+    if (!ds.length) return null;
+    var up = ds.slice().sort(function (x, y) { return y.d - x.d; })[0], dn = ds.slice().sort(function (x, y) { return x.d - y.d; })[0];
+    var o = { up: up.d >= 1 ? up : null, down: dn.d <= -1 && (!up || dn.name !== up.name || up.d < 1) ? dn : null, base: prv && prv.length ? 'prev' : 'half' };
+    return o.up || o.down ? o : null;
   }
   function wavg(xs) { var q = 0, s = 0; xs.forEach(function (x) { s += x.r * x.n; q += x.n; }); return q ? Math.round(s / q) : null; }
   function lastVal(pts) { for (var i = pts.length - 1; i >= 0; i--) if (pts[i].v != null) return pts[i]; return null; }
@@ -93,14 +126,22 @@
     /* 정답률 */
     if (its.length) {
       var cur = its.filter(function (x) { return inR(x.date, R); }), prv = its.filter(function (x) { return inR(x.date, R.prev); });
-      var tops = [], areaPts = {};
+      var tops = [];
       cur.forEach(function (x) { if (tops.indexOf(x.top) < 0) tops.push(x.top); });
       tops.sort(function (a, b) { var O = Ab.ORDER, i = O.indexOf(a), j = O.indexOf(b); return (i < 0 ? 99 : i) - (j < 0 ? 99 : j); });
-      tops.forEach(function (t) { areaPts[t] = weekly(cur.filter(function (x) { return x.top === t; }), weeks, wavg); });
       var rp = weekly(cur, weeks, wavg), all = weekly(its, allWeeks, wavg);
       var v = wavg(cur), pv = wavg(prv);
       if (v != null) {
-        out.sections.rate = { avg: v, pts: rp, areas: tops.map(function (t, i) { return { name: t, color: AREA_INK[i % AREA_INK.length], pts: areaPts[t] }; }), isNew: isNewBest(all), allPts: all };
+        /* 그래프 (20261113e) — 기간이 3개월(92일) 이하면 주 단위 · 더 길면 달 단위 평균 · 기록 없는 칸은 null(선 끊김) */
+        var by = bucketsOf(R.from, today), unit = by.unit;
+        var gp = function (xs) { return by.list.map(function (b) { var ys = xs.filter(function (x) { return x.date >= b.w && x.date <= b.to; }); return { w: b.w, to: b.to, lab: b.lab, v: ys.length ? wavg(ys) : null }; }); };
+        var months = monthsOf(R.from, today);
+        var heat = tops.map(function (t) {
+          var xs = cur.filter(function (x) { return x.top === t; });
+          return { name: t, cells: months.map(function (m) { var ys = xs.filter(function (x) { return x.date >= m.w && x.date <= m.to; }); return { m: m.w, to: m.to, lab: m.lab, v: ys.length ? wavg(ys) : null, q: ys.reduce(function (s, x) { return s + x.n; }, 0), est: ys.some(function (x) { return x.est; }), k: ys.length }; }) };
+        });
+        out.sections.rate = { avg: v, pts: rp, unit: unit, line: gp(cur), months: months, heat: heat, moves: movesOf(cur, R, tops, prv),
+          areas: tops.map(function (t, i) { return { name: t, color: AREA_INK[i % AREA_INK.length], pts: gp(cur.filter(function (x) { return x.top === t; })) }; }), isNew: isNewBest(all), allPts: all };
         out.cards.push({ key: 'rate', label: '정답률', v: v, unit: '%', pts: rp, delta: pv != null ? v - pv : null, isNew: isNewBest(all), color: COLORS.rate });
       }
     }
@@ -232,20 +273,21 @@
     var x = function (i) { return n > 1 ? L + i * (W - L - Rr) / (n - 1) : (L + W - Rr) / 2; }, y = function (v) { return T + (max - v) * (H - T - B) / ((max - min) || 1); };
     var grid = [min, (min + max) / 2, max].map(function (v) { return '<line class="an-g" x1="' + L + '" x2="' + (W - Rr) + '" y1="' + y(v).toFixed(1) + '" y2="' + y(v).toFixed(1) + '"/><text class="an-ax" x="' + (L - 4) + '" y="' + (y(v) + 3).toFixed(1) + '" text-anchor="end">' + Math.round(v) + '</text>'; }).join('');
     var ref = series[0] ? series[0].pts : [], step = Math.max(1, Math.ceil(n / 6));
-    var xl = ref.map(function (p, i) { return i % step && i !== n - 1 ? '' : '<text class="an-ax" x="' + x(i).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="middle">' + md(p.w) + '</text>'; }).join('');
+    /* 아래 글자 — 마지막 칸과 너무 가까운 글자는 빼서 겹치지 않게 (20261113e) */
+    var xl = ref.map(function (p, i) { return (i % step && i !== n - 1) || (i !== n - 1 && n - 1 - i < step * 0.6) ? '' : '<text class="an-ax" x="' + x(i).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="' + (i === n - 1 && n > 1 ? 'end' : i === 0 && n > 1 ? 'start' : 'middle') + '">' + esc(p.lab || md(p.w)) + '</text>'; }).join('');
     var bestV = vals.length ? Math.max.apply(null, vals) : null, starred = false;
     var body = series.map(function (s, si) {
       if (s.off) return '';
       var segs = [], cur = [];
       s.pts.forEach(function (p, i) { if (p.v == null) { if (cur.length) segs.push(cur); cur = []; } else cur.push(i); });
       if (cur.length) segs.push(cur);
-      var lines = segs.map(function (sg) { return sg.length > 1 ? '<polyline class="an-ln an-draw" pathLength="1" style="stroke:' + s.color + '" points="' + sg.map(function (i) { return x(i).toFixed(1) + ',' + y(s.pts[i].v).toFixed(1); }).join(' ') + '"/>' : ''; }).join('');
+      var lines = segs.map(function (sg) { return sg.length > 1 ? '<polyline class="an-ln an-draw' + (s.main ? ' an-ln--main' : s.sub ? ' an-ln--sub' : '') + '" pathLength="1" style="stroke:' + s.color + '" points="' + sg.map(function (i) { return x(i).toFixed(1) + ',' + y(s.pts[i].v).toFixed(1); }).join(' ') + '"/>' : ''; }).join('');
       var dots = s.pts.map(function (p, i) {
         if (p.v == null) return '';
         var star = !starred && si === 0 && p.v === bestV && vals.length >= 2;
         if (star) starred = true;
-        return '<g class="an-pt" tabindex="0" role="button" data-an-pt="' + esc(p.w + '|' + (p.to || addDays(p.w, 6)) + '|' + s.name + '|' + p.v + (o.unit || '')) + '" aria-label="' + esc(md(p.w) + ' 주 ' + s.name + ' ' + p.v + (o.unit || '')) + '">' +
-          '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(p.v).toFixed(1) + '" r="9" class="an-hit"/>' +
+        return '<g class="an-pt" tabindex="0" role="button" data-an-pt="' + esc(p.w + '|' + (p.to || addDays(p.w, 6)) + '|' + s.name + '|' + p.v + (o.unit || '') + (o.month ? '|' + (+p.w.slice(5, 7)) + '월' : '')) + '" aria-label="' + esc((o.month ? (+p.w.slice(5, 7)) + '월 ' : md(p.w) + ' 주 ') + s.name + ' ' + p.v + (o.unit || '')) + '">' +
+          '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(p.v).toFixed(1) + '" r="11" class="an-hit"/>' +
           '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(p.v).toFixed(1) + '" r="3.2" style="fill:' + s.color + '"/>' +
           (star ? '<text class="an-star" x="' + x(i).toFixed(1) + '" y="' + (y(p.v) - 7).toFixed(1) + '" text-anchor="middle">★</text>' : '') + '</g>';
       }).join('');
@@ -294,7 +336,7 @@
     if (key === 'hours') { var mx = Math.max.apply(null, s.bins); return hourWord(s.bins.indexOf(mx)) + '에 가장 많이 내요'; }
     if (key === 'dows') { var m2 = Math.max.apply(null, s.bins); return m2 ? WD[s.bins.indexOf(m2)] + '요일에 가장 많이 냈어요' : ''; }
     if (key === 'sub') { var t = s.onTime + s.late; return t ? '낸 과제의 ' + Math.round(s.onTime * 100 / t) + '%를 제때 냈어요' : ''; }
-    if (key === 'rate') { return s.isNew ? '지난주가 지금까지 가장 높았어요 ★' : '정답률 평균 ' + s.avg + '% · 한 주씩 쌓이고 있어요'; }
+    if (key === 'rate') { return s.isNew ? '지난주가 지금까지 가장 높았어요 ★' : '정답률 평균 ' + s.avg + '% · ' + (s.unit === 'month' ? '한 달씩' : '한 주씩') + ' 쌓이고 있어요'; }
     if (key === 'wrong' || key === 'text') return s.rise >= 2 ? s.rise + '주째 오르는 중이에요' : '평균 ' + s.avg + ' · 최고 ' + s.max + (s.all ? ' (가진 점수 전체)' : '');
     if (key === 'total') return '지금까지 ' + s.n + '개 · 꾸준함이 실력이 돼요';
     if (key === 'grass') { var n = Object.keys(s.days).length; return n ? '한 해 동안 ' + n + '일 과제를 냈어요' : ''; }
@@ -402,12 +444,20 @@
   function chartFor(a, key, off) {
     var s = a.sections[key];
     if (key === 'rate') {
-      var ser = [{ name: '전체', color: COLORS.rate, pts: s.pts }].concat(s.areas.map(function (x) { return { name: x.name, color: x.color, pts: x.pts, off: !!(off && off[x.name]) }; }));
-      return lineSvg(ser, { max: 100, unit: '%', label: '주별 정답률' }) +
-        (s.areas.length ? '<div class="an-legend" role="group" aria-label="영역 켜고 끄기">' + s.areas.map(function (x) {
-          var on = !(off && off[x.name]);
-          return '<button type="button" class="an-lg' + (on ? ' is-on' : '') + '" data-an-area="' + esc(x.name) + '" aria-pressed="' + on + '"><i style="background:' + x.color + '"></i>' + esc(x.name) + '</button>';
-        }).join('') + '</div>' : '');
+      /* 20261113e — 기본은 전체 선 하나 · 영역은 눌러서 최대 2개(세 번째를 누르면 가장 먼저 켠 것이 꺼짐) · 켠 순서대로 두 색 */
+      var onL = ((off && off.on) || []).filter(function (nm) { return s.areas.some(function (x) { return x.name === nm; }); });
+      var mon = s.unit === 'month';
+      var ser = [{ name: '전체', color: COLORS.rate, pts: s.line, main: true }].concat(onL.map(function (nm, i) {
+        var ar = s.areas.filter(function (x) { return x.name === nm; })[0];
+        return { name: nm, color: SLOT_INK[i % SLOT_INK.length], pts: ar.pts, sub: true };
+      }));
+      return movesHtml(s.moves) + lineSvg(ser, { max: 100, unit: '%', label: mon ? '달별 정답률' : '주별 정답률', month: mon }) +
+        '<p class="an-unit">' + (mon ? '한 달 평균 · 점이 없는 달은 기록이 없어요' : '한 주 평균 · 점이 없는 주는 기록이 없어요') + '</p>' +
+        (s.areas.length > 1 ? '<div class="an-legend" role="group" aria-label="영역 같이 보기 (최대 2개)">' + s.areas.map(function (x) {
+          var i = onL.indexOf(x.name), on = i >= 0;
+          return '<button type="button" class="an-lg' + (on ? ' is-on' : '') + '" data-an-area="' + esc(x.name) + '" aria-pressed="' + on + '"><i' + (on ? ' style="background:' + SLOT_INK[i] + '"' : '') + '></i>' + esc(x.name) + '</button>';
+        }).join('') + '</div><p class="an-unit">영역을 누르면 전체 선과 같이 보여요 · 2개까지</p>' : '') +
+        heatHtml(s);
     }
     if (key === 'wrong' || key === 'text') return lineSvg([{ name: key === 'wrong' ? '오답정리' : '지문 장악', color: COLORS[key], pts: s.pts }], { max: 100, label: '주별 점수' });
     if (key === 'sub') return lineSvg([{ name: '제출률', color: COLORS.sub, pts: s.pts }], { max: 100, unit: '%', label: '주별 제출률' }) +
@@ -417,6 +467,46 @@
     if (key === 'grass') return grassSvg(s) + '<p class="an-grass-lg"><span>적게</span><i class="an-gr--1"></i><i class="an-gr--2"></i><i class="an-gr--3"></i><i class="an-gr--4"></i><span>많이</span></p>';
     if (key === 'total') return lineSvg([{ name: '누적 제출', color: COLORS.total, pts: s.pts.slice(-Math.max(8, a.weeks.length)) }], { unit: '개', label: '누적 제출' });
     return '';
+  }
+  /* 영역 변화 한 줄 두 개 (그래프 위) — 기록이 적으면 없음 */
+  function movesHtml(m) {
+    if (!m) return '';
+    var base = m.base === 'prev' ? '앞 기간보다' : '이 기간 앞쪽보다';
+    return '<ul class="an-moves">' +
+      (m.up ? '<li class="an-mv an-mv--up"><span>가장 오른 영역</span><b>' + esc(m.up.name) + ' <span class="num">+' + m.up.d + '%</span></b></li>' : '') +
+      (m.down ? '<li class="an-mv an-mv--down"><span>요즘 주춤한 영역</span><b>' + esc(m.down.name) + '</b></li>' : '') +
+      '<li class="an-mv__b">' + base + '</li></ul>';
+  }
+  /* 영역 × 월 칸 표 — 정답률이 높을수록 진하게 · 기록 없는 칸은 회색 점선 빈칸 · 누르면 그 달 그 영역 정답률 · 문제 수 */
+  function heatHtml(s) {
+    if (!s.heat || !s.heat.length || !s.months.length) return '';
+    /* 머리 — 달 숫자만(휴대폰 13칸에서도 안 겹침) · 해가 바뀌는 칸은 위에 작은 연도 */
+    var n = s.months.length, multiY = s.months[0].y !== s.months[n - 1].y;
+    var head = '<span class="an-hm__c an-hm__h">월</span>' + s.months.map(function (m, i) {
+      var yr = multiY && (i === 0 || m.lab === '1월');
+      return '<span class="an-hm__c an-hm__h num' + (yr ? ' has-y' : '') + '"' + (yr ? ' data-y="\'' + m.y.slice(2) + '"' : '') + '>' + (+m.w.slice(5, 7)) + '</span>';
+    }).join('');
+    var rows = s.heat.map(function (r) {
+      return '<span class="an-hm__c an-hm__n">' + esc(r.name) + '</span>' + r.cells.map(function (c) {
+        if (c.v == null) return '<span class="an-hm__c an-hm__e" aria-label="' + esc(c.lab + ' ' + r.name + ' 기록 없음') + '"></span>';
+        var al = 0.1 + 0.9 * Math.pow(c.v / 100, 1.6);              /* 높을수록 진하게 — 차이가 잘 보이게 */
+        return '<button type="button" class="an-hm__c an-hm__v num' + (al > 0.58 ? ' is-dk' : '') + '" style="background:rgba(245,200,66,' + al.toFixed(2) + ')" data-an-hm="' +
+          esc(c.m + '|' + r.name + '|' + c.v + '|' + c.q + '|' + (c.est ? 1 : 0) + '|' + c.k) + '" aria-label="' + esc(c.lab + ' ' + r.name + ' ' + c.v + '%') + '">' + c.v + '</button>';
+      }).join('');
+    }).join('');
+    return '<div class="an-hm-w"><p class="an-hm__t">영역 × 월 <span>진할수록 정답률이 높아요 · 칸을 눌러 보세요</span></p>' +
+      '<div class="an-hm" role="group" aria-label="영역별 달별 정답률" style="grid-template-columns:minmax(44px,auto) repeat(' + n + ',minmax(0,1fr))">' + head + rows + '</div>' +
+      '<div class="an-info" data-an-hm-info hidden></div></div>';
+  }
+  function showHeat(c) {
+    var w = c.closest('.an-hm-w'), info = w && w.querySelector('[data-an-hm-info]');
+    if (!info) return;
+    var p = c.getAttribute('data-an-hm').split('|');
+    w.querySelectorAll('.an-hm__v.is-sel').forEach(function (x) { x.classList.remove('is-sel'); });
+    c.classList.add('is-sel');
+    info.hidden = false;
+    info.innerHTML = '<p class="an-info__t"><b>' + esc(p[0].slice(0, 4) + '년 ' + (+p[0].slice(5, 7)) + '월 · ' + p[1]) + '</b> 정답률 <b class="num">' + esc(p[2]) + '%</b> · ' +
+      (p[4] === '1' ? '과제 <b class="num">' + esc(p[5]) + '</b>개' : '문제 <b class="num">' + esc(p[3]) + '</b>개') + '</p>';
   }
   function statsHtml(items) { return '<div class="an-stats">' + items.map(function (x) { return '<div class="an-stat"><b class="num">' + esc(x[0]) + '</b><span>' + esc(x[1]) + '</span></div>'; }).join('') + '</div>'; }
   function recordsHtml(a) {
@@ -468,7 +558,7 @@
     var a = analyze(ctx), el = layer('an-full', 'anFull');
     el.innerHTML = fullHtml(ctx, a);
     show(el);
-    FULL = { el: el, ctx: ctx, a: a, off: {} };
+    FULL = { el: el, ctx: ctx, a: a, off: { on: [] } };
     animate(el.querySelector('.an-full__in'), 'full:' + a.kind);
     drawCharts(el, a, FULL.off);
     if (focus) { var s = el.querySelector('#anSec-' + focus); if (s && s.scrollIntoView) s.scrollIntoView({ block: 'start' }); }
@@ -488,7 +578,9 @@
     var sec = pt.closest('.an-sec'), info = sec && sec.querySelector('[data-an-info]');
     if (!info || !FULL) return;
     var p = pt.getAttribute('data-an-pt').split('|');
-    var label = p[0] === p[1] ? md(p[0]) : md(p[0]) + '~' + md(p[1]) + ' 주';
+    sec.querySelectorAll('.an-pt.is-sel').forEach(function (x) { x.classList.remove('is-sel'); });
+    pt.classList.add('is-sel');
+    var label = p[4] ? p[0].slice(0, 4) + '년 ' + p[4] : p[0] === p[1] ? md(p[0]) : md(p[0]) + '~' + md(p[1]) + ' 주';
     info.hidden = false;
     info.innerHTML = '<p class="an-info__t"><b>' + esc(label) + '</b> · ' + esc(p[2]) + ' <b class="num">' + esc(p[3]) + '</b></p>' +
       (FULL.ctx.openSubs ? '<button type="button" class="an-btn" data-an-subs="' + esc(p[0] + '|' + p[1]) + '">그때 제출물 보기</button><div class="an-subs" data-an-subs-host></div>' : '');
@@ -545,7 +637,15 @@
       var k = t.closest('[data-an-k]');
       if (k) { var st = FULL.ctx.state; if (st) { st.kind = k.getAttribute('data-an-k'); st.picked = true; } if (FULL.ctx.onKind) FULL.ctx.onKind(); repaintFull(); return; }
       var ar = t.closest('[data-an-area]');
-      if (ar) { var nm = ar.getAttribute('data-an-area'); FULL.off[nm] = !FULL.off[nm]; var box = FULL.el.querySelector('[data-an-chart="rate"]'); if (box) box.innerHTML = chartFor(FULL.a, 'rate', FULL.off); return; }
+      if (ar) {
+        /* 켜기 · 끄기 — 최대 2개 · 세 번째를 켜면 가장 먼저 켠 것이 꺼진다 (20261113e) */
+        var nm = ar.getAttribute('data-an-area'), L = FULL.off.on || (FULL.off.on = []), at = L.indexOf(nm);
+        if (at >= 0) L.splice(at, 1); else { L.push(nm); while (L.length > AREA_MAX) L.shift(); }
+        var box = FULL.el.querySelector('[data-an-chart="rate"]'); if (box) { box.classList.remove('an-anim'); box.classList.add('an-static'); box.innerHTML = chartFor(FULL.a, 'rate', FULL.off); }
+        return;
+      }
+      var hm = t.closest('[data-an-hm]');
+      if (hm) { showHeat(hm); return; }
       var sb = t.closest('[data-an-subs]');
       if (sb && FULL.ctx.openSubs) { var q = sb.getAttribute('data-an-subs').split('|'), host = sb.parentNode.querySelector('[data-an-subs-host]'); FULL.ctx.openSubs(q[0], q[1], host); return; }
       var pt = t.closest('[data-an-pt]');

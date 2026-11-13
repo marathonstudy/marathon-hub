@@ -102,6 +102,7 @@
      「정답 정보 없음」으로 보고 셈에서 뺀다 (진짜 0점이 섞인 반은 다른 과제에 0 보다 큰 값이 있어 그대로 셈)
      과제 하나 안에서도 영역별 맞힌 수가 모두 0 인데 정답률이 0 보다 크면 정답률을 쓴다 */
   function partsZero(h) { return Array.isArray(h.parts) && h.parts.length && h.parts.every(function (p) { return !(+p.k > 0); }); }
+  function realZero(h) { return typeof h.correct === 'number' && h.correct === 0 && typeof h.total === 'number' && h.total > 0; }
   function rateOf(h) { return typeof h.correct === 'number' && typeof h.total === 'number' && h.total > 0 ? h.correct * 100 / h.total : h.correctRate != null && isFinite(Number(h.correctRate)) ? Number(h.correctRate) : null; }
   function blankGroups(list) {
     var g = {};
@@ -129,19 +130,24 @@
       if (!valid(d)) return;
       if (Array.isArray(h.parts) && h.parts.length) {
         var rz = partsZero(h) ? rateOf(h) : null;                   /* 영역 맞힌 수가 모두 0 인데 정답률이 있으면 — 영역은 그대로 · 값은 과제 정답률 */
+        /* 맞힌 수가 비어 있던 기록(예전 받기 함수가 null → 0 으로 저장 · 20261113e) — 영역 맞힌 수가 모두 0 이고 정답률도 0 보다 크지 않은데
+           과제 맞힌 수(correct = 0 · total > 0)가 없으면 「기록 없음」(점 안 찍음) · 진짜로 풀고 다 틀린 것(맞힌 수 0 이 따로 옴)만 0 */
+        if (partsZero(h) && !(rz > 0) && !realZero(h)) return;
         h.parts.forEach(function (p) {
-          var a = p && +p.n > 0 ? areaOfName(p.c) : null;
+          var a = p && +p.n > 0 && p.k != null && p.k !== '' && isFinite(+p.k) ? areaOfName(p.c) : null;
           if (a) out.push({ date: d, top: a.top, sub: a.sub, r: Math.max(0, Math.min(100, rz > 0 ? rz : +p.k * 100 / +p.n)), n: +p.n });
         });
         return;
       }
-      var r = null, n = 0;
+      var r = null, n = 0, est = false;
       if (typeof h.correct === 'number' && typeof h.total === 'number' && h.total > 0) { r = h.correct * 100 / h.total; n = h.total; }
-      else if (h.correctRate != null && isFinite(Number(h.correctRate))) { r = Number(h.correctRate); n = Q_UNKNOWN; }
+      else if (typeof h.total === 'number' && h.total <= 0) return;                       /* 문제 수 0 — 안 푼 것 */
+      else if (h.correctRate != null && h.correctRate !== '' && isFinite(Number(h.correctRate)) && Number(h.correctRate) > 0) { r = Number(h.correctRate); n = Q_UNKNOWN; est = true; }
+      /* 정답률 칸만 0 이고 맞힌 수 · 문제 수가 없으면 기록 없음 (정답률 칸을 0 으로 채워 보내는 경로 · 20261113e) */
       if (r == null) return;
       var a = areaOf(h.title);
       if (!a) return;
-      out.push({ date: d, top: a.top, sub: a.sub, r: Math.max(0, Math.min(100, r)), n: n });
+      out.push(est ? { date: d, top: a.top, sub: a.sub, r: Math.max(0, Math.min(100, r)), n: n, est: true } : { date: d, top: a.top, sub: a.sub, r: Math.max(0, Math.min(100, r)), n: n });
     });
     return out.sort(function (x, y) { return x.date < y.date ? -1 : x.date > y.date ? 1 : 0; });
   }
@@ -152,7 +158,17 @@
     data = withOld(data);
     var cats = (data && data.categories) || [], qn = {};
     ((data && data.history) || []).forEach(function (h) { (h && h.submittedAt && h.parts || []).forEach(function (p) { if (p && p.c) qn[p.c] = (qn[p.c] || 0) + (+p.n || 0); }); });
-    var list = cats.filter(function (c) { return c && c.name && (c.count == null || c.count > 0); });
+    /* 20261113e — 앱 영역별 정답률이 0(또는 비어 있음)인 영역은 과제 기록에 그 영역을 실제로 푼 것(맞힌 수가 적힌 것)이 있을 때만 0 으로 둔다
+       (맞힌 수가 비어 0 으로 온 영역이 「0점 D · 성장 포인트」로 나오던 것) */
+    var solved = {};
+    items(data).forEach(function (it) { solved[it.top + '|' + (it.sub || '')] = 1; solved[it.top] = 1; });
+    var list = cats.filter(function (c) {
+      if (!c || !c.name || !(c.count == null || c.count > 0)) return false;
+      if (c.rate == null || c.rate === '' || !isFinite(+c.rate)) return false;
+      if (+c.rate > 0) return true;
+      var a = areaOfName(c.name);
+      return !!(a && (solved[a.top + '|' + (a.sub || '')] || (!a.sub && solved[a.top])));
+    });
     /* 앱 영역별 정답률이 모두 0 이고 과제가 3개 이상이면 정답 정보가 없는 것 (20261113d · 위 blankGroups 와 같은 까닭) */
     if (list.length && list.every(function (c) { return !(+c.rate > 0); }) && list.reduce(function (s, c) { return s + (+c.count || 1); }, 0) >= 3) return [];
     return list.map(function (c) {
@@ -353,7 +369,7 @@
     var names = ORDER.slice();
     c.areas.forEach(function (a) { if (names.indexOf(a.name) < 0) names.push(a.name); });
     var body = !c.areas.length ? '<p class="ab-note">' + (c.items || c.src === 'app' ? '이 기간에는 정답률이 있는 과제가 없어요' : '낸 과제 ' + c.submitted + '개 · 정답 수가 적힌 과제가 쌓이면 영역별 능력치가 보여요') + '</p>'
-      : (c.areas.length >= 5 ? radarHtml(c.areas, names) : '') + barsHtml(c, names);
+      : (c.areas.length >= 3 ? radarHtml(c.areas, names) : '') + barsHtml(c, names);
     return '<section class="ab' + (opt.small ? ' ab--small' : '') + (opt.card === false ? '' : ' gm-card') + '" id="' + (opt.id || 'gmAbility') + '" data-ab-root>' + head +
       '<p class="ab-range num">' + esc(c.range.note) + (c.range.prev ? ' · 앞 기간과 비교' : '') + '</p>' +
       (c.auto ? '<p class="ab-auto">최근 기록이 적어 전체 기간으로 보여 줘요</p>' : '') + body +

@@ -82,7 +82,32 @@ dialog.an-rc::backdrop { background: rgba(12, 8, 36, .5); }
 .an-legend { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .an-lg { appearance: none; display: inline-flex; align-items: center; gap: 5px; min-height: 34px; padding: 0 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,.25); background: transparent; color: rgba(255,255,255,.55); font: inherit; font-size: 12.5px; font-weight: 800; cursor: pointer; }
 .an-lg.is-on { background: rgba(255,255,255,.12); color: #fff; }
-.an-lg i { width: 10px; height: 10px; border-radius: 3px; }
+.an-lg i { width: 10px; height: 10px; border-radius: 3px; background: rgba(255,255,255,.22); }
+/* 20261113e — 정답률: 전체 선 굵게 · 영역 선 가늘게 · 고른 점 · 단위 안내 · 영역 변화 한 줄 · 영역 × 월 칸 표 */
+.an-ln--main { stroke-width: 3.2; }
+.an-ln--sub { stroke-width: 2; opacity: .95; }
+.an-pt.is-sel .an-hit { fill: rgba(255,255,255,.22); stroke: #fff; stroke-width: 1.2; }
+.an-unit { margin: 2px 0 0; font-size: 11.5px; color: rgba(255,255,255,.6); }
+.an-moves { list-style: none; margin: 0 0 4px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.an-mv { display: inline-flex; align-items: baseline; gap: 6px; padding: 6px 10px; border-radius: 10px; background: rgba(255,255,255,.08); font-size: 12.5px; min-width: 0; }
+.an-mv span { color: rgba(255,255,255,.7); font-weight: 700; }
+.an-mv b { font-weight: 900; color: #fff; }
+.an-mv--up b .num { color: #7EE0C3; }
+.an-mv__b { font-size: 11px; color: rgba(255,255,255,.5); }
+.an-hm-w { display: grid; gap: 6px; margin-top: 10px; min-width: 0; }
+.an-hm__t { margin: 0; font-size: 13px; font-weight: 900; }
+.an-hm__t span { font-size: 11px; font-weight: 700; color: rgba(255,255,255,.6); margin-left: 4px; }
+.an-hm { display: grid; gap: 3px; min-width: 0; }
+.an-hm__c { min-width: 0; height: 26px; display: flex; align-items: center; justify-content: center; border-radius: 5px; font-size: 10.5px; font-weight: 800; overflow: hidden; white-space: nowrap; }
+.an-hm__h { height: 18px; font-size: 10.5px; color: rgba(255,255,255,.6); font-weight: 700; position: relative; overflow: visible; }
+.an-hm__h.has-y::before { content: attr(data-y); position: absolute; top: -9px; font-size: 8.5px; color: rgba(255,255,255,.45); }
+.an-hm__n { justify-content: flex-start; padding-right: 4px; font-size: 11.5px; color: rgba(255,255,255,.85); text-overflow: ellipsis; }
+.an-hm__e { border: 1px dashed rgba(255,255,255,.28); background: transparent; }
+.an-hm__v { appearance: none; border: 0; padding: 0; color: #fff; font-family: inherit; cursor: pointer; }
+.an-hm__v.is-dk { color: #2A1F00; }
+.an-hm__v.is-sel { outline: 2px solid #fff; outline-offset: 1px; }
+.an-hm__v:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+@media (max-width: 420px) { .an-hm__c { font-size: 9.5px; height: 24px; } .an-hm { gap: 2px; } }
 .an-dn-row { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
 .an-donut { width: 112px; height: 112px; flex: none; }
 .an-dn-bg { fill: none; stroke: rgba(255,255,255,.14); stroke-width: 14; }
