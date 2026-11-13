@@ -4914,3 +4914,33 @@ button.fa-thumb { appearance: none; padding: 0; cursor: zoom-in; position: relat
 .fa-big__page { background: #fff; box-shadow: 0 8px 30px rgba(0,0,0,.35); overflow: hidden; flex: none; }
 .fa-big__scale { width: 210mm; transform-origin: top left; }
 @media (max-width: 640px) { .fa-big__nav { width: 34px; height: 54px; } }
+
+/* 20261114f — 완주증 인쇄 설정 창 */
+.fa-ps { width: min(620px, 100vw); max-width: 100vw; }
+.fa-ps__b { display: grid; gap: 12px; }
+.fa-ps__quick { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.fa-ps__q { appearance: none; font: inherit; display: grid; gap: 2px; justify-items: start; text-align: left; padding: 12px 14px; border: 2px solid #E2DCF8; border-radius: 14px; background: #fff; cursor: pointer; min-width: 0; }
+.fa-ps__q b { font-size: 16px; color: #2E2266; } .fa-ps__q span { font-size: 13px; font-weight: 800; color: #5A3FD0; } .fa-ps__q small { font-size: 12px; color: #6B6F86; }
+.fa-ps__q.is-on { border-color: #5A3FD0; background: #F3EFFF; }
+.fa-ps__f { border: 0; margin: 0; padding: 0; display: grid; gap: 6px; min-width: 0; }
+.fa-ps__f legend { font-size: 13px; font-weight: 900; color: #2E2266; padding: 0; margin-bottom: 4px; }
+.fa-ps__opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px; }
+.fa-ps__o { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 0 8px; padding: 8px 10px; border: 1px solid #E2DCF8; border-radius: 12px; cursor: pointer; min-width: 0; }
+.fa-ps__o input { grid-row: span 2; } .fa-ps__o b { font-size: 14px; } .fa-ps__o small { font-size: 11.5px; color: #6B6F86; }
+.fa-ps__o.is-on { border-color: #5A3FD0; background: #F3EFFF; }
+.fa-ps__o.is-off { opacity: .45; cursor: not-allowed; background: #F4F4F8; }
+.fa-ps__hint { margin: 2px 0 0; font-size: 12.5px; font-weight: 800; color: #7A5300; }
+.fa-ps__pv { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; }
+.fa-ps__sheet { flex: 1 1 150px; min-width: 0; border: 1px dashed #CFC7F2; border-radius: 10px; padding: 6px 8px; background: #FAF9FF; }
+.fa-ps__st { margin: 0 0 4px; font-size: 12px; font-weight: 900; color: #5A3FD0; }
+.fa-ps__sides { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
+.fa-ps__side { display: grid; gap: 2px; padding: 6px; aspect-ratio: 210 / 297; border: 1px solid #D9D3F5; border-radius: 4px; background: #fff; align-content: start; min-width: 0; }
+.fa-ps__side small { font-size: 10.5px; color: #8A8EA6; font-weight: 800; } .fa-ps__side span { font-size: 11.5px; font-weight: 800; color: #2E2266; overflow-wrap: anywhere; }
+.fa-ps__side.is-blank span { color: #B5B8C8; font-weight: 700; }
+.fa-ps__more { align-self: center; margin: 0; font-size: 12px; color: #6B6F86; }
+.fa-ps__sum { margin: 0; font-size: 14px; } .fa-ps__sum b { font-size: 16px; color: #2E2266; }
+.fa-ps__warn { margin: 0; font-size: 13px; font-weight: 800; color: #B42318; }
+@media (max-width: 520px) { .fa-ps__quick { grid-template-columns: 1fr; } .fa-ps__sheet { flex-basis: 100%; } .fa-ps__sides { max-width: 220px; } }
+dialog.modal.fa-ps { width: min(620px, calc(100vw - 16px)); max-height: calc(100vh - 16px); overflow: auto; margin: auto; }
+.fa-ps__side { max-width: 120px; }
+.fa-ps__sides { justify-content: start; }

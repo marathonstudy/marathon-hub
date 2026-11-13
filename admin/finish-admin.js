@@ -253,16 +253,102 @@
   function views(list) {
     return list.map(function (s) { var v = viewOf(s); if (S.kind === 'year' && !savedOf(s).note_ok) v.note = ''; return v; });
   }
+  /* ---------- 인쇄 설정 창 (20261114f · 공통 Layer) ----------
+     [이 반 전체 인쇄] · [이 학생 인쇄] → 이 창 먼저 · 빠른 선택(🏅 상장처럼 = 1쪽만 · 단면 / 📘 기록까지 전부 = 전체 쪽 · 양면)
+     범위(전체 쪽 · 1쪽만 · 2쪽부터 — 2쪽이 꺼진 반 · 이달판은 막힘) · 방식(양면 · 단면) · 양면이면 쪽 수가 홀수인 학생 뒤에 빈 쪽(한 명만이면 없음)
+     미리보기(처음 3장 · 종이 앞 / 뒤) · 요약 「학생 n명 · 총 n쪽 · 종이 n장」 · 「프린터 설정도 ○면으로」 · 고른 범위 · 방식은 이 기기에 기억 */
+  var PS = null, PS_KEY = 'mh.fin.print';
+  function psLoad() { try { var o = JSON.parse(localStorage.getItem(PS_KEY) || '{}'); return { range: /^(all|p1|p2)$/.test(o.range) ? o.range : 'all', mode: o.mode === 'simplex' ? 'simplex' : 'duplex' }; } catch (e) { return { range: 'all', mode: 'duplex' }; } }
+  function psSave() { try { localStorage.setItem(PS_KEY, JSON.stringify({ range: PS.range, mode: PS.mode })); } catch (e) { /* 기억 못 해도 이번엔 그대로 */ } }
+  /* 학생마다 실제 쪽(넘침 맞춘 뒤 — 2쪽이 넘치면 3쪽) — 화면 밖에 A4 크기로 그려 잰다 */
+  function studPages(list) {
+    var tmp = document.createElement('div');
+    tmp.style.cssText = 'position:fixed;left:-10000px;top:0;width:210mm;visibility:hidden';
+    document.body.appendChild(tmp);
+    var out = views(list).map(function (v) {
+      tmp.innerHTML = Finish.pagesHtml(v, { base: abs('../assets/chars/'), p2: S.kind === 'year' ? p2On() : false }).join('');
+      try { if (Finish.fit) Finish.fit(tmp); } catch (e) { /* 그대로 */ }
+      return { name: v.name, pages: Array.prototype.map.call(tmp.querySelectorAll('.fc-page'), function (p) { return p.outerHTML; }) };
+    });
+    tmp.parentNode.removeChild(tmp);
+    return out;
+  }
   function printList(list) {
+    list = (list || []).filter(Boolean);
     if (!list.length) return;
+    var o = psLoad();
+    PS = { list: list, single: list.length === 1, studs: studPages(list), range: o.range, mode: o.mode, hint: '' };
+    if (!canP2() && PS.range === 'p2') PS.range = 'all';
+    /* 가운데 뜨는 보통 창 — 띄우기 · 닫기 · Esc · 맨 앞은 공통 Layer.show (Layer.make 는 화면 전체 모양이라 쓰지 않음) */
+    var old = document.getElementById('faPrint'); if (old && old.parentNode) old.parentNode.removeChild(old);
+    var el = document.createElement('dialog'); el.className = 'modal fa-ps'; el.id = 'faPrint'; el.setAttribute('aria-label', '인쇄 설정');
+    PS.el = el;
+    paintPs();
+    Layer.show(el, { onClose: function () { PS = null; } });
+  }
+  function canP2() { return PS && PS.studs.some(function (x) { return x.pages.length > 1; }); }
+  function psPlan() { return Finish.plan(PS.studs, { range: PS.range, mode: PS.mode, single: PS.single }); }
+  function pageLabel(p) { return p ? (p.blank ? '빈 쪽' : p.name + ' ' + p.no + '쪽') : ''; }
+  function paintPs() {
+    if (!PS) return;
+    var pl = psPlan(), duplex = PS.mode === 'duplex', p2ok = canP2();
+    var quick = [['p1', 'simplex', '🏅 상장처럼', '1쪽만 · 단면', '두꺼운 상장 용지에 좋아요'], ['all', 'duplex', '📘 기록까지 전부', '전체 쪽 · 양면', '레이스 기록까지 한 묶음']];
+    var ranges = [['all', '전체 쪽', ''], ['p1', '1쪽만 (완주증)', ''], ['p2', '2쪽부터 (레이스 기록)', p2ok ? '' : '2쪽이 꺼져 있어요']];
+    var modes = [['duplex', '양면', '종이를 아껴요 · 학생마다 새 종이에서 시작'], ['simplex', '단면', '양면이 안 되는 프린터 · 두꺼운 종이 · 액자용']];
+    /* 미리보기 — 처음 3장 */
+    var sheets = [], i = 0;
+    while (i < pl.pages.length && sheets.length < 3) { sheets.push({ front: pl.pages[i], back: duplex ? pl.pages[i + 1] : null }); i += duplex ? 2 : 1; }
+    PS.el.innerHTML = '<div class="modal__head"><h2 class="modal__title">🖨️ 인쇄 설정</h2><p class="modal__desc">' + (PS.single ? esc(PS.studs[0].name) + ' 한 명' : esc(S.cls) + ' ' + PS.studs.length + '명') + ' · ' + (S.kind === 'year' ? '1년 완주증' : esc(S.month) + ' 완주증') + '</p></div>' +
+      '<div class="modal__body fa-ps__b">' +
+        '<div class="fa-ps__quick">' + quick.map(function (q) {
+          var on = PS.range === q[0] && PS.mode === q[1], dis = q[0] === 'all' && !p2ok && q[1] === 'duplex' && false;
+          return '<button type="button" class="fa-ps__q' + (on ? ' is-on' : '') + '" data-ps-quick="' + q[0] + '|' + q[1] + '"' + (dis ? ' disabled' : '') + '><b>' + q[2] + '</b><span>' + q[3] + '</span><small>' + q[4] + '</small></button>';
+        }).join('') + '</div>' +
+        '<fieldset class="fa-ps__f"><legend>인쇄 범위</legend><div class="fa-ps__opts">' + ranges.map(function (r) {
+          var dis = r[0] === 'p2' && !p2ok;
+          return '<label class="fa-ps__o' + (PS.range === r[0] ? ' is-on' : '') + (dis ? ' is-off' : '') + '"><input type="radio" name="psRange" value="' + r[0] + '"' + (PS.range === r[0] ? ' checked' : '') + (dis ? ' disabled' : '') + '><b>' + r[1] + '</b>' + (r[2] ? '<small>' + r[2] + '</small>' : '') + '</label>';
+        }).join('') + '</div></fieldset>' +
+        '<fieldset class="fa-ps__f"><legend>인쇄 방식</legend><div class="fa-ps__opts">' + modes.map(function (m) {
+          return '<label class="fa-ps__o' + (PS.mode === m[0] ? ' is-on' : '') + '"><input type="radio" name="psMode" value="' + m[0] + '"' + (PS.mode === m[0] ? ' checked' : '') + '><b>' + m[1] + '</b><small>' + m[2] + '</small></label>';
+        }).join('') + '</div>' + (PS.hint ? '<p class="fa-ps__hint" role="status">' + esc(PS.hint) + '</p>' : '') + '</fieldset>' +
+        '<div class="fa-ps__pv" aria-label="미리보기 처음 3장">' + sheets.map(function (sh, k) {
+          return '<div class="fa-ps__sheet"><p class="fa-ps__st">종이 ' + (k + 1) + '</p><div class="fa-ps__sides">' +
+            '<div class="fa-ps__side' + (sh.front && sh.front.blank ? ' is-blank' : '') + '"><small>앞</small><span>' + esc(pageLabel(sh.front)) + '</span></div>' +
+            (duplex ? '<div class="fa-ps__side' + (!sh.back || sh.back.blank ? ' is-blank' : '') + '"><small>뒤</small><span>' + esc(sh.back ? pageLabel(sh.back) : '빈 쪽') + '</span></div>' : '') +
+          '</div></div>';
+        }).join('') + (pl.sheets > 3 ? '<p class="fa-ps__more">… 종이 ' + (pl.sheets - 3) + '장 더</p>' : '') + '</div>' +
+        '<p class="fa-ps__sum" data-ps-sum>학생 <b>' + pl.students + '</b>명 · 총 <b>' + pl.count + '</b>쪽 · 종이 <b>' + pl.sheets + '</b>장</p>' +
+        '<p class="fa-ps__warn">⚠️ 프린터 설정도 <b>' + (duplex ? '양면' : '단면') + '</b>으로 맞춰 주세요' + (duplex ? ' (긴 쪽으로 넘기기)' : '') + '</p>' +
+      '</div>' +
+      '<div class="modal__foot"><div class="spacer"></div><button type="button" class="btn" data-ps-x>취소</button><button type="button" class="btn btn--primary" data-ps-go' + (pl.count ? '' : ' disabled') + '>인쇄하기</button></div>';
+  }
+  function psGo() {
+    var pl = psPlan();
+    if (!pl.count) return;
+    psSave();
     var w = window.open('', '_blank');
     if (!w) { toast('팝업이 막혀 있어요 — 이 사이트의 팝업을 허용해 주세요', 'bad'); return; }
     w.document.open();
-    w.document.write(Finish.printDoc(views(list), { base: abs('../assets/chars/'), css: abs('../assets/finish.css'), p2: p2On(), title: (S.kind === 'year' ? '완주증' : S.month + ' 완주증') + ' · ' + S.cls }));
+    w.document.write(Finish.printPlanDoc(pl, { css: abs('../assets/finish.css'), title: (S.kind === 'year' ? '완주증' : S.month + ' 완주증') + ' · ' + (PS.single ? PS.studs[0].name : S.cls) }));
     w.document.close();
     var go = function () { try { w.focus(); w.print(); } catch (e) { /* 사람이 Ctrl+P */ } };
     if (w.document.readyState === 'complete') setTimeout(go, 500); else w.addEventListener('load', function () { setTimeout(go, 300); });
+    Layer.hide(PS.el); PS = null;
   }
+  document.addEventListener('click', function (e) {
+    if (!PS || !e.target.closest || !PS.el.contains(e.target)) return;
+    var t = e.target;
+    if (t.closest('[data-ps-x]')) { Layer.hide(PS.el); PS = null; return; }
+    if (t.closest('[data-ps-go]')) { psGo(); return; }
+    var q = t.closest('[data-ps-quick]');
+    if (q && !q.disabled) { var v = q.getAttribute('data-ps-quick').split('|'); PS.range = v[0] === 'p2' && !canP2() ? 'all' : v[0]; PS.mode = v[1]; PS.hint = ''; paintPs(); }
+  });
+  document.addEventListener('change', function (e) {
+    if (!PS || !e.target || !PS.el.contains(e.target)) return;
+    var t = e.target;
+    if (t.name === 'psRange') { PS.range = t.value; PS.hint = ''; if (t.value === 'p1' && PS.mode === 'duplex') { PS.mode = 'simplex'; PS.hint = '1쪽만은 단면이 좋아요 · 양면으로 바꿀 수도 있어요'; } paintPs(); }
+    if (t.name === 'psMode') { PS.mode = t.value; PS.hint = ''; paintPs(); }
+  });
   function publish(s) {
     var v = viewOf(s);
     if (!savedOf(s).note_ok) { toast('한마디를 확정해야 공개할 수 있어요', 'bad'); return; }
@@ -318,5 +404,5 @@
       if (S.cls) load(); else paint();
     }, function (e) { S.err = String((e && e.message) || e); paint(); });
   }
-  window.FinishAdmin = { open: open, state: function () { return S; }, _views: views };
+  window.FinishAdmin = { open: open, state: function () { return S; }, _views: views, _ps: function () { return PS; } };
 })();

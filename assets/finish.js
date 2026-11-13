@@ -291,6 +291,31 @@
     });
     return moved;
   }
+  /* 인쇄 배치 (20261114f) — studs = [{ name, pages: [쪽 html …] }](넘침 맞춘 뒤) · o = { range: all | p1 | p2, mode: duplex | simplex, single }
+     range p1 = 1쪽만 · p2 = 2쪽부터 · 양면이면 고른 쪽 수가 홀수인 학생 뒤에 빈 쪽 → 다음 학생이 늘 새 종이 앞면(맨 끝 학생 · 한 명만 인쇄면 넣지 않음)
+     → { pages: [{ stu, name, no, html } | { blank, stu, name }], count, sheets, students } */
+  function plan(studs, o) {
+    o = o || {};
+    var range = o.range === 'p1' || o.range === 'p2' ? o.range : 'all', duplex = o.mode !== 'simplex', out = [], who = 0;
+    var parts = (studs || []).map(function (st) { var pg = st.pages || []; return range === 'p1' ? pg.slice(0, 1) : range === 'p2' ? pg.slice(1) : pg.slice(); });
+    parts.forEach(function (pg, i) {
+      if (!pg.length) return;
+      who++;
+      pg.forEach(function (h, j) { out.push({ stu: i, name: studs[i].name, no: (range === 'p2' ? j + 2 : j + 1), html: h }); });
+      var later = parts.slice(i + 1).some(function (x) { return x.length; });
+      if (duplex && !o.single && later && pg.length % 2 === 1) out.push({ blank: true, stu: i, name: studs[i].name });
+    });
+    return { pages: out, count: out.length, sheets: duplex ? Math.ceil(out.length / 2) : out.length, students: who, duplex: duplex, range: range };
+  }
+  /* 배치대로 인쇄 문서 — 빈 쪽은 완전 흰 종이(테두리 없음) */
+  function printPlanDoc(pl, opt) {
+    opt = opt || {};
+    var css = opt.css || '../assets/finish.css';
+    return '<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>' + esc(opt.title || '완주증') + '</title>' +
+      '<link rel="stylesheet" href="' + esc(css) + '"><style>@page { size: A4 portrait; margin: 0; } html, body { margin: 0; }</style></head><body class="fc-print">' +
+      pl.pages.map(function (p) { return p.blank ? '<article class="fc-page fc-blank" aria-label="빈 쪽"></article>' : p.html; }).join('') +
+      '<script>window.__fcFitDone = true;</scr' + 'ipt></body></html>';
+  }
   /* 새 창 인쇄 문서 — css 는 링크로 · 그림이 다 뜬 뒤 넘침 맞춤 → 인쇄 · opt.p2 */
   function printDoc(views, opt) {
     opt = opt || {};
@@ -302,5 +327,5 @@
       'window.addEventListener("load", function () { window.__fcFitN = window.__fcFit(); window.__fcFitDone = true; });</scr' + 'ipt></body></html>';
   }
 
-  global.Finish = { compute: compute, view: view, pageHtml: pageHtml, pagesHtml: pagesHtml, printDoc: printDoc, flowSvg: flowSvg, fit: fit, overOf: overOf, RULE: RULE, P1: P1 };
+  global.Finish = { compute: compute, view: view, pageHtml: pageHtml, pagesHtml: pagesHtml, printDoc: printDoc, plan: plan, printPlanDoc: printPlanDoc, flowSvg: flowSvg, fit: fit, overOf: overOf, RULE: RULE, P1: P1 };
 })(window);
