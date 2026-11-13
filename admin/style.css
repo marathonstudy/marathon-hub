@@ -4944,3 +4944,6 @@ button.fa-thumb { appearance: none; padding: 0; cursor: zoom-in; position: relat
 dialog.modal.fa-ps { width: min(620px, calc(100vw - 16px)); max-height: calc(100vh - 16px); overflow: auto; margin: auto; }
 .fa-ps__side { max-width: 120px; }
 .fa-ps__sides { justify-content: start; }
+
+/* 20261114g — 온라인 반 학생 카드 안내 한 줄 */
+.sc-online { margin: 10px 0 4px; padding: 8px 12px; border-radius: 10px; background: #F3EFFF; font-size: 13px; font-weight: 800; color: #4A3BA8; }

@@ -889,6 +889,7 @@
        공개된 레포트 · 낸 복습 점수 · 확정된 요약 · 앱 기록 · 학생이 올린 필기만. 상담 · 성적 · 금액 · 다른 학생 정보는 넣지 않는다.
        주 시작일(10/12 같은 날짜)은 화면에 쓰지 않는다 — 수업일로 (레포트에 없으면 반 일정의 수업일).
      ============================================================ */
+  var MODE = { online: false, classes: [] };   /* 반 종류 (20261114g) */
   var HUBD = null;        /* hub_get 이 준 것 (낸 복습 점수 · 공지 — 030 부터 확인 단계 없이 낸 점수 그대로) */
   var RVW = {};           /* 주(월요일) → hub_review_week (낸 것 · 맞은 수 / 전체 · 미응시 사유 이름) */
 
@@ -1367,6 +1368,14 @@
       }
 
       var st = d.student || {};
+      /* 온라인 반만 듣는 학생 (20261114g · migration-112 hub_class_mode) — 모의고사 탭 숨김 · 레포트 탭은 주간 레포트가 있을 때만 · D-day · 수업 일정 숨김
+         현강과 온라인을 둘 다 들으면 현강 기준(모든 탭) · 112 전이거나 못 읽으면 예전 그대로 */
+      MODE = { online: false, classes: [] };
+      rpc('hub_class_mode', { p_code: h.code }).then(function (m) {
+        if (!m || !m.ok) return;
+        MODE = { online: !!m.online, classes: m.classes || [] };
+        if (MODE.online) applyOnline();
+      }, function () {});
       $('#hubName').textContent = (st.name || '') + ' 학생의 러닝노트';
       $('#hubMeta').textContent = [st.class_name, st.school, st.grade].filter(Boolean).join(' · ');
       renderDday(d.exam, (st.name || '') + ' 학생');
@@ -1502,6 +1511,18 @@
         }
       }
 
+      /* 온라인 반만 — 탭 · 머리 정리 (20261114g) */
+      function applyOnline() {
+        var tm = $('#tabMogo'); if (tm) tm.hidden = true;
+        var tr = $('#tabReport'); if (tr) tr.hidden = !(d.reports || []).length;
+        var dd = $('#hubDday'); if (dd) dd.hidden = true;
+        var line = MODE.classes.map(function (c) { return c.line; }).filter(Boolean)[0];
+        if (line) $('#hubMeta').textContent = [line, st.school, st.grade].filter(Boolean).join(' · ');
+        layoutTabs();
+        var cur = tabs.querySelector('.hub-tab[aria-selected="true"]');
+        if ((!cur || cur.hidden) && $('#tabHome') && !$('#tabHome').hidden) { select('home'); try { navPush('home'); } catch (e) { /* 그대로 */ } }
+        if (global.HubHome && HubHome.refresh) HubHome.refresh();
+      }
       /* 탭 수에 맞춰 칸을 나눈다 (교재비 탭은 청구서가 있을 때만) */
       function layoutTabs() {
         var n = Array.prototype.filter.call(tabs.querySelectorAll('.hub-tab'), function (b) { return !b.hidden; }).length;
@@ -1544,6 +1565,7 @@
           mogo: function () { return MOGO && !MOGO.failed ? MOGO : null; },
           latestVideo: function () { var x = videoWeeks()[0]; return x ? { label: weekName(x.w.week_start) } : null; },
           badges: rpc('hub_badges', { p_code: h.code }).catch(function () { return null; }),
+          mode: function () { return MODE; },                                       /* 온라인 반만인지 · 반 이름 줄 (20261114g) */
           /* 학습 분석 — 오답정리 · 지문 장악 점수 숫자만 (migration-101 · 없으면 그 칸 없음 · 20261110l) */
           scoresP: rpc('hub_scores', { p_code: h.code }).catch(function () { return null; }),
           go: function (v) {

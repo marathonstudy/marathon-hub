@@ -426,8 +426,8 @@
       m.innerHTML = '<div class="cs-sheet">' + headHtml(sid) + '<div class="cs-scroll" id="csScroll">' +
         (SC && window.Faces ? Faces.cardHtml(sid) : '') +
         (SC ? SC.infoHtml(sid) + SC.hwHtml(sid, hwOfFn(sid)) + (SC.abilityHtml ? SC.abilityHtml(sid) : '') + (mOff ? '' : SC.mogoHtml(sid)) : '') +
-        '<section class="sc-sec sc-consult is-off" id="scConsult" aria-label="상담"><h3 class="sc-t">상담</h3>' +
-        '<p class="sc-hint">‘' + esc(s.className || s.class_name || '') + '’ 은 온라인 반이라 상담이 꺼져 있어요 · 반 관리 → [반 종류]에서 켤 수 있어요</p></section></div></div>';
+        /* 20261114g — 상담 · 모의고사 칸 대신 짧은 안내 한 줄 */
+        '<p class="sc-online" id="scConsult">🌐 온라인 반 학생 · ' + (mOff ? '상담 · 모의고사' : '상담') + ' 꺼짐 <span class="muted-note">(반 관리 → 반 종류에서 켤 수 있어요)</span></p></div></div>';
       m.setAttribute('aria-label', (s.name || '') + ' 학생 카드');
       return;
     }

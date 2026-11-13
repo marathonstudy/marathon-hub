@@ -40,8 +40,23 @@
   }
 
   /* ---------- 불러오기 ---------- */
+  /* 반 이름 줄 (migration-112 class_lines) — { 반: { kind, line } } · 112 전이면 반 이름만 */
+  var LINES = {};
+  function loadLines() { return Promise.resolve(sb().rpc('class_lines')).then(function (r) { LINES = (r && !r.error && r.data) || {}; }, function () { LINES = {}; }); }
+  function lineOf(cls) { return (LINES[cls] && LINES[cls].line) || cls; }
+  function onlineCls(cls) { return !!(LINES[cls] && LINES[cls].kind === 'online'); }
+  /* 온라인 반 1년판 — 앱 학생 id 로 이어 붙인 기록의 첫 달 1일 ~ 마지막 달 말일(오늘을 넘지 않음) */
+  function spanOf(data, old) {
+    var ds = [];
+    ((data && data.history) || []).concat((old && old.history) || []).forEach(function (h) { var d = String(h && h.submittedAt || '').slice(0, 10); if (/^\d{4}-\d{2}-\d{2}$/.test(d)) ds.push(d); });
+    if (!ds.length) return null;
+    ds.sort();
+    var f = ds[0].slice(0, 8) + '01', l = monthEnd(ds[ds.length - 1].slice(0, 7));
+    return { from: f, to: l > today() ? today() : l };
+  }
   function loadClasses() {
     var c = sb();
+    loadLines();
     return Promise.resolve(c.from('classes').select('name,first_lesson,end_on,archived,kind')).then(function (r) {
       if (r.error) return Promise.resolve(c.from('classes').select('name,first_lesson,end_on,archived')).then(function (r2) { return r2.data || []; });
       return r.data || [];
@@ -103,7 +118,8 @@
       s._saved = null;
       var data = Object.assign({}, s.data || {});
       if (s.old && typeof s.old === 'object') data.old = s.old;
-      s.cert = Finish.compute(data, { kind: S.kind, from: from, to: to, today: today(), badges: s.badges, game: s.game || {}, name: s.name, cls: S.cls });
+      var sp = S.kind === 'year' && onlineCls(S.cls) ? spanOf(s.data, s.old) : null;
+      s.cert = Finish.compute(data, { kind: S.kind, from: sp ? sp.from : from, to: sp ? sp.to : to, today: today(), badges: s.badges, game: s.game || {}, name: s.name, cls: lineOf(S.cls) });
     });
   }
   function savedOf(s) { return s._saved || (s._saved = Object.assign({ title_key: '', hl_keys: [], note: '', note_ok: false, published: false }, s.dbCert || {})); }
@@ -121,7 +137,7 @@
         : '<label class="fa-f"><span>달</span><input class="input" type="month" id="faMonth" value="' + esc(S.month) + '"></label>') +
       (S.kind === 'year' && S.cls ? '<label class="fa-p2"><input type="checkbox" data-fa-p2' + (p2On() ? ' checked' : '') + '> 2쪽 「나의 1년 레이스 기록」</label>' : '') +
       (S.rows.length ? '<button type="button" class="btn btn--primary" data-fa-printall>이 반 전체 인쇄</button>' : '') +
-      '</div>' + (S.kind === 'year' ? '<p class="field__hint">종강일 · 개강일은 반 관리 → 수업 설정에서 반마다 바꿀 수 있어요. 여기서 바꾸면 이 화면에만 써요.</p>' : '');
+      '</div>' + (S.kind === 'year' ? '<p class="field__hint">' + (onlineCls(S.cls) ? '온라인 반은 학생마다 앱 기록의 첫 달 ~ 마지막 달로 만들어요(여러 앱 반 기록을 이어 붙임).' : '종강일 · 개강일은 반 관리 → 수업 설정에서 반마다 바꿀 수 있어요. 여기서 바꾸면 이 화면에만 써요.') + '</p>' : '');
   }
   function cardHtml(s) {
     var sv = savedOf(s), v = viewOf(s), op = oldProgress(s), year = S.kind === 'year', open = !!S.open[s.id];

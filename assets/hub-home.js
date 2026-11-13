@@ -63,7 +63,7 @@
   function profileHtml() {
     var c = H.ctx, st = c.student || {}, g = H.g, lv = g ? g.level : G().levelOf(0), p = G().clean(H.prof, lv.i);
     /* D-day — 「D-day 문자」 목록(hub_dday)이 있으면 그것 · 그 학생에게 남은 D-day 가 없으면 숨김 · 094 전이면 예전 시험 */
-    var dd = H.dd ? H.dd : H.dd === false ? null : (c.dday ? c.dday() : null);
+    var dd = isOnline() ? null : H.dd ? H.dd : H.dd === false ? null : (c.dday ? c.dday() : null);       /* 온라인 반만이면 D-day 없음 (20261114g) */
     var ava = G().avatarHtml(p, { size: 104, label: (isParent() ? (st.name || '') + ' 학생의 캐릭터 ' : '내 캐릭터 ') + G().charOf(p.char).name });
     var nx = G().LEVELS[lv.i + 1];
     /* 홈의 주인공 — 맨 위 작게 RUN 로고 · 학생용/학부모용 (큰 보라 머리는 홈에서 숨김) */
@@ -141,6 +141,8 @@
     if (!H.badges) return '';
     return '<section class="gm-card gm-bdg" id="gmBadge" aria-label="내 배지"><div id="gmBadgeBox"></div></section>';
   }
+  /* 온라인 반만 듣는 학생 (hub.js ctx.mode · migration-112) */
+  function isOnline() { var m = H && H.ctx && H.ctx.mode ? H.ctx.mode() : null; return !!(m && m.online); }
   function paintFinish() { if (global.FinishHub && H) FinishHub.mount(document.getElementById('gmFinNew'), document.getElementById('gmFinRow'), H); }
   function paintBadge() {
     var box = document.getElementById('gmBadgeBox');
@@ -193,7 +195,8 @@
        「📊 내 학습 분석」 — 능력치 바로 아래 (20261110l) */
     /* 20261113g — 프로필 → 🏅 내 배지(접힌 모양) → 이번 주 퀘스트 → 📊 학습 분석 → ⚔️ 능력치 → 새 레포트 → 모의고사 → 수업 영상 */
     /* 🏁 완주증 (20261114b · finish-hub.js) — 새 이달의 완주증 카드는 내 배지 바로 아래 · 「완주증 모음」 한 줄은 능력치 아래 */
-    H.host.innerHTML = '<div class="gm-home">' + profileHtml() + badgeHtml() + '<div id="gmFinNew"></div>' + questHtml() + '<div id="gmAnaHost"></div><div id="gmAbilityHost"></div><div id="gmFinRow"></div>' + reportCardHtml() + mogoHtml() + videoHtml() + '</div>';
+    if (isOnline()) H.host.innerHTML = '<div class="gm-home gm-home--online">' + profileHtml() + badgeHtml() + questHtml() + '<div id="gmFinNew"></div><div id="gmFinRow"></div><div id="gmAnaHost"></div><div id="gmAbilityHost"></div>' + videoHtml() + '</div>';
+    else H.host.innerHTML = '<div class="gm-home">' + profileHtml() + badgeHtml() + '<div id="gmFinNew"></div>' + questHtml() + '<div id="gmAnaHost"></div><div id="gmAbilityHost"></div><div id="gmFinRow"></div>' + reportCardHtml() + mogoHtml() + videoHtml() + '</div>';
     paintBadge();
     paintFinish();
     paintAbility();

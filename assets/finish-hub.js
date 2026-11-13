@@ -29,7 +29,8 @@
     (sv.month || []).forEach(function (x) { if (x && x.pkey) saveM[x.pkey] = x; });
     var game = (global.Game && H.prof) ? Game.clean(H.prof, H.g ? H.g.level.i : 0) : {};
     Object.keys(months).filter(function (m) { return m < thisM; }).sort().reverse().slice(0, 12).forEach(function (m) {
-      var cert = Finish.compute(data, { kind: 'month', from: m + '-01', to: monthEnd(m), today: today, badges: H.badges, game: game, name: st.name || '', cls: st.class_name || st.class || '' });
+      var md = c.mode ? c.mode() : null, line = md && md.classes && md.classes[0] ? md.classes[0].line : '';          /* 「목동반 · 토 18:30」 · 「온라인 · 고2 11월 마라톤」 (20261114g) */
+      var cert = Finish.compute(data, { kind: 'month', from: m + '-01', to: monthEnd(m), today: today, badges: H.badges, game: game, name: st.name || '', cls: line || st.class_name || st.class || '' });
       var s = saveM[m] || {};
       var v = Finish.view(cert, { title_key: s.title || '', hl_keys: Array.isArray(s.hls) ? s.hls : [], note: s.note || '', note_ok: !!s.note });
       out.push({ key: 'm:' + m, label: (+m.slice(5, 7)) + '월 완주증', sort: m + '-99', v: v });
@@ -49,7 +50,8 @@
   function mount(newHost, rowHost, H) {
     if (!global.Finish || !H || H.loading || H.data === undefined) return;
     F.H = H;
-    var key = H.ctx.code + '|' + (H.data ? 1 : 0) + '|' + (H.badges ? 1 : 0) + '|' + (H.prof && H.prof.char || '');
+    var md0 = H.ctx.mode ? H.ctx.mode() : null;
+    var key = H.ctx.code + '|' + (H.data ? 1 : 0) + '|' + (H.badges ? 1 : 0) + '|' + (H.prof && H.prof.char || '') + '|' + (md0 && md0.classes && md0.classes[0] ? md0.classes[0].line : '');
     if (F.saved === null && !F.loading && H.ctx.rpc) {
       F.loading = true;
       Promise.resolve(H.ctx.rpc('hub_finish', { p_code: H.ctx.code })).then(function (r) { F.saved = r && r.ok ? r : { year: [], month: [] }; }, function () { F.saved = { year: [], month: [] }; })
