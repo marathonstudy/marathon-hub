@@ -75,16 +75,25 @@
     }, function (e) { S.busy = false; S.err = String((e && e.message) || e); paint(); });
   }
   /* 옛 기록 받는 중 — 1월 ~ 이번 달 중 받은 달(옛 기록 달 + 지금 기록이 있는 달) */
+  function covered(s) {
+    var t = today(), y = (S.kind === 'year' ? S.from : S.month + '-01').slice(0, 4), months = [], got = {};
+    for (var m = 1; m <= +t.slice(5, 7) && y === t.slice(0, 4); m++) months.push(y + '-' + String(m).padStart(2, '0'));
+    (s.old_parts || []).forEach(function (m2) { got[m2] = 1; });
+    ((s.old && s.old.history) || []).concat((s.data && s.data.history) || []).forEach(function (h) { var k = String(h && h.submittedAt || '').slice(0, 7); if (k) got[k] = 1; });
+    return { n: months.filter(function (m2) { return got[m2]; }).length, total: months.length };
+  }
+  function dataFirst(s) { var f = ''; ((s.data && s.data.history) || []).forEach(function (h) { var d = String(h && h.submittedAt || '').slice(0, 10); if (d && (!f || d < f)) f = d; }); return f; }
   function oldProgress(s) {
-    if (!s.linked || s.old_at) return null;
+    if (!s.linked) return null;
+    var cut = s.old && s.old.cut ? String(s.old.cut) : '', df = dataFirst(s);
+    /* 20261114c — 예전에는 수강 시작일 전까지만 받아 1월 개강 학생은 「다 받음」으로 끝났다 → 받은 끝(cut)이 지금 기록 시작보다 앞이면 아직 받는 중 */
+    var stale = s.old_at && df && (!cut || cut.slice(0, 7) < df.slice(0, 7));
+    if (s.old_at && !stale) return null;
     var t = today(), y = (S.kind === 'year' ? S.from : S.month + '-01').slice(0, 4), months = [];
     for (var m = 1; m <= +t.slice(5, 7) && y === t.slice(0, 4); m++) months.push(y + '-' + String(m).padStart(2, '0'));
     if (!months.length) return null;
-    var got = {};
-    (s.old_parts || []).forEach(function (m2) { got[m2] = 1; });
-    ((s.data && s.data.history) || []).forEach(function (h) { var k = String(h && h.submittedAt || '').slice(0, 7); if (k) got[k] = 1; });
-    var n = months.filter(function (m2) { return got[m2]; }).length;
-    return n >= months.length ? null : { n: n, total: months.length };      /* 모든 달이 있으면 받는 중 표시 없음 */
+    var c = covered(s);
+    return c.n >= c.total ? null : c;                                      /* 모든 달이 있으면 받는 중 표시 없음 */
   }
   function build() {
     var from = S.kind === 'year' ? S.from : S.month + '-01', to = S.kind === 'year' ? S.to : monthEnd(S.month);
@@ -110,6 +119,7 @@
       (S.kind === 'year'
         ? '<label class="fa-f"><span>개강일</span><input class="input" type="date" id="faFrom" value="' + esc(S.from) + '"></label><label class="fa-f"><span>종강일</span><input class="input" type="date" id="faTo" value="' + esc(S.to) + '"></label>'
         : '<label class="fa-f"><span>달</span><input class="input" type="month" id="faMonth" value="' + esc(S.month) + '"></label>') +
+      (S.kind === 'year' && S.cls ? '<label class="fa-p2"><input type="checkbox" data-fa-p2' + (p2On() ? ' checked' : '') + '> 2쪽 「나의 1년 레이스 기록」</label>' : '') +
       (S.rows.length ? '<button type="button" class="btn btn--primary" data-fa-printall>이 반 전체 인쇄</button>' : '') +
       '</div>' + (S.kind === 'year' ? '<p class="field__hint">종강일 · 개강일은 반 관리 → 수업 설정에서 반마다 바꿀 수 있어요. 여기서 바꾸면 이 화면에만 써요.</p>' : '');
   }
@@ -118,18 +128,18 @@
     var flags = (s.cert.low ? '<span class="fa-flag">기록 적음</span>' : '') + (op ? '<span class="fa-flag">기록 받는 중 ' + op.n + '/' + op.total + '달</span>' : '') +
       (year && !sv.note_ok ? '<span class="fa-flag fa-flag--red">한마디 확인 필요</span>' : '') + (sv.published ? '<span class="fa-flag fa-flag--ok">러닝노트 공개</span>' : '');
     var titles = '<select class="input fa-title" data-fa-title="' + s.id + '">' + s.cert.titles.map(function (t) { return '<option value="' + esc(t.key) + '"' + (v.title === t.text ? ' selected' : '') + '>' + esc(t.text) + '</option>'; }).join('') + '</select>';
-    var chosen = v.hls;
+    var chosen = v.hls.map(function (x) { return x.key; });
     var hls = s.cert.hls.length ? '<div class="fa-hls">' + s.cert.hls.map(function (h) {
-      var on = chosen.indexOf(h.text) >= 0;
+      var on = chosen.indexOf(h.key) >= 0;
       return '<label class="fa-hl' + (on ? ' is-on' : '') + '"><input type="checkbox" data-fa-hl="' + s.id + '" value="' + esc(h.key) + '"' + (on ? ' checked' : '') + '> ' + esc(h.text) + '</label>';
-    }).join('') + '</div><p class="field__hint">3개까지 · 모두 끄면 하이라이트 없이 「함께 달렸어요」 한 줄</p>' : '<p class="field__hint">기준에 맞는 하이라이트가 없어요 — 「함께 달렸어요」 한 줄로 나가요</p>';
+    }).join('') + '</div><p class="field__hint">원하는 만큼 고르세요 · 1쪽에는 앞의 6개(1~3개 큰 카드 · 4~6개 두 칸) · 나머지는 2쪽 · 모두 끄면 「함께 달렸어요」 한 줄</p>' : '<p class="field__hint">기준에 맞는 하이라이트가 없어요 — 「함께 달렸어요」 한 줄로 나가요</p>';
     var note = '<div class="fa-note"><label class="field__label" for="faN' + s.id + '">선생님 한마디' + (year ? '' : ' (넣으면 보여요)') + '</label>' +
       '<textarea class="input" rows="3" maxlength="400" id="faN' + s.id + '" data-fa-note="' + s.id + '">' + esc(sv.note) + '</textarea>' +
       '<div class="fa-note__b">' + (year ? '<button type="button" class="btn btn--sm" data-fa-ai="' + s.id + '">AI 초안</button>' : '') +
         '<button type="button" class="btn btn--sm' + (sv.note_ok ? '' : ' btn--primary') + '" data-fa-ok="' + s.id + '">' + (sv.note_ok ? '확정됨 ✓' : '확정') + '</button>' +
         '<span class="fa-note__m" data-fa-msg="' + s.id + '"></span></div></div>';
     return '<article class="fa-card' + (needCheck(s) ? ' is-check' : '') + '" data-fa-id="' + s.id + '">' +
-      '<div class="fa-thumb" aria-hidden="true"><div class="fa-thumb__in">' + Finish.pageHtml(v, { base: '../assets/chars/' }) + '</div></div>' +
+      '<button type="button" class="fa-thumb" data-fa-big="' + s.id + '" aria-label="' + esc(s.name + ' 완주증 크게 보기') + '"><span class="fa-thumb__in">' + Finish.pageHtml(v, { base: '../assets/chars/' }) + '</span><span class="fa-thumb__z" aria-hidden="true">🔍 크게</span></button>' +
       '<div class="fa-ctl"><div class="fa-ctl__h"><b>' + esc(s.name) + '</b>' + flags + '</div>' +
         '<label class="field__label">칭호</label>' + titles +
         '<label class="field__label">하이라이트</label>' + hls + note +
@@ -145,11 +155,66 @@
     else if (!S.rows.length) h += '<p class="panel__hint">이 반에 학생이 없어요.</p>';
     else {
       var chk = S.rows.filter(needCheck), rest = S.rows.filter(function (s) { return !needCheck(s); });
+      if (S.kind === 'year') h += oldSummaryHtml();
       if (chk.length) h += '<h3 class="fa-h">확인 필요 <span class="muted-note">' + chk.length + '명 — 기록이 아주 적거나 옛 기록을 다 못 받았어요</span></h3>' + chk.map(cardHtml).join('');
       h += '<h3 class="fa-h">' + esc(S.cls) + ' <span class="muted-note">' + rest.length + '명</span></h3>' + rest.map(cardHtml).join('');
     }
     b.innerHTML = h;
   }
+  /* 반마다 2쪽 켜고 끄기 — 이 기기에 기억 (기본 켬) */
+  function p2On() { try { return localStorage.getItem('mh.fin.p2.' + S.cls) !== '0'; } catch (e) { return true; } }
+  /* 옛 기록 받은 달 — 학생마다 n/11달 (적은 학생부터) */
+  function oldSummaryHtml() {
+    var list = S.rows.filter(function (s) { return s.linked; }).map(function (s) { var c = covered(s); return { s: s, c: c, wait: !!oldProgress(s) }; }).sort(function (a, b) { return a.c.n - b.c.n || (a.s.name < b.s.name ? -1 : 1); });
+    if (!list.length) return '';
+    var wait = list.filter(function (x) { return x.wait; }).length;
+    return '<details class="fa-old"' + (wait ? ' open' : '') + '><summary><b>옛 기록 받은 달</b> <span class="muted-note">' + (wait ? '받는 중 ' + wait + '명' : '모두 받음') + ' · 1월 ~ 이번 달 중 기록이 있는 달</span></summary>' +
+      '<ul class="fa-old__l">' + list.map(function (x) { return '<li class="' + (x.wait ? 'is-wait' : '') + '"><span>' + esc(x.s.name) + '</span><b class="num">' + x.c.n + '/' + x.c.total + '달</b>' + (x.wait ? '<small>받는 중</small>' : '') + '</li>'; }).join('') + '</ul></details>';
+  }
+  /* 크게 미리보기 — A4 실제 비율 · 여러 쪽이면 좌우로 · 창 안에서 [이 학생 인쇄] (공통 Layer) */
+  var BIG = null;
+  function openBig(s) {
+    var pages = Finish.pagesHtml(views([s])[0], { base: '../assets/chars/', p2: p2On() });
+    var el = Layer.make('fa-big', 'faBig');
+    BIG = { el: el, s: s, pages: pages, i: 0 };
+    paintBig();
+    Layer.show(el, { full: true, onClose: function () { BIG = null; } });
+    fitBig();
+  }
+  function paintBig() {
+    if (!BIG) return;
+    var n = BIG.pages.length, i = BIG.i;
+    BIG.el.innerHTML = '<div class="fa-big__in" role="dialog" aria-modal="true" aria-label="' + esc(BIG.s.name + ' 완주증 미리보기') + '">' +
+      '<div class="fa-big__top"><b>' + esc(BIG.s.name) + '</b> <span class="muted-note num">' + (i + 1) + ' / ' + n + '쪽</span><div class="spacer"></div>' +
+        '<button type="button" class="btn btn--primary btn--sm" data-fa-bigprint>이 학생 인쇄</button><button type="button" class="btn btn--sm" data-fa-bigx aria-label="닫기">닫기</button></div>' +
+      '<div class="fa-big__stage"><button type="button" class="fa-big__nav" data-fa-bigp="-1"' + (i ? '' : ' disabled') + ' aria-label="앞 쪽">◀</button>' +
+        '<div class="fa-big__page" data-fa-bigbox><div class="fa-big__scale">' + BIG.pages[i] + '</div></div>' +
+        '<button type="button" class="fa-big__nav" data-fa-bigp="1"' + (i < n - 1 ? '' : ' disabled') + ' aria-label="다음 쪽">▶</button></div></div>';
+    fitBig();
+  }
+  function fitBig() {
+    if (!BIG) return;
+    var box = BIG.el.querySelector('[data-fa-bigbox]'), sc = BIG.el.querySelector('.fa-big__scale');
+    if (!box || !sc) return;
+    var w = Math.max(200, BIG.el.clientWidth - 120), h = Math.max(260, BIG.el.clientHeight - 90);
+    var k = Math.min(w / 793.7, h / 1122.5);
+    sc.style.transform = 'scale(' + k + ')';
+    box.style.width = Math.floor(793.7 * k) + 'px'; box.style.height = Math.floor(1122.5 * k) + 'px';
+  }
+  document.addEventListener('click', function (e) {
+    if (!BIG || !e.target.closest || !BIG.el.contains(e.target)) return;
+    var t = e.target;
+    if (t.closest('[data-fa-bigx]')) { Layer.hide(BIG.el); BIG = null; return; }
+    if (t.closest('[data-fa-bigprint]')) { printList([BIG.s]); return; }
+    var nv = t.closest('[data-fa-bigp]');
+    if (nv && !nv.disabled) { BIG.i = Math.max(0, Math.min(BIG.pages.length - 1, BIG.i + (+nv.getAttribute('data-fa-bigp')))); paintBig(); }
+  });
+  document.addEventListener('keydown', function (e) {
+    if (!BIG || Layer.top() !== BIG.el) return;
+    if (e.key === 'ArrowRight' && BIG.i < BIG.pages.length - 1) { BIG.i++; paintBig(); }
+    if (e.key === 'ArrowLeft' && BIG.i > 0) { BIG.i--; paintBig(); }
+  });
+  window.addEventListener('resize', fitBig);
   function repaintCard(s) { var el = dlg.querySelector('[data-fa-id="' + s.id + '"]'); if (el) el.outerHTML = cardHtml(s); }
   function rowOf(id) { return S.rows.filter(function (x) { return x.id === id; })[0]; }
 
@@ -184,7 +249,7 @@
     var w = window.open('', '_blank');
     if (!w) { toast('팝업이 막혀 있어요 — 이 사이트의 팝업을 허용해 주세요', 'bad'); return; }
     w.document.open();
-    w.document.write(Finish.printDoc(views(list), { base: abs('../assets/chars/'), css: abs('../assets/finish.css'), title: (S.kind === 'year' ? '완주증' : S.month + ' 완주증') + ' · ' + S.cls }));
+    w.document.write(Finish.printDoc(views(list), { base: abs('../assets/chars/'), css: abs('../assets/finish.css'), p2: p2On(), title: (S.kind === 'year' ? '완주증' : S.month + ' 완주증') + ' · ' + S.cls }));
     w.document.close();
     var go = function () { try { w.focus(); w.print(); } catch (e) { /* 사람이 Ctrl+P */ } };
     if (w.document.readyState === 'complete') setTimeout(go, 500); else w.addEventListener('load', function () { setTimeout(go, 300); });
@@ -192,7 +257,7 @@
   function publish(s) {
     var v = viewOf(s);
     if (!savedOf(s).note_ok) { toast('한마디를 확정해야 공개할 수 있어요', 'bad'); return; }
-    var snap = { kind: v.kind, from: v.from, to: v.to, name: v.name, cls: v.cls, game: v.game, level: v.level, title: v.title, hls: v.hls, flow: v.flow, note: v.note };
+    var snap = { kind: v.kind, from: v.from, to: v.to, name: v.name, cls: v.cls, game: v.game, level: v.level, title: v.title, hls: v.hls, flow: v.flow, medals: v.medals, stats: v.stats, note: v.note };
     save(s, { published: true, snap: snap }).then(function (r) { if (!r.error) { toast(s.name + ' 완주증을 러닝노트에 공개했어요', 'good'); repaintCard(s); } });
   }
 
@@ -203,6 +268,7 @@
     var k = t.closest('[data-fa-kind]');
     if (k) { S.kind = k.getAttribute('data-fa-kind'); if (S.cls) setClass(S.cls); if (!S.month) S.month = prevMonth(today()); load(); return; }
     if (t.closest('[data-fa-printall]')) { printList(S.rows); return; }
+    var bg = t.closest('[data-fa-big]'); if (bg) { openBig(rowOf(bg.getAttribute('data-fa-big'))); return; }
     var p = t.closest('[data-fa-print]'); if (p) { printList([rowOf(p.getAttribute('data-fa-print'))].filter(Boolean)); return; }
     var ai = t.closest('[data-fa-ai]'); if (ai) { aiDraft(rowOf(ai.getAttribute('data-fa-ai'))); return; }
     var ok = t.closest('[data-fa-ok]');
@@ -219,11 +285,11 @@
     if (t.id === 'faClass') { setClass(t.value); if (!S.month) S.month = prevMonth(today()); load(); return; }
     if (t.id === 'faFrom' || t.id === 'faTo') { S[t.id === 'faFrom' ? 'from' : 'to'] = t.value; load(); return; }
     if (t.id === 'faMonth') { S.month = t.value; load(); return; }
+    if (t.hasAttribute('data-fa-p2')) { try { localStorage.setItem('mh.fin.p2.' + S.cls, t.checked ? '1' : '0'); } catch (e2) { /* 기억 못 해도 이번엔 그대로 */ } return; }
     if (t.hasAttribute('data-fa-title')) { var s = rowOf(t.getAttribute('data-fa-title')); save(s, { title: t.value }).then(function () { savedOf(s).title_key = t.value; repaintCard(s); }); savedOf(s).title_key = t.value; return; }
     if (t.hasAttribute('data-fa-hl')) {
       var s2 = rowOf(t.getAttribute('data-fa-hl')), box = dlg.querySelector('[data-fa-id="' + s2.id + '"]');
       var keys = Array.prototype.map.call(box.querySelectorAll('[data-fa-hl]:checked'), function (x) { return x.value; });
-      if (keys.length > 3) { t.checked = false; toast('하이라이트는 3개까지 고를 수 있어요', 'bad'); return; }
       savedOf(s2).hl_keys = keys.length ? keys : ['-'];
       save(s2, { hls: savedOf(s2).hl_keys }).then(function () { repaintCard(s2); });
     }

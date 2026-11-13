@@ -81,15 +81,15 @@
     /* ---------- 하이라이트 후보 (기준에 못 미치면 뺀다) ---------- */
     var bv = global.BadgeView, b = o.badges;
     /* 최장 연속 — 1년: 주간 배지 연속 · 이달: 그달 주간 배지 수 */
-    if (b && bv && kind === 'year') { var br = bv.bestRun ? bv.bestRun(b) : 0; if (br >= R.streakW) hls.push({ key: 'streak', text: '주간 배지 ' + br + '주 연속', score: 40 + br * 2 }); }
+    if (b && bv && kind === 'year') { var br = bv.bestRun ? bv.bestRun(b) : 0; if (br >= R.streakW) hls.push({ key: 'streak', icon: '⭐', big: br + '주', desc: '주간 배지 연속', text: '주간 배지 ' + br + '주 연속', score: 40 + br * 2 }); }
     var wGot = b ? (b.weeks || []).filter(function (x) { var k = String(x.week || x.from || '').slice(0, 10); return x.perfect && inR(k); }).length : 0;
-    if (wGot >= R.wBadge) hls.push({ key: 'wbadge', text: (kind === 'month' ? '이달 ' : '') + '주간 배지 ⭐ ' + wGot + '개', score: 30 + wGot * (kind === 'month' ? 8 : 1) });
+    if (wGot >= R.wBadge) hls.push({ key: 'wbadge', icon: '⭐', big: wGot + '개', desc: (kind === 'month' ? '이달 ' : '') + '주간 배지', text: (kind === 'month' ? '이달 ' : '') + '주간 배지 ⭐ ' + wGot + '개', score: 30 + wGot * (kind === 'month' ? 8 : 1) });
     var mGot = b ? (b.months || []).filter(function (m) { return inR(m + '-01') || (kind === 'month' && m === from.slice(0, 7)); }).length : 0;
-    if (mGot) hls.push({ key: 'mbadge', text: kind === 'month' ? '이달의 월간 배지 🏅' : '월간 배지 🏅 ' + mGot + '개', score: kind === 'month' ? 75 : 45 + mGot * 5 });
+    if (mGot) hls.push({ key: 'mbadge', icon: '🏅', big: kind === 'month' ? '획득' : mGot + '개', desc: kind === 'month' ? '이달의 월간 배지' : '월간 배지', text: kind === 'month' ? '이달의 월간 배지 🏅' : '월간 배지 🏅 ' + mGot + '개', score: kind === 'month' ? 75 : 45 + mGot * 5 });
     /* 연속 제출 — 과제 있던 평일 기준 가장 긴 줄 */
     var run = 0, bestRun = 0;
     if (global.Game && Game.hwDays) Game.hwDays(data, o.today || to).forEach(function (d) { if (!inR(d.date)) return; if (d.done) { run++; if (run > bestRun) bestRun = run; } else run = 0; });
-    if (bestRun >= R.run) hls.push({ key: 'run', text: '연속 제출 최장 ' + bestRun + '일', score: 30 + bestRun });
+    if (bestRun >= R.run) hls.push({ key: 'run', icon: '🔥', big: bestRun + '일', desc: '연속 제출 최장', text: '연속 제출 최장 ' + bestRun + '일', score: 30 + bestRun });
     /* 가장 성장한 영역 — 앞쪽 · 뒤쪽 정답률 */
     var grow = null;
     areas.forEach(function (a) {
@@ -100,32 +100,35 @@
       var g = wavg(Q) - wavg(P);
       if (g >= R.grow && (!grow || g > grow.d)) grow = { name: a.name, d: g };
     });
-    if (grow) hls.push({ key: 'grow', text: '가장 성장한 영역 · ' + grow.name + ' +' + grow.d + '%', score: 45 + grow.d * 2 });
+    if (grow) hls.push({ key: 'grow', icon: '📈', big: '+' + grow.d + '%', desc: '가장 성장한 영역 · ' + grow.name, text: '가장 성장한 영역 · ' + grow.name + ' +' + grow.d + '%', score: 45 + grow.d * 2 });
     /* 주력 스킬 */
     var skill = areas.filter(function (a) { return a.q >= R.q; }).sort(function (a, b2) { return b2.rate - a.rate; })[0];
-    if (skill && skill.rate >= 75) hls.push({ key: 'skill', text: '주력 스킬 · ' + skill.name + ' ' + skill.rate + '%', score: skill.rate - 30 });
+    if (skill && skill.rate >= 75) hls.push({ key: 'skill', icon: '🎯', big: skill.rate + '%', desc: '주력 스킬 · ' + skill.name, text: '주력 스킬 · ' + skill.name + ' ' + skill.rate + '%', score: skill.rate - 30 });
     /* 가장 꾸준했던 달(1년) · 주(이달) — 과제를 낸 날이 가장 많은 */
     var by = {};
     dayList.forEach(function (d) { var k = kind === 'year' ? d.slice(0, 7) : monday(d); by[k] = (by[k] || 0) + 1; });
     var top = Object.keys(by).sort(function (x, y) { return by[y] - by[x] || (x < y ? -1 : 1); })[0];
-    if (top && by[top] >= (kind === 'year' ? 8 : 4)) hls.push({ key: 'steadyp', text: kind === 'year' ? '가장 꾸준했던 달 · ' + mon(top + '-01') : '가장 꾸준했던 주 · ' + md(top) + ' 주', score: 28 + by[top] });
+    if (top && by[top] >= (kind === 'year' ? 8 : 4)) hls.push({ key: 'steadyp', icon: '📅', big: kind === 'year' ? mon(top + '-01') : md(top) + ' 주', desc: kind === 'year' ? '가장 꾸준했던 달' : '가장 꾸준했던 주', text: kind === 'year' ? '가장 꾸준했던 달 · ' + mon(top + '-01') : '가장 꾸준했던 주 · ' + md(top) + ' 주', score: 28 + by[top] });
     /* 최고 정답률을 찍은 날 */
     var byDay = {};
     its.forEach(function (x) { (byDay[x.date] = byDay[x.date] || []).push(x); });
     var bd = Object.keys(byDay).filter(function (d) { return qsum(byDay[d]) >= R.dayQ; }).map(function (d) { return { d: d, v: wavg(byDay[d]) }; }).sort(function (x, y) { return y.v - x.v || (x.d < y.d ? 1 : -1); })[0];
-    if (bd && bd.v >= 80) hls.push({ key: 'bestday', text: '최고 정답률 ' + bd.v + '% · ' + md(bd.d), score: bd.v - 45 });
+    if (bd && bd.v >= 80) hls.push({ key: 'bestday', icon: '💯', big: bd.v + '%', desc: '최고 정답률 · ' + md(bd.d), text: '최고 정답률 ' + bd.v + '% · ' + md(bd.d), score: bd.v - 45 });
     /* 함께한 기간 */
-    if (kind === 'year' && dayList.length) { var wks = Math.max(1, Math.round(days(dayList[0], dayList[dayList.length - 1]) / 7) + 1); if (wks >= R.together) hls.push({ key: 'weeks', text: '함께 달린 시간 ' + wks + '주', score: 25 + Math.round(wks / 4) }); }
-    if (kind === 'month' && dayList.length && days(dayList[0], dayList[dayList.length - 1]) >= 20) hls.push({ key: 'weeks', text: '한 달 내내 함께 달렸어요', score: 32 });
+    if (kind === 'year' && dayList.length) { var wks = Math.max(1, Math.round(days(dayList[0], dayList[dayList.length - 1]) / 7) + 1); if (wks >= R.together) hls.push({ key: 'weeks', icon: '🏃', big: wks + '주', desc: '함께 달린 시간', text: '함께 달린 시간 ' + wks + '주', score: 25 + Math.round(wks / 4) }); }
+    if (kind === 'month' && dayList.length && days(dayList[0], dayList[dayList.length - 1]) >= 20) hls.push({ key: 'weeks', icon: '🏃', big: '한 달', desc: '내내 함께 달렸어요', text: '한 달 내내 함께 달렸어요', score: 32 });
 
     /* 1년판 — 정답률 월별 흐름(기록 없는 달은 끊김) */
     var flow = [];
     if (kind === 'year') for (var m = from.slice(0, 8) + '01'; m <= to && flow.length < 13; m = nextMonth(m)) { var e = monthEnd(m), xs = its.filter(function (x) { return x.date >= m && x.date <= e; }); flow.push({ m: m, v: xs.length ? wavg(xs) : null }); }
 
+    var medals = kind === 'year' && b ? (b.months || []).filter(function (m) { return m >= from.slice(0, 7) && m <= to.slice(0, 7); }) : [];
+    var stats = null;
+    if (kind === 'year' && Ab && Ab.compute) { try { var cc = Ab.compute(data, 'y1', to); stats = { total: cc.total, groups: (cc.groups || []).map(function (g) { return { name: g.name, rate: g.rate, grade: g.grade, enough: g.enough, areas: g.areas.map(function (a) { return { name: a.name, rate: a.rate, grade: a.grade, enough: a.enough }; }) }; }) }; } catch (e) { stats = null; } }
     var G = global.Game, lv = G ? G.compute(data, { today: o.today || to }).level : { i: 0, name: '' };
     return { kind: kind, from: from, to: to, name: o.name || '', cls: o.cls || '', game: o.game || {}, level: { i: lv.i, name: lv.name },
              titles: titles.sort(function (a, b2) { return b2.score - a.score; }), hls: hls.sort(function (a, b2) { return b2.score - a.score; }),
-             flow: flow, low: low, items: its.length, subs: subs.length };
+             flow: flow, medals: medals, stats: stats, low: low, items: its.length, subs: subs.length };
   }
 
   /* 저장된 고르기 + 자동 → 화면 · 인쇄 · 공개에 쓰는 모양 */
@@ -135,24 +138,29 @@
     var keys = Array.isArray(saved.hl_keys) ? saved.hl_keys : [];
     var hl = keys.length ? (keys[0] === '-' ? [] : keys.map(function (k) { return cert.hls.filter(function (x) { return x.key === k; })[0]; }).filter(Boolean)) : cert.hls.slice(0, 3);
     return { kind: cert.kind, from: cert.from, to: cert.to, name: cert.name, cls: cert.cls, game: cert.game, level: cert.level,
-             title: t ? t.text : '', hls: hl.slice(0, 3).map(function (x) { return x.text; }), flow: cert.flow, low: cert.low,
+             title: t ? t.text : '', hls: hl.map(function (x) { return { key: x.key, icon: x.icon || '★', big: x.big || '', desc: x.desc || x.text, text: x.text }; }),
+             flow: cert.flow, medals: cert.medals || [], stats: cert.stats || null, low: cert.low,
              note: saved.note_ok ? String(saved.note || '') : '', noteOk: !!saved.note_ok };
   }
 
-  /* ---------- 그림 ---------- */
+  /* ---------- 그림 (20261114c — 1년판 1쪽 균형 · 하이라이트 카드 · 2쪽 「나의 1년 레이스 기록」) ---------- */
   function charSrc(id, base) { return global.Game ? Game.charSrc(id || 'maratoni', base) : (base || '../assets/chars/') + 'maratoni.png'; }
-  function flowSvg(flow) {
-    var pts = flow.map(function (p, i) { return { i: i, v: p.v, m: p.m }; }), n = pts.length;
-    if (pts.filter(function (p) { return p.v != null; }).length < 2) return '';
-    var W = 520, H = 96, L = 30, Rr = 12, T = 14, B = 22, lo = Math.max(0, Math.floor(Math.min.apply(null, pts.filter(function (p) { return p.v != null; }).map(function (p) { return p.v; })) / 10) * 10 - 10), x = function (i) { return n > 1 ? L + i * (W - L - Rr) / (n - 1) : L; }, y = function (v) { return T + (100 - v) * (H - T - B) / (100 - lo || 1); };
+  /* 옛 공개본(글자만)도 카드로 */
+  function hlOf(h) { return typeof h === 'string' ? { icon: '★', big: '', desc: h, text: h } : h || { icon: '★', big: '', desc: '' }; }
+  function flowSvg(flow, big) {
+    var pts = (flow || []).map(function (p, i) { return { i: i, v: p.v, m: p.m }; }), n = pts.length, vs = pts.filter(function (p) { return p.v != null; });
+    if (vs.length < 2) return '';
+    var W = 520, H = big ? 210 : 96, L = 30, Rr = 12, T = 16, B = 24;
+    var lo = Math.max(0, Math.floor(Math.min.apply(null, vs.map(function (p) { return p.v; })) / 10) * 10 - 10);
+    var x = function (i) { return n > 1 ? L + i * (W - L - Rr) / (n - 1) : L; }, y = function (v) { return T + (100 - v) * (H - T - B) / (100 - lo || 1); };
     var segs = [], cur = [];
     pts.forEach(function (p) { if (p.v == null) { if (cur.length) segs.push(cur); cur = []; } else cur.push(p); });
     if (cur.length) segs.push(cur);
     var grid = [lo, Math.round((lo + 100) / 2), 100].map(function (v) { return '<line x1="' + L + '" x2="' + (W - Rr) + '" y1="' + y(v) + '" y2="' + y(v) + '" class="fc-g"/><text x="' + (L - 4) + '" y="' + (y(v) + 3) + '" class="fc-ax" text-anchor="end">' + v + '</text>'; }).join('');
     var lines = segs.map(function (s) { return s.length > 1 ? '<polyline class="fc-ln" points="' + s.map(function (p) { return x(p.i).toFixed(1) + ',' + y(p.v).toFixed(1); }).join(' ') + '"/>' : ''; }).join('');
-    var dots = pts.map(function (p) { return p.v == null ? '' : '<circle cx="' + x(p.i).toFixed(1) + '" cy="' + y(p.v).toFixed(1) + '" r="3.2" class="fc-dot"/>'; }).join('');
-    var xl = pts.map(function (p) { return '<text x="' + x(p.i).toFixed(1) + '" y="' + (H - 6) + '" class="fc-ax" text-anchor="middle">' + (+p.m.slice(5, 7)) + '</text>'; }).join('');
-    return '<svg class="fc-flow" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="정답률 월별 흐름">' + grid + lines + dots + xl + '</svg>';
+    var dots = pts.map(function (p) { return p.v == null ? '' : '<circle cx="' + x(p.i).toFixed(1) + '" cy="' + y(p.v).toFixed(1) + '" r="' + (big ? 4 : 3.2) + '" class="fc-dot"/>' + (big ? '<text x="' + x(p.i).toFixed(1) + '" y="' + (y(p.v) - 8).toFixed(1) + '" class="fc-ax fc-ax--v" text-anchor="middle">' + p.v + '</text>' : ''); }).join('');
+    var xl = pts.map(function (p) { return '<text x="' + x(p.i).toFixed(1) + '" y="' + (H - 7) + '" class="fc-ax" text-anchor="middle">' + (+p.m.slice(5, 7)) + '월</text>'; }).join('');
+    return '<svg class="fc-flow' + (big ? ' fc-flow--big' : '') + '" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet" role="img" aria-label="정답률 월별 흐름">' + grid + lines + dots + xl + '</svg>';
   }
   /* 결승선 — 체크무늬 띠 + 리본 · 마라토니 · 마라부기가 통과 */
   function finishLine(base, small) {
@@ -168,44 +176,96 @@
   function corner(pos) {
     return '<svg class="fc-cn fc-cn--' + pos + '" viewBox="0 0 60 60" aria-hidden="true"><path d="M4 56 L4 4 L56 4" fill="none" stroke="#5A3FD0" stroke-width="2"/><path d="M12 56 L12 12 L56 12" fill="none" stroke="#E0A920" stroke-width="1.2"/><circle cx="4" cy="4" r="3" fill="#E0A920"/></svg>';
   }
-  /* A4 한 장 — opt = { base(그림 주소 앞), link(러닝노트 · 서명 칸 없음), sign('마라톤국어 대표 김종현') } */
+  function corners() { return corner('tl') + corner('tr') + corner('bl') + corner('br'); }
+  function cardHtml(h) {
+    h = hlOf(h);
+    return '<div class="fc-card"><span class="fc-card__i" aria-hidden="true">' + esc(h.icon || '★') + '</span>' +
+      (h.big ? '<b class="fc-card__b">' + esc(h.big) + '</b>' : '') + '<span class="fc-card__d">' + esc(h.desc || h.text || '') + '</span></div>';
+  }
+  function cardsHtml(list, cls) { return '<div class="fc-cards ' + (cls || '') + '">' + list.map(cardHtml).join('') + '</div>'; }
+  var P1 = 6;                                            /* 1쪽 하이라이트 최대 */
+  function periodText(v) { return v.kind === 'year' ? ymd(v.from) + ' ~ ' + ymd(v.to) : v.from.slice(0, 4) + '년 ' + mon(v.from); }
+  function noteCls(v) { var n = String(v.note || '').length; return !n ? ' fc-note-0' : n > 150 ? ' fc-note-l' : ''; }
+
+  /* 1쪽 — opt = { base(그림 주소 앞), link(러닝노트 · 서명 칸 없음), sign } */
   function pageHtml(v, opt) {
     opt = opt || {};
-    var year = v.kind === 'year', base = opt.base, g = v.game || {};
-    var title = year ? '완주증' : mon(v.from) + ' 완주증';
-    var period = year ? ymd(v.from) + ' ~ ' + ymd(v.to) : v.from.slice(0, 4) + '년 ' + mon(v.from);
-    var ava = '<span class="fc-ava"><img src="' + esc(charSrc(g.char, base)) + '" alt="' + esc(global.Game ? Game.charOf(g.char).name : '') + '"></span>';
-    var hl = v.hls.length ? '<ul class="fc-hls">' + v.hls.map(function (t) { return '<li><span class="fc-hl__i" aria-hidden="true">★</span>' + esc(t) + '</li>'; }).join('') + '</ul>'
-      : '<p class="fc-plain">' + (year ? '한 해 동안 함께 달렸어요.' : '이번 달도 함께 달렸어요.') + '</p>';
-    var flow = year && v.flow && v.flow.length ? flowSvg(v.flow) : '';
+    if (v.kind !== 'year') return monthHtml(v, opt);
+    var base = opt.base, g = v.game || {}, hls = (v.hls || []).map(hlOf), p1 = hls.slice(0, P1), n = p1.length;
     var sign = opt.sign || '마라톤국어 대표 김종현';
-    return '<article class="fc-page fc-page--' + (year ? 'year' : 'month') + (opt.link ? ' fc-page--link' : '') + '">' +
-      (year ? corner('tl') + corner('tr') + corner('bl') + corner('br') : '') +
-      '<div class="fc-in">' +
-        '<p class="fc-brand">마라톤국어</p>' +
-        '<h1 class="fc-title">' + esc(title) + '</h1>' +
-        '<p class="fc-sub">' + (year ? 'FINISHER CERTIFICATE' : 'MONTHLY FINISHER') + '</p>' +
-        '<div class="fc-who">' + ava +
-          '<div class="fc-who__t"><p class="fc-name">' + esc(v.name) + '</p>' +
-          '<p class="fc-meta">' + esc([v.cls, period].filter(Boolean).join(' · ')) + '</p>' +
-          '<p class="fc-lv">Lv.' + ((v.level && v.level.i) + 1) + ' ' + esc((v.level && v.level.name) || '') + '</p></div></div>' +
+    var cards = n ? cardsHtml(p1, n > 3 ? 'fc-cards--grid' : 'fc-cards--col') : '<p class="fc-plain">한 해 동안 함께 달렸어요.</p>';
+    return '<article class="fc-page fc-page--year fc-y fc-h' + n + noteCls(v) + (opt.link ? ' fc-page--link' : '') + '">' + corners() +
+      '<div class="fc-in fc-in--y">' +
+        '<header class="fc-hd"><p class="fc-brand">마라톤국어</p><h1 class="fc-title">완주증</h1><p class="fc-sub">FINISHER CERTIFICATE</p></header>' +
+        '<div class="fc-person"><p class="fc-name">' + esc(v.name) + '</p><p class="fc-meta">' + esc([v.cls, periodText(v)].filter(Boolean).join(' · ')) + '</p></div>' +
+        '<div class="fc-hero"><span class="fc-ava fc-ava--big"><img src="' + esc(charSrc(g.char, base)) + '" alt="' + esc(global.Game ? Game.charOf(g.char).name : '') + '"></span>' +
+          '<span class="fc-lv">Lv.' + ((v.level && v.level.i) + 1) + ' ' + esc((v.level && v.level.name) || '') + '</span></div>' +
         (v.title ? '<p class="fc-ribbon"><span>' + esc(v.title) + '</span></p>' : '') +
-        hl +
-        (flow ? '<div class="fc-box"><p class="fc-box__t">정답률 흐름</p>' + flow + '</div>' : '') +
+        cards +
         (v.note ? '<div class="fc-box fc-note"><p class="fc-box__t">선생님 한마디</p><p class="fc-note__t">' + esc(v.note) + '</p></div>' : '') +
-        finishLine(base, !year) +
-        (year ? '<div class="fc-foot"><span class="fc-date">' + ymd(v.to) + '</span>' +
-          (opt.link ? '<span class="fc-sign">' + esc(sign) + '</span>' : '<span class="fc-sign">' + esc(sign) + ' <span class="fc-sign__box" aria-label="서명"></span></span>') + '</div>'
-          : '<div class="fc-foot fc-foot--m"><span class="fc-sign">마라톤국어</span></div>') +
+        '<div class="fc-end">' + finishLine(base, false) +
+          '<div class="fc-foot"><span class="fc-date">' + ymd(v.to) + '</span>' +
+          (opt.link ? '<span class="fc-sign">' + esc(sign) + '</span>' : '<span class="fc-sign">' + esc(sign) + ' <span class="fc-sign__box" aria-label="서명"></span></span>') + '</div></div>' +
       '</div></article>';
   }
-  /* 새 창 인쇄 문서 — css 는 링크로 · 그림이 다 뜬 뒤 인쇄 */
+  function monthHtml(v, opt) {
+    var base = opt.base, g = v.game || {}, hls = (v.hls || []).map(hlOf);
+    var cards = hls.length ? cardsHtml(hls.slice(0, 8), hls.length > 3 ? 'fc-cards--grid' : 'fc-cards--col') : '<p class="fc-plain">이번 달도 함께 달렸어요.</p>';
+    return '<article class="fc-page fc-page--month' + (opt.link ? ' fc-page--link' : '') + '"><div class="fc-in">' +
+      '<p class="fc-brand">마라톤국어</p><h1 class="fc-title">' + esc(mon(v.from) + ' 완주증') + '</h1><p class="fc-sub">MONTHLY FINISHER</p>' +
+      '<div class="fc-who"><span class="fc-ava"><img src="' + esc(charSrc(g.char, base)) + '" alt=""></span><div class="fc-who__t"><p class="fc-name">' + esc(v.name) + '</p>' +
+        '<p class="fc-meta">' + esc([v.cls, periodText(v)].filter(Boolean).join(' · ')) + '</p><p class="fc-lv">Lv.' + ((v.level && v.level.i) + 1) + ' ' + esc((v.level && v.level.name) || '') + '</p></div></div>' +
+      (v.title ? '<p class="fc-ribbon"><span>' + esc(v.title) + '</span></p>' : '') + cards +
+      (v.note ? '<div class="fc-box fc-note"><p class="fc-box__t">선생님 한마디</p><p class="fc-note__t">' + esc(v.note) + '</p></div>' : '') +
+      finishLine(base, true) + '<div class="fc-foot fc-foot--m"><span class="fc-sign">마라톤국어</span></div></div></article>';
+  }
+  /* 2쪽 「나의 1년 레이스 기록」 — 월간 메달 12칸 → 정답률 흐름(크게) → 능력치 스탯 카드(묶음별) → 1쪽에 못 들어간 하이라이트 */
+  function medalsHtml(v) {
+    var y = v.to.slice(0, 4), got = {}, cells = '';
+    (v.medals || []).forEach(function (m) { got[m] = 1; });
+    for (var m = 1; m <= 12; m++) { var ym = y + '-' + String(m).padStart(2, '0'); cells += '<span class="fc-md' + (got[ym] ? ' is-got' : '') + '"><i aria-hidden="true">' + (got[ym] ? '🏅' : '') + '</i><small>' + m + '월</small></span>'; }
+    return '<section class="fc-sec fc-sec--md"><p class="fc-box__t">월간 메달 <span class="fc-box__n">' + (v.medals || []).length + '개</span></p><div class="fc-mds">' + cells + '</div></section>';
+  }
+  function statsHtml(v) {
+    var st = v.stats;
+    if (!st || !st.groups || !st.groups.length) return '';
+    var gr = function (x) { return x.enough && x.grade ? '<span class="fc-gr fc-gr--' + x.grade + '">' + x.grade + '</span>' : '<small>%</small>'; };
+    return '<section class="fc-sec fc-sec--st"><p class="fc-box__t">능력치' + (st.total ? ' <span class="fc-box__n">종합 ' + (st.total.enough && st.total.grade ? st.total.grade + ' · ' : '') + st.total.rate + '</span>' : '') + '</p>' +
+      st.groups.map(function (g) {
+        return '<div class="fc-sg"><p class="fc-sg__t">' + esc(g.name) + ' <b>' + g.rate + '</b>' + gr(g) + '</p><div class="fc-sks">' +
+          g.areas.map(function (a) { return '<div class="fc-sk' + (a.enough && a.grade ? ' fc-sk--' + a.grade : ' is-few') + '"><span>' + esc(a.name) + '</span><b>' + a.rate + '</b>' + gr(a) + '</div>'; }).join('') + '</div></div>';
+      }).join('') + '</section>';
+  }
+  function page2Html(v, opt, extra, part) {
+    var flow = flowSvg(v.flow, true);
+    return '<article class="fc-page fc-page--year fc-p2' + (opt.link ? ' fc-page--link' : '') + '">' + corners() +
+      '<div class="fc-in fc-in--p2">' +
+        '<header class="fc-hd fc-hd--p2"><p class="fc-brand">마라톤국어</p><h1 class="fc-title fc-title--p2">나의 1년 레이스 기록</h1>' +
+          '<p class="fc-meta">' + esc([v.name, v.cls, periodText(v)].filter(Boolean).join(' · ')) + (part ? ' · ' + part : '') + '</p></header>' +
+        (part ? '' : medalsHtml(v) + (flow ? '<section class="fc-sec fc-sec--flow"><p class="fc-box__t">1년 정답률 흐름</p><div class="fc-flowbox">' + flow + '</div></section>' : '') + statsHtml(v)) +
+        (extra.length ? '<section class="fc-sec fc-sec--more"><p class="fc-box__t">더 빛난 기록</p>' + cardsHtml(extra, 'fc-cards--grid') + '</section>' : '') +
+        '<div class="fc-foot fc-foot--m"><span class="fc-sign">마라톤국어 · ' + ymd(v.to) + '</span></div>' +
+      '</div></article>';
+  }
+  /* 한 학생의 쪽들 — 1년판: 1쪽 + (opt.p2 가 false 가 아니면) 2쪽 · 2쪽에 못 들어간 하이라이트가 아주 많을 때만 3쪽 */
+  var P2 = 6, P3 = 12;
+  function pagesHtml(v, opt) {
+    opt = opt || {};
+    if (v.kind !== 'year') return [monthHtml(v, opt)];
+    var out = [pageHtml(v, opt)], hls = (v.hls || []).map(hlOf), rest = hls.slice(P1);
+    if (opt.p2 === false) return out;
+    out.push(page2Html(v, opt, rest.slice(0, P2), ''));
+    if (rest.length > P2) out.push(page2Html(v, opt, rest.slice(P2, P2 + P3), '이어서'));
+    return out;
+  }
+  /* 새 창 인쇄 문서 — css 는 링크로 · 그림이 다 뜬 뒤 인쇄 · opt.p2 */
   function printDoc(views, opt) {
     opt = opt || {};
     var css = opt.css || '../assets/finish.css';
     return '<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>' + esc(opt.title || '완주증') + '</title>' +
-      '<link rel="stylesheet" href="' + esc(css) + '"><style>@page { size: A4 portrait; margin: 0; } html, body { margin: 0; }</style></head><body class="fc-print">' + views.map(function (v) { return pageHtml(v, opt); }).join('') + '</body></html>';
+      '<link rel="stylesheet" href="' + esc(css) + '"><style>@page { size: A4 portrait; margin: 0; } html, body { margin: 0; }</style></head><body class="fc-print">' +
+      views.map(function (v) { return pagesHtml(v, opt).join(''); }).join('') + '</body></html>';
   }
 
-  global.Finish = { compute: compute, view: view, pageHtml: pageHtml, printDoc: printDoc, flowSvg: flowSvg, RULE: RULE };
+  global.Finish = { compute: compute, view: view, pageHtml: pageHtml, pagesHtml: pagesHtml, printDoc: printDoc, flowSvg: flowSvg, RULE: RULE, P1: P1 };
 })(window);

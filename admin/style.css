@@ -4891,3 +4891,26 @@ dialog.sheet, .sheet .modal__body { max-width: 100vw; overflow-x: hidden; box-si
 .fa-note__m { font-size: 12px; color: #6B6F86; }
 @media (max-width: 640px) { .fa-card { grid-template-columns: minmax(0, 1fr); } .fa-thumb { margin: 0 auto; } }
 dialog.fa-modal.modal--wide { width: min(1100px, 100vw); max-width: min(1100px, 100vw); }
+
+/* 20261114c — 완주증: 썸네일 누르면 크게 · 2쪽 켜고 끄기 · 옛 기록 받은 달 */
+button.fa-thumb { appearance: none; padding: 0; cursor: zoom-in; position: relative; display: block; }
+.fa-thumb__in { display: block; }
+.fa-thumb__z { position: absolute; right: 6px; bottom: 6px; font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 999px; background: rgba(46,34,102,.82); color: #fff; }
+.fa-p2 { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; min-height: 40px; }
+.fa-old { margin: 10px 0 4px; padding: 8px 12px; border: 1px solid #E6E2F6; border-radius: 12px; background: #FAF9FF; }
+.fa-old summary { cursor: pointer; font-size: 13.5px; }
+.fa-old__l { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px 10px; font-size: 13px; }
+.fa-old__l li { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.fa-old__l li span { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fa-old__l li.is-wait b { color: #B42318; }
+.fa-old__l small { font-size: 11px; color: #B42318; font-weight: 800; }
+.fa-big { background: rgba(30, 24, 60, .78); }
+.fa-big__in { height: 100%; display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; box-sizing: border-box; }
+.fa-big__top { display: flex; align-items: center; gap: 8px; color: #fff; }
+.fa-big__top .muted-note { color: rgba(255,255,255,.75); }
+.fa-big__stage { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 0; }
+.fa-big__nav { appearance: none; border: 0; width: 44px; height: 64px; border-radius: 12px; background: rgba(255,255,255,.18); color: #fff; font-size: 20px; cursor: pointer; flex: none; }
+.fa-big__nav[disabled] { opacity: .3; cursor: default; }
+.fa-big__page { background: #fff; box-shadow: 0 8px 30px rgba(0,0,0,.35); overflow: hidden; flex: none; }
+.fa-big__scale { width: 210mm; transform-origin: top left; }
+@media (max-width: 640px) { .fa-big__nav { width: 34px; height: 54px; } }

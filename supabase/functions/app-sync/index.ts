@@ -690,7 +690,7 @@ export async function runOld(started = Date.now(), limit = 50) {
    · 요청 사이 OLD_GAP_MS 쉼 + 분당 28회 한도(hubGate) · until(함수 시작부터 ms)까지만 새 요청을 시작
    · 106 전이면(app_old_due2 없음) 예전 방식(runOld · 밤에는 쉼)
    ============================================================ */
-const OLD_GAP_MS = 1000, OLD_DUE = 40;
+const OLD_GAP_MS = 250, OLD_DUE = 40;                                          /* 20261114c — 1000 → 250ms (분당 28회 한도는 hubGate 가 그대로 지킴) */
 const isDay = (d: unknown) => /^\d{4}-\d{2}-\d{2}$/.test(String(d ?? ""));
 function monthOf(d: string): string { return d.slice(0, 7) + "-01"; }
 function nextMonth(m: string): string { const x = new Date(m + "T00:00:00Z"); x.setUTCMonth(x.getUTCMonth() + 1); return x.toISOString().slice(0, 10); }
@@ -722,7 +722,8 @@ export async function runOldMonths(started = Date.now(), until = BUDGET_MS, nigh
   for (const x of list) {
     if (stop || Date.now() - started > until) { out.left = (out.left || 0) + 1; continue; }
     const uid = num(x.uid);
-    const cut = isDay(x.start) ? String(x.start) : addDaysIso(t, -364);
+    /* 20261114c — 받는 끝 = 지금 기록이 시작하는 날(dfirst · migration-111) · 없으면 수강 시작일 (예전엔 수강 시작일 → 1월 개강 학생은 1 ~ 9월이 비었음) */
+    const cut = isDay(x.dfirst) ? String(x.dfirst) : isDay(x.start) ? String(x.start) : addDaysIso(t, -364);
     const last = addDaysIso(cut, -1);
     let m = isDay(x.month) ? nextMonth(monthOf(String(x.month))) : monthOf(from0);
     out.students++;
@@ -884,7 +885,7 @@ async function handle(req: Request, cors: Record<string, string>) {
        낮에는 평소 동기화가 먼저 · 옛 기록은 함수 시간의 70% 까지 · 건너뛰거나 실패하면 이유를 남긴다 (105) */
     if (!hubKey()) old = { skip: "nokey" };
     else if (!due?.night && Date.now() - started >= BUDGET_MS * 0.6) old = { skip: "time" };
-    else old = await runOldMonths(started, due?.night ? BUDGET_MS : BUDGET_MS * 0.7, !!due?.night).catch((e) => ({ err: "run: " + short(e) }));
+    else old = await runOldMonths(started, due?.night ? BUDGET_MS : BUDGET_MS * 0.8, !!due?.night)     /* 낮에도 80% 까지 (20261114c · 평소 동기화가 먼저 끝난 뒤) */.catch((e) => ({ err: "run: " + short(e) }));
     if (!due?.night && hubKey() && Date.now() - started < BUDGET_MS * 0.75) {
       let ll: Any[] = [];
       try { ll = (await rpc("app_link_due", { p_limit: 20 })) || []; } catch (e) { link = { err: "due: " + short(e) }; }
