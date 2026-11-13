@@ -141,6 +141,7 @@
     if (!H.badges) return '';
     return '<section class="gm-card gm-bdg" id="gmBadge" aria-label="내 배지"><div id="gmBadgeBox"></div></section>';
   }
+  function paintFinish() { if (global.FinishHub && H) FinishHub.mount(document.getElementById('gmFinNew'), document.getElementById('gmFinRow'), H); }
   function paintBadge() {
     var box = document.getElementById('gmBadgeBox');
     if (!box || !H.badges || !global.BadgeView || !BadgeView.mountHome) return;
@@ -191,8 +192,10 @@
     /* 「⚔️ 내 능력치」 — 프로필 카드 바로 아래 · 이번 주 퀘스트보다 위 (ability.js · 20261110h) · 기간 · 그래프 상태는 H.per 에 남김
        「📊 내 학습 분석」 — 능력치 바로 아래 (20261110l) */
     /* 20261113g — 프로필 → 🏅 내 배지(접힌 모양) → 이번 주 퀘스트 → 📊 학습 분석 → ⚔️ 능력치 → 새 레포트 → 모의고사 → 수업 영상 */
-    H.host.innerHTML = '<div class="gm-home">' + profileHtml() + badgeHtml() + questHtml() + '<div id="gmAnaHost"></div><div id="gmAbilityHost"></div>' + reportCardHtml() + mogoHtml() + videoHtml() + '</div>';
+    /* 🏁 완주증 (20261114b · finish-hub.js) — 새 이달의 완주증 카드는 내 배지 바로 아래 · 「완주증 모음」 한 줄은 능력치 아래 */
+    H.host.innerHTML = '<div class="gm-home">' + profileHtml() + badgeHtml() + '<div id="gmFinNew"></div>' + questHtml() + '<div id="gmAnaHost"></div><div id="gmAbilityHost"></div><div id="gmFinRow"></div>' + reportCardHtml() + mogoHtml() + videoHtml() + '</div>';
     paintBadge();
+    paintFinish();
     paintAbility();
     paintAnalysis();
     var bar = document.getElementById('hubBar');

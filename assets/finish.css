@@ -83,3 +83,22 @@
 /* 이달판 — 가운데로 모아 가볍게 */
 .fc-page--month .fc-in { justify-content: center; }
 .fc-page--month .fc-line { margin-top: 10mm; }
+
+/* ---------- 러닝노트 「🏁 완주증 모음」 (finish-hub.js · 20261114b) ---------- */
+.fh-dlg { padding: 0; }
+.fh-in { box-sizing: border-box; width: min(560px, 100vw); max-width: 100vw; margin: 0 auto; padding: 14px 16px 20px; display: grid; gap: 10px; background: #fff; min-height: 100%; }
+.fh-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.fh-t { margin: 0; font-size: 17px; font-weight: 900; color: #2E2266; }
+.fh-x { appearance: none; border: 0; background: #F1EEFF; color: #2E2266; width: 40px; height: 40px; border-radius: 12px; font-size: 18px; cursor: pointer; }
+.fh-tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.fh-tab { appearance: none; flex: none; border: 1px solid #E2DCF8; background: #fff; color: #4A4F68; font: inherit; font-size: 13px; font-weight: 800; padding: 0 12px; min-height: 36px; border-radius: 999px; cursor: pointer; }
+.fh-tab.is-on { background: #5A3FD0; color: #fff; border-color: #5A3FD0; }
+.fh-view { width: 100%; overflow: hidden; border-radius: 8px; box-shadow: 0 2px 10px rgba(46,34,102,.12); background: #fff; }
+.fh-view__in { width: 210mm; transform-origin: top left; }
+.fh-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.fh-btn { appearance: none; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; border: 1px solid #E2DCF8; background: #fff; color: #2E2266; font: inherit; font-size: 14px; font-weight: 900; min-height: 46px; border-radius: 14px; cursor: pointer; }
+.fh-btn--main { background: #5A3FD0; color: #fff; border-color: #5A3FD0; }
+.fh-msg { margin: 0; text-align: center; font-size: 12.5px; color: #6B6F86; min-height: 1em; }
+.fh-fb { display: grid; gap: 6px; }
+.fh-fb[hidden] { display: none; }
+.fh-new { border: 2px solid #E0A920; }
