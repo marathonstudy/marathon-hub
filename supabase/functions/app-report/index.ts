@@ -106,13 +106,15 @@ const CORRECT_KEYS = ["correctCount", "correctAnswerCount", "correctAnswers", "c
 const TOTAL_KEYS = ["correctTotal", "totalQuestions", "questionCount", "totalQuestionCount", "problemCount", "quizCount", "totalCount"];
 /* 과제 한 개 안의 영역별 결과 (앱 categoryResults — 「독서-과학기술 3/4 · 문학-현대시 2/3」) — 영역 이름 · 맞힌 수 · 문제 수만 (20261110l)
    앱 「영역별 정답률」(categoryStats)과 같은 재료 — 능력치 · 학습 분석이 날짜별로 다시 센다 · 맞힌 수가 비어 있는 칸은 뺀다(앱과 같음) */
+/* 20261113d — 맞힌 수가 null · "" 이면 Number(null) = 0 으로 「0개 맞힘」이 되던 것 → 숫자(또는 숫자 글자)일 때만 · 칸 이름이 조금 달라도 (app-sync 와 같다) */
+const PART_K = ["correctCount", "correct", "correctAnswers", "correctAnswerCount", "correctNum"];
+const PART_N = ["totalCount", "totalQuestions", "total", "questionCount", "count"];
 function partsOf(h: Any): { parts?: { c: string; k: number; n: number }[] } {
-  const cr = Array.isArray(h?.categoryResults) ? h.categoryResults : [];
-  const out = cr.map((r: Any) => ({ c: (String(r?.category ?? "").trim() || "기타").slice(0, 30), k: Number(r?.correctCount), n: Number(r?.totalCount ?? r?.totalQuestions) }))
-    .filter((x: Any) => r0(x.k) && r0(x.n) && x.n > 0 && x.k <= x.n).slice(0, 12);
+  const cr = Array.isArray(h?.categoryResults) ? h.categoryResults : Array.isArray(h?.categoryStats) ? h.categoryStats : [];
+  const out = cr.map((r: Any) => ({ c: (String(r?.category ?? r?.name ?? r?.categoryName ?? "").trim() || "기타").slice(0, 30), k: countOf(r, PART_K), n: countOf(r, PART_N) }))
+    .filter((x: Any) => x.k != null && x.n != null && x.n > 0 && x.k <= x.n).slice(0, 12);
   return out.length ? { parts: out } : {};
 }
-function r0(v: unknown): boolean { return typeof v === "number" && Number.isFinite(v) && v >= 0; }
 function countsOf(h: Any): { correct?: number; total?: number } {
   const c = countOf(h, CORRECT_KEYS), n = countOf(h, TOTAL_KEYS);
   return c != null && n != null && n > 0 && c <= n ? { correct: c, total: n } : {};

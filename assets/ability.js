@@ -97,19 +97,41 @@
   }
   /* 옛 기록 수 (러닝노트 홈 「이전 기록 n개」) — 지금 기록과 겹치지 않는 것만 */
   function oldCount(data) { var m = withOld(data); return m && m !== data ? m.oldN || 0 : 0; }
+  /* 정답 정보가 없는 반 (20261113d) — 앱이 맞힌 수를 비워(null) 보내면 예전 받기 함수가 「0개 맞힘」으로 저장했고,
+     정답률 칸을 0 으로 주는 경로도 있다 → 한 반(강 번호 1000 단위 묶음) 안에서 점수가 있는 과제가 3개 이상인데 모두 0 이면
+     「정답 정보 없음」으로 보고 셈에서 뺀다 (진짜 0점이 섞인 반은 다른 과제에 0 보다 큰 값이 있어 그대로 셈)
+     과제 하나 안에서도 영역별 맞힌 수가 모두 0 인데 정답률이 0 보다 크면 정답률을 쓴다 */
+  function partsZero(h) { return Array.isArray(h.parts) && h.parts.length && h.parts.every(function (p) { return !(+p.k > 0); }); }
+  function rateOf(h) { return typeof h.correct === 'number' && typeof h.total === 'number' && h.total > 0 ? h.correct * 100 / h.total : h.correctRate != null && isFinite(Number(h.correctRate)) ? Number(h.correctRate) : null; }
+  function blankGroups(list) {
+    var g = {};
+    list.forEach(function (h) {
+      if (!h || !h.submittedAt) return;
+      var hasP = Array.isArray(h.parts) && h.parts.length, r = rateOf(h);
+      if (!hasP && r == null) return;
+      var k = Math.floor((+h.order || 0) / 1000), x = g[k] || (g[k] = { n: 0, pos: 0 });
+      x.n++;
+      if ((hasP && !partsZero(h)) || r > 0) x.pos++;
+    });
+    var out = {};
+    Object.keys(g).forEach(function (k) { if (g[k].n >= 3 && !g[k].pos) out[k] = 1; });
+    return out;
+  }
   function items(data) {
     var A = AW(), out = [];
     data = withOld(data);
     if (!A || !data) return out;
-    var by = A.orderDays(data);
-    (data.history || data.recent || []).forEach(function (h) {
+    var by = A.orderDays(data), list = data.history || data.recent || [], blank = blankGroups(list);
+    list.forEach(function (h) {
       if (!h || !h.submittedAt) return;
+      if (blank[Math.floor((+h.order || 0) / 1000)]) return;
       var d = A.hwDateOf(h, by).date;
       if (!valid(d)) return;
       if (Array.isArray(h.parts) && h.parts.length) {
+        var rz = partsZero(h) ? rateOf(h) : null;                   /* 영역 맞힌 수가 모두 0 인데 정답률이 있으면 — 영역은 그대로 · 값은 과제 정답률 */
         h.parts.forEach(function (p) {
           var a = p && +p.n > 0 ? areaOfName(p.c) : null;
-          if (a) out.push({ date: d, top: a.top, sub: a.sub, r: Math.max(0, Math.min(100, +p.k * 100 / +p.n)), n: +p.n });
+          if (a) out.push({ date: d, top: a.top, sub: a.sub, r: Math.max(0, Math.min(100, rz > 0 ? rz : +p.k * 100 / +p.n)), n: +p.n });
         });
         return;
       }
@@ -130,7 +152,10 @@
     data = withOld(data);
     var cats = (data && data.categories) || [], qn = {};
     ((data && data.history) || []).forEach(function (h) { (h && h.submittedAt && h.parts || []).forEach(function (p) { if (p && p.c) qn[p.c] = (qn[p.c] || 0) + (+p.n || 0); }); });
-    return cats.filter(function (c) { return c && c.name && (c.count == null || c.count > 0); }).map(function (c) {
+    var list = cats.filter(function (c) { return c && c.name && (c.count == null || c.count > 0); });
+    /* 앱 영역별 정답률이 모두 0 이고 과제가 3개 이상이면 정답 정보가 없는 것 (20261113d · 위 blankGroups 와 같은 까닭) */
+    if (list.length && list.every(function (c) { return !(+c.rate > 0); }) && list.reduce(function (s, c) { return s + (+c.count || 1); }, 0) >= 3) return [];
+    return list.map(function (c) {
       var a = areaOfName(c.name);
       return { date: '', top: a.top, sub: a.sub, r: Math.max(0, Math.min(100, +c.rate || 0)), n: qn[c.name] || Math.max(1, +c.count || 1) * Q_UNKNOWN };
     });

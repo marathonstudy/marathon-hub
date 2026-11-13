@@ -268,9 +268,13 @@
       return '<div class="bdg-row"><div class="bdg-ml-row">' + labels + '</div><div class="bdg-cells">' + cells + '</div></div>';
     }).join('') + '</div>';
   }
+  /* 옛 기록으로 다시 센 월간 배지 { 'YYYY-MM': { done, total } } (20261113d) */
+  function fillMap(v) { var o = {}; (v && Array.isArray(v.mfill) ? v.mfill : []).forEach(function (f) { if (f && /^\d{4}-\d{2}$/.test(String(f.m))) o[f.m] = f; }); return o; }
+  function monthFillInfo(ym, f) { return (+ym.slice(5, 7)) + '월 월간 배지 🏅 (채움 — 지난 기록으로 다시 셈)' + (f && num(f.total) ? ' · 제출 ' + num(f.done) + '/' + num(f.total) : ''); }
   /* 월간 배지 — 그해 칸(시작한 달부터) · 받은 달 금색(누르면 그달 화면) · 못 받은 달 연회색 · 아직 안 끝난 달 흐리게 */
   function monthCellsHtml(v, y) {
     var today = String(v.today || '').slice(0, 7), m0 = (v.months || []).slice().sort()[0] || '', stM = gridStart(v).slice(0, 7), runs = monthRuns(v.months), got = {}, cells = '';
+    var fill = fillMap(v);
     (v.months || []).forEach(function (m) { got[m] = 1; });
     if (m0 && m0 < stM) stM = m0;                                        /* 받은 월간 배지가 더 앞이면 그달부터 */
     for (var m = 1; m <= 12; m++) {
@@ -278,6 +282,8 @@
       if (ym < stM) continue;
       var on = !!got[ym], fut = ym >= today;
       var cls = on ? 'is-got' + (runs.run[ym] >= 3 ? ' is-streak' : '') : fut ? 'is-future' : 'is-miss';
+      /* 옛 기록으로 다시 센 달 (20261113d · migration-108 mfill) — 받은 달과 똑같이 금색 · 누르면 아래에 「채움 · 제출 n/n」(그달 화면은 원장이 보낸 달만) */
+      if (on && fill[ym]) { cells += '<button type="button" class="bdg-m ' + cls + ' is-fill" data-bdg-mf="' + ym + '" aria-label="' + esc(monthFillInfo(ym, fill[ym])) + '"><span aria-hidden="true">🏅</span><small>' + m + '월</small></button>'; continue; }
       cells += on
         ? '<button type="button" class="bdg-m ' + cls + '" data-bdg-m="' + ym + '" aria-label="' + esc(m + '월 월간 배지 — 누르면 그달 화면') + '"><span aria-hidden="true">🏅</span><small>' + m + '월</small></button>'
         : '<span class="bdg-m ' + cls + '" aria-label="' + esc(m + '월' + (fut ? ' (아직)' : '')) + '"><span aria-hidden="true">🏅</span><small>' + m + '월</small></span>';
@@ -297,7 +303,7 @@
     var Y = yearsOf(v), y = Math.max(Y.first, Math.min(Y.last, year || Y.last));
     var cur = curMon(v), cw = weekMap(v)[cur];
     var nowOn = cur >= monOf(startOf(v)) && !(cw && cw.perfect);          /* 이번 주 아직 배지 전 — 「이번 주 진행 중」 */
-    var best = bestRun(v), mc = monthCellsHtml(v, y), nm = (v.months || []).length;
+    var best = bestRun(v), mc = monthCellsHtml(v, y), nm = (v.months || []).length, nf = Object.keys(fillMap(v)).length;
     var none = !num(v.perfect) && !nm;
     return '<div class="card bdg" data-bdg-year="' + y + '">' +
       (opt.noTitle ? '' : '<h2 class="card-title">🏅 내 배지' + (opt.note ? '<span class="card-note">' + esc(opt.note) + '</span>' : '') + '</h2>') +
@@ -311,9 +317,10 @@
         '<p class="bdg-info" data-bdg-info hidden></p>' +
       '</section>' +
       '<section class="bdg-sec bdg-sec--m"><h3 class="bdg-h">월간 배지</h3>' +
-        '<p class="bdg-sum"><b>🏅 월간 배지 <span class="num">' + nm + '개</span></b>' +
+        '<p class="bdg-sum"><b>🏅 월간 배지 <span class="num">' + nm + '개</span></b>' + (nf ? ' <span class="bdg-fill">채움 ' + nf + '</span>' : '') +
           (mc.best >= 2 ? ' <span class="bdg-dot">·</span> <span>최장 연속 <b class="num">' + mc.best + '개월</b></span>' : '') + '</p>' +
         (mc.html ? '<div class="bdg-months">' + mc.html + '</div>' : '') +
+        (nf ? '<p class="bdg-info" data-bdg-minfo hidden></p>' : '') +
       '</section>' +
       kingsHtml(v) +
       (none ? '<p class="bdg-hint">한 주 과제를 모두 내면 주간 배지, 한 달 제출률이 높으면 월간 배지를 받아요</p>' : '') +
@@ -342,6 +349,13 @@
     host.onclick = function (e) {
       var yb = e.target.closest('[data-bdg-y]');
       if (yb && !yb.disabled) { year = (year || yearsOf(v).last) + (+yb.dataset.bdgY); paint(); return; }
+      var fb = e.target.closest('[data-bdg-mf]');
+      if (fb) {
+        var mi = host.querySelector('[data-bdg-minfo]'), ym = fb.dataset.bdgMf;
+        if (mi) { mi.hidden = false; mi.textContent = monthFillInfo(ym, fillMap(v)[ym]); }
+        Array.prototype.forEach.call(host.querySelectorAll('[data-bdg-mf]'), function (b) { b.classList.toggle('is-pick', b === fb); });
+        return;
+      }
       var mb = e.target.closest('[data-bdg-m]');
       if (mb && onMonth) { onMonth(mb.dataset.bdgM); return; }
       var sb = e.target.closest('[data-bdg-k]');

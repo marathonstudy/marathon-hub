@@ -88,6 +88,8 @@ function shapeOf(src: Any) {
     calendarData: itemKeys(src?.calendarData),
     categoryStats: itemKeys(src?.categoryStats),
     homeworkHistory: itemKeys(src?.homeworkHistory),
+    /* 과제 안 영역별 결과의 칸 이름 (20261113d · 확인용 SQL 이 경로별로 영역 정보가 오는지 본다 · 값은 넣지 않음) */
+    categoryResults: itemKeys((Array.isArray(src?.homeworkHistory) ? src.homeworkHistory : []).slice(-60).flatMap((h: Any) => (Array.isArray(h?.categoryResults) ? h.categoryResults.slice(0, 3) : []))),
   };
 }
 
@@ -104,13 +106,16 @@ const CORRECT_KEYS = ["correctCount", "correctAnswerCount", "correctAnswers", "c
 const TOTAL_KEYS = ["correctTotal", "totalQuestions", "questionCount", "totalQuestionCount", "problemCount", "quizCount", "totalCount"];
 /* 과제 한 개 안의 영역별 결과 (앱 categoryResults — 「독서-과학기술 3/4 · 문학-현대시 2/3」) — 영역 이름 · 맞힌 수 · 문제 수만 (20261110l)
    앱 「영역별 정답률」(categoryStats)과 같은 재료 — 능력치 · 학습 분석이 날짜별로 다시 센다 · 맞힌 수가 비어 있는 칸은 뺀다(앱과 같음) */
-function partsOf(h: Any): { parts?: { c: string; k: number; n: number }[] } {
-  const cr = Array.isArray(h?.categoryResults) ? h.categoryResults : [];
-  const out = cr.map((r: Any) => ({ c: (String(r?.category ?? "").trim() || "기타").slice(0, 30), k: Number(r?.correctCount), n: Number(r?.totalCount ?? r?.totalQuestions) }))
-    .filter((x: Any) => r0(x.k) && r0(x.n) && x.n > 0 && x.k <= x.n).slice(0, 12);
+/* 20261113d — 맞힌 수가 null · "" 이면 예전에는 Number(null) = 0 으로 「0개 맞힘」이 되어 능력치가 0 으로 나왔다 → 숫자(또는 숫자 글자)일 때만
+   칸 이름이 조금 달라도(correct · correctAnswers · total · questionCount …) 읽는다 · 영역 이름은 category · name · categoryName */
+const PART_K = ["correctCount", "correct", "correctAnswers", "correctAnswerCount", "correctNum"];
+const PART_N = ["totalCount", "totalQuestions", "total", "questionCount", "count"];
+export function partsOf(h: Any): { parts?: { c: string; k: number; n: number }[] } {
+  const cr = Array.isArray(h?.categoryResults) ? h.categoryResults : Array.isArray(h?.categoryStats) ? h.categoryStats : [];
+  const out = cr.map((r: Any) => ({ c: (String(r?.category ?? r?.name ?? r?.categoryName ?? "").trim() || "기타").slice(0, 30), k: countOf(r, PART_K), n: countOf(r, PART_N) }))
+    .filter((x: Any) => x.k != null && x.n != null && x.n > 0 && x.k <= x.n).slice(0, 12);
   return out.length ? { parts: out } : {};
 }
-function r0(v: unknown): boolean { return typeof v === "number" && Number.isFinite(v) && v >= 0; }
 function countsOf(h: Any): { correct?: number; total?: number } {
   const c = countOf(h, CORRECT_KEYS), n = countOf(h, TOTAL_KEYS);
   return c != null && n != null && n > 0 && c <= n ? { correct: c, total: n } : {};
@@ -245,11 +250,67 @@ async function fetchShare(share: string): Promise<Any> {
   }
   return last;
 }
+/* ============================================================
+   영역 정보 채우기 (20261113d) — 받은 경로에 과제 안 영역별 결과(parts)가 없으면 다른 경로에서 같은 과제의 것만 가져와 붙인다
+     학생 기준 주소로 받았는데 최근 4주 과제에 영역 정보가 없으면 → 공유 코드(그 반 리포트)로
+     공유 코드로 받았는데(학생 기준 주소 실패) 없으면 → 학생 기준 주소로 그 학생 1명 × 최근 4주만 (짧게 물어 timeout 을 피함)
+     같은 과제 = 제출 시각 + 제목 (없으면 제목 + 한국 날짜) · 영역 · 맞힌 수 · 문제 수만 · 한 번에 PARTS_MAX 명까지
+   ============================================================ */
+const PARTS_DAYS = 28, PARTS_MAX = 6;
+function kstDay0(v: unknown): string { const t = Date.parse(String(v ?? "")); return Number.isFinite(t) ? new Date(t + 9 * 3600000).toISOString().slice(0, 10) : ""; }
+/* 최근 n일 낸 과제 중 영역 정보가 없는 것 수 */
+export function partsMissing(data: Any, days = PARTS_DAYS): number {
+  const cut = addDaysIso(kstToday(), -(days - 1));
+  return (data?.history || []).filter((h: Any) => h && h.submittedAt && kstDay0(h.submittedAt) >= cut && !(Array.isArray(h.parts) && h.parts.length)).length;
+}
+/* src 의 영역 정보를 dst 의 같은 과제에 붙인다 — 붙인 과제 수 */
+export function fillParts(dst: Any, src: Any): number {
+  const a = new Map<string, Any>(), b = new Map<string, Any>();
+  (src?.history || []).forEach((h: Any) => {
+    if (!h || !(Array.isArray(h.parts) && h.parts.length)) return;
+    a.set(String(h.submittedAt) + "|" + String(h.title ?? ""), h);
+    b.set(String(h.title ?? "") + "|" + kstDay0(h.submittedAt), h);
+  });
+  if (!a.size) return 0;
+  let n = 0;
+  (dst?.history || []).forEach((h: Any) => {
+    if (!h || !h.submittedAt || (Array.isArray(h.parts) && h.parts.length)) return;
+    const s = a.get(String(h.submittedAt) + "|" + String(h.title ?? "")) || b.get(String(h.title ?? "") + "|" + kstDay0(h.submittedAt));
+    if (!s) return;
+    h.parts = s.parts.map((p: Any) => ({ c: p.c, k: p.k, n: p.n }));
+    if (h.correct == null && s.correct != null && s.total != null) { h.correct = s.correct; h.total = s.total; }
+    n++;
+  });
+  return n;
+}
+
 /* 받기 (20261110m) — 앱 id 가 있는 학생은 새 주소로 50명씩(묶음 사이 1.5초) · 없으면 공유 코드로 3명씩
    새 주소가 실패하면(403 · 429 · 오류 · 그 학생 없음) 그 학생은 공유 코드로 받고 이유를 남긴다(user_fail) · 공유 코드도 없으면 실패
    시간이 모자라면 남은 학생은 다음 차례로 (next_try 10분) · 묶음마다 저장 (중간에 끊겨도 받은 것은 남는다) */
 export async function runList(list: Any[], started = Date.now()) {
-  const out = { saved: 0, failed: 0, left: 0, reasons: {} as Record<string, number>, user: 0, fallback: 0, filled: 0, userWhy: {} as Record<string, number> };
+  const out = { saved: 0, failed: 0, left: 0, reasons: {} as Record<string, number>, user: 0, fallback: 0, filled: 0, userWhy: {} as Record<string, number>,
+                parts: { tried: 0, got: 0, share: 0, user: 0 } };
+  /* 영역 정보 채우기 (20261113d) — 한 번에 PARTS_MAX 명 · 시간이 모자라면 건너뜀 */
+  let userStop = false;
+  const partsFrom = async (r: Any, x: Any, way: "share" | "user", why = "") => {
+    if (!r?.ok || !r.data || out.parts.tried >= PARTS_MAX || Date.now() - started > BUDGET_MS * 0.6 || !partsMissing(r.data)) return;
+    let src: Any = null;
+    if (way === "share") {
+      if (!/^[A-Za-z0-9_-]{8,128}$/.test(String(x.share || ""))) return;
+      out.parts.tried++;
+      const s = await fetchShare(String(x.share));
+      if (s.ok) src = s.data;
+    } else {
+      if (!(num(x.uid) > 0) || !hubKey() || userStop || /^http40[13]$/.test(why) || why === "busy") return;
+      out.parts.tried++;
+      const t = kstToday(), g = await fetchUsers([num(x.uid)], addDaysIso(t, -PARTS_DAYS), t, "parts");
+      if (!g.ok) userStop = true;                                       /* 1명 × 4주도 안 되면 이번 차례에는 더 묻지 않음 (timeout 이 쌓이지 않게) */
+      const recs = g.ok ? g.by.get(num(x.uid)) : null;
+      if (recs && recs.length) src = pick(mergeClasses(recs));
+    }
+    const n = src ? fillParts(r.data, src) : 0;
+    if (n) { out.parts.got += n; out.parts[way]++; }
+  };
   const userList = list.filter((x: Any) => num(x.uid) > 0 && hubKey());
   const shareList = list.filter((x: Any) => !(num(x.uid) > 0 && hubKey()));
   const save = async (results: Any[]) => {
@@ -281,7 +342,9 @@ export async function runList(list: Any[], started = Date.now()) {
       const recs = got.ok ? got.by.get(num(x.uid)) : null;
       if (recs && recs.length) {
         const raw = mergeClasses(recs), data = pick(raw);
-        results.push({ id: x.id, ok: true, src: "user", data, lite: lite(data), subs: subsOf(raw), fill: !!x.fill, days: daysOf(data) });
+        const r: Any = { id: x.id, ok: true, src: "user", data, subs: subsOf(raw), fill: !!x.fill, days: daysOf(data) };
+        await partsFrom(r, x, "share");                                 /* 학생 기준 주소에 영역 정보가 없으면 공유 코드에서 (20261113d) */
+        results.push({ ...r, lite: lite(data) });
         out.user++;
         continue;
       }
@@ -289,6 +352,7 @@ export async function runList(list: Any[], started = Date.now()) {
       out.userWhy[why] = (out.userWhy[why] || 0) + 1;                 /* 학생 기준 주소로 못 받은 이유 (동기화 기록 · 105) */
       if (/^[A-Za-z0-9_-]{8,128}$/.test(String(x.share || ""))) {
         const r = await fetchShare(String(x.share));
+        await partsFrom(r, x, "user", why);                             /* 공유 코드에 영역 정보가 없으면 학생 기준 주소 1명 × 4주로 (20261113d) */
         results.push({ id: x.id, ...r, user_fail: why, fill: false });
         out.fallback++;
       } else results.push({ id: x.id, ok: false, reason: "user_" + why, user_fail: why });
