@@ -6,6 +6,7 @@
      이달판 한마디: 기본 없음 · 넣고 [확정]하면 보임
    「확인 필요」(기록이 아주 적음 · 옛 기록을 다 못 받음 「기록 받는 중 n/11달」)는 맨 위에 모은다
    [이 반 전체 인쇄] · 학생마다 [인쇄] — 새 창에 A4 장마다 한 학생(Ctrl+P) · 학생 정보는 화면에서만(파일로 남기지 않음)
+   20261115a — 카드 왼쪽 위 체크 · 고정 막대로 한 번에 확정 · 확정 풀기 · 러닝노트 공개 · 공개 취소 · 거르기 칩 · 상태 색 배지 (아래 「한 번에」)
    ============================================================ */
 (function () {
   'use strict';
@@ -18,7 +19,8 @@
   function monthEnd(ym) { return new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7), 0)).toISOString().slice(0, 10); }
   function abs(p) { try { return new URL(p, location.href).href; } catch (e) { return p; } }
 
-  var S = { kind: 'year', cls: '', from: '', to: '', month: '', classes: [], rows: [], busy: false, err: '', open: {}, mark: {} };
+  /* mark = 고른 학생(카드 왼쪽 위 체크) · filter = 목록 위 거르기 칩 · draft = 아직 저장 안 한 한마디(다시 그려도 그대로) · bk = 한 번에 하는 중 (20261115a) */
+  var S = { kind: 'year', cls: '', from: '', to: '', month: '', classes: [], rows: [], busy: false, err: '', open: {}, mark: {}, filter: 'all', draft: {}, bk: '' };
   /* 원장님 서명 (20261114h · migration-113) — Storage 비공개 버킷 staff-private/signature.png · 직원 로그인으로 짧은 signed URL(2분) → 그림을 받아 이 화면 메모리(blob:)에만
      저장소 · 파일 · 러닝노트 · 사진 공유 · 링크에는 넣지 않음 · 못 받으면 빈 서명 칸 · 인쇄는 그대로 */
   var SIGN = { url: '', state: '', p: null };
@@ -103,7 +105,7 @@
   }
   function load() {
     if (!S.cls) { paint(); return; }
-    S.busy = true; S.err = ''; S.rows = []; S.mark = {}; paint();
+    S.busy = true; S.err = ''; S.rows = []; S.mark = {}; S.draft = {}; paint();
     var key = pkey(), kind = S.kind;
     Promise.resolve(sb().rpc('finish_class', { p_class: S.cls, p_kind: kind, p_key: key })).then(function (r) {
       if (r.error) { S.busy = false; S.err = /finish_class|function/.test(r.error.message || '') ? 'migration-110 SQL 을 먼저 실행해 주세요.' : r.error.message; paint(); return; }
@@ -170,9 +172,7 @@
       '</div>' + (S.kind === 'year' ? '<p class="field__hint">' + (onlineCls(S.cls) ? '온라인 반은 학생마다 앱 기록의 첫 달 ~ 마지막 달로 만들어요(여러 앱 반 기록을 이어 붙임).' : '종강일 · 개강일은 반 관리 → 수업 설정에서 반마다 바꿀 수 있어요. 여기서 바꾸면 이 화면에만 써요.') + '</p>' : '');
   }
   function cardHtml(s) {
-    var sv = savedOf(s), v = viewOf(s), op = oldProgress(s), year = S.kind === 'year', open = !!S.open[s.id];
-    var flags = (s.cert.low ? '<span class="fa-flag">기록 적음</span>' : '') + (op ? '<span class="fa-flag">기록 받는 중 ' + op.n + '/' + op.total + '달</span>' : '') +
-      (year && !sv.note_ok ? '<span class="fa-flag fa-flag--red">한마디 확인 필요</span>' : '') + (sv.published ? '<span class="fa-flag fa-flag--ok">러닝노트 공개</span>' : '');
+    var sv = savedOf(s), v = viewOf(s), year = S.kind === 'year', open = !!S.open[s.id];
     var titles = '<select class="input fa-title" data-fa-title="' + s.id + '">' + s.cert.titles.map(function (t) { return '<option value="' + esc(t.key) + '"' + (v.title === t.text ? ' selected' : '') + '>' + esc(t.text) + '</option>'; }).join('') + '</select>';
     var chosen = v.hls.map(function (x) { return x.key; });
     var hls = s.cert.hls.length ? '<div class="fa-hls">' + s.cert.hls.map(function (h) {
@@ -180,14 +180,15 @@
       return '<label class="fa-hl' + (on ? ' is-on' : '') + '"><input type="checkbox" data-fa-hl="' + s.id + '" value="' + esc(h.key) + '"' + (on ? ' checked' : '') + '> ' + esc(h.text) + '</label>';
     }).join('') + '</div><p class="field__hint">처음에는 후보 전부 체크 · 빼고 싶은 것만 끄세요 · 1쪽에는 앞의 6개(1~3개 큰 카드 · 4~6개 두 칸) · 나머지는 2쪽 · 모두 끄면 「함께 달렸어요」 한 줄</p>' : '<p class="field__hint">기준에 맞는 하이라이트가 없어요 — 「함께 달렸어요」 한 줄로 나가요</p>';
     var note = '<div class="fa-note"><label class="field__label" for="faN' + s.id + '">선생님 한마디' + (year ? ' <span class="muted-note">→ 마지막 쪽 「선생님의 편지」 · 빈 줄 = 문단 · **글자** = 굵게</span>' : ' (넣으면 보여요 · 길면 편지 쪽)') + '</label>' +
-      '<textarea class="input" rows="' + (year ? 6 : 3) + '" maxlength="3000" id="faN' + s.id + '" data-fa-note="' + s.id + '">' + esc(sv.note) + '</textarea>' +
+      '<textarea class="input" rows="' + (year ? 6 : 3) + '" maxlength="3000" id="faN' + s.id + '" data-fa-note="' + s.id + '">' + esc(noteOf(s)) + '</textarea>' +
       '<div class="fa-note__b">' + (year ? '<button type="button" class="btn btn--sm" data-fa-ai="' + s.id + '">AI 초안</button>' : '') +
         '<button type="button" class="btn btn--sm' + (sv.note_ok ? '' : ' btn--primary') + '" data-fa-ok="' + s.id + '">' + (sv.note_ok ? '확정됨 ✓' : '확정') + '</button>' +
         '<span class="fa-note__m" data-fa-msg="' + s.id + '"></span></div>' +
       '<button type="button" class="btn btn--sm fa-note__all" data-fa-all="' + s.id + '">✉️ 이 편지를 반 전체에 넣기</button></div>';      /* 20261114i */
     return '<article class="fa-card' + (needCheck(s) ? ' is-check' : '') + (S.mark[s.id] ? ' is-marked' : '') + '" data-fa-id="' + s.id + '">' +
+      '<label class="fa-sel" title="고르기 — 위 막대의 버튼으로 한 번에"><input type="checkbox" data-fa-mark="' + s.id + '"' + (S.mark[s.id] ? ' checked' : '') + ' aria-label="' + esc(s.name) + ' 고르기"></label>' +
       '<button type="button" class="fa-thumb" data-fa-big="' + s.id + '" aria-label="' + esc(s.name + ' 완주증 크게 보기') + '"><span class="fa-thumb__in">' + Finish.pageHtml(v, popt()) + '</span><span class="fa-thumb__z" aria-hidden="true">🔍 크게</span></button>' +
-      '<div class="fa-ctl"><div class="fa-ctl__h"><label class="fa-mark" title="표시 — 위의 [표시한 학생 모두 확정]"><input type="checkbox" data-fa-mark="' + s.id + '"' + (S.mark[s.id] ? ' checked' : '') + ' aria-label="' + esc(s.name) + ' 표시"></label><b>' + esc(s.name) + '</b>' + flags + '</div>' +
+      '<div class="fa-ctl"><div class="fa-ctl__h"><b>' + esc(s.name) + '</b><span class="fa-ctl__f" data-fa-flags="' + s.id + '">' + flagsHtml(s) + '</span></div>' +
         '<label class="field__label">칭호</label>' + titles +
         '<label class="field__label">하이라이트</label>' + hls + note +
         '<div class="fa-ctl__b"><button type="button" class="btn btn--sm" data-fa-print="' + s.id + '">이 학생 인쇄</button>' +
@@ -202,40 +203,155 @@
     else if (!S.cls) h += '<p class="panel__hint">반을 고르세요.</p>';
     else if (!S.rows.length) h += '<p class="panel__hint">이 반에 학생이 없어요.</p>';
     else {
-      var chk = S.rows.filter(needCheck), rest = S.rows.filter(function (s) { return !needCheck(s); });
+      if (S.kind !== 'year' && S.filter === 'pub') S.filter = 'all';
       if (S.kind === 'year') h += oldSummaryHtml();
+      h += '<div class="fa-chips" role="group" aria-label="학생 거르기" data-fa-chips>' + chipsHtml() + '</div>';
       h += '<div class="fa-bulk" data-fa-bulk>' + bulkHtml() + '</div>';
-      if (chk.length) h += '<h3 class="fa-h">확인 필요 <span class="muted-note">' + chk.length + '명 — 기록이 아주 적거나 옛 기록을 다 못 받았어요</span></h3>' + chk.map(cardHtml).join('');
-      h += '<h3 class="fa-h">' + esc(S.cls) + ' <span class="muted-note">' + rest.length + '명</span></h3>' + rest.map(cardHtml).join('');
+      h += '<div data-fa-list>' + listHtml() + '</div>';
     }
     b.innerHTML = h;
   }
-  /* ---------- 표시한 학생 모두 확정 (20261114i) — 목록 위 · 체크(표시)한 학생만 · 확인 창 「n명 확정할까요?」 ---------- */
-  function marked() { return S.rows.filter(function (s) { return S.mark[s.id]; }); }
+  function listHtml() {
+    var v = shown(), chk = v.filter(needCheck), rest = v.filter(function (s) { return !needCheck(s); }), h = '';
+    if (!v.length) return '<p class="panel__hint fa-empty">「' + esc(filterName(S.filter)) + '」에 맞는 학생이 없어요.</p>';
+    if (chk.length) h += '<h3 class="fa-h">확인 필요 <span class="muted-note">' + chk.length + '명 — 기록이 아주 적거나 옛 기록을 다 못 받았어요</span></h3>' + chk.map(cardHtml).join('');
+    if (rest.length) h += '<h3 class="fa-h">' + esc(S.cls) + ' <span class="muted-note">' + rest.length + '명' + (S.filter !== 'all' ? ' · ' + esc(filterName(S.filter)) : '') + '</span></h3>' + rest.map(cardHtml).join('');
+    return h;
+  }
+
+  /* ---------- 한 번에 확정 · 풀기 · 공개 (20261115a · 1년판 · 이달판) ----------
+     카드 왼쪽 위 체크 · 고정 막대(스크롤해도 따라옴) [전체 선택] [선택 해제] 「n명 선택됨」
+       [선택한 학생 한마디 확정] · [한마디 있는 학생 모두 확정](반 전체 · 빈 학생 건너뜀) · [선택한 학생 확정 풀기]
+       1년판만 [선택한 학생 러닝노트에 공개](확정된 학생만) · [공개 취소]
+     누르기 전 확인 창(공통 Layer) 「n명 확정할까요? (한마디 없음 n명은 건너뜀)」 + 대상 이름 → 끝나면 「n명 확정 완료」
+     거르기 칩 — 전체 · 확정 전 · 확정됨 · 한마디 없음 · 공개됨(1년판) · 기록 받는 중 · 칩 옆 숫자
+     카드 색 배지 — 확정 전 빨강 · 확정됨 초록 · 공개됨 파랑 · 한마디 없음 회색
+     칭호 · 하이라이트 · 한마디는 학생마다 따로 · 확정 뒤에 고치면 그 학생만 확정이 풀림(러닝노트에서도 다시 확정할 때까지 안 보임) */
+  function noteOf(s) { return S.draft[s.id] != null ? S.draft[s.id] : String(savedOf(s).note || ''); }
+  function noteNow(s) { return noteOf(s).trim(); }
+  function stOf(s) {
+    var sv = savedOf(s), has = !!noteNow(s), ok = !!sv.note_ok && has, year = S.kind === 'year';
+    return { has: has, ok: ok, pub: year && !!sv.published && ok, pubOff: year && !!sv.published && !ok, st: !has ? 'none' : ok ? 'ok' : 'wait' };
+  }
+  function flagsHtml(s) {
+    var t = stOf(s), op = oldProgress(s);
+    return (t.st === 'ok' ? '<span class="fa-flag fa-st fa-st--ok">확정됨</span>' : t.st === 'wait' ? '<span class="fa-flag fa-flag--red fa-st fa-st--wait">확정 전</span>' : '<span class="fa-flag fa-st fa-st--none">한마디 없음</span>') +
+      (t.pub ? '<span class="fa-flag fa-st fa-st--pub">공개됨</span>' : '') +
+      (t.pubOff ? '<span class="fa-flag fa-st fa-st--off" title="다시 확정한 뒤 [러닝노트 공개 다시]를 누르면 다시 보여요">공개 멈춤 · 확정 전이라 안 보임</span>' : '') +
+      (s.cert.low ? '<span class="fa-flag">기록 적음</span>' : '') + (op ? '<span class="fa-flag">기록 받는 중 ' + op.n + '/' + op.total + '달</span>' : '');
+  }
+  var FILTERS = [['all', '전체'], ['wait', '확정 전'], ['ok', '확정됨'], ['none', '한마디 없음'], ['pub', '공개됨'], ['old', '기록 받는 중']];
+  function filterName(f) { var x = FILTERS.filter(function (y) { return y[0] === f; })[0]; return x ? x[1] : ''; }
+  function inF(s, f) { if (f === 'all') return true; if (f === 'old') return !!oldProgress(s); var t = stOf(s); return f === 'pub' ? t.pub : t.st === f; }
+  function shown() { return S.rows.filter(function (s) { return inF(s, S.filter); }); }
+  function picked() { return shown().filter(function (s) { return S.mark[s.id]; }); }
+  function chipsHtml() {
+    return FILTERS.filter(function (f) { return S.kind === 'year' || f[0] !== 'pub'; }).map(function (f) {
+      var n = S.rows.filter(function (s) { return inF(s, f[0]); }).length, on = S.filter === f[0];
+      return '<button type="button" class="fa-chip fa-chip--' + f[0] + (on ? ' is-on' : '') + '" data-fa-filter="' + f[0] + '" aria-pressed="' + on + '">' + f[1] + ' <b class="num">' + n + '</b></button>';
+    }).join('');
+  }
   function bulkHtml() {
-    var m = marked(), all = S.rows.length && m.length === S.rows.length;
-    return '<label class="fa-bulk__all"><input type="checkbox" data-fa-markall' + (all ? ' checked' : '') + '> 모두 표시</label>' +
-      '<span class="fa-bulk__n">표시 <b class="num">' + m.length + '</b>명</span>' +
-      '<button type="button" class="btn btn--sm btn--primary" data-fa-okall' + (m.length ? '' : ' disabled') + '>표시한 학생 모두 확정</button>';
+    var v = shown(), m = picked(), year = S.kind === 'year', busy = !!S.bk;
+    var waitN = S.rows.filter(function (s) { return stOf(s).st === 'wait'; }).length;
+    function bt(act, label, off, primary) { return '<button type="button" class="btn btn--sm' + (primary ? ' btn--primary' : '') + '" data-bk="' + act + '"' + (off || busy ? ' disabled' : '') + '>' + label + '</button>'; }
+    return '<div class="fa-bulk__sel">' +
+        '<button type="button" class="btn btn--sm" data-fa-selall' + (v.length && m.length < v.length && !busy ? '' : ' disabled') + '>전체 선택</button>' +
+        '<button type="button" class="btn btn--sm" data-fa-selnone' + (m.length && !busy ? '' : ' disabled') + '>선택 해제</button>' +
+        '<span class="fa-bulk__n" data-fa-seln role="status"><b class="num">' + m.length + '</b>명 선택됨' + (busy ? ' · <b>' + esc(S.bk) + '</b>' : '') + '</span></div>' +
+      '<div class="fa-bulk__b">' +
+        bt('ok', '선택한 학생 한마디 확정', !m.length, true) +
+        bt('okall', '한마디 있는 학생 모두 확정', !waitN) +
+        bt('undo', '선택한 학생 확정 풀기', !m.length) +
+        (year ? bt('pub', '선택한 학생 러닝노트에 공개', !m.length) + bt('unpub', '공개 취소', !m.length) : '') +
+      '</div>';
   }
-  function paintBulk() {
-    var el = dlg && dlg.querySelector('[data-fa-bulk]'); if (el) el.innerHTML = bulkHtml();
-    Array.prototype.forEach.call(dlg.querySelectorAll('[data-fa-id]'), function (c) { c.classList.toggle('is-marked', !!S.mark[c.getAttribute('data-fa-id')]); });
+  /* 칩 숫자 · 막대 · 카드 배지만 다시 (쓰는 중인 글 칸은 그대로) */
+  function paintTools() {
+    if (!dlg) return;
+    var c = dlg.querySelector('[data-fa-chips]'); if (c) c.innerHTML = chipsHtml();
+    var el = dlg.querySelector('[data-fa-bulk]'); if (el) el.innerHTML = bulkHtml();
+    Array.prototype.forEach.call(dlg.querySelectorAll('[data-fa-id]'), function (x) { x.classList.toggle('is-marked', !!S.mark[x.getAttribute('data-fa-id')]); });
   }
-  function noteNow(s) { var ta = dlg.querySelector('[data-fa-note="' + s.id + '"]'); return (ta ? ta.value : savedOf(s).note || '').trim(); }
-  function okAll() {
-    var m = marked(), go = m.filter(function (s) { return noteNow(s); }), skip = m.length - go.length;
-    if (!go.length) { toast('표시한 학생 중 한마디가 있는 학생이 없어요', 'bad'); return; }
-    var ask = window.UI && UI.confirmAsk ? UI.confirmAsk('표시한 학생 모두 확정', go.length + '명 확정할까요?' + (skip ? ' (한마디가 빈 ' + skip + '명은 빼요)' : ''), go.length + '명 확정') : Promise.resolve(true);
-    ask.then(function (ok) {
-      if (!ok) return;
-      var i = 0;
-      (function next() {
-        var part = go.slice(i, i + 4); i += 4;
-        if (!part.length) { toast(go.length + '명 확정했어요', 'good'); return; }
-        Promise.all(part.map(function (s) { var n = noteNow(s); return save(s, { note: n, note_ok: true }).then(function () { repaintCard(s); }); })).then(next);
-      })();
+  function paintFlags(s) { var f = dlg && dlg.querySelector('[data-fa-flags="' + s.id + '"]'); if (f) f.innerHTML = flagsHtml(s); }
+  function paintList() {
+    S.rows.forEach(function (s) { if (!inF(s, S.filter)) delete S.mark[s.id]; });     /* 목록에서 빠진 학생은 고르기에서도 뺌(안 보이는 학생이 같이 바뀌지 않게) */
+    var l = dlg && dlg.querySelector('[data-fa-list]'); if (l) l.innerHTML = listHtml(); paintTools();
+  }
+  /* 무엇을 · 누구에게 — { go: 대상, skips: [「n명은 건너뜀」 …], note } */
+  var BK_ACT = {
+    ok:    { t: '선택한 학생 한마디 확정', q: '확정할까요?', btn: '확정', ing: '확정하는', done: '확정 완료' },
+    okall: { t: '한마디 있는 학생 모두 확정', q: '확정할까요?', btn: '확정', ing: '확정하는', done: '확정 완료' },
+    undo:  { t: '선택한 학생 확정 풀기', q: '확정을 풀까요?', btn: '확정 풀기', ing: '확정 푸는', done: '확정 풀기 완료' },
+    pub:   { t: '선택한 학생 러닝노트에 공개', q: '러닝노트에 공개할까요?', btn: '공개', ing: '공개하는', done: '러닝노트 공개 완료' },
+    unpub: { t: '러닝노트 공개 취소', q: '공개를 취소할까요?', btn: '공개 취소', ing: '공개 취소하는', done: '공개 취소 완료' }
+  };
+  function bkPlan(act) {
+    var from = act === 'okall' ? S.rows : picked(), go = [], skips = [], note = '';
+    var none = 0, already = 0, notOk = 0, notPub = 0, rePub = 0, hid = 0;
+    from.forEach(function (s) {
+      var t = stOf(s), sv = savedOf(s);
+      if (act === 'ok' || act === 'okall') { if (!t.has) none++; else if (t.ok) already++; else go.push(s); }
+      else if (act === 'undo') { if (sv.note_ok) { go.push(s); if (sv.published) hid++; } else notOk++; }
+      else if (act === 'pub') { if (t.ok) { go.push(s); if (sv.published) rePub++; } else notOk++; }
+      else if (act === 'unpub') { if (sv.published) go.push(s); else notPub++; }
     });
+    if (none) skips.push('한마디 없음 ' + none + '명은 건너뜀');
+    if (already) skips.push('이미 확정 ' + already + '명은 그대로');
+    if (notOk) skips.push((act === 'undo' ? '확정 전 ' : '확정 안 된 ') + notOk + '명은 건너뜀');
+    if (notPub) skips.push('공개 안 된 ' + notPub + '명은 건너뜀');
+    if (rePub) note = '이미 공개된 ' + rePub + '명은 지금 내용으로 다시 공개(업데이트)돼요.';
+    if (hid) note = '러닝노트에 공개된 ' + hid + '명은 다시 확정할 때까지 러닝노트에서 안 보여요.';
+    if (act === 'pub' && go.length) note = (note ? note + ' ' : '') + '학생 · 학부모 러닝노트 「완주증 모음」에 보여요(문자 · 알림톡은 나가지 않아요).';
+    return { act: act, go: go, skips: skips, note: note };
+  }
+  function bkMsg(p) { return p.go.length + '명 ' + BK_ACT[p.act].q + (p.skips.length ? ' (' + p.skips.join(' · ') + ')' : ''); }
+  function bulk(act) {
+    if (S.bk) return;
+    var p = bkPlan(act);
+    if (!p.go.length) { toast(p.skips.length ? BK_ACT[act].t + ' — 할 학생이 없어요 (' + p.skips.join(' · ') + ')' : '먼저 학생을 고르세요', 'bad'); return; }
+    bkAsk(p).then(function (yes) { if (yes) bkRun(p); });
+  }
+  /* 확인 창 — 공통 Layer · 대상 이름 목록 · [취소] [n명 ○○] */
+  var BKD = null;
+  function bkAsk(p) {
+    return new Promise(function (resolve) {
+      var old = document.getElementById('faBk'); if (old && old.parentNode) old.parentNode.removeChild(old);
+      var el = document.createElement('dialog'); el.className = 'modal fa-bk'; el.id = 'faBk'; el.setAttribute('aria-labelledby', 'faBkT'); el.setAttribute('data-ly-keep', '');
+      var fin = false;
+      function end(v) { if (fin) return; fin = true; BKD = null; if (el.open) Layer.hide(el); resolve(v); }
+      el.innerHTML = '<div class="modal__head"><h2 class="modal__title" id="faBkT">' + esc(BK_ACT[p.act].t) + '</h2><p class="modal__desc">' + esc(S.cls) + ' · ' + (S.kind === 'year' ? '1년 완주증' : esc(S.month) + ' 완주증') + '</p></div>' +
+        '<div class="modal__body fa-bk__b"><p class="fa-bk__q" data-bk-q>' + esc(bkMsg(p)) + '</p>' +
+          (p.note ? '<p class="fa-bk__note">' + esc(p.note) + '</p>' : '') +
+          '<p class="field__label">대상 <b class="num">' + p.go.length + '</b>명</p><ul class="fa-bk__names" data-bk-names>' + p.go.map(function (s) { return '<li>' + esc(s.name) + '</li>'; }).join('') + '</ul></div>' +
+        '<div class="modal__foot"><div class="spacer"></div><button type="button" class="btn" data-bk-no>취소</button><button type="button" class="btn btn--primary" data-bk-yes>' + p.go.length + '명 ' + esc(BK_ACT[p.act].btn) + '</button></div>';
+      el.addEventListener('click', function (e) { if (e.target.closest('[data-bk-yes]')) end(true); else if (e.target.closest('[data-bk-no]')) end(false); });
+      BKD = el;
+      Layer.show(el, { outside: false, onClose: function () { end(false); } });
+    });
+  }
+  function bkPatch(act, s) {
+    if (act === 'ok' || act === 'okall') return { note: noteNow(s), note_ok: true };
+    if (act === 'undo') return { note_ok: false };
+    if (act === 'pub') return { published: true, snap: snapOf(s) };
+    return { published: false };
+  }
+  function bkRun(p) {
+    var go = p.go.slice(), n = 0, bad = 0, i = 0;
+    S.bk = BK_ACT[p.act].ing + ' 중… 0/' + go.length;
+    paintTools();
+    (function next() {
+      var part = go.slice(i, i + 4); i += 4;
+      if (!part.length) {
+        S.bk = ''; S.mark = {};                                          /* 끝나면 고르기 비움 — 같은 버튼을 또 눌러 겹치지 않게 */
+        paintList();
+        toast(n + '명 ' + BK_ACT[p.act].done + (bad ? ' · 실패 ' + bad + '명' : ''), bad ? 'bad' : 'good');
+        return;
+      }
+      Promise.all(part.map(function (s) {
+        return save(s, bkPatch(p.act, s)).then(function (r) { if (r && !r.error && !(r.data && r.data.ok === false)) n++; else bad++; }, function () { bad++; });
+      })).then(function () { S.bk = S.bk.replace(/\d+\/(\d+)$/, (n + bad) + '/$1'); paintTools(); next(); });
+    })();
   }
 
   /* ---------- 반 전체에 같은 편지 넣기 (20261114i · admin/finish-letter.js) ----------
@@ -399,11 +515,12 @@
     if (e.key === 'ArrowLeft' && BIG.i > 0) { BIG.i--; paintBig(); }
   });
   window.addEventListener('resize', fitBig);
-  function repaintCard(s) { var el = dlg.querySelector('[data-fa-id="' + s.id + '"]'); if (el) el.outerHTML = cardHtml(s); }
+  function repaintCard(s) { var el = dlg.querySelector('[data-fa-id="' + s.id + '"]'); if (el) el.outerHTML = cardHtml(s); paintTools(); }
   function rowOf(id) { return S.rows.filter(function (x) { return x.id === id; })[0]; }
 
   /* ---------- 저장 ---------- */
   function save(s, patch) {
+    if ('note' in patch) delete S.draft[s.id];               /* 저장한 글 = 칸의 글 */
     Object.assign(savedOf(s), patch);
     var row = Object.assign({ student: s.id, kind: S.kind, pkey: pkey(), class: S.cls }, patch);
     return Promise.resolve(sb().rpc('finish_save', { p_row: row })).then(function (r) {
@@ -805,11 +922,13 @@
     if (sum) sum.querySelector('p').innerHTML = '대상 <b class="num">' + pl.people + '</b>명 · 문자 <b class="num">' + pl.items.length + '</b>건 · 예상 약 <b class="num">' + pl.won.toLocaleString() + '</b>원 <span class="muted-note">(장문 ' + pl.lms + '원 기준)</span>';
     if (go) { go.disabled = true; go.title = '문구를 바꿨어요 — 시험 발송을 다시 해 보세요'; }
   });
-  function publish(s) {
+  function snapOf(s) {
     var v = viewOf(s);
+    return { kind: v.kind, from: v.from, to: v.to, name: v.name, cls: v.cls, game: v.game, level: v.level, title: v.title, hls: v.hls, flow: v.flow, medals: v.medals, stats: v.stats, note: v.note };
+  }
+  function publish(s) {
     if (!savedOf(s).note_ok) { toast('한마디를 확정해야 공개할 수 있어요', 'bad'); return; }
-    var snap = { kind: v.kind, from: v.from, to: v.to, name: v.name, cls: v.cls, game: v.game, level: v.level, title: v.title, hls: v.hls, flow: v.flow, medals: v.medals, stats: v.stats, note: v.note };
-    save(s, { published: true, snap: snap }).then(function (r) { if (!r.error) { toast(s.name + ' 완주증을 러닝노트에 공개했어요', 'good'); repaintCard(s); } });
+    save(s, { published: true, snap: snapOf(s) }).then(function (r) { if (!r.error) { toast(s.name + ' 완주증을 러닝노트에 공개했어요', 'good'); repaintCard(s); } });
   }
 
   /* ---------- 누르기 ---------- */
@@ -817,7 +936,14 @@
     var t = e.target;
     if (t.closest('[data-fa-close]')) { dlg.close(); return; }
     var la = t.closest('[data-fa-all]'); if (la) { openAll(rowOf(la.getAttribute('data-fa-all'))); return; }
-    if (t.closest('[data-fa-okall]')) { okAll(); return; }
+    var bk = t.closest('[data-bk]'); if (bk) { if (!bk.disabled) bulk(bk.getAttribute('data-bk')); return; }
+    var fl = t.closest('[data-fa-filter]');
+    if (fl) {                                                            /* 거르기를 바꾸면 안 보이게 된 학생은 고르기에서 뺌 */
+      S.filter = fl.getAttribute('data-fa-filter');
+      paintList(); return;
+    }
+    if (t.closest('[data-fa-selall]')) { shown().forEach(function (s) { S.mark[s.id] = true; }); Array.prototype.forEach.call(dlg.querySelectorAll('[data-fa-mark]'), function (x) { x.checked = true; }); paintTools(); return; }
+    if (t.closest('[data-fa-selnone]')) { S.mark = {}; Array.prototype.forEach.call(dlg.querySelectorAll('[data-fa-mark]'), function (x) { x.checked = false; }); paintTools(); return; }
     if (t.closest('[data-fa-send]')) { openSend(); return; }
     var k = t.closest('[data-fa-kind]');
     if (k) { S.kind = k.getAttribute('data-fa-kind'); if (S.cls) setClass(S.cls); if (!S.month) S.month = prevMonth(today()); load(); return; }
@@ -838,23 +964,32 @@
   }
   function onChange(e) {
     var t = e.target;
-    if (t.hasAttribute('data-fa-mark')) { S.mark[t.getAttribute('data-fa-mark')] = t.checked; paintBulk(); return; }
-    if (t.hasAttribute('data-fa-markall')) { S.rows.forEach(function (s) { S.mark[s.id] = t.checked; }); Array.prototype.forEach.call(dlg.querySelectorAll('[data-fa-mark]'), function (x) { x.checked = t.checked; }); paintBulk(); return; }
+    if (t.hasAttribute('data-fa-mark')) { if (t.checked) S.mark[t.getAttribute('data-fa-mark')] = true; else delete S.mark[t.getAttribute('data-fa-mark')]; paintTools(); return; }
     if (t.id === 'faClass') { setClass(t.value); if (!S.month) S.month = prevMonth(today()); load(); return; }
     if (t.id === 'faFrom' || t.id === 'faTo') { S[t.id === 'faFrom' ? 'from' : 'to'] = t.value; load(); return; }
     if (t.id === 'faMonth') { S.month = t.value; load(); return; }
     if (t.hasAttribute('data-fa-p2')) { try { localStorage.setItem('mh.fin.p2.' + S.cls, t.checked ? '1' : '0'); } catch (e2) { /* 기억 못 해도 이번엔 그대로 */ } return; }
-    if (t.hasAttribute('data-fa-title')) { var s = rowOf(t.getAttribute('data-fa-title')); save(s, { title: t.value }).then(function () { savedOf(s).title_key = t.value; repaintCard(s); }); savedOf(s).title_key = t.value; return; }
+    /* 칭호 · 하이라이트 — 확정 뒤에 바꾸면 그 학생만 확정이 풀림 */
+    if (t.hasAttribute('data-fa-title')) { var s = rowOf(t.getAttribute('data-fa-title')), pt = { title: t.value }; if (savedOf(s).note_ok) pt.note_ok = false; save(s, pt).then(function () { savedOf(s).title_key = t.value; repaintCard(s); }); savedOf(s).title_key = t.value; return; }
     if (t.hasAttribute('data-fa-hl')) {
       var s2 = rowOf(t.getAttribute('data-fa-hl')), box = dlg.querySelector('[data-fa-id="' + s2.id + '"]');
       var keys = Array.prototype.map.call(box.querySelectorAll('[data-fa-hl]:checked'), function (x) { return x.value; });
       savedOf(s2).hl_keys = keys.length ? keys : ['-'];
-      save(s2, { hls: savedOf(s2).hl_keys }).then(function () { repaintCard(s2); });
+      var ph = { hls: savedOf(s2).hl_keys }; if (savedOf(s2).note_ok) ph.note_ok = false;
+      save(s2, ph).then(function () { repaintCard(s2); });
     }
   }
   function onInput(e) {
     var t = e.target;
-    if (t.hasAttribute && t.hasAttribute('data-fa-note')) { var s = rowOf(t.getAttribute('data-fa-note')); if (s && savedOf(s).note_ok) { savedOf(s).note_ok = false; } }
+    if (t.hasAttribute && t.hasAttribute('data-fa-note')) {
+      var s = rowOf(t.getAttribute('data-fa-note')); if (!s) return;
+      var was = stOf(s).st;
+      S.draft[s.id] = t.value;
+      if (savedOf(s).note_ok) save(s, { note_ok: false });              /* 확정 뒤에 고치면 그 학생만 확정 풀림 */
+      if (stOf(s).st !== was) { paintFlags(s); var ok = dlg.querySelector('[data-fa-ok="' + s.id + '"]'); if (ok) { ok.textContent = '확정'; ok.classList.add('btn--primary'); }
+        var pb = dlg.querySelector('[data-fa-pub="' + s.id + '"]'); if (pb) pb.disabled = !savedOf(s).note_ok;
+        paintTools(); }
+    }
   }
 
   function open() {

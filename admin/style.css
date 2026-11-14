@@ -5047,3 +5047,42 @@ dialog.modal.fa-ps { width: min(620px, calc(100vw - 16px)); max-height: calc(100
 .fa-pd__ok { margin: 0; font-size: 14px; font-weight: 800; color: #1F7A4D; }
 .fa-pd__fail { padding: 8px 12px; border: 1px solid #F3C4C0; border-radius: 12px; background: #FFF6F5; font-size: 13px; }
 .fa-pd__fail b { color: #B42318; } .fa-pd__fail ul { margin: 4px 0 0; padding-left: 18px; }
+
+/* 20261115a — 완주증 한 번에 확정 · 풀기 · 공개 — 카드 왼쪽 위 체크 · 고정 막대 · 거르기 칩 · 상태 배지 */
+.fa-card { position: relative; }
+.fa-sel { position: absolute; top: 4px; left: 4px; z-index: 1; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 10px; background: rgba(255,255,255,.94); box-shadow: 0 1px 4px rgba(46,34,102,.22); cursor: pointer; }
+.fa-sel input { width: 22px; height: 22px; margin: 0; cursor: pointer; accent-color: #5A3FD0; }
+.fa-card.is-marked { border-color: #5A3FD0; box-shadow: inset 4px 0 0 #5A3FD0, 0 0 0 1px #5A3FD0; background: #FBFAFF; }
+.fa-ctl__h b { margin-left: 0; }
+.fa-ctl__f { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.fa-st { font-size: 11.5px; padding: 2px 9px; }
+.fa-st--wait { background: #FDE2E2; color: #B42318; }
+.fa-st--ok { background: #DDF3E6; color: #17663F; }
+.fa-st--pub { background: #DFEBFF; color: #1D4FB8; }
+.fa-st--none { background: #EEEEF3; color: #5B5F73; }
+.fa-st--off { background: #F3F0E8; color: #6B5B2E; font-weight: 700; }
+.fa-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; }
+.fa-chip { appearance: none; font: inherit; font-size: 13px; font-weight: 800; min-height: 36px; padding: 0 12px; border: 1px solid #DCD6F3; border-radius: 999px; background: #fff; color: #4A4F68; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.fa-chip b { font-size: 12px; min-width: 18px; padding: 0 6px; border-radius: 999px; background: #F1EEFF; color: #5A3FD0; text-align: center; }
+.fa-chip.is-on { border-color: #5A3FD0; background: #5A3FD0; color: #fff; }
+.fa-chip.is-on b { background: rgba(255,255,255,.25); color: #fff; }
+.fa-chip--wait:not(.is-on) b { background: #FDE2E2; color: #B42318; }
+.fa-chip--ok:not(.is-on) b { background: #DDF3E6; color: #17663F; }
+.fa-chip--pub:not(.is-on) b { background: #DFEBFF; color: #1D4FB8; }
+.fa-bulk { top: 0; box-shadow: 0 4px 10px -6px rgba(46,34,102,.35); }
+.fa-bulk__sel { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.fa-bulk__b { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+.fa-bulk .fa-bulk__b .btn, .fa-bulk .fa-bulk__sel .btn { margin-left: 0; }
+.fa-empty { margin: 14px 0; }
+.fa-bk__b { display: grid; gap: 8px; }
+.fa-bk__q { margin: 0; font-size: 15px; font-weight: 800; }
+.fa-bk__note { margin: 0; font-size: 13px; color: #5B5F73; }
+.fa-bk__names { margin: 0; padding: 8px 12px; list-style: none; display: flex; flex-wrap: wrap; gap: 4px 10px; max-height: 40vh; overflow: auto; border: 1px solid #E6E2F6; border-radius: 10px; background: #FAF9FF; font-size: 13.5px; }
+@media (max-width: 640px) {
+  .fa-bulk { padding: 8px; gap: 6px; }
+  .fa-bulk__b { margin-left: 0; flex-wrap: nowrap; overflow-x: auto; width: 100%; padding-bottom: 2px; -webkit-overflow-scrolling: touch; }
+  .fa-bulk__b .btn { flex: 0 0 auto; white-space: nowrap; }
+  .fa-chips { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
+  .fa-chip { flex: 0 0 auto; }
+  .fa-sel { top: 14px; left: 14px; }
+}
