@@ -475,5 +475,5 @@
     return Promise.race([FONT_P, t]);
   }
 
-  global.Finish = { compute: compute, view: view, pageHtml: pageHtml, pagesHtml: pagesHtml, letterHtml: letterHtml, letterBody: letterBody, noteInline: noteInline, printDoc: printDoc, plan: plan, printPlanDoc: printPlanDoc, flowSvg: flowSvg, fit: fit, overOf: overOf, loadFont: loadFont, RULE: RULE, P1: P1, LF: LF };
+  global.Finish = { compute: compute, view: view, pageHtml: pageHtml, pagesHtml: pagesHtml, letterHtml: letterHtml, letterBody: letterBody, noteInline: noteInline, printDoc: printDoc, plan: plan, printPlanDoc: printPlanDoc, flowSvg: flowSvg, fit: fit, overOf: overOf, loadFont: loadFont, FONT_URL: FONT_URL, RULE: RULE, P1: P1, LF: LF };
 })(window);

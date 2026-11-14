@@ -165,6 +165,7 @@
         : '<label class="fa-f"><span>달</span><input class="input" type="month" id="faMonth" value="' + esc(S.month) + '"></label>') +
       (S.kind === 'year' && S.cls ? '<label class="fa-p2"><input type="checkbox" data-fa-p2' + (p2On() ? ' checked' : '') + '> 2쪽 「나의 1년 레이스 기록」</label>' : '') +
       (S.rows.length ? '<button type="button" class="btn btn--primary" data-fa-printall>이 반 전체 인쇄</button>' : '') +
+      (S.rows.length ? '<button type="button" class="btn" data-fa-pdfall>📥 학생별 PDF 한 번에 받기</button>' : '') +
       (S.rows.length ? '<button type="button" class="btn" data-fa-send>📨 완주증 보내기</button>' : '') +
       '</div>' + (S.kind === 'year' ? '<p class="field__hint">' + (onlineCls(S.cls) ? '온라인 반은 학생마다 앱 기록의 첫 달 ~ 마지막 달로 만들어요(여러 앱 반 기록을 이어 붙임).' : '종강일 · 개강일은 반 관리 → 수업 설정에서 반마다 바꿀 수 있어요. 여기서 바꾸면 이 화면에만 써요.') + '</p>' : '');
   }
@@ -190,6 +191,7 @@
         '<label class="field__label">칭호</label>' + titles +
         '<label class="field__label">하이라이트</label>' + hls + note +
         '<div class="fa-ctl__b"><button type="button" class="btn btn--sm" data-fa-print="' + s.id + '">이 학생 인쇄</button>' +
+          '<button type="button" class="btn btn--sm" data-fa-pdf="' + s.id + '">이 학생 PDF 저장</button>' +
           (year ? '<button type="button" class="btn btn--sm" data-fa-pub="' + s.id + '"' + (sv.note_ok ? '' : ' disabled title="한마디를 확정해야 공개할 수 있어요"') + '>' + (sv.published ? '러닝노트 공개 다시(내용 업데이트)' : '러닝노트에 공개') + '</button>' : '') +
         '</div></div></article>';
   }
@@ -525,6 +527,127 @@
     if (t.name === 'psRange') { PS.range = t.value; PS.hint = ''; if ((t.value === 'p1' || t.value === 'p1l') && PS.mode === 'duplex') { PS.mode = 'simplex'; PS.hint = (t.value === 'p1' ? '1쪽만은' : '1쪽 + 편지는') + ' 단면이 좋아요 · 양면으로 바꿀 수도 있어요'; } paintPs(); }
     if (t.name === 'psMode') { PS.mode = t.value; PS.hint = ''; paintPs(); }
   });
+  /* ---------- 학생별 PDF (20261114k · admin/finish-pdf.js) ----------
+     [📥 학생별 PDF 한 번에 받기] → 범위(전체 쪽 · 1쪽 + 편지 · 1쪽만 · 2쪽부터) · 대상 학생(기본 전원 · 「편지 없음」 표시 · 그래도 받을 수 있음)
+     → 학생마다 PDF 하나 · ZIP 하나 「반이름_완주증_날짜.zip」 · 안의 파일 「반이름_학생이름_완주증(1년|11월).pdf」
+     학생 카드 [이 학생 PDF 저장] → 같은 창(학생 목록 없음) → PDF 하나
+     진행 막대 「n / 전체 명 만드는 중」 · [멈추기] → 만든 학생만 받을 수 있음 · 실패한 학생은 끝에 목록 · 나머지는 계속
+     브라우저 안에서만 · 서명은 지금처럼 직원 로그인 때만 · 파일은 이 PC 에만 */
+  var PD = null, PD_KEY = 'mh.fin.pdf';
+  function pdLabel() { return S.kind === 'year' ? '1년' : (+String(S.month).slice(5, 7)) + '월'; }
+  function pdLetter(s) { var sv = savedOf(s); return !!(sv.note_ok && String(sv.note || '').trim()); }
+  function pdFile(name) { return FinPdf.safeName(S.cls) + '_' + (FinPdf.safeName(name) || '이름없음') + '_완주증(' + pdLabel() + ').pdf'; }
+  function pdZip() { return FinPdf.safeName(S.cls) + '_완주증_' + today() + '.zip'; }
+  function pdfList(list, single) {
+    list = (list || []).filter(Boolean);
+    if (!list.length) return;
+    if (!window.FinPdf) { toast('화면을 새로 고쳐 주세요', 'bad'); return; }
+    ready().then(function () { pdfList0(list, single); });
+  }
+  function pdfList0(list, single) {
+    var r = 'all'; try { var o = JSON.parse(localStorage.getItem(PD_KEY) || '{}'); if (/^(all|p1|p1l|p2)$/.test(o.range)) r = o.range; } catch (e) { /* 기본 */ }
+    var studs = studPages(list), ck = {};
+    list.forEach(function (s) { ck[s.id] = true; });
+    var old = document.getElementById('faPdf'); if (old && old.parentNode) old.parentNode.removeChild(old);
+    var el = document.createElement('dialog'); el.className = 'modal fa-ps fa-pd'; el.id = 'faPdf'; el.setAttribute('aria-label', '학생별 PDF');
+    PD = { el: el, list: list, studs: studs, single: single, range: r, ck: ck, phase: 'pick', done: 0, total: 0, files: [], fails: [], stop: false, now: '', bytes: 0, fontOk: true };
+    if (!pdP2() && PD.range === 'p2') PD.range = 'all';
+    paintPd();
+    Layer.show(el, { onClose: function () { if (PD) PD.stop = true; PD = null; } });
+  }
+  function pdP2() { return PD.studs.some(function (x) { return x.pages.length > 1; }); }
+  function pdPicked() { return PD.list.filter(function (s) { return PD.ck[s.id]; }); }
+  function mb(n) { return (n / 1048576).toFixed(n >= 10485760 ? 0 : 1) + 'MB'; }
+  function paintPd() {
+    if (!PD) return;
+    var head = '<div class="modal__head"><h2 class="modal__title">📥 ' + (PD.single ? '이 학생 PDF 저장' : '학생별 PDF 한 번에 받기') + '</h2><p class="modal__desc">' +
+      (PD.single ? esc(PD.list[0].name) : esc(S.cls) + ' ' + PD.list.length + '명') + ' · ' + (S.kind === 'year' ? '1년 완주증' : esc(S.month) + ' 완주증') + ' · A4 · 이 PC 에만 저장돼요</p></div>';
+    if (PD.phase === 'pick') {
+      var p2ok = pdP2(), n = pdPicked().length;
+      var ranges = [['all', '전체 쪽', ''], ['p1l', '1쪽 + 편지', ''], ['p1', '1쪽만 (완주증)', ''], ['p2', '2쪽부터 (레이스 기록 · 편지)', p2ok ? '' : '1쪽뿐이에요']];
+      var rows = PD.single ? (pdLetter(PD.list[0]) ? '' : '<p class="fa-pd__note">편지 없음 — 한마디를 확정하지 않아 편지 쪽 없이 만들어요</p>') :
+        '<div class="fa-lt__bar"><button type="button" class="btn btn--sm" data-pd-all="1">모두 체크</button><button type="button" class="btn btn--sm" data-pd-all="0">모두 해제</button><span class="muted-note" data-pd-n>체크 <b class="num">' + n + '</b>명</span></div>' +
+        '<div class="fa-pd__list">' + PD.list.map(function (s, i) {
+          var st = PD.studs[i];
+          return '<label class="fa-pd__r' + (PD.ck[s.id] ? ' is-on' : '') + '"><input type="checkbox" data-pd-ck="' + s.id + '"' + (PD.ck[s.id] ? ' checked' : '') + '><b>' + esc(s.name) + '</b>' +
+            '<span class="muted-note num">' + st.pages.length + '쪽</span>' + (pdLetter(s) ? '' : '<span class="fa-flag">편지 없음</span>') + '</label>';
+        }).join('') + '</div>';
+      PD.el.innerHTML = head + '<div class="modal__body fa-ps__b">' +
+        '<fieldset class="fa-ps__f"><legend>인쇄 범위</legend><div class="fa-ps__opts">' + ranges.map(function (x) {
+          var dis = x[0] === 'p2' && !p2ok;
+          return '<label class="fa-ps__o' + (PD.range === x[0] ? ' is-on' : '') + (dis ? ' is-off' : '') + '"><input type="radio" name="pdRange" value="' + x[0] + '"' + (PD.range === x[0] ? ' checked' : '') + (dis ? ' disabled' : '') + '><b>' + x[1] + '</b>' + (x[2] ? '<small>' + x[2] + '</small>' : '') + '</label>';
+        }).join('') + '</div><p class="field__hint">편지(확정한 한마디)가 없는 학생은 「1쪽 + 편지」도 1쪽만 · 「2쪽부터」에서 1쪽뿐인 학생은 빠져요</p></fieldset>' +
+        (PD.single ? rows : '<fieldset class="fa-ps__f"><legend>대상 학생</legend>' + rows + '</fieldset>') +
+        '<p class="fa-ps__sum">' + (PD.single ? 'PDF 파일 하나 · ' + esc(pdFile(PD.list[0].name)) : '학생 <b>' + n + '</b>명 · PDF ' + n + '개를 ZIP 하나로 · ' + esc(pdZip())) + '</p>' +
+        '<p class="muted-note">브라우저 안에서만 만들어요(서버로 보내지 않음) · 학생이 많으면 몇 분 걸릴 수 있어요</p>' +
+        '</div><div class="modal__foot"><div class="spacer"></div><button type="button" class="btn" data-pd-x>취소</button><button type="button" class="btn btn--primary" data-pd-go' + (n ? '' : ' disabled') + '>' + (PD.single ? 'PDF 저장' : 'PDF 만들기 (' + n + '명)') + '</button></div>';
+      return;
+    }
+    var pct = PD.total ? Math.round(PD.done / PD.total * 100) : 0, run = PD.phase === 'run';
+    var fails = PD.fails.length ? '<div class="fa-pd__fail" role="alert"><b>만들지 못한 학생 ' + PD.fails.length + '명</b><ul>' + PD.fails.map(function (f) { return '<li>' + esc(f.name) + ' <span class="muted-note">' + esc(f.why) + '</span></li>'; }).join('') + '</ul></div>' : '';
+    var made = PD.files.length, avg = made ? PD.bytes / made : 0;
+    var sum = PD.phase === 'done' ? '<p class="fa-pd__ok" role="status">✓ ' + (PD.single ? 'PDF 를 저장했어요' : made + '명 PDF 를 ZIP 하나로 내려받았어요') + ' · ' + (PD.single ? mb(PD.bytes) : '학생 한 명 평균 ' + mb(avg) + ' · 모두 ' + mb(PD.bytes)) + '</p>' +
+        (PD.fontOk ? '' : '<p class="fa-ps__hint">편지 글꼴을 받지 못한 쪽은 기본 글꼴로 만들었어요(인터넷 연결 확인)</p>') :
+      PD.phase === 'stopped' ? '<p class="fa-ps__hint" role="status">멈췄어요 — ' + made + '명까지 만들었어요' + (made ? ' · 만든 학생만 받을 수 있어요' : '') + '</p>' : '';
+    PD.el.innerHTML = head + '<div class="modal__body fa-ps__b">' +
+      '<div class="fa-pd__prog"><div class="fa-pd__bar" role="progressbar" aria-valuemin="0" aria-valuemax="' + PD.total + '" aria-valuenow="' + PD.done + '"><span style="width:' + pct + '%"></span></div>' +
+      '<p class="fa-pd__t" data-pd-t><b class="num">' + PD.done + ' / ' + PD.total + '</b>명 ' + (run ? '만드는 중' + (PD.now ? ' · ' + esc(PD.now) : '') : PD.phase === 'stopped' ? '· 멈춤' : '· 끝') + '</p></div>' +
+      sum + fails + '</div><div class="modal__foot"><div class="spacer"></div>' +
+      (run ? '<button type="button" class="btn" data-pd-stop' + (PD.stop ? ' disabled' : '') + '>' + (PD.stop ? '멈추는 중…' : '멈추기') + '</button>'
+        : (PD.phase === 'stopped' && made ? '<button type="button" class="btn btn--primary" data-pd-part>만든 ' + made + '명만 ' + (PD.single ? 'PDF' : 'ZIP') + '으로 받기</button>' : '') + '<button type="button" class="btn" data-pd-x>닫기</button>') + '</div>';
+  }
+  function pdGo() {
+    var list = pdPicked();
+    if (!list.length) return;
+    try { localStorage.setItem(PD_KEY, JSON.stringify({ range: PD.range })); } catch (e) { /* 기억 못 해도 그대로 */ }
+    var me = PD, ses = FinPdf.session({ css: abs('../assets/finish.css'), fontCss: [Finish.FONT_URL] });
+    me.phase = 'run'; me.total = list.length; me.done = 0; me.files = []; me.fails = []; me.bytes = 0; me.stop = false;
+    paintPd();
+    var used = {}, i = 0, alive = function () { return !me.stop && PD === me; };
+    (function next() {
+      if (PD !== me) { ses.close(); return; }
+      if (me.stop || i >= list.length) { ses.close(); pdEnd(me); return; }
+      var s = list[i++], st = me.studs[me.list.indexOf(s)];
+      me.now = s.name; paintPd();
+      var pl = Finish.plan([st], { range: me.range, mode: 'simplex', single: true });
+      if (!pl.count) { me.fails.push({ name: s.name, why: me.range === 'p2' ? '2쪽이 없어요' : '고른 범위에 쪽이 없어요' }); me.done++; next(); return; }
+      var fname = FinPdf.uniq(pdFile(s.name), used);
+      Promise.resolve().then(function () { return ses.student(pl.pages.map(function (p) { return p.html; }), fname.replace(/\.pdf$/, ''), alive); }).then(function (r) {
+        me.files.push({ name: fname, data: r.bytes, pages: r.pages, dpi: r.dpi, q: r.q }); me.bytes += r.bytes.length; if (!r.fontOk) me.fontOk = false;
+      }, function (e) {
+        if (!alive()) return;
+        me.fails.push({ name: s.name, why: String((e && e.message) || e || '알 수 없는 오류').slice(0, 80) });
+      }).then(function () { if (alive()) me.done++; next(); });
+    })();
+  }
+  function pdEnd(me) {
+    if (me.stop) { me.phase = 'stopped'; paintPd(); return; }
+    me.phase = 'done';
+    pdSave(me);
+    paintPd();
+  }
+  function pdSave(me) {
+    if (!me.files.length) return;
+    if (me.single) FinPdf.save(me.files[0].data, me.files[0].name, 'application/pdf');
+    else FinPdf.save(FinPdf.zip(me.files.map(function (f) { return { name: f.name, data: f.data }; })), pdZip(), 'application/zip');
+    toast(me.single ? 'PDF 를 저장했어요' : me.files.length + '명 PDF 를 ZIP 으로 받았어요', 'good');
+  }
+  document.addEventListener('click', function (e) {
+    if (!PD || !e.target.closest || !PD.el.contains(e.target)) return;
+    var t = e.target;
+    if (t.closest('[data-pd-x]')) { var el = PD.el; PD.stop = true; PD = null; Layer.hide(el); return; }
+    if (t.closest('[data-pd-go]')) { pdGo(); return; }
+    if (t.closest('[data-pd-stop]')) { PD.stop = true; paintPd(); return; }
+    if (t.closest('[data-pd-part]')) { pdSave(PD); PD.phase = 'done'; paintPd(); return; }
+    var a = t.closest('[data-pd-all]');
+    if (a) { var on = a.getAttribute('data-pd-all') === '1'; PD.list.forEach(function (s) { PD.ck[s.id] = on; }); paintPd(); }
+  });
+  document.addEventListener('change', function (e) {
+    if (!PD || !e.target || !PD.el.contains(e.target)) return;
+    var t = e.target;
+    if (t.name === 'pdRange') { PD.range = t.value; paintPd(); }
+    if (t.hasAttribute('data-pd-ck')) { PD.ck[t.getAttribute('data-pd-ck')] = t.checked; paintPd(); }
+  });
   /* ---------- 완주증 보내기 (20261114j · migration-114 finish_send_info · finish_send_mark · 함수 sms-send purpose 'finish') ----------
      반마다 [완주증 보내기] — 학생마다 러닝노트 링크를 문자(LMS)로 · 1년판은 [러닝노트에 공개]한 학생만 · 이달판은 그 달 기록이 있는 학생
      받는 사람 학생 / 학부모 / 둘 다 · 확인 창(대상 · 번호 없음 · 링크 없음 · 이미 보냄 · 예상 비용 · 실제 한 건 문구)
@@ -699,6 +822,8 @@
     var k = t.closest('[data-fa-kind]');
     if (k) { S.kind = k.getAttribute('data-fa-kind'); if (S.cls) setClass(S.cls); if (!S.month) S.month = prevMonth(today()); load(); return; }
     if (t.closest('[data-fa-printall]')) { printList(S.rows); return; }
+    if (t.closest('[data-fa-pdfall]')) { pdfList(S.rows, false); return; }
+    var pf = t.closest('[data-fa-pdf]'); if (pf) { pdfList([rowOf(pf.getAttribute('data-fa-pdf'))].filter(Boolean), true); return; }
     var bg = t.closest('[data-fa-big]'); if (bg) { openBig(rowOf(bg.getAttribute('data-fa-big'))); return; }
     var p = t.closest('[data-fa-print]'); if (p) { printList([rowOf(p.getAttribute('data-fa-print'))].filter(Boolean)); return; }
     var ai = t.closest('[data-fa-ai]'); if (ai) { aiDraft(rowOf(ai.getAttribute('data-fa-ai'))); return; }
@@ -743,5 +868,5 @@
       if (S.cls) load(); else paint();
     }, function (e) { S.err = String((e && e.message) || e); paint(); });
   }
-  window.FinishAdmin = { open: open, state: function () { return S; }, _views: views, _ps: function () { return PS; }, _sign: function () { return SIGN; }, _lt: function () { return LT; }, _fs: function () { return FS; } };
+  window.FinishAdmin = { open: open, state: function () { return S; }, _views: views, _ps: function () { return PS; }, _sign: function () { return SIGN; }, _lt: function () { return LT; }, _fs: function () { return FS; }, _pd: function () { return PD; } };
 })();

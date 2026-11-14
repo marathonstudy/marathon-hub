@@ -5032,3 +5032,18 @@ dialog.modal.fa-ps { width: min(620px, calc(100vw - 16px)); max-height: calc(100
 .ol-ctbl { border-collapse: collapse; font-size: 13px; }
 .ol-ctbl th, .ol-ctbl td { padding: 7px 8px; border-bottom: 1px solid #ECEAF5; text-align: left; vertical-align: middle; }
 .ol-ctbl thead th { background: #F8F6FF; position: sticky; top: 0; }
+
+/* 완주증 학생별 PDF (20261114k · finish-admin.js · finish-pdf.js) */
+.fa-pd__list { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; max-height: 40vh; overflow-y: auto; padding-right: 2px; }
+.fa-pd__r { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 7px 10px; border: 1px solid #E6E2F6; border-radius: 12px; cursor: pointer; background: #fff; min-width: 0; }
+.fa-pd__r.is-on { border-color: #5A3FD0; background: #F8F6FF; }
+.fa-pd__r input { width: 18px; height: 18px; margin: 0; }
+.fa-pd__r b { font-size: 14px; overflow-wrap: anywhere; }
+.fa-pd__note { margin: 0; font-size: 13px; font-weight: 800; color: #7A5300; }
+.fa-pd__prog { display: grid; gap: 6px; }
+.fa-pd__bar { height: 14px; border-radius: 999px; background: #EEEAFB; overflow: hidden; }
+.fa-pd__bar span { display: block; height: 100%; background: #5A3FD0; border-radius: 999px; transition: width .2s; }
+.fa-pd__t { margin: 0; font-size: 14px; } .fa-pd__t b { font-size: 16px; color: #2E2266; }
+.fa-pd__ok { margin: 0; font-size: 14px; font-weight: 800; color: #1F7A4D; }
+.fa-pd__fail { padding: 8px 12px; border: 1px solid #F3C4C0; border-radius: 12px; background: #FFF6F5; font-size: 13px; }
+.fa-pd__fail b { color: #B42318; } .fa-pd__fail ul { margin: 4px 0 0; padding-left: 18px; }
