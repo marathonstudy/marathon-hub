@@ -4947,3 +4947,26 @@ dialog.modal.fa-ps { width: min(620px, calc(100vw - 16px)); max-height: calc(100
 
 /* 20261114g — 온라인 반 학생 카드 안내 한 줄 */
 .sc-online { margin: 10px 0 4px; padding: 8px 12px; border-radius: 10px; background: #F3EFFF; font-size: 13px; font-weight: 800; color: #4A3BA8; }
+
+/* 20261114i — 완주증 「반 전체에 같은 편지 넣기」 · 표시한 학생 모두 확정 */
+.fa-note__all { margin-top: 6px; }
+.fa-mark { display: inline-flex; align-items: center; }
+.fa-mark input { width: 18px; height: 18px; margin: 0; }
+.fa-card.is-marked { box-shadow: inset 4px 0 0 #5A3FD0; }
+.fa-bulk { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 10px 0 4px; padding: 8px 12px; border: 1px solid #E2DCF8; border-radius: 12px; background: #F8F6FF; }
+.fa-bulk__all { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 800; }
+.fa-bulk__n { font-size: 13px; color: #4A4F68; }
+.fa-bulk .btn { margin-left: auto; }
+.fa-lt__b { display: grid; gap: 10px; }
+.fa-lt__ok { margin: 0; font-size: 13.5px; font-weight: 800; color: #1F7A4D; }
+.fa-lt__warn { margin: 0; font-size: 13.5px; font-weight: 800; color: #B0362B; background: #FFF1EF; border-radius: 10px; padding: 8px 10px; }
+.fa-lt__src textarea { width: 100%; box-sizing: border-box; }
+.fa-lt__pick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.fa-lt__bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.fa-lt__list { display: grid; gap: 6px; max-height: 46vh; overflow-y: auto; padding-right: 2px; }
+.fa-lt__r { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; align-items: start; padding: 8px 10px; border: 1px solid #E6E2F6; border-radius: 12px; cursor: pointer; background: #fff; min-width: 0; }
+.fa-lt__r.is-on { border-color: #5A3FD0; background: #F8F6FF; }
+.fa-lt__r input { grid-row: span 2; width: 18px; height: 18px; margin: 2px 0 0; }
+.fa-lt__who { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 14px; }
+.fa-lt__pv { font-size: 13px; line-height: 1.5; color: #4A4F68; min-width: 0; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.fa-lt__nm { background: #FFE9A8; color: #2E2266; font-weight: 800; border-radius: 4px; padding: 0 2px; }
