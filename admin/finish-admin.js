@@ -165,6 +165,7 @@
         : '<label class="fa-f"><span>달</span><input class="input" type="month" id="faMonth" value="' + esc(S.month) + '"></label>') +
       (S.kind === 'year' && S.cls ? '<label class="fa-p2"><input type="checkbox" data-fa-p2' + (p2On() ? ' checked' : '') + '> 2쪽 「나의 1년 레이스 기록」</label>' : '') +
       (S.rows.length ? '<button type="button" class="btn btn--primary" data-fa-printall>이 반 전체 인쇄</button>' : '') +
+      (S.rows.length ? '<button type="button" class="btn" data-fa-send>📨 완주증 보내기</button>' : '') +
       '</div>' + (S.kind === 'year' ? '<p class="field__hint">' + (onlineCls(S.cls) ? '온라인 반은 학생마다 앱 기록의 첫 달 ~ 마지막 달로 만들어요(여러 앱 반 기록을 이어 붙임).' : '종강일 · 개강일은 반 관리 → 수업 설정에서 반마다 바꿀 수 있어요. 여기서 바꾸면 이 화면에만 써요.') + '</p>' : '');
   }
   function cardHtml(s) {
@@ -524,6 +525,163 @@
     if (t.name === 'psRange') { PS.range = t.value; PS.hint = ''; if ((t.value === 'p1' || t.value === 'p1l') && PS.mode === 'duplex') { PS.mode = 'simplex'; PS.hint = (t.value === 'p1' ? '1쪽만은' : '1쪽 + 편지는') + ' 단면이 좋아요 · 양면으로 바꿀 수도 있어요'; } paintPs(); }
     if (t.name === 'psMode') { PS.mode = t.value; PS.hint = ''; paintPs(); }
   });
+  /* ---------- 완주증 보내기 (20261114j · migration-114 finish_send_info · finish_send_mark · 함수 sms-send purpose 'finish') ----------
+     반마다 [완주증 보내기] — 학생마다 러닝노트 링크를 문자(LMS)로 · 1년판은 [러닝노트에 공개]한 학생만 · 이달판은 그 달 기록이 있는 학생
+     받는 사람 학생 / 학부모 / 둘 다 · 확인 창(대상 · 번호 없음 · 링크 없음 · 이미 보냄 · 예상 비용 · 실제 한 건 문구)
+     [원장님 번호로 시험 발송](설정의 내 시험 번호 · 한 건) 먼저 → [실제 발송] → 「n명에게 보낼까요?」 한 번 더
+     온라인 반 자동 발송은 계속 꺼짐 — 이 버튼으로만 나감 · 같은 완주증을 같은 사람에게 두 번 보내지 않게 기록 · 번호는 화면에 보이지 않음 */
+  var FS = null;
+  var SITE_ME = 'https://marathonstudy.github.io/marathon-hub/me/#';
+  function fsLabel() { return S.kind === 'year' ? '1년' : (+String(S.month).slice(5, 7)) + '월'; }
+  function fsBodies() {
+    var k = fsLabel();
+    return {
+      s: S.kind === 'year'
+        ? '[마라톤국어] #{이름} 학생의 1년 완주증이 도착했어요. 한 해 동안 끝까지 달려 줘서 고마워요. 선생님의 편지도 함께 있어요. #{링크}'
+        : '[마라톤국어] #{이름} 학생의 ' + k + ' 완주증이 도착했어요. 한 달 동안 달려온 기록을 확인해 보세요. #{링크}',
+      p: '[마라톤국어] #{이름} 학생의 ' + (S.kind === 'year' ? '1년' : k) + ' 완주증이 나왔어요. 편하실 때 한 번 봐 주세요. #{링크}'
+    };
+  }
+  function fsCan(s) { return S.kind === 'year' ? !!savedOf(s).published : !!(s.cert && s.cert.items > 0); }
+  function fsBytes(t) { var n = 0; for (var i = 0; i < t.length; i++) { var c = t.charCodeAt(i); n += c > 0 && c < 128 ? 1 : 2; } return n; }
+  function fsText(body, name) { return body.split('#{이름}').join(name).split('#{링크}').join(SITE_ME + '…'); }
+  /* 보낼 줄 — [{ s, to, body }] · 빠진 이유별 학생 수 */
+  function fsPlan() {
+    var items = [], why = { off: 0, nophone: 0, nolink: 0, sent: 0 }, who = {};
+    S.rows.forEach(function (s) {
+      if (!fsCan(s)) { why.off++; return; }
+      var inf = FS.info[s.id] || {}, sent = inf.sent || [], add = 0, miss = 0, nolink = 0, dup = 0;
+      if (FS.to !== 'parent') {
+        if (!inf.sp) miss++; else if (!inf.scode) nolink++; else if (sent.indexOf('student') >= 0) dup++; else { items.push({ s: s, to: 'student', body: FS.bs }); add++; }
+      }
+      if (FS.to !== 'student') {
+        var pt = inf.pp ? 'parent1' : inf.pp2 ? 'parent2' : '';
+        if (!pt) miss++; else if (!inf.hcode) nolink++; else if (sent.indexOf('parent1') >= 0 || sent.indexOf('parent2') >= 0) dup++; else { items.push({ s: s, to: pt, body: FS.bp }); add++; }
+      }
+      if (add) who[s.id] = 1;
+      if (miss) why.nophone++;                    /* 그 번호만 빠짐(다른 쪽 번호가 있으면 그쪽은 보냄) */
+      if (nolink) why.nolink++;
+      if (dup) why.sent++;
+    });
+    var cfg = (window.Sms && Sms.state && Sms.state().cfg) || {}, lms = +cfg.lmsWon || 50, sms = +cfg.smsWon || 20;
+    var won = items.reduce(function (w, x) { return w + (fsBytes(fsText(x.body, x.s.name) + 'xxxxxxxxxxxxxxxxxxxxxx') > 90 ? lms : sms); }, 0);
+    return { items: items, people: Object.keys(who).length, why: why, won: won, lms: lms };
+  }
+  function openSend() {
+    if (!S.rows.length) return;
+    var b = fsBodies();
+    var old = document.getElementById('faSend'); if (old && old.parentNode) old.parentNode.removeChild(old);
+    var el = document.createElement('dialog'); el.className = 'modal modal--wide fa-fs'; el.id = 'faSend'; el.setAttribute('aria-label', '완주증 보내기');
+    FS = { el: el, to: 'student', bs: b.s, bp: b.p, info: {}, busy: true, msg: '', tested: false, loaded: false };
+    paintSend();
+    Layer.show(el, { onClose: function () { FS = null; } });
+    Promise.resolve(sb().rpc('finish_send_info', { p_class: S.cls, p_kind: S.kind, p_key: pkey() })).then(function (r) {
+      if (!FS) return;
+      FS.busy = false;
+      if (r.error) { FS.msg = /finish_send_info|function/.test(r.error.message || '') ? 'migration-114 SQL 을 먼저 실행해 주세요.' : r.error.message; FS.err = true; paintSend(); return; }
+      (r.data || []).forEach(function (x) { FS.info[x.id] = x; });
+      FS.loaded = true; paintSend();
+    });
+  }
+  function paintSend() {
+    if (!FS) return;
+    var title = esc(S.cls) + ' · ' + fsLabel() + ' 완주증';
+    if (FS.busy && !FS.loaded) { FS.el.innerHTML = '<div class="modal__head"><h2 class="modal__title">📨 완주증 보내기</h2><p class="modal__desc">' + title + '</p></div><div class="modal__body"><p class="panel__hint">학생 번호 · 링크를 확인하는 중…</p></div>'; return; }
+    var pl = FS.loaded ? fsPlan() : { items: [], people: 0, why: { off: 0, nophone: 0, nolink: 0, sent: 0 }, won: 0 };
+    var first = pl.items[0], firstP = pl.items.filter(function (x) { return x.to !== 'student'; })[0], firstS = pl.items.filter(function (x) { return x.to === 'student'; })[0];
+    var tos = [['student', '학생'], ['parent', '학부모'], ['both', '둘 다']];
+    FS.el.innerHTML = '<div class="modal__head"><h2 class="modal__title">📨 완주증 보내기</h2><p class="modal__desc">' + title + ' · 러닝노트 링크를 문자(LMS)로 · 온라인 반도 이 버튼으로만 나가요</p></div>' +
+      '<div class="modal__body fa-fs__b">' +
+        (FS.err ? '<p class="cs-err" role="alert">' + esc(FS.msg) + '</p>' : '') +
+        '<fieldset class="fa-ps__f"><legend>받는 사람</legend><div class="fa-ps__opts">' + tos.map(function (t) {
+          return '<label class="fa-ps__o' + (FS.to === t[0] ? ' is-on' : '') + '"><input type="radio" name="fsTo" value="' + t[0] + '"' + (FS.to === t[0] ? ' checked' : '') + '><b>' + t[1] + '</b></label>';
+        }).join('') + '</div></fieldset>' +
+        (FS.to !== 'parent' ? '<label class="field__label" for="fsBodyS">학생용 문구 <span class="muted-note">#{이름} · #{링크}(학생 러닝노트)</span></label><textarea class="input" id="fsBodyS" rows="3" maxlength="500">' + esc(FS.bs) + '</textarea>' : '') +
+        (FS.to !== 'student' ? '<label class="field__label" for="fsBodyP">학부모용 문구 <span class="muted-note">#{이름} · #{링크}(학부모 러닝노트)</span></label><textarea class="input" id="fsBodyP" rows="3" maxlength="500">' + esc(FS.bp) + '</textarea>' : '') +
+        '<div class="fa-fs__sum" data-fs-sum><p>대상 <b class="num">' + pl.people + '</b>명 · 문자 <b class="num">' + pl.items.length + '</b>건 · 예상 약 <b class="num">' + pl.won.toLocaleString() + '</b>원 <span class="muted-note">(장문 ' + pl.lms + '원 기준)</span></p>' +
+          '<p class="muted-note">빠짐 — 번호 없음 <b>' + pl.why.nophone + '</b>명(그 번호만) · 링크 없음 ' + pl.why.nolink + '명 · 이미 보냄 ' + pl.why.sent + '명' +
+            (S.kind === 'year' ? ' · 러닝노트 공개 안 함 ' + pl.why.off + '명' : ' · 이달 기록 없음 ' + pl.why.off + '명') + '</p></div>' +
+        '<div class="fa-fs__pv"><p class="field__label">실제 한 건 미리보기</p>' +
+          (firstS ? '<p class="fa-fs__msg"><small>학생 · ' + esc(firstS.s.name) + '</small>' + esc(fsText(firstS.body, firstS.s.name)) + '</p>' : '') +
+          (firstP ? '<p class="fa-fs__msg"><small>학부모 · ' + esc(firstP.s.name) + '</small>' + esc(fsText(firstP.body, firstP.s.name)) + '</p>' : '') +
+          (!first ? '<p class="panel__hint">보낼 학생이 없어요.</p>' : '') + '</div>' +
+        (FS.msg && !FS.err ? '<p class="fa-fs__res" role="status">' + esc(FS.msg) + '</p>' : '') +
+      '</div>' +
+      '<div class="modal__foot"><button type="button" class="btn" data-fs-x>닫기</button><div class="spacer"></div>' +
+        '<button type="button" class="btn" data-fs-test' + (first && !FS.busy ? '' : ' disabled') + '>원장님 번호로 시험 발송</button>' +
+        '<button type="button" class="btn btn--primary" data-fs-go' + (first && FS.tested && !FS.busy ? '' : ' disabled title="먼저 시험 발송을 해 보세요"') + '>실제 발송 (' + pl.people + '명)</button></div>';
+  }
+  function fsCall(body) {
+    if (window.Sms && Sms.invoke) return Promise.resolve(Sms.invoke(body));
+    var f = sb() && sb().functions;
+    return Promise.resolve(f.invoke('sms-send', { body: body })).then(function (r) { return (r && r.data) || { ok: false, message: '보내지 못했어요' }; });
+  }
+  function fsTest() {
+    var pl = fsPlan(), x = pl.items[0];
+    if (!x) return;
+    FS.busy = true; FS.msg = '시험 발송 중…'; paintSend();
+    fsCall({ action: 'test', items: [{ student_id: x.s.id, to: x.to }], body: x.body, purpose: 'finish', label: '완주증 시험 ' + pkey() }).then(function (r) {
+      if (!FS) return;
+      FS.busy = false;
+      if (r && r.ok && r.sent) { FS.tested = true; FS.msg = '✓ 원장님 시험 번호로 한 건 보냈어요(맨 앞 「[테스트]」). 받은 문자를 확인한 뒤 [실제 발송]을 누르세요.'; }
+      else FS.msg = '시험 발송 실패 — ' + ((r && (r.message || (r.results && r.results[0] && r.results[0].error))) || '설정 → 문자에서 내 시험 번호를 확인해 주세요');
+      paintSend();
+    }, function () { if (FS) { FS.busy = false; FS.msg = '시험 발송 실패'; paintSend(); } });
+  }
+  function fsGo() {
+    var pl = fsPlan();
+    if (!pl.items.length || !FS.tested) return;
+    UI.confirmAsk('완주증 보내기', pl.people + '명에게 보낼까요? (문자 ' + pl.items.length + '건 · 예상 약 ' + pl.won.toLocaleString() + '원)', pl.people + '명에게 보내기').then(function (ok) {
+      if (!ok || !FS) return;
+      FS.busy = true; FS.msg = '보내는 중…'; paintSend();
+      var groups = [], seen = {};
+      pl.items.forEach(function (x) { var k = x.to === 'student' ? 's' : 'p'; if (!seen[k]) { seen[k] = { body: x.body, items: [] }; groups.push(seen[k]); } seen[k].items.push({ student_id: x.s.id, to: x.to }); });
+      var chunks = [];
+      groups.forEach(function (g) { for (var i = 0; i < g.items.length; i += 150) chunks.push({ body: g.body, items: g.items.slice(i, i + 150) }); });
+      var sent = 0, failed = 0, marks = [], why = '';
+      (function next() {
+        var c = chunks.shift();
+        if (!c) {
+          var fin = function () {
+            if (!FS) return;
+            FS.busy = false; FS.tested = false;
+            FS.msg = '보냈어요 — 접수 ' + sent + '건' + (failed ? ' · 실패 ' + failed + '건' + (why ? ' (' + why + ')' : '') : '') + ' · 같은 사람에게는 다시 보내지 않아요';
+            Promise.resolve(sb().rpc('finish_send_info', { p_class: S.cls, p_kind: S.kind, p_key: pkey() })).then(function (r) { if (FS && r && !r.error) { (r.data || []).forEach(function (x) { FS.info[x.id] = x; }); } paintSend(); });
+          };
+          if (marks.length) Promise.resolve(sb().rpc('finish_send_mark', { p_kind: S.kind, p_key: pkey(), p_rows: marks })).then(fin, fin); else fin();
+          toast('완주증 문자 — 접수 ' + sent + '건' + (failed ? ' · 실패 ' + failed + '건' : ''), failed ? 'bad' : 'good');
+          return;
+        }
+        fsCall({ action: 'send', items: c.items, body: c.body, purpose: 'finish', label: '완주증 ' + pkey() }).then(function (r) {
+          if (!r || !r.ok) { failed += c.items.length; why = (r && r.message) || why; }
+          else (r.results || []).forEach(function (x) { if (x.ok) { sent++; marks.push({ student: x.student_id, target: x.to }); } else { failed++; why = why || x.error; } });
+          next();
+        }, function () { failed += c.items.length; next(); });
+      })();
+    });
+  }
+  document.addEventListener('click', function (e) {
+    if (!FS || !e.target.closest || !FS.el.contains(e.target)) return;
+    var t = e.target;
+    if (t.closest('[data-fs-x]')) { Layer.hide(FS.el); FS = null; return; }
+    if (FS.busy) return;
+    if (t.closest('[data-fs-test]')) { fsTest(); return; }
+    if (t.closest('[data-fs-go]')) { fsGo(); return; }
+  });
+  document.addEventListener('change', function (e) {
+    if (!FS || !e.target || !FS.el.contains(e.target)) return;
+    if (e.target.name === 'fsTo') { FS.to = e.target.value; FS.tested = false; paintSend(); }
+  });
+  document.addEventListener('input', function (e) {
+    if (!FS || !e.target || !FS.el.contains(e.target)) return;
+    if (e.target.id === 'fsBodyS') FS.bs = e.target.value;
+    else if (e.target.id === 'fsBodyP') FS.bp = e.target.value;
+    else return;
+    FS.tested = false;
+    var pl = fsPlan(), sum = FS.el.querySelector('[data-fs-sum]'), go = FS.el.querySelector('[data-fs-go]');
+    if (sum) sum.querySelector('p').innerHTML = '대상 <b class="num">' + pl.people + '</b>명 · 문자 <b class="num">' + pl.items.length + '</b>건 · 예상 약 <b class="num">' + pl.won.toLocaleString() + '</b>원 <span class="muted-note">(장문 ' + pl.lms + '원 기준)</span>';
+    if (go) { go.disabled = true; go.title = '문구를 바꿨어요 — 시험 발송을 다시 해 보세요'; }
+  });
   function publish(s) {
     var v = viewOf(s);
     if (!savedOf(s).note_ok) { toast('한마디를 확정해야 공개할 수 있어요', 'bad'); return; }
@@ -537,6 +695,7 @@
     if (t.closest('[data-fa-close]')) { dlg.close(); return; }
     var la = t.closest('[data-fa-all]'); if (la) { openAll(rowOf(la.getAttribute('data-fa-all'))); return; }
     if (t.closest('[data-fa-okall]')) { okAll(); return; }
+    if (t.closest('[data-fa-send]')) { openSend(); return; }
     var k = t.closest('[data-fa-kind]');
     if (k) { S.kind = k.getAttribute('data-fa-kind'); if (S.cls) setClass(S.cls); if (!S.month) S.month = prevMonth(today()); load(); return; }
     if (t.closest('[data-fa-printall]')) { printList(S.rows); return; }
@@ -584,5 +743,5 @@
       if (S.cls) load(); else paint();
     }, function (e) { S.err = String((e && e.message) || e); paint(); });
   }
-  window.FinishAdmin = { open: open, state: function () { return S; }, _views: views, _ps: function () { return PS; }, _sign: function () { return SIGN; }, _lt: function () { return LT; } };
+  window.FinishAdmin = { open: open, state: function () { return S; }, _views: views, _ps: function () { return PS; }, _sign: function () { return SIGN; }, _lt: function () { return LT; }, _fs: function () { return FS; } };
 })();

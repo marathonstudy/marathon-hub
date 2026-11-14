@@ -10,6 +10,7 @@
 //                      화면은 학생 id 와 보낼 곳만 보낸다. 번호 · 링크 코드는 부른 직원의 로그인으로 DB 함수 sms_prepare 가 찾는다
 //                      (같은 번호는 한 번만 · 한 번 · 하루 상한 · 광고 문구). 보낸 결과는 sms_record 로 기록(번호는 뒤 4자리만).
 //    action "test"   — 같은 내용을 첫 사람 것으로 바꿔, 설정에 넣은 내 시험 번호에 한 건만. 맨 앞 「[테스트] 」 (사본 「[사본] 」과 구분 · 20261106g)
+//  20261114j — purpose "finish"(코치룸 완주증 [완주증 보내기])는 발송이 꺼진 온라인 반 학생에게도 보낸다 · 다른 발송은 그대로 막음
 //  사본 — 보낸 뒤 msg_copy_note 로 첫 사람 글을 맡긴다. 보내는 일은 note-remind 가 매분 한 곳에서 (migration-064 · 원래 발송과 따로)
 //  솔라피는 「접수」 결과만 바로 알려 준다 (실제 도착 여부는 솔라피 콘솔의 발송 내역에서 본다).
 //
@@ -169,7 +170,8 @@ async function handle(req: Request, cors: Record<string, string>) {
   /* 온라인 반 · 발송 꺼짐 (20261113b · migration-107) — 원장님이 켜기 전까지 보내지 않는다 · 107 전이면 함수가 없어 그대로 */
   const quiet: Any = await rpcAs(auth, apikey, "send_quiet", {}).catch(() => null);
   const qS = new Set<string>((quiet?.students || []).map(String)), qP = new Set<string>((quiet?.phones || []).map(String));
-  const isQuiet = (r: Any) => qS.has(String(r.student_id)) || qP.has(String(r.to).replace(/\D/g, ""));
+  /* 20261114j — 코치룸 완주증 화면 [완주증 보내기](purpose "finish")만 온라인 반에도 나간다(원장님이 확인 창에서 누름 · 자동 발송은 계속 꺼짐) */
+  const isQuiet = (r: Any) => purpose !== "finish" && (qS.has(String(r.student_id)) || qP.has(String(r.to).replace(/\D/g, "")));
   const quietRows: Any[] = all.filter((r) => !leftOf(r.text).length && isQuiet(r));
   const rows: Any[] = all.filter((r) => !leftOf(r.text).length && !isQuiet(r));
 

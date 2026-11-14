@@ -4970,3 +4970,65 @@ dialog.modal.fa-ps { width: min(620px, calc(100vw - 16px)); max-height: calc(100
 .fa-lt__who { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 14px; }
 .fa-lt__pv { font-size: 13px; line-height: 1.5; color: #4A4F68; min-width: 0; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .fa-lt__nm { background: #FFE9A8; color: #2E2266; font-weight: 800; border-radius: 4px; padding: 0 2px; }
+
+/* 20261114j — 「📥 온라인 반 가져오기」 반 목록 정렬 · 거르기 · 여러 반 미리보기 · 기록 받기 진행 · 완주증 보내기 */
+.ol-imp .modal__body { min-width: 0; }
+.ol-flt { display: grid; gap: 6px; margin-bottom: 8px; min-width: 0; }
+.ol-flt__top { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; }
+.ol-q { flex: 1 1 160px; min-width: 0; }
+.ol-sort { flex: 0 1 auto; max-width: 100%; }
+.ol-view { display: inline-flex; gap: 4px; }
+.ol-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; }
+.ol-chips__l { font-size: 12px; font-weight: 900; color: #6B6F86; flex: none; min-width: 32px; }
+.ol-chip { appearance: none; font: inherit; flex: none; border: 1px solid #E2DCF8; background: #fff; color: #4A4F68; font-size: 12.5px; font-weight: 800; min-height: 32px; padding: 0 11px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
+.ol-chip.is-on { background: #5A3FD0; border-color: #5A3FD0; color: #fff; }
+.ol-flt__chk { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; font-size: 13px; }
+.ol-min { width: 64px; display: inline-block; }
+.ol-cnt { display: flex; align-items: center; gap: 8px; margin: 4px 0 6px; font-size: 13.5px; }
+.ol-cls__i { display: flex; align-items: stretch; gap: 6px; min-width: 0; }
+.ol-cls__i .ol-cls__b { flex: 1 1 auto; min-width: 0; }
+.ol-cls__ck { display: inline-flex; align-items: center; padding: 0 4px; }
+.ol-cls__ck input { width: 20px; height: 20px; }
+.ol-cls__i.is-sel .ol-cls__b { border-color: #5A3FD0; background: #F8F6FF; }
+.ol-imp-badge { display: inline-block; font-size: 11.5px; font-weight: 900; color: #1F7A4D; background: #E8F7EF; border-radius: 999px; padding: 1px 8px; }
+.ol-tblw { width: 100%; overflow-x: auto; }
+.ol-ctbl { width: 100%; min-width: 520px; }
+.ol-ctbl .ol-ck { width: 32px; text-align: center; }
+.ol-ctbl tr.is-ended td { color: #8A8EA6; }
+.ol-th { appearance: none; border: 0; background: none; font: inherit; font-weight: 900; color: #2E2266; cursor: pointer; padding: 0; white-space: nowrap; }
+.ol-th.is-on { color: #5A3FD0; }
+.ol-link { appearance: none; border: 0; background: none; font: inherit; color: #2E2266; font-weight: 800; text-align: left; cursor: pointer; padding: 0; }
+.ol-many { display: grid; gap: 8px; }
+.ol-mi { border: 1px solid #E2DCF8; border-radius: 12px; padding: 10px 12px; background: #fff; min-width: 0; }
+.ol-mi.is-link { border-color: #9FD9BC; background: #F4FBF7; }
+.ol-mi__h { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.ol-mode { font-size: 12px; font-weight: 900; color: #5A3FD0; background: #F3EFFF; border-radius: 999px; padding: 2px 9px; }
+.ol-mode--link { color: #1F7A4D; background: #E8F7EF; }
+.ol-mi__n { margin: 6px 0 0; font-size: 13px; color: #4A4F68; overflow-wrap: anywhere; }
+.ol-mi__d summary { cursor: pointer; font-size: 12.5px; color: #6B6F86; margin-top: 4px; }
+.ol-mi__d .ol-tbl { margin-top: 6px; }
+.ol-done { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 13.5px; }
+.ol-prog { border: 1px solid #E2DCF8; border-radius: 12px; padding: 8px 12px; margin-bottom: 8px; background: #FBFAFF; }
+.ol-prog summary { cursor: pointer; font-size: 13.5px; }
+.ol-prog__l { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+.ol-prog__l li { display: grid; gap: 3px; min-width: 0; }
+.ol-prog__n { font-weight: 800; font-size: 13.5px; overflow-wrap: anywhere; }
+.ol-prog__t { font-size: 12.5px; color: #4A4F68; }
+.ol-bar { display: block; height: 6px; border-radius: 99px; background: #ECEAF5; overflow: hidden; }
+.ol-bar i { display: block; height: 100%; background: #5A3FD0; border-radius: 99px; }
+@media (max-width: 640px) {
+  .ol-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; -webkit-overflow-scrolling: touch; }
+  .ol-chips::-webkit-scrollbar { display: none; }
+  .ol-sort { flex: 1 1 140px; }
+}
+.fa-fs__b { display: grid; gap: 10px; }
+.fa-fs__b textarea { width: 100%; box-sizing: border-box; }
+.fa-fs__sum { border: 1px solid #E2DCF8; border-radius: 12px; padding: 8px 12px; background: #F8F6FF; }
+.fa-fs__sum p { margin: 2px 0; font-size: 13.5px; }
+.fa-fs__pv { display: grid; gap: 6px; }
+.fa-fs__msg { margin: 0; padding: 8px 10px; border-radius: 12px; background: #F1F3F8; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-wrap; }
+.fa-fs__msg small { display: block; font-size: 11.5px; font-weight: 900; color: #6B6F86; margin-bottom: 2px; }
+.fa-fs__res { margin: 0; font-size: 13px; font-weight: 800; color: #1F7A4D; }
+.ol-ctbl { border-collapse: collapse; font-size: 13px; }
+.ol-ctbl th, .ol-ctbl td { padding: 7px 8px; border-bottom: 1px solid #ECEAF5; text-align: left; vertical-align: middle; }
+.ol-ctbl thead th { background: #F8F6FF; position: sticky; top: 0; }

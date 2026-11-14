@@ -23,6 +23,8 @@
 //    · 옛 기록은 밤 1~6시에도(평소 동기화의 밤 쉼은 그대로) · 분당 28회 한도(hubGate) · 요청마다 걸린 시간(app_hub_calls)
 //    · 평소 동기화 50명 → 10명씩 · 수강 시작일이 비슷한 학생끼리 · timeout 이면 다시 묻지 않고 다음 묶음을 반으로 · 실패하면 지금처럼 공유 코드로
 //  20261113b — 앱 반 목록 · 반 명단 { action: "app_classes" } · { action: "app_roster", classId } (직원만 · 앱에 주소가 없으면 noapi · 온라인 반 가져오기)
+//  20261114j — 온라인 반만 듣는 학생(app_sync_due 의 online · migration-114)은 1시간마다 · 받은 뒤 주간 배지 칸(app_online_weeks · 월~금 한 주)
+//    옛 기록 순서는 DB(app_old_due2)가 종강 반 → 현강 → 온라인 · 분당 28회 한도(hubGate)는 그대로
 //
 //  키 — 새로 넣을 키 없음. Supabase 가 함수에 기본으로 주는 SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY (이 함수 안에서만)
 //  배포: 대시보드 → Edge Functions → Deploy a new function → Via Editor → 이름 app-sync → 이 파일 전체 → Deploy
@@ -289,7 +291,8 @@ export function fillParts(dst: Any, src: Any): number {
    시간이 모자라면 남은 학생은 다음 차례로 (next_try 10분) · 묶음마다 저장 (중간에 끊겨도 받은 것은 남는다) */
 export async function runList(list: Any[], started = Date.now()) {
   const out = { saved: 0, failed: 0, left: 0, reasons: {} as Record<string, number>, user: 0, fallback: 0, filled: 0, userWhy: {} as Record<string, number>,
-                parts: { tried: 0, got: 0, share: 0, user: 0 } };
+                parts: { tried: 0, got: 0, share: 0, user: 0 }, onlineWeeks: 0 };
+  const onl = new Set<string>(list.filter((x: Any) => x && x.online).map((x: Any) => String(x.id)));     /* 온라인 반만 듣는 학생 (app_sync_due · 114) */
   /* 영역 정보 채우기 (20261113d) — 한 번에 PARTS_MAX 명 · 시간이 모자라면 건너뜀 */
   let userStop = false;
   const partsFrom = async (r: Any, x: Any, way: "share" | "user", why = "") => {
@@ -326,6 +329,11 @@ export async function runList(list: Any[], started = Date.now()) {
     for (const x of results.filter((y: Any) => y.ok && y.fill && Array.isArray(y.days))) {
       const n = await rpc("app_fill_save", { p_student: x.id, p_days: x.days }).catch(() => 0);
       out.filled += Number(n) || 0;
+    }
+    /* 온라인 반만 듣는 학생 — 수업 요일이 없으니 월~금 한 주로 주간 배지 칸 (20261114j · migration-114 · 114 전이면 함수가 없어 조용히 넘어감) */
+    for (const x of results.filter((y: Any) => y.ok && onl.has(String(y.id)) && y.data)) {
+      const n = await rpc("app_online_weeks", { p_student: x.id, p_days: Array.isArray(x.days) ? x.days : daysOf(x.data) }).catch(() => 0);
+      out.onlineWeeks += Number(n) || 0;
     }
   };
   /* 20261113a — 한 번에 USER_AT_ONCE 명(10) · 수강 시작일이 비슷한 학생끼리 묶어 기간을 짧게 · timeout 이 나면 다음 묶음은 반으로(1명까지) */
