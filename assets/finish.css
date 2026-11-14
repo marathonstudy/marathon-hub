@@ -195,3 +195,48 @@
 .fc-sk { padding: 1.6mm 3mm; } .fc-sk b { font-size: 15pt; } .fc-sec--st { gap: 1.8mm; } .fc-sg { gap: 1.2mm; }
 .fc-sec--flow { min-height: 50mm; }
 .fc-in--p2 { gap: 3.2mm; }
+
+/* ============================================================
+   20261114h — 「선생님의 편지」 쪽 · 원장님 서명 · 1쪽 한마디 상자 없앰(그만큼 캐릭터 · 칭호 · 카드 키움)
+   ============================================================ */
+/* 1쪽 — 한마디 상자 자리만큼 키움 (넘치면 fc-tight · fc-tighter 가 다시 줄임) */
+.fc-y.fc-note-0 .fc-ribbon span { font-size: 20pt; padding: 2.8mm 11mm; }
+.fc-note-0.fc-h3 .fc-card { padding: 4.2mm 6mm; } .fc-note-0.fc-h3 .fc-card__i { font-size: 21pt; } .fc-note-0.fc-h3 .fc-card__b { font-size: 26pt; } .fc-note-0.fc-h3 .fc-card__d { font-size: 13.5pt; }
+.fc-note-0.fc-h4 .fc-cards--grid .fc-card, .fc-note-0.fc-h5 .fc-cards--grid .fc-card, .fc-note-0.fc-h6 .fc-cards--grid .fc-card { padding: 4.4mm 4mm; }
+.fc-note-0.fc-h5 .fc-cards--grid .fc-card__b, .fc-note-0.fc-h6 .fc-cards--grid .fc-card__b { font-size: 19pt; }
+.fc-note-0.fc-h5 .fc-cards--grid .fc-card__d, .fc-note-0.fc-h6 .fc-cards--grid .fc-card__d { font-size: 11.5pt; }
+.fc-note-0.fc-h2 .fc-cards { gap: 3.5mm; } .fc-note-0.fc-h3 .fc-cards { gap: 3mm; }
+/* 서명 — 글자 높이의 약 2 ~ 2.3배 · 이름 끝 글자 위에 살짝 겹침 · 잉크색은 그림 그대로 · 못 받으면 빈 서명 칸(밑줄) */
+.fc-sign__box.has-img { width: auto; height: auto; border-bottom: 0; margin-left: calc(-0.9em - 3mm); line-height: 0; position: relative; align-self: flex-end; }
+.fc-sign__img { display: block; height: 2.3em; width: auto; max-width: 48mm; object-fit: contain; }
+/* 이달판 인쇄본 — 날짜 · 「마라톤국어 대표 김종현」 + 서명 */
+.fc-foot--ms { font-size: 10.5pt; color: #2E2266; }
+/* 편지 쪽 */
+.fc-in--l { justify-content: flex-start; align-items: stretch; text-align: left; gap: 3.5mm; }
+.fc-lhd { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 0.3mm solid #E6E2F6; padding-bottom: 2mm; }
+.fc-brand--s { font-size: 9pt; letter-spacing: .3em; margin: 0; }
+.fc-lhd__t { margin: 0; font-size: 9.5pt; font-weight: 800; color: #8A8EA6; letter-spacing: .2em; }
+.fc-to, .fc-from__n { font-family: 'Gaegu', 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; }
+.fc-to { margin: 1mm 0 0; font-size: 22pt; color: #2E2266; line-height: 1.3; }
+.fc-to b { font-weight: 700; letter-spacing: .04em; }
+.fc-to__c { display: none; font-size: 13pt; color: #8A8EA6; }
+.fc-letter--cont .fc-to__c { display: inline; }
+.fc-lbody { flex: 1 1 auto; min-height: 0; overflow: hidden; padding: 0 1mm; color: #2E2266; line-height: 2;
+  font-family: 'Gaegu', 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; word-break: keep-all; overflow-wrap: anywhere;
+  background-image: linear-gradient(to bottom, transparent calc(2em - 0.25mm), #E6E1F4 calc(2em - 0.25mm)); background-size: 100% 2em; background-repeat: repeat; }
+.fc-lbody .fc-lp { margin: 0; }
+.fc-lbody .fc-lp--g1 { margin-bottom: 2em; } .fc-lbody .fc-lp--g2 { margin-bottom: 4em; }     /* 빈 줄 1개 = 한 줄 · 2개 이상 = 두 줄 (.fc-page p 보다 앞서게) */
+.fc-lbody > .fc-lp:last-child { margin-bottom: 0; }
+.fc-lbody b { font-weight: 700; color: #4A3BA8; }
+.fc-lnext { display: none; margin: 0; text-align: right; font-size: 10pt; font-weight: 800; color: #8A8EA6; }
+.fc-letter--more .fc-lnext { display: block; }
+.fc-letter--more .fc-from { display: none; }
+.fc-from { display: flex; justify-content: space-between; align-items: flex-end; gap: 6mm; border-top: 0.3mm solid #E6E2F6; padding-top: 3mm; }
+.fc-from__m { display: flex; align-items: flex-end; gap: 1mm; }
+.fc-from__m img { width: 16mm; height: 16mm; object-fit: contain; }
+.fc-from__m img + img { transform: scaleX(-1); }
+.fc-from__r { display: grid; justify-items: end; gap: 1mm; text-align: right; }
+.fc-from__n { margin: 0; font-size: 20pt; font-weight: 700; color: #2E2266; line-height: 1.2; }
+.fc-from__n .fc-sign__img { height: 2em; }
+.fc-from__n .fc-sign__box:not(.has-img) { width: 26mm; height: 10mm; }
+.fc-from__d { margin: 0; font-size: 10.5pt; font-weight: 700; color: #4A4F68; }

@@ -19,6 +19,34 @@
   function abs(p) { try { return new URL(p, location.href).href; } catch (e) { return p; } }
 
   var S = { kind: 'year', cls: '', from: '', to: '', month: '', classes: [], rows: [], busy: false, err: '', open: {} };
+  /* 원장님 서명 (20261114h · migration-113) — Storage 비공개 버킷 staff-private/signature.png · 직원 로그인으로 짧은 signed URL(2분) → 그림을 받아 이 화면 메모리(blob:)에만
+     저장소 · 파일 · 러닝노트 · 사진 공유 · 링크에는 넣지 않음 · 못 받으면 빈 서명 칸 · 인쇄는 그대로 */
+  var SIGN = { url: '', state: '', p: null };
+  function loadSign() {
+    if (SIGN.p) return SIGN.p;
+    SIGN.state = 'loading';
+    var st = sb() && sb().storage;
+    if (!st || !st.from) { SIGN.state = 'fail'; return (SIGN.p = Promise.resolve('')); }
+    SIGN.p = Promise.resolve(st.from('staff-private').createSignedUrl('signature.png', 120)).then(function (r) {
+      var u = r && !r.error && r.data && (r.data.signedUrl || r.data.signedURL);
+      if (!u) throw new Error('nourl');
+      return fetch(u, { cache: 'no-store' });
+    }).then(function (res) {
+      if (!res.ok) throw new Error('http ' + res.status);
+      return res.blob();
+    }).then(function (b) {
+      if (!b || !/^image\//.test(b.type || 'image/png') || !b.size) throw new Error('type');
+      SIGN.url = URL.createObjectURL(b); SIGN.state = 'ok';
+      return SIGN.url;
+    }).catch(function () { SIGN.url = ''; SIGN.state = 'fail'; SIGN.p = null; return ''; });
+    return SIGN.p;
+  }
+  /* 서명 · 편지 글꼴을 기다린 뒤(최대 2.5초) — 못 받아도 그대로 진행 */
+  function ready() {
+    var t = new Promise(function (res) { setTimeout(res, 2500); });
+    return Promise.race([Promise.all([loadSign(), Finish.loadFont ? Finish.loadFont(2500) : null]), t]);
+  }
+  function popt(extra) { return Object.assign({ base: '../assets/chars/', signImg: SIGN.url || '' }, extra || {}); }
   var dlg = null;
   function pkey() { return S.kind === 'year' ? S.from + '~' + S.to : S.month; }
 
@@ -149,13 +177,13 @@
       var on = chosen.indexOf(h.key) >= 0;
       return '<label class="fa-hl' + (on ? ' is-on' : '') + '"><input type="checkbox" data-fa-hl="' + s.id + '" value="' + esc(h.key) + '"' + (on ? ' checked' : '') + '> ' + esc(h.text) + '</label>';
     }).join('') + '</div><p class="field__hint">처음에는 후보 전부 체크 · 빼고 싶은 것만 끄세요 · 1쪽에는 앞의 6개(1~3개 큰 카드 · 4~6개 두 칸) · 나머지는 2쪽 · 모두 끄면 「함께 달렸어요」 한 줄</p>' : '<p class="field__hint">기준에 맞는 하이라이트가 없어요 — 「함께 달렸어요」 한 줄로 나가요</p>';
-    var note = '<div class="fa-note"><label class="field__label" for="faN' + s.id + '">선생님 한마디' + (year ? '' : ' (넣으면 보여요)') + '</label>' +
-      '<textarea class="input" rows="3" maxlength="400" id="faN' + s.id + '" data-fa-note="' + s.id + '">' + esc(sv.note) + '</textarea>' +
+    var note = '<div class="fa-note"><label class="field__label" for="faN' + s.id + '">선생님 한마디' + (year ? ' <span class="muted-note">→ 마지막 쪽 「선생님의 편지」 · 빈 줄 = 문단 · **글자** = 굵게</span>' : ' (넣으면 보여요 · 길면 편지 쪽)') + '</label>' +
+      '<textarea class="input" rows="' + (year ? 6 : 3) + '" maxlength="3000" id="faN' + s.id + '" data-fa-note="' + s.id + '">' + esc(sv.note) + '</textarea>' +
       '<div class="fa-note__b">' + (year ? '<button type="button" class="btn btn--sm" data-fa-ai="' + s.id + '">AI 초안</button>' : '') +
         '<button type="button" class="btn btn--sm' + (sv.note_ok ? '' : ' btn--primary') + '" data-fa-ok="' + s.id + '">' + (sv.note_ok ? '확정됨 ✓' : '확정') + '</button>' +
         '<span class="fa-note__m" data-fa-msg="' + s.id + '"></span></div></div>';
     return '<article class="fa-card' + (needCheck(s) ? ' is-check' : '') + '" data-fa-id="' + s.id + '">' +
-      '<button type="button" class="fa-thumb" data-fa-big="' + s.id + '" aria-label="' + esc(s.name + ' 완주증 크게 보기') + '"><span class="fa-thumb__in">' + Finish.pageHtml(v, { base: '../assets/chars/' }) + '</span><span class="fa-thumb__z" aria-hidden="true">🔍 크게</span></button>' +
+      '<button type="button" class="fa-thumb" data-fa-big="' + s.id + '" aria-label="' + esc(s.name + ' 완주증 크게 보기') + '"><span class="fa-thumb__in">' + Finish.pageHtml(v, popt()) + '</span><span class="fa-thumb__z" aria-hidden="true">🔍 크게</span></button>' +
       '<div class="fa-ctl"><div class="fa-ctl__h"><b>' + esc(s.name) + '</b>' + flags + '</div>' +
         '<label class="field__label">칭호</label>' + titles +
         '<label class="field__label">하이라이트</label>' + hls + note +
@@ -189,8 +217,9 @@
   }
   /* 크게 미리보기 — A4 실제 비율 · 여러 쪽이면 좌우로 · 창 안에서 [이 학생 인쇄] (공통 Layer) */
   var BIG = null;
-  function openBig(s) {
-    var pages = Finish.pagesHtml(views([s])[0], { base: '../assets/chars/', p2: p2On() });
+  function openBig(s) { ready().then(function () { openBig0(s); }); }
+  function openBig0(s) {
+    var pages = Finish.pagesHtml(views([s])[0], popt({ p2: p2On() }));
     /* 인쇄와 같게 — 화면 밖에 실제 크기로 그려 넘침을 맞춘 뒤(능력치 칩 줄이기 · 3쪽으로) 쪽들을 다시 모음 (20261114d) */
     if (Finish.fit) {
       var tmp = document.createElement('div');
@@ -274,7 +303,7 @@
      범위(전체 쪽 · 1쪽만 · 2쪽부터 — 2쪽이 꺼진 반 · 이달판은 막힘) · 방식(양면 · 단면) · 양면이면 쪽 수가 홀수인 학생 뒤에 빈 쪽(한 명만이면 없음)
      미리보기(처음 3장 · 종이 앞 / 뒤) · 요약 「학생 n명 · 총 n쪽 · 종이 n장」 · 「프린터 설정도 ○면으로」 · 고른 범위 · 방식은 이 기기에 기억 */
   var PS = null, PS_KEY = 'mh.fin.print';
-  function psLoad() { try { var o = JSON.parse(localStorage.getItem(PS_KEY) || '{}'); return { range: /^(all|p1|p2)$/.test(o.range) ? o.range : 'all', mode: o.mode === 'simplex' ? 'simplex' : 'duplex' }; } catch (e) { return { range: 'all', mode: 'duplex' }; } }
+  function psLoad() { try { var o = JSON.parse(localStorage.getItem(PS_KEY) || '{}'); return { range: /^(all|p1|p1l|p2)$/.test(o.range) ? o.range : 'all', mode: o.mode === 'simplex' ? 'simplex' : 'duplex' }; } catch (e) { return { range: 'all', mode: 'duplex' }; } }
   function psSave() { try { localStorage.setItem(PS_KEY, JSON.stringify({ range: PS.range, mode: PS.mode })); } catch (e) { /* 기억 못 해도 이번엔 그대로 */ } }
   /* 학생마다 실제 쪽(넘침 맞춘 뒤 — 2쪽이 넘치면 3쪽) — 화면 밖에 A4 크기로 그려 잰다 */
   function studPages(list) {
@@ -282,7 +311,7 @@
     tmp.style.cssText = 'position:fixed;left:-10000px;top:0;width:210mm;visibility:hidden';
     document.body.appendChild(tmp);
     var out = views(list).map(function (v) {
-      tmp.innerHTML = Finish.pagesHtml(v, { base: abs('../assets/chars/'), p2: S.kind === 'year' ? p2On() : false }).join('');
+      tmp.innerHTML = Finish.pagesHtml(v, popt({ base: abs('../assets/chars/'), p2: S.kind === 'year' ? p2On() : false })).join('');
       try { if (Finish.fit) Finish.fit(tmp); } catch (e) { /* 그대로 */ }
       return { name: v.name, pages: Array.prototype.map.call(tmp.querySelectorAll('.fc-page'), function (p) { return p.outerHTML; }) };
     });
@@ -292,6 +321,9 @@
   function printList(list) {
     list = (list || []).filter(Boolean);
     if (!list.length) return;
+    ready().then(function () { printList0(list); });
+  }
+  function printList0(list) {
     var o = psLoad();
     PS = { list: list, single: list.length === 1, studs: studPages(list), range: o.range, mode: o.mode, hint: '' };
     if (!canP2() && PS.range === 'p2') PS.range = 'all';
@@ -308,8 +340,8 @@
   function paintPs() {
     if (!PS) return;
     var pl = psPlan(), duplex = PS.mode === 'duplex', p2ok = canP2();
-    var quick = [['p1', 'simplex', '🏅 상장처럼', '1쪽만 · 단면', '두꺼운 상장 용지에 좋아요'], ['all', 'duplex', '📘 기록까지 전부', '전체 쪽 · 양면', '레이스 기록까지 한 묶음']];
-    var ranges = [['all', '전체 쪽', ''], ['p1', '1쪽만 (완주증)', ''], ['p2', '2쪽부터 (레이스 기록)', p2ok ? '' : '2쪽이 꺼져 있어요']];
+    var quick = [['p1l', 'simplex', '🏅 상장처럼', '1쪽 + 편지 · 단면', '두꺼운 상장 용지에 좋아요'], ['all', 'duplex', '📘 기록까지 전부', '전체 쪽 · 양면', '레이스 기록 · 편지까지 한 묶음']];
+    var ranges = [['all', '전체 쪽', ''], ['p1l', '1쪽 + 편지', PS.studs.some(function (x) { return x.pages.some(function (h) { return /fc-letter/.test(h); }); }) ? '' : '편지(확정한 한마디)가 없으면 1쪽만'], ['p1', '1쪽만 (완주증)', ''], ['p2', '2쪽부터 (레이스 기록 · 편지)', p2ok ? '' : '1쪽뿐이에요']];
     var modes = [['duplex', '양면', '종이를 아껴요 · 학생마다 새 종이에서 시작'], ['simplex', '단면', '양면이 안 되는 프린터 · 두꺼운 종이 · 액자용']];
     /* 미리보기 — 처음 3장 */
     var sheets = [], i = 0;
@@ -347,8 +379,8 @@
     w.document.open();
     w.document.write(Finish.printPlanDoc(pl, { css: abs('../assets/finish.css'), title: (S.kind === 'year' ? '완주증' : S.month + ' 완주증') + ' · ' + (PS.single ? PS.studs[0].name : S.cls) }));
     w.document.close();
-    var go = function () { try { w.focus(); w.print(); } catch (e) { /* 사람이 Ctrl+P */ } };
-    if (w.document.readyState === 'complete') setTimeout(go, 500); else w.addEventListener('load', function () { setTimeout(go, 300); });
+    var tries = 0, go = function () { if (!w.__fcFitDone && tries++ < 30) { setTimeout(go, 150); return; } try { w.focus(); w.print(); } catch (e) { /* 사람이 Ctrl+P */ } };
+    setTimeout(go, 300);
     Layer.hide(PS.el); PS = null;
   }
   document.addEventListener('click', function (e) {
@@ -362,7 +394,7 @@
   document.addEventListener('change', function (e) {
     if (!PS || !e.target || !PS.el.contains(e.target)) return;
     var t = e.target;
-    if (t.name === 'psRange') { PS.range = t.value; PS.hint = ''; if (t.value === 'p1' && PS.mode === 'duplex') { PS.mode = 'simplex'; PS.hint = '1쪽만은 단면이 좋아요 · 양면으로 바꿀 수도 있어요'; } paintPs(); }
+    if (t.name === 'psRange') { PS.range = t.value; PS.hint = ''; if ((t.value === 'p1' || t.value === 'p1l') && PS.mode === 'duplex') { PS.mode = 'simplex'; PS.hint = (t.value === 'p1' ? '1쪽만은' : '1쪽 + 편지는') + ' 단면이 좋아요 · 양면으로 바꿀 수도 있어요'; } paintPs(); }
     if (t.name === 'psMode') { PS.mode = t.value; PS.hint = ''; paintPs(); }
   });
   function publish(s) {
@@ -412,6 +444,7 @@
 
   function open() {
     modal();
+    loadSign();
     S.month = S.month || prevMonth(today());
     Layer.show(dlg);
     paint();
@@ -420,5 +453,5 @@
       if (S.cls) load(); else paint();
     }, function (e) { S.err = String((e && e.message) || e); paint(); });
   }
-  window.FinishAdmin = { open: open, state: function () { return S; }, _views: views, _ps: function () { return PS; } };
+  window.FinishAdmin = { open: open, state: function () { return S; }, _views: views, _ps: function () { return PS; }, _sign: function () { return SIGN; } };
 })();

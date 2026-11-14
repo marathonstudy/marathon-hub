@@ -189,6 +189,58 @@
   function periodText(v) { return v.kind === 'year' ? ymd(v.from) + ' ~ ' + ymd(v.to) : v.from.slice(0, 4) + '년 ' + mon(v.from); }
   function noteCls(v) { var n = String(v.note || '').length; return !n ? ' fc-note-0' : n > 150 ? ' fc-note-l' : ''; }
 
+  /* ---------- 선생님 한마디 글 (20261114h) — 「**글자**」 → 굵게 · 빈 줄(문단) 살림 ---------- */
+  function segsOf(line) {
+    var out = [], re = /\*\*([\s\S]+?)\*\*/g, i = 0, m;
+    while ((m = re.exec(line))) { if (m.index > i) out.push({ t: line.slice(i, m.index), b: 0 }); out.push({ t: m[1], b: 1 }); i = re.lastIndex; }
+    if (i < line.length) out.push({ t: line.slice(i), b: 0 });
+    return out.map(function (s) { return { t: s.t.replace(/\*\*/g, ''), b: s.b }; }).filter(function (s) { return s.t; });
+  }
+  function segHtml(s) { return s.b ? '<b>' + esc(s.t) + '</b>' : esc(s.t); }
+  /* 상자 안(이달판 · 러닝노트) — 줄바꿈은 그대로(pre-wrap) · 굵게만 */
+  function noteInline(t) { return String(t || '').replace(/\r\n?/g, '\n').split('\n').map(function (l) { return segsOf(l).map(segHtml).join(''); }).join('\n'); }
+  /* 편지 — 문단 <p data-k> · 줄 <br> · 문장 <span class="fc-ls">(넘치면 문장 단위로 다음 면에 이어짐) · 빈 줄 1 ~ 2개 = 문단 사이 한 줄 · 두 줄 */
+  function letterBody(t) {
+    var lines = String(t || '').replace(/\r\n?/g, '\n').split('\n'), paras = [], cur = null;
+    lines.forEach(function (l) {
+      if (!l.trim()) { if (cur) { paras.push(cur); cur = null; } if (paras.length) paras[paras.length - 1].gap = Math.min(2, paras[paras.length - 1].gap + 1); return; }
+      if (!cur) cur = { ls: [], gap: 0 };
+      cur.ls.push(l.trim());
+    });
+    if (cur) paras.push(cur);
+    if (paras.length) paras[paras.length - 1].gap = 0;
+    return paras.map(function (p, k) {
+      return '<p class="fc-lp fc-lp--g' + p.gap + '" data-k="' + k + '">' + p.ls.map(function (l) {
+        var sents = [], now = '';
+        segsOf(l).forEach(function (s) {
+          var parts = s.t.replace(/([.!?…~])\s+/g, '$1\u0001').split('\u0001');
+          parts.forEach(function (x, j) { if (j) { sents.push(now); now = ''; } if (x) now += segHtml({ t: x, b: s.b }); });
+        });
+        if (now) sents.push(now);
+        return sents.map(function (x) { return '<span class="fc-ls">' + x + '</span>'; }).join(' ');
+      }).join('<br>') + '</p>';
+    }).join('');
+  }
+  /* 원장님 서명 — opt.signImg(코치룸이 직원 로그인으로 받은 그림 · 인쇄 · 크게 보기에만) · 없거나 못 받으면 빈 서명 칸 */
+  function signBox(opt) {
+    return opt && opt.signImg ? '<span class="fc-sign__box has-img"><img class="fc-sign__img" src="' + esc(opt.signImg) + '" alt="서명"></span>' : '<span class="fc-sign__box" aria-label="서명"></span>';
+  }
+  /* 「선생님의 편지」 쪽 — 같은 테두리 · 작은 머리글 · To. ○○○ · 줄 노트 · From. 김종현 쌤 + 서명 · 날짜(종강일) · 모서리 마라토니 · 마라부기
+     글자 크기는 fit 이 한 면에 맞춰 고른다(LF.max ~ LF.min) · 그래도 넘치면 같은 모양의 다음 면으로 이어짐(fc-letter--more → fc-letter--cont) */
+  var LF = { max: 30, min: 15 };
+  function letterHtml(v, opt, spare) {
+    var base = opt.base;
+    return '<article class="fc-page fc-letter' + (spare ? ' fc-letter--spare' : '') + '">' + corners() +
+      '<div class="fc-in fc-in--l">' +
+        '<header class="fc-lhd"><p class="fc-brand fc-brand--s">마라톤국어</p><p class="fc-lhd__t">선생님의 편지</p></header>' +
+        '<p class="fc-to">To. <b>' + esc(v.name) + '</b><span class="fc-to__c"> · 이어서</span></p>' +
+        '<div class="fc-lbody" style="font-size:' + LF.max + 'px">' + letterBody(v.note) + '</div>' +
+        '<p class="fc-lnext">다음 장에 이어져요 →</p>' +
+        '<div class="fc-from"><span class="fc-from__m" aria-hidden="true"><img src="' + esc(charSrc('maratoni', base)) + '" alt=""><img src="' + esc(charSrc('marabugi', base)) + '" alt=""></span>' +
+          '<div class="fc-from__r"><p class="fc-from__n"><span class="fc-sign">From. 김종현 쌤 ' + signBox(opt) + '</span></p><p class="fc-from__d">' + ymd(v.to) + '</p></div></div>' +
+      '</div></article>';
+  }
+
   /* 1쪽 — opt = { base(그림 주소 앞), link(러닝노트 · 서명 칸 없음), sign } */
   function pageHtml(v, opt) {
     opt = opt || {};
@@ -196,7 +248,9 @@
     var base = opt.base, g = v.game || {}, hls = (v.hls || []).map(hlOf), p1 = hls.slice(0, P1), n = p1.length;
     var sign = opt.sign || '마라톤국어 대표 김종현';
     var cards = n ? cardsHtml(p1, n > 3 ? 'fc-cards--grid' : 'fc-cards--col') : '<p class="fc-plain">한 해 동안 함께 달렸어요.</p>';
-    return '<article class="fc-page fc-page--year fc-y fc-h' + n + noteCls(v) + (opt.link ? ' fc-page--link' : '') + '">' + corners() +
+    /* 20261114h — 인쇄 · 코치룸에서는 한마디를 마지막 쪽 「선생님의 편지」로(1쪽 상자 없음 · 캐릭터 · 칭호 · 카드가 그만큼 커짐) · 러닝노트 링크판만 상자 그대로 */
+    var inNote = opt.link && v.note;
+    return '<article class="fc-page fc-page--year fc-y fc-h' + n + (inNote ? noteCls(v) : ' fc-note-0') + (opt.link ? ' fc-page--link' : '') + '">' + corners() +
       '<div class="fc-in fc-in--y">' +
         '<header class="fc-hd"><p class="fc-brand">마라톤국어</p><h1 class="fc-title">완주증</h1><p class="fc-sub">FINISHER CERTIFICATE</p></header>' +
         '<div class="fc-person"><p class="fc-name">' + esc(v.name) + '</p><p class="fc-meta">' + esc([v.cls, periodText(v)].filter(Boolean).join(' · ')) + '</p></div>' +
@@ -204,10 +258,10 @@
           '<span class="fc-lv">Lv.' + ((v.level && v.level.i) + 1) + ' ' + esc((v.level && v.level.name) || '') + '</span></div>' +
         (v.title ? '<p class="fc-ribbon"><span>' + esc(v.title) + '</span></p>' : '') +
         cards +
-        (v.note ? '<div class="fc-box fc-note"><p class="fc-box__t">선생님 한마디</p><p class="fc-note__t">' + esc(v.note) + '</p></div>' : '') +
+        (inNote ? '<div class="fc-box fc-note"><p class="fc-box__t">선생님 한마디</p><p class="fc-note__t">' + noteInline(v.note) + '</p></div>' : '') +
         '<div class="fc-end">' + finishLine(base, false) +
           '<div class="fc-foot"><span class="fc-date">' + ymd(v.to) + '</span>' +
-          (opt.link ? '<span class="fc-sign">' + esc(sign) + '</span>' : '<span class="fc-sign">' + esc(sign) + ' <span class="fc-sign__box" aria-label="서명"></span></span>') + '</div></div>' +
+          (opt.link ? '<span class="fc-sign">' + esc(sign) + '</span>' : '<span class="fc-sign">' + esc(sign) + ' ' + signBox(opt) + '</span>') + '</div></div>' +
       '</div></article>';
   }
   function monthHtml(v, opt) {
@@ -218,8 +272,11 @@
       '<div class="fc-who"><span class="fc-ava"><img src="' + esc(charSrc(g.char, base)) + '" alt=""></span><div class="fc-who__t"><p class="fc-name">' + esc(v.name) + '</p>' +
         '<p class="fc-meta">' + esc([v.cls, periodText(v)].filter(Boolean).join(' · ')) + '</p><p class="fc-lv">Lv.' + ((v.level && v.level.i) + 1) + ' ' + esc((v.level && v.level.name) || '') + '</p></div></div>' +
       (v.title ? '<p class="fc-ribbon"><span>' + esc(v.title) + '</span></p>' : '') + cards +
-      (v.note ? '<div class="fc-box fc-note"><p class="fc-box__t">선생님 한마디</p><p class="fc-note__t">' + esc(v.note) + '</p></div>' : '') +
-      finishLine(base, true) + '<div class="fc-foot fc-foot--m"><span class="fc-sign">마라톤국어</span></div></div></article>';
+      (v.note ? '<div class="fc-box fc-note"><p class="fc-box__t">선생님 한마디</p><p class="fc-note__t">' + noteInline(v.note) + '</p></div>' : '') +
+      finishLine(base, true) +
+      (opt.link ? '<div class="fc-foot fc-foot--m"><span class="fc-sign">마라톤국어</span></div>'
+        : '<div class="fc-foot fc-foot--ms"><span class="fc-date">' + ymd(v.to) + '</span><span class="fc-sign">마라톤국어 대표 김종현 ' + signBox(opt) + '</span></div>') +      /* 인쇄본 — 서명 자리 (20261114h) */
+      '</div></article>';
   }
   /* 2쪽 「나의 1년 레이스 기록」 — 월간 메달 12칸 → 정답률 흐름(크게) → 능력치 스탯 카드(묶음별) → 1쪽에 못 들어간 하이라이트 */
   function medalsHtml(v) {
@@ -253,12 +310,65 @@
   var P2 = 6, P3 = 12;
   function pagesHtml(v, opt) {
     opt = opt || {};
-    if (v.kind !== 'year') return [monthHtml(v, opt)];
+    /* 이달판 — 한마디는 같은 쪽 · 넘칠 때만 편지 쪽(fit 이 fc-letter--spare 를 살리거나 지움) */
+    if (v.kind !== 'year') return v.note && !opt.link ? [monthHtml(v, opt), letterHtml(v, opt, true)] : [monthHtml(v, opt)];
     var out = [pageHtml(v, opt)], hls = (v.hls || []).map(hlOf), rest = hls.slice(P1);
-    if (opt.p2 === false) return out;
-    out.push(page2Html(v, opt, rest.slice(0, P2), ''));
-    if (rest.length > P2) out.push(page2Html(v, opt, rest.slice(P2, P2 + P3), '이어서'));
+    if (opt.p2 !== false) {
+      out.push(page2Html(v, opt, rest.slice(0, P2), ''));
+      if (rest.length > P2) out.push(page2Html(v, opt, rest.slice(P2, P2 + P3), '이어서'));
+    }
+    if (v.note && !opt.link) out.push(letterHtml(v, opt, false));          /* 마지막 쪽 「선생님의 편지」 — 한마디가 비었거나 확정 전이면 없음(view 가 비움) */
     return out;
+  }
+  /* 편지 맞춤 — 넘침 = 줄 노트 칸 안 넘침 · 쪽 넘침 중 큰 것 */
+  function lOver(pg) { var b = pg.querySelector('.fc-lbody'); return Math.max(b ? b.scrollHeight - b.clientHeight : 0, overOf(pg)); }
+  /* 맨 끝 문장(또는 문단)을 다음 면 맨 앞으로 — 같은 문단이면 이어 붙임 */
+  function lMove(b, cb) {
+    var p = b.lastElementChild; if (!p) return false;
+    var spans = p.querySelectorAll('.fc-ls'), first = cb.firstElementChild, same = first && first.getAttribute('data-k') === p.getAttribute('data-k');
+    if (spans.length <= 1) {
+      if (same) { while (p.lastChild) first.insertBefore(p.lastChild, first.firstChild); p.parentNode.removeChild(p); }
+      else cb.insertBefore(p, cb.firstChild);
+      return true;
+    }
+    var tgt = same ? first : p.cloneNode(false);
+    if (!same) cb.insertBefore(tgt, cb.firstChild);
+    while (p.lastChild) { var nd = p.lastChild; tgt.insertBefore(nd, tgt.firstChild); if (nd.nodeType === 1 && nd.classList.contains('fc-ls')) break; }
+    return true;
+  }
+  /* 면 경계의 빈 줄바꿈 · 공백 정리 */
+  function lTidy(b, cb) {
+    var a = b.lastElementChild, c = cb.firstElementChild;
+    while (a && a.lastChild && (a.lastChild.nodeName === 'BR' || (a.lastChild.nodeType === 3 && !a.lastChild.nodeValue.trim()))) a.removeChild(a.lastChild);
+    while (c && c.firstChild && (c.firstChild.nodeName === 'BR' || (c.firstChild.nodeType === 3 && !c.firstChild.nodeValue.trim()))) c.removeChild(c.firstChild);
+  }
+  /* 글자 크기 — 한 면에 맞는 가장 큰 크기(짧으면 크게 · 길면 작게 · LF.min 아래로 안 내려감) · 그래도 넘치면 다음 면으로 */
+  function fitLetter(pg, depth) {
+    var b = pg.querySelector('.fc-lbody'); if (!b) return 0;
+    depth = depth || 0;
+    if (!depth) {
+      var hi = LF.max, lo = LF.min;
+      b.style.fontSize = hi + 'px';
+      if (lOver(pg) <= 0.5) return 0;
+      b.style.fontSize = lo + 'px';
+      if (lOver(pg) <= 0.5) {
+        while (hi - lo > 0.25) { var mid = (hi + lo) / 2; b.style.fontSize = mid + 'px'; if (lOver(pg) <= 0.5) lo = mid; else hi = mid; }
+        b.style.fontSize = (Math.floor(lo * 4) / 4) + 'px';
+        return 0;
+      }
+    } else if (lOver(pg) <= 0.5) return 0;
+    if (depth > 5) return 0;
+    var cont = pg.cloneNode(true), cb = cont.querySelector('.fc-lbody');
+    cb.innerHTML = '';
+    pg.classList.add('fc-letter--more'); cont.classList.add('fc-letter--cont');
+    pg.parentNode.insertBefore(cont, pg.nextSibling);
+    var guard = 0;
+    while (lOver(pg) > 0.5 && b.children.length && guard++ < 4000) { if (!lMove(b, cb)) break; }
+    if (!b.children.length && cb.firstElementChild) b.appendChild(cb.firstElementChild);     /* 한 문장이 한 면보다 길면 — 그대로 두고 멈춤 */
+    lTidy(b, cb);
+    if (!cb.children.length) { cont.parentNode.removeChild(cont); pg.classList.remove('fc-letter--more'); return 0; }
+    var fr = pg.querySelector('.fc-from'); if (fr) fr.parentNode.removeChild(fr);              /* From · 서명은 마지막 면에만 */
+    return 1 + fitLetter(cont, depth + 1);
   }
   /* 넘침 자동 맞춤 (20261114d) — 화면에 그린 뒤 쪽마다 내용이 테두리 안쪽 여백 위에서 끝나는지 재고
        1쪽: fc-tight → fc-tighter(캐릭터 · 간격 줄임) · 2쪽: ① 능력치 칩을 더 작게(fc-compact) ② 그래도 넘치면 「더 빛난 기록」을 3쪽으로(같은 테두리 · 머리글)
@@ -274,6 +384,14 @@
     if (!root || !root.querySelectorAll) return 0;
     var moved = 0;
     Array.prototype.slice.call(root.querySelectorAll('.fc-page')).forEach(function (pg) {
+      /* 편지 (20261114h) — 이달판 여분은 이달 쪽이 넘칠 때만 남김 */
+      if (pg.classList.contains('fc-letter--spare')) { if (pg.parentNode) pg.parentNode.removeChild(pg); return; }
+      if (pg.classList.contains('fc-letter')) { moved += fitLetter(pg, 0); return; }
+      if (pg.classList.contains('fc-page--month')) {
+        var sp = pg.nextElementSibling, nb = pg.querySelector('.fc-note');
+        if (overOf(pg) > 0.5 && nb && sp && sp.classList.contains('fc-letter--spare')) { nb.parentNode.removeChild(nb); sp.classList.remove('fc-letter--spare'); }
+        return;
+      }
       if (overOf(pg) <= 0.5) return;
       if (pg.classList.contains('fc-y')) { pg.classList.add('fc-tight'); if (overOf(pg) > 0.5) pg.classList.add('fc-tighter'); return; }
       if (!pg.classList.contains('fc-p2')) return;
@@ -296,12 +414,17 @@
      → { pages: [{ stu, name, no, html } | { blank, stu, name }], count, sheets, students } */
   function plan(studs, o) {
     o = o || {};
-    var range = o.range === 'p1' || o.range === 'p2' ? o.range : 'all', duplex = o.mode !== 'simplex', out = [], who = 0;
-    var parts = (studs || []).map(function (st) { var pg = st.pages || []; return range === 'p1' ? pg.slice(0, 1) : range === 'p2' ? pg.slice(1) : pg.slice(); });
+    /* range p1l = 1쪽 + 편지 (20261114h) · 쪽 번호(no)는 그 학생의 실제 쪽 번호 */
+    var range = /^(p1|p1l|p2)$/.test(o.range) ? o.range : 'all', duplex = o.mode !== 'simplex', out = [], who = 0;
+    var parts = (studs || []).map(function (st) {
+      return (st.pages || []).map(function (h, j) { return { h: h, no: j + 1 }; }).filter(function (x) {
+        return range === 'p1' ? x.no === 1 : range === 'p2' ? x.no > 1 : range === 'p1l' ? x.no === 1 || /\bfc-letter\b/.test(x.h) : true;
+      });
+    });
     parts.forEach(function (pg, i) {
       if (!pg.length) return;
       who++;
-      pg.forEach(function (h, j) { out.push({ stu: i, name: studs[i].name, no: (range === 'p2' ? j + 2 : j + 1), html: h }); });
+      pg.forEach(function (x) { out.push({ stu: i, name: studs[i].name, no: x.no, html: x.h, letter: /\bfc-letter\b/.test(x.h) }); });
       var later = parts.slice(i + 1).some(function (x) { return x.length; });
       if (duplex && !o.single && later && pg.length % 2 === 1) out.push({ blank: true, stu: i, name: studs[i].name });
     });
@@ -312,20 +435,45 @@
     opt = opt || {};
     var css = opt.css || '../assets/finish.css';
     return '<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>' + esc(opt.title || '완주증') + '</title>' +
-      '<link rel="stylesheet" href="' + esc(css) + '"><style>@page { size: A4 portrait; margin: 0; } html, body { margin: 0; }</style></head><body class="fc-print">' +
+      '<link rel="stylesheet" href="' + esc(css) + '">' + FONT_LINK + '<style>@page { size: A4 portrait; margin: 0; } html, body { margin: 0; }</style></head><body class="fc-print">' +
       pl.pages.map(function (p) { return p.blank ? '<article class="fc-page fc-blank" aria-label="빈 쪽"></article>' : p.html; }).join('') +
-      '<script>window.__fcFitDone = true;</scr' + 'ipt></body></html>';
+      /* 쪽은 코치룸에서 이미 나눠 옴 — 글꼴이 다 뜬 뒤 편지 글이 칸을 넘치면 글자만 조금 줄임(쪽 수는 그대로) */
+      '<script>(function () { function shrink() { Array.prototype.forEach.call(document.querySelectorAll(".fc-letter .fc-lbody"), function (b) { var s = parseFloat(b.style.fontSize) || 15, g = 0; while (b.scrollHeight - b.clientHeight > 0.5 && s > 9 && g++ < 40) { s -= 0.5; b.style.fontSize = s + "px"; } }); }' +
+      ' function done() { try { shrink(); } catch (e) {} window.__fcFitDone = true; }' +
+      ' window.addEventListener("load", function () { var f = document.fonts && document.fonts.ready; if (f) f.then(done, done); else done(); }); })();</scr' + 'ipt></body></html>';
   }
+  /* 편지 글꼴 — Google Fonts 「Gaegu」(따뜻한 손글씨 · 인쇄에 깨끗함) · 못 받으면 Pretendard · 맑은 고딕 */
+  var FONT_URL = 'https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&display=swap';
+  var FONT_LINK = '<link rel="stylesheet" href="' + esc(FONT_URL) + '">';
   /* 새 창 인쇄 문서 — css 는 링크로 · 그림이 다 뜬 뒤 넘침 맞춤 → 인쇄 · opt.p2 */
   function printDoc(views, opt) {
     opt = opt || {};
     var css = opt.css || '../assets/finish.css';
     return '<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>' + esc(opt.title || '완주증') + '</title>' +
-      '<link rel="stylesheet" href="' + esc(css) + '"><style>@page { size: A4 portrait; margin: 0; } html, body { margin: 0; }</style></head><body class="fc-print">' +
+      '<link rel="stylesheet" href="' + esc(css) + '">' + FONT_LINK + '<style>@page { size: A4 portrait; margin: 0; } html, body { margin: 0; }</style></head><body class="fc-print">' +
       views.map(function (v) { return pagesHtml(v, opt).join(''); }).join('') +
-      '<script>window.__fcFit = function () { var getComputedStyle = window.getComputedStyle.bind(window); var global = window; ' + overOf.toString() + fit.toString() + ' return fit(document.body); };' +
-      'window.addEventListener("load", function () { window.__fcFitN = window.__fcFit(); window.__fcFitDone = true; });</scr' + 'ipt></body></html>';
+      '<script>window.__fcFit = function () { var getComputedStyle = window.getComputedStyle.bind(window); var global = window; var LF = ' + JSON.stringify(LF) + '; ' +
+        [overOf, lOver, lMove, lTidy, fitLetter, fit].map(function (f) { return f.toString(); }).join('\n') + ' return fit(document.body); };' +
+      'window.addEventListener("load", function () { var go = function () { window.__fcFitN = window.__fcFit(); window.__fcFitDone = true; }; var f = document.fonts && document.fonts.ready; if (f) f.then(go, go); else go(); });</scr' + 'ipt></body></html>';
+  }
+  /* 코치룸 — 편지 글꼴을 이 문서에도 불러 둔다(넘침을 잴 때 인쇄와 같은 글꼴) · 최대 ms 기다림 */
+  var FONT_P = null;
+  function loadFont(ms) {
+    var D = global.document;
+    if (!D || !D.head) return Promise.resolve(false);
+    if (!D.fonts || !D.fonts.load) return Promise.resolve(false);
+    /* 글꼴 정의(@font-face)가 든 css 가 다 뜬 뒤에 글꼴 파일을 부른다 — 먼저 부르면 「없음」으로 끝남 */
+    if (!FONT_P) FONT_P = new Promise(function (res) {
+      var l = D.createElement('link'); l.rel = 'stylesheet'; l.href = FONT_URL; l.setAttribute('data-fc-font', '1');
+      l.onload = function () { res(true); }; l.onerror = function () { res(false); };
+      D.head.appendChild(l);
+    }).then(function (okCss) {
+      if (!okCss) return false;
+      return Promise.all([D.fonts.load('400 20px Gaegu', '가'), D.fonts.load('700 20px Gaegu', '가')]).then(function (x) { return !!(x[0] && x[0].length); }, function () { return false; });
+    });
+    var t = new Promise(function (res) { setTimeout(function () { res(false); }, ms || 2500); });
+    return Promise.race([FONT_P, t]);
   }
 
-  global.Finish = { compute: compute, view: view, pageHtml: pageHtml, pagesHtml: pagesHtml, printDoc: printDoc, plan: plan, printPlanDoc: printPlanDoc, flowSvg: flowSvg, fit: fit, overOf: overOf, RULE: RULE, P1: P1 };
+  global.Finish = { compute: compute, view: view, pageHtml: pageHtml, pagesHtml: pagesHtml, letterHtml: letterHtml, letterBody: letterBody, noteInline: noteInline, printDoc: printDoc, plan: plan, printPlanDoc: printPlanDoc, flowSvg: flowSvg, fit: fit, overOf: overOf, loadFont: loadFont, RULE: RULE, P1: P1, LF: LF };
 })(window);
