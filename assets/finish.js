@@ -412,23 +412,38 @@
   /* 인쇄 배치 (20261114f) — studs = [{ name, pages: [쪽 html …] }](넘침 맞춘 뒤) · o = { range: all | p1 | p2, mode: duplex | simplex, single }
      range p1 = 1쪽만 · p2 = 2쪽부터 · 양면이면 고른 쪽 수가 홀수인 학생 뒤에 빈 쪽 → 다음 학생이 늘 새 종이 앞면(맨 끝 학생 · 한 명만 인쇄면 넣지 않음)
      → { pages: [{ stu, name, no, html } | { blank, stu, name }], count, sheets, students } */
+  /* 쪽 이름 (20261115b) — 쪽 번호 대신 「상장 · 레이스 기록 · 편지」 */
+  var PART_NAME = { cert: '상장', race: '레이스 기록', letter: '편지', blank: '빈 쪽' };
+  function partOf(h) { h = String(h || ''); return /\bfc-blank\b/.test(h) ? 'blank' : /\bfc-letter\b/.test(h) ? 'letter' : /\bfc-p[23]\b/.test(h) ? 'race' : 'cert'; }
+  /* 범위 — all 전체 · cert 상장만 · letter 편지만 · race 레이스 기록만 (20261115b) · 예전 값 p1 = cert · p1l(1쪽 + 편지) · p2(2쪽부터)도 읽음 */
+  var RANGES = ['all', 'cert', 'letter', 'race'];
   function plan(studs, o) {
     o = o || {};
-    /* range p1l = 1쪽 + 편지 (20261114h) · 쪽 번호(no)는 그 학생의 실제 쪽 번호 */
-    var range = /^(p1|p1l|p2)$/.test(o.range) ? o.range : 'all', duplex = o.mode !== 'simplex', out = [], who = 0;
+    var range = RANGES.indexOf(o.range) >= 0 || /^(p1|p1l|p2)$/.test(o.range) ? o.range : 'all', duplex = o.mode !== 'simplex', out = [], who = 0, skip = [];
+    var keep = function (x) {
+      var k = partOf(x.h);
+      return range === 'p1' ? x.no === 1 : range === 'cert' ? k === 'cert' : range === 'letter' ? k === 'letter' : range === 'race' ? k === 'race'
+        : range === 'p2' ? x.no > 1 : range === 'p1l' ? k === 'cert' || k === 'letter' : true;
+    };
     var parts = (studs || []).map(function (st) {
-      return (st.pages || []).map(function (h, j) { return { h: h, no: j + 1 }; }).filter(function (x) {
-        return range === 'p1' ? x.no === 1 : range === 'p2' ? x.no > 1 : range === 'p1l' ? x.no === 1 || /\bfc-letter\b/.test(x.h) : true;
-      });
+      var all = (st.pages || []).map(function (h, j) { return { h: h, no: j + 1, part: partOf(h) }; }), kept = all.filter(keep);
+      kept.forEach(function (x) { var same = kept.filter(function (y) { return y.part === x.part; }); x.pn = same.length; x.pi = same.indexOf(x) + 1; });
+      return kept;
     });
     parts.forEach(function (pg, i) {
-      if (!pg.length) return;
+      if (!pg.length) { skip.push(studs[i].name); return; }
       who++;
-      pg.forEach(function (x) { out.push({ stu: i, name: studs[i].name, no: x.no, html: x.h, letter: /\bfc-letter\b/.test(x.h) }); });
+      pg.forEach(function (x) { out.push({ stu: i, name: studs[i].name, no: x.no, part: x.part, pi: x.pi, pn: x.pn, label: PART_NAME[x.part] + (x.pn > 1 ? ' ' + x.pi + '/' + x.pn : ''), html: x.h, letter: x.part === 'letter' }); });
       var later = parts.slice(i + 1).some(function (x) { return x.length; });
-      if (duplex && !o.single && later && pg.length % 2 === 1) out.push({ blank: true, stu: i, name: studs[i].name });
+      if (duplex && !o.single && later && pg.length % 2 === 1) out.push({ blank: true, stu: i, name: studs[i].name, label: '빈 쪽' });
     });
-    return { pages: out, count: out.length, sheets: duplex ? Math.ceil(out.length / 2) : out.length, students: who, duplex: duplex, range: range };
+    return { pages: out, count: out.length, sheets: duplex ? Math.ceil(out.length / 2) : out.length, students: who, duplex: duplex, range: range, skipped: skip };
+  }
+  /* 한 학생 쪽들 이름 — 「상장 · 레이스 기록(2장) · 편지」 */
+  function partsText(pages) {
+    var seq = [], n = {};
+    (pages || []).forEach(function (h) { var k = partOf(h); if (k === 'blank') return; if (!n[k]) { n[k] = 0; seq.push(k); } n[k]++; });
+    return seq.map(function (k) { return PART_NAME[k] + (n[k] > 1 ? '(' + n[k] + '장)' : ''); }).join(' · ');
   }
   /* 배치대로 인쇄 문서 — 빈 쪽은 완전 흰 종이(테두리 없음) */
   function printPlanDoc(pl, opt) {
@@ -475,5 +490,5 @@
     return Promise.race([FONT_P, t]);
   }
 
-  global.Finish = { compute: compute, view: view, pageHtml: pageHtml, pagesHtml: pagesHtml, letterHtml: letterHtml, letterBody: letterBody, noteInline: noteInline, printDoc: printDoc, plan: plan, printPlanDoc: printPlanDoc, flowSvg: flowSvg, fit: fit, overOf: overOf, loadFont: loadFont, FONT_URL: FONT_URL, RULE: RULE, P1: P1, LF: LF };
+  global.Finish = { compute: compute, view: view, pageHtml: pageHtml, pagesHtml: pagesHtml, letterHtml: letterHtml, letterBody: letterBody, noteInline: noteInline, printDoc: printDoc, plan: plan, printPlanDoc: printPlanDoc, partOf: partOf, partsText: partsText, PART_NAME: PART_NAME, RANGES: RANGES, flowSvg: flowSvg, fit: fit, overOf: overOf, loadFont: loadFont, FONT_URL: FONT_URL, RULE: RULE, P1: P1, LF: LF };
 })(window);

@@ -5086,3 +5086,12 @@ dialog.modal.fa-ps { width: min(620px, calc(100vw - 16px)); max-height: calc(100
   .fa-chip { flex: 0 0 auto; }
   .fa-sel { top: 14px; left: 14px; }
 }
+
+/* 20261115b — PDF 받기 창 범위 큰 버튼 넷 · 화면 판 */
+.fa-pd__rg { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.fa-pd__q { min-height: 64px; }
+.fa-pd__q:disabled { opacity: .45; cursor: not-allowed; background: #F4F4F7; border-color: #E4E4EA; }
+.fa-pd__q:disabled b { color: #7C7F93; }
+.fa-ver { font-size: 12px; }
+@media (max-width: 720px) { .fa-pd__rg { grid-template-columns: 1fr 1fr; } }
+.fa-acts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
