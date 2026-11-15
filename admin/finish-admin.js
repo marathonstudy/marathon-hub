@@ -112,14 +112,19 @@
   function load() {
     if (!S.cls) { paint(); return; }
     S.busy = true; S.err = ''; S.rows = []; S.mark = {}; S.draft = {}; paint();
-    var key = pkey(), kind = S.kind;
+    if (window.FinRec) FinRec.reset();
+    var key = pkey(), kind = S.kind, cls0 = S.cls;
     Promise.resolve(sb().rpc('finish_class', { p_class: S.cls, p_kind: kind, p_key: key })).then(function (r) {
       if (r.error) { S.busy = false; S.err = /finish_class|function/.test(r.error.message || '') ? 'migration-110 SQL 을 먼저 실행해 주세요.' : r.error.message; paint(); return; }
       var list = r.data || [], out = [], i = 0;
       /* 배지는 4명씩 나눠 받기 */
       function next() {
         var part = list.slice(i, i + 4); i += 4;
-        if (!part.length) { S.busy = false; S.rows = out; build(); paint(); return; }
+        if (!part.length) {
+          S.busy = false; S.rows = out; build(); paint();
+          if (window.FinRec) FinRec.load(S.cls).then(function () { if (S.cls === cls0) paintList(); });      /* 기록 상태 (20261115d · migration-116 · 없으면 앱 연결 · 기록 적음만) */
+          return;
+        }
         Promise.all(part.map(function (s) { return badgesOf(s.id).then(function (b) { s.badges = b; return s; }); })).then(function (xs) { out = out.concat(xs); next(); });
       }
       next();
@@ -146,9 +151,9 @@
     var c = covered(s);
     return c.n >= c.total ? null : c;                                      /* 모든 달이 있으면 받는 중 표시 없음 */
   }
-  function build() {
+  function build(only) {
     var from = S.kind === 'year' ? S.from : S.month + '-01', to = S.kind === 'year' ? S.to : monthEnd(S.month);
-    S.rows.forEach(function (s) {
+    (only || S.rows).forEach(function (s) {
       /* finish_class 가 주는 cert = 저장된 고르기(finish_certs) → dbCert 로 옮기고, cert 자리에는 계산한 완주증 */
       if (!('dbCert' in s)) s.dbCert = s.cert && !s.cert.titles ? s.cert : null;
       s._saved = null;
@@ -196,6 +201,7 @@
       '<label class="fa-sel" title="고르기 — 위 막대의 버튼으로 한 번에"><input type="checkbox" data-fa-mark="' + s.id + '"' + (S.mark[s.id] ? ' checked' : '') + ' aria-label="' + esc(s.name) + ' 고르기"></label>' +
       '<button type="button" class="fa-thumb" data-fa-big="' + s.id + '" aria-label="' + esc(s.name + ' 완주증 크게 보기') + '"><span class="fa-thumb__in">' + Finish.pageHtml(v, popt()) + '</span><span class="fa-thumb__z" aria-hidden="true">🔍 크게</span></button>' +
       '<div class="fa-ctl"><div class="fa-ctl__h"><b>' + esc(s.name) + '</b><span class="fa-ctl__f" data-fa-flags="' + s.id + '">' + flagsHtml(s) + '</span></div>' +
+        (window.FinRec ? FinRec.panelHtml(s) : '') +                    /* 기록 상태 (직원만 · 20261115d) */
         '<label class="field__label">칭호</label>' + titles +
         '<label class="field__label">하이라이트</label>' + hls + note +
         '<div class="fa-ctl__b"><button type="button" class="btn btn--sm" data-fa-print="' + s.id + '">이 학생 인쇄</button>' +
@@ -219,7 +225,7 @@
     b.innerHTML = h;
   }
   function listHtml() {
-    var v = shown(), chk = v.filter(needCheck), rest = v.filter(function (s) { return !needCheck(s); }), h = '';
+    var v = shown(), chk = v.filter(needCheck), rest = v.filter(function (s) { return !needCheck(s); }), h = window.FinRec ? FinRec.barHtml() : '';
     if (!v.length) return '<p class="panel__hint fa-empty">「' + esc(filterName(S.filter)) + '」에 맞는 학생이 없어요.</p>';
     if (chk.length) h += '<h3 class="fa-h">확인 필요 <span class="muted-note">' + chk.length + '명 — 기록이 아주 적거나 옛 기록을 다 못 받았어요</span></h3>' + chk.map(cardHtml).join('');
     if (rest.length) h += '<h3 class="fa-h">' + esc(S.cls) + ' <span class="muted-note">' + rest.length + '명' + (S.filter !== 'all' ? ' · ' + esc(filterName(S.filter)) : '') + '</span></h3>' + rest.map(cardHtml).join('');
@@ -969,6 +975,7 @@
   function onClick(e) {
     var t = e.target;
     if (t.closest('[data-fa-close]')) { dlg.close(); return; }
+    if (window.FinRec && FinRec.onClick(e)) return;                     /* 기록 상태 칸 · 반 위 막대 (20261115d) */
     var la = t.closest('[data-fa-all]'); if (la) { openAll(rowOf(la.getAttribute('data-fa-all'))); return; }
     var bk = t.closest('[data-bk]'); if (bk) { if (!bk.disabled) bulk(bk.getAttribute('data-bk')); return; }
     var fl = t.closest('[data-fa-filter]');
@@ -1025,6 +1032,32 @@
         paintTools(); }
     }
   }
+
+  /* ---------- 기록 상태 · 다시 받기 (20261115d · admin/finish-rec.js · migration-116) ----------
+     다시 받기가 끝난 학생 — 기록(data · old)을 다시 불러와 완주증을 다시 계산 · 칭호 · 하이라이트는 자동(다시 받기 때 서버가 비움) · 한마디 · 확정은 그대로
+     러닝노트에 공개된 학생은 새 내용으로 다시 공개(snap · 확정된 한마디 그대로) */
+  function reloadRows(ids) {
+    var cls0 = S.cls, key = pkey(), kind = S.kind;
+    return Promise.resolve(sb().rpc('finish_class', { p_class: S.cls, p_kind: kind, p_key: key })).then(function (r) {
+      if (!r || r.error || S.cls !== cls0 || pkey() !== key) return;
+      var got = [];
+      (r.data || []).forEach(function (x) {
+        if (ids.indexOf(x.id) < 0) return;
+        var s = rowOf(x.id); if (!s) return;
+        s.data = x.data; s.old = x.old; s.old_at = x.old_at; s.old_status = x.old_status; s.old_parts = x.old_parts; s.linked = x.linked;
+        s.dbCert = x.cert && !x.cert.titles ? x.cert : null; s._saved = null;
+        got.push(s);
+      });
+      build(got);
+      got.forEach(function (s) { var sv = savedOf(s); if (S.kind === 'year' && sv.published && sv.note_ok) save(s, { published: true, snap: snapOf(s) }); });
+      paintList();
+    });
+  }
+  function resetPick(ids) {
+    ids.forEach(function (id) { var s = rowOf(id); if (!s) return; var sv = savedOf(s); sv.title_key = ''; sv.hl_keys = []; if (s.dbCert) { s.dbCert.title_key = ''; s.dbCert.hl_keys = []; } });
+  }
+  if (window.FinRec) FinRec.bind({ S: function () { return S; }, open: function () { return !!(dlg && dlg.open); }, rowOf: rowOf, needCheck: needCheck, oldProgress: oldProgress, covered: covered,
+    reload: reloadRows, repaint: function (s) { if (s) repaintCard(s); }, paintList: function () { if (dlg) paintList(); }, pkey: pkey, toast: toast, resetPick: resetPick });
 
   function open() {
     modal();
