@@ -208,6 +208,9 @@
 .fc-note-0.fc-h2 .fc-cards { gap: 3.5mm; } .fc-note-0.fc-h3 .fc-cards { gap: 3mm; }
 /* 서명 — 글자 높이의 약 2 ~ 2.3배 · 이름 끝 글자 위에 살짝 겹침 · 잉크색은 그림 그대로 · 못 받으면 빈 서명 칸(밑줄) */
 .fc-sign__box.has-img { width: auto; height: auto; border-bottom: 0; margin-left: calc(-0.9em - 3mm); line-height: 0; position: relative; align-self: flex-end; }
+/* 20261115c — 서명이 「마라톤국어 대표 김종현」 글자를 덮던 것 → 이름 오른쪽 끝에서 살짝만(약 0.3글자) 겹치고 · 글자가 서명 위에 보임(상장 · 이달판 · 편지 모두) */
+.fc-sign__t { position: relative; z-index: 1; white-space: nowrap; }
+.fc-sign .fc-sign__box.has-img { margin-left: calc(-0.3em - 3mm); z-index: 0; }
 .fc-sign__img { display: block; height: 2.3em; width: auto; max-width: 48mm; object-fit: contain; }
 /* 이달판 인쇄본 — 날짜 · 「마라톤국어 대표 김종현」 + 서명 */
 .fc-foot--ms { font-size: 10.5pt; color: #2E2266; }

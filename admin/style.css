@@ -5095,3 +5095,10 @@ dialog.modal.fa-ps { width: min(620px, calc(100vw - 16px)); max-height: calc(100
 .fa-ver { font-size: 12px; }
 @media (max-width: 720px) { .fa-pd__rg { grid-template-columns: 1fr 1fr; } }
 .fa-acts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* 20261115c — 「크게」 미리보기 위 부분 이름 「상장 · 레이스 기록(2장) · 편지」(지금 보는 부분 굵게 · 누르면 그 부분으로) */
+.fa-big__parts { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; margin: 0 8px; }
+.fa-big__part { appearance: none; font: inherit; font-size: 13px; font-weight: 700; color: #6B6F86; background: transparent; border: 0; border-radius: 999px; padding: 4px 10px; min-height: 32px; cursor: pointer; }
+.fa-big__part.is-on { color: #fff; background: #5A3FD0; }
+.fa-big__dot { color: #B8B4CC; }
+.fa-big__top .fa-big__part { color: #E4E1F5; } .fa-big__top .fa-big__part.is-on { color: #fff; } .fa-big__top .fa-big__dot { color: #9E99B8; }

@@ -103,7 +103,8 @@
     });
     if (grow) hls.push({ key: 'grow', icon: '📈', big: '+' + grow.d + '%', desc: '가장 성장한 영역 · ' + grow.name, text: '가장 성장한 영역 · ' + grow.name + ' +' + grow.d + '%', score: 45 + grow.d * 2 });
     /* 주력 스킬 */
-    var skill = areas.filter(function (a) { return a.q >= R.q; }).sort(function (a, b2) { return b2.rate - a.rate; })[0];
+    /* 20261115c — 「기타」 영역은 빼고 분류된 영역(독서 · 문학 · 선택과목) 중 가장 높은 것 (러닝노트 · 코치룸 능력치와 같은 규칙) */
+    var skill = areas.filter(function (a) { return a.q >= R.q && !(Ab && Ab.groupOf && Ab.groupOf(a.name, a.name) === '기타'); }).sort(function (a, b2) { return b2.rate - a.rate; })[0];
     if (skill && skill.rate >= 75) hls.push({ key: 'skill', icon: '🎯', big: skill.rate + '%', desc: '주력 스킬 · ' + skill.name, text: '주력 스킬 · ' + skill.name + ' ' + skill.rate + '%', score: skill.rate - 30 });
     /* 가장 꾸준했던 달(1년) · 주(이달) — 과제를 낸 날이 가장 많은 */
     var by = {};
@@ -237,7 +238,7 @@
         '<div class="fc-lbody" style="font-size:' + LF.max + 'px">' + letterBody(v.note) + '</div>' +
         '<p class="fc-lnext">다음 장에 이어져요 →</p>' +
         '<div class="fc-from"><span class="fc-from__m" aria-hidden="true"><img src="' + esc(charSrc('maratoni', base)) + '" alt=""><img src="' + esc(charSrc('marabugi', base)) + '" alt=""></span>' +
-          '<div class="fc-from__r"><p class="fc-from__n"><span class="fc-sign">From. 김종현 쌤 ' + signBox(opt) + '</span></p><p class="fc-from__d">' + ymd(v.to) + '</p></div></div>' +
+          '<div class="fc-from__r"><p class="fc-from__n"><span class="fc-sign"><span class="fc-sign__t">From. 김종현 쌤</span>' + signBox(opt) + '</span></p><p class="fc-from__d">' + ymd(v.to) + '</p></div></div>' +
       '</div></article>';
   }
 
@@ -261,7 +262,7 @@
         (inNote ? '<div class="fc-box fc-note"><p class="fc-box__t">선생님 한마디</p><p class="fc-note__t">' + noteInline(v.note) + '</p></div>' : '') +
         '<div class="fc-end">' + finishLine(base, false) +
           '<div class="fc-foot"><span class="fc-date">' + ymd(v.to) + '</span>' +
-          (opt.link ? '<span class="fc-sign">' + esc(sign) + '</span>' : '<span class="fc-sign">' + esc(sign) + ' ' + signBox(opt) + '</span>') + '</div></div>' +
+          (opt.link ? '<span class="fc-sign">' + esc(sign) + '</span>' : '<span class="fc-sign"><span class="fc-sign__t">' + esc(sign) + '</span>' + signBox(opt) + '</span>') + '</div></div>' +
       '</div></article>';
   }
   function monthHtml(v, opt) {
@@ -275,7 +276,7 @@
       (v.note ? '<div class="fc-box fc-note"><p class="fc-box__t">선생님 한마디</p><p class="fc-note__t">' + noteInline(v.note) + '</p></div>' : '') +
       finishLine(base, true) +
       (opt.link ? '<div class="fc-foot fc-foot--m"><span class="fc-sign">마라톤국어</span></div>'
-        : '<div class="fc-foot fc-foot--ms"><span class="fc-date">' + ymd(v.to) + '</span><span class="fc-sign">마라톤국어 대표 김종현 ' + signBox(opt) + '</span></div>') +      /* 인쇄본 — 서명 자리 (20261114h) */
+        : '<div class="fc-foot fc-foot--ms"><span class="fc-date">' + ymd(v.to) + '</span><span class="fc-sign"><span class="fc-sign__t">마라톤국어 대표 김종현</span>' + signBox(opt) + '</span></div>') +      /* 인쇄본 — 서명 자리 (20261114h) */
       '</div></article>';
   }
   /* 2쪽 「나의 1년 레이스 기록」 — 월간 메달 12칸 → 정답률 흐름(크게) → 능력치 스탯 카드(묶음별) → 1쪽에 못 들어간 하이라이트 */

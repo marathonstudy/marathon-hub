@@ -290,9 +290,10 @@
     var ok = areas.filter(function (a) { return a.enough; });
     var hi = null, lo = null;
     if (ok.length >= 2) {
-      hi = ok.slice().sort(function (a, b) { return b.rate - a.rate; })[0];
+      /* 주력 스킬 — 「기타」 묶음은 빼고 분류된 영역 중 가장 높은 것 (20261115c · 완주증 하이라이트와 같은 규칙) */
+      hi = ok.filter(function (a) { return a.group !== '기타'; }).sort(function (a, b) { return b.rate - a.rate; })[0] || null;
       lo = ok.slice().sort(function (a, b) { return a.rate - b.rate; })[0];
-      if (hi.rate === lo.rate) lo = null;
+      if (hi && (hi.rate === lo.rate || hi === lo)) lo = null;
     }
     var qSum = areas.reduce(function (s, a) { return s + a.q; }, 0);
     return { groups: groupsOf(areas), total: sumOf(areas), kind: src === 'app' ? 'y1' : (kind || 'w4'), auto: src === 'app' && (kind || 'w4') !== 'y1', range: p, areas: areas, detail: detail, src: src,
