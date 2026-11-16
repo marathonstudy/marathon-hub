@@ -1841,6 +1841,9 @@
     selectTab: selectTab,
     whoami: whoami,
     issueMissing: issueMissing,
+    /* 미리보기 창 [링크 복사] (20261116a) — 있던 링크 그대로 · 없을 때만 지금 방식으로 만든다 (재발급 아님) */
+    ensureParentLink: function (sid) { var c = Store.linkOf(sid).hubCode; return c ? Promise.resolve(c) : issueLink(sid); },
+    ensureStudentLink: ensureStudentLink,
     loginTagHtml: loginTagHtml,
     entryUrl: entryUrl,
     entryNotice: function () { return ENTRY_NOTICE.split('{주소}').join(entryUrl()); },

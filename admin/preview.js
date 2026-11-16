@@ -253,6 +253,11 @@
           '<button type="button" class="btn btn--sm" data-pvset="parent">학부모 화면</button>' +
           '<button type="button" class="btn btn--sm" data-pvset="student">학생 화면</button>' +
         '</div>' +
+        /* 링크 복사 (20261116a · 직원 화면에만 있는 창) — 주소는 화면에 안 보이고 버튼으로만 복사 */
+        '<div class="pv-seg pv-copy" role="group" aria-label="링크 복사">' +
+          '<button type="button" class="btn btn--sm pv-copy__b" data-pvcopy="parent" title="이 학생 학부모 링크 복사" aria-label="학부모 링크 복사">🔗<span class="pv-copy__t"> 학부모 링크 복사</span></button>' +
+          '<button type="button" class="btn btn--sm pv-copy__b" data-pvcopy="student" title="이 학생 학생 링크(러닝노트) 복사" aria-label="학생 링크 복사">🔗<span class="pv-copy__t"> 학생 링크 복사</span></button>' +
+        '</div>' +
         '<label class="chk-inline"><input type="checkbox" id="pvPhone"> 휴대폰 크기로 보기</label>' +
         '<button type="button" class="btn" id="pvClose">닫기</button>' +
       '</div>' +
@@ -275,6 +280,8 @@
       var m = e.target.closest('[data-pvmode]');
       if (m) { cur.mode = m.dataset.pvmode; bridge.view = ''; bridge.arg = ''; load(); }
       if (e.target.id === 'pvClose') close();
+      var cp = e.target.closest('[data-pvcopy]');
+      if (cp) copyLink(cp);
       var nv = e.target.closest('#pvPrev, #pvNext');
       if (nv && cur.list) step(nv.id === 'pvNext' ? 1 : -1);
     });
@@ -283,6 +290,32 @@
       o.querySelector('#pvWrap').classList.toggle('is-phone', cur.phone);
     });
     return o;
+  }
+
+  /* [🔗 학부모 링크 복사] [🔗 학생 링크 복사] — 지금 보고 있는 학생의 실제 링크(학부모 /me/#학부모코드 · 학생 /me/#학생코드)
+     있던 링크 그대로 · 없으면 명단의 [링크 만들기] · [학생 링크]와 같은 방식으로 만든 뒤 복사 · 재발급 · 무효화 없음 · 퇴원 학생은 막힘 */
+  function copyLink(btn) {
+    var s = student(), who = btn.dataset.pvcopy === 'student' ? 'student' : 'parent';
+    if (!s || btn.disabled) return;
+    var say = function (t, k) { if (window.UI && UI.toast) UI.toast(t, k); };
+    if (Store.isGone && Store.isGone(s)) { say('퇴원한 학생이라 링크가 막혀 있습니다', 'bad'); return; }
+    var mk = who === 'student' ? (window.UI && UI.ensureStudentLink) : (window.UI && UI.ensureParentLink);
+    if (!mk) return;
+    var sid = s.id, label = who === 'student' ? '학생' : '학부모';
+    btn.disabled = true;
+    Promise.resolve().then(function () { return mk(sid); }).then(function (code) {
+      if (!code) throw new Error('링크를 만들지 못했습니다');
+      /* /me/#코드/home — 「이 수업 레포트」 한 장이 아니라 홈부터 러닝노트 전체 (#코드 만이면 최근 레포트가 먼저 열림) */
+      return UI.copyText(Store.hubUrl(code, 'home'));
+    }).then(function () {
+      var was = btn.innerHTML;
+      btn.classList.add('is-done');
+      btn.innerHTML = '✓ 복사됨';
+      say(s.name + ' ' + label + ' 링크 복사됨', 'good');
+      setTimeout(function () { btn.classList.remove('is-done'); btn.innerHTML = was; }, 1600);
+    }).catch(function (err) {
+      say('복사하지 못했습니다 — ' + ((err && err.message) || ''), 'bad');
+    }).then(function () { btn.disabled = false; });
   }
 
   function step(d) {

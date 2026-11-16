@@ -2555,6 +2555,17 @@ body.pv-open { overflow: hidden; }
 .pv-bar__title { font-size: 15px; font-weight: 800; margin-right: auto; }
 .pv-bar .chk-inline { color: #fff; }
 .pv-seg { display: flex; gap: 4px; }
+/* 미리보기 링크 복사 (20261116a) — 좁으면 아이콘만 */
+.pv-copy__b { white-space: nowrap; }
+.pv-copy__b.is-done { background: #2F7D63; border-color: #2F7D63; color: #fff; }
+@media (max-width: 600px) {
+  .pv-bar { padding: 8px 10px; gap: 6px 8px; }
+  .pv-bar__title { width: 100%; font-size: 14px; overflow-wrap: anywhere; }
+  .pv-bar .btn { max-width: 100%; }
+  .pv-seg { flex-wrap: wrap; min-width: 0; }
+  .pv-copy__t { display: none; }
+  .pv-copy__b { min-width: 40px; }
+}
 .pv-tag { display: inline-block; font-size: 12px; font-weight: 800; border-radius: 999px; padding: 2px 9px; background: #fff; }
 .pv-tag--student { color: #2F7D63; }
 .pv-tag--parent { color: #5B42D6; }
