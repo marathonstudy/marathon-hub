@@ -128,6 +128,27 @@ function whoOf(src: Any): string {
   return v ? String(v).trim().slice(0, 40) : "";
 }
 
+/* 20261117b — 앱 반 정보(구간 계산용) — 있는 칸만: 반 id · 이름 · 시작 · 종료일 · 구간 반 여부 · 환급 기준(%) · 강 번호 띄움(off)
+   앱 「구간」은 shared/sections.ts calculateSections(총 일수 27일 이상 · has_sections 반만) · 판정은 getSectionOnTimeStats(구간 안 열린 숙제 중 정시 제출 비율 ≥ 기준)
+   지금 앱 응답(공유 리포트 · 학생 기준 주소)의 classInfo 에는 id · title · openType 만 있어 나머지는 비어 있다 → 앱이 보내 주면 그대로 저장(.local/replit_구간요청.md) */
+const dayStr = (v: unknown) => { const s = String(v ?? "").slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : ""; };
+export function classMeta(ci: Any, off: number, rec?: Any): Any {
+  if (!ci || typeof ci !== "object") return null;
+  if (rec && rec.sectionStats !== undefined && ci.sectionStats === undefined) ci = { ...ci, sectionStats: rec.sectionStats };
+  const o: Any = { off, id: ci.id ?? ci.classId ?? null, title: String(ci.title ?? ci.classTitle ?? "").slice(0, 80) };
+  const od = dayStr(ci.openDate ?? ci.open_date), cd = dayStr(ci.closeDate ?? ci.close_date);
+  if (od) o.openDate = od;
+  if (cd) o.closeDate = cd;
+  const hs = ci.hasSections ?? ci.has_sections;
+  if (typeof hs === "boolean") o.hasSections = hs;
+  const th = ci.refundThreshold ?? ci.refund_threshold;
+  if (th != null && th !== "" && Number.isFinite(Number(th))) o.refundThreshold = Number(th);
+  if (ci.openType) o.openType = String(ci.openType).slice(0, 20);
+  /* 앱이 직접 계산한 구간 정시 제출(getSectionOnTimeStats) — 주면 그대로(숫자만) */
+  const ss = ci.sectionStats ?? ci.section_stats;
+  if (Array.isArray(ss)) o.sectionStats = ss.slice(0, 3).map((s: Any) => ({ section: num(s?.section), on: num(s?.onTimeCount), n: num(s?.totalCount), rate: num(s?.onTimeRate) })).filter((s: Any) => s.section >= 1 && s.section <= 3);
+  return o;
+}
 function pick(src: Any) {
   const st = src?.stats ?? {};
   const lectures = Array.isArray(src?.lectures) ? src.lectures : [];
@@ -147,10 +168,13 @@ function pick(src: Any) {
       correctRate: h?.correctRate == null ? null : Math.round(num(h.correctRate)),
       ...countsOf(h),
       ...partsOf(h),
+      /* 퀴즈 — 답을 냈는지(참 · 거짓)만 · 글은 넘기지 않는다 · 앱이 보낼 때만 (20261117b) */
+      ...(typeof h?.quizAnswered === "boolean" ? { quiz: h.quizAnswered } : (h?.quizAnswer ?? h?.quiz_answer) != null ? { quiz: String(h?.quizAnswer ?? h?.quiz_answer).trim() !== "" } : {}),
     }));
 
   return {
     classTitle: String(src?.classInfo?.title ?? ""),
+    classes: (Array.isArray(src?.__classes) ? src.__classes : [classMeta(src?.classInfo, 0, src)]).filter(Boolean),
     who: whoOf(src),
     stats: {
       submissionRate: Math.round(num(st.homeworkSubmissionRate)),
@@ -203,6 +227,7 @@ function lite(full: Any) {
       .map((h: Any) => ({ title: h.title, order: h.order, submittedAt: h.submittedAt, late: h.late })),
   };
 }
+
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /* 개인 링크 코드 하나 → { ok, data } | { ok: false, reason } (한 명 · 반 단위 모두 이것을 쓴다)

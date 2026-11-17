@@ -1,10 +1,10 @@
 -- ============================================================
 --  migration-117-online-run.sql — 20261117a · 116 다음 · 여러 번 실행해도 됨 · 함수 다시 배포 없음
---  온라인 마라톤 「구간 완주」 — 사정 인정(직원이 날짜마다 체크) · 반 단위 구간 완주 표
---  1. online_excuse — 학생 · 날짜마다 「사정 인정」(시험 등으로 미리 알린 날) · 직원만 읽고 쓴다(RLS)
---     사유 글(note)은 직원만 · 러닝노트(학생 · 학부모)는 날짜만 받는다
---  2. hub_online_excuse(링크 코드) — 그 학생의 사정 인정 날짜만(사유 없음)
---  3. online_run_class(반) — 직원만 · 그 반 학생마다 이미 받아 둔 앱 기록(app_records)의 날짜별 제출 · 과제 제목 · 강별 영상 + 사정 인정 날짜
+--  온라인 마라톤 구간 — 앱 기준(앱과 같은 계산 · 화면에서) + 허브 기준(골든패스 · 사정 인정 · 직원만)
+--  1. online_excuse — 학생 · 날짜마다 「사정 인정」(시험 등으로 미리 알린 날) · 직원만 읽고 쓴다(RLS) · 허브 기준에만 반영
+--     학생 · 학부모 화면(러닝노트)에는 보내지 않는다(앱 기준만)
+--  2. (20261117a 판의 hub_online_excuse 는 지움)
+--  3. online_run_class(반) — 직원만 · 그 반 학생마다 이미 받아 둔 앱 기록(app_records)의 날짜별 제출 · 과제 · 강별 숙제 수 · 반 정보 + 사정 인정 날짜
 --     앱 · 앱 DB 는 건드리지 않는다 · 전화번호 없음 · 문자 · 알림톡 없음
 -- ============================================================
 
@@ -24,19 +24,8 @@ create policy online_excuse_staff on public.online_excuse for all to authenticat
 revoke all on public.online_excuse from anon;
 grant select, insert, update, delete on public.online_excuse to authenticated;
 
-/* ---------- 2. 러닝노트 — 날짜만 ---------- */
-create or replace function public.hub_online_excuse(p_code text)
-returns jsonb language plpgsql stable security definer set search_path = public as $$
-declare s record;
-begin
-  select * into s from public._hub_student(p_code);
-  if not found or s.archived then return '[]'::jsonb; end if;
-  return coalesce((select jsonb_agg(to_char(x.day, 'YYYY-MM-DD') order by x.day)
-                     from public.online_excuse x where x.student_id = s.id and x.day > current_date - 400), '[]'::jsonb);
-end;
-$$;
-revoke all on function public.hub_online_excuse(text) from public;
-grant execute on function public.hub_online_excuse(text) to anon, authenticated;
+/* 예전 판(20261117a)의 러닝노트용 날짜 함수 — 학생 · 학부모 화면에는 앱 기준만 보이므로 쓰지 않는다(있으면 지움) */
+drop function if exists public.hub_online_excuse(text);
 
 /* ---------- 3. 반 표 (직원만) ---------- */
 create or replace function public.online_run_class(p_class text)
@@ -50,6 +39,7 @@ begin
            'data', jsonb_build_object(
              'calendar', coalesce(r.data -> 'calendar', '[]'::jsonb),
              'lectures', coalesce(r.data -> 'lectures', '[]'::jsonb),
+             'classes', coalesce(r.data -> 'classes', '[]'::jsonb),
              'history', coalesce((select jsonb_agg(jsonb_build_object('title', h ->> 'title', 'order', h -> 'order', 'submittedAt', h ->> 'submittedAt', 'late', h -> 'late'))
                                     from jsonb_array_elements(case when jsonb_typeof(r.data -> 'history') = 'array' then r.data -> 'history' else '[]'::jsonb end) h), '[]'::jsonb),
              'old', case when jsonb_typeof(r.old) = 'object' then jsonb_build_object('calendar', coalesce(r.old -> 'calendar', '[]'::jsonb),
@@ -75,6 +65,6 @@ select '사정 인정 표(online_excuse) · RLS 켬' as what, (to_regclass('publ
 union all select '사정 인정 — 직원만 쓰기(정책 is_staff)', exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'online_excuse'
   and policyname = 'online_excuse_staff' and qual like '%is_staff%' and with_check like '%is_staff%')::text
 union all select '사정 인정 — 로그인 안 한 사람은 표를 못 봄', (not has_table_privilege('anon', 'public.online_excuse', 'select'))::text
-union all select '러닝노트 — 날짜만(hub_online_excuse)', (to_regprocedure('public.hub_online_excuse(text)') is not null)::text
+union all select '러닝노트에는 사정 인정 없음(hub_online_excuse 없음)', (to_regprocedure('public.hub_online_excuse(text)') is null)::text
 union all select '반 구간 완주 표 — 직원만(online_run_class)', (to_regprocedure('public.online_run_class(text)') is not null
   and not has_function_privilege('anon', 'public.online_run_class(text)', 'execute'))::text;

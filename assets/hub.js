@@ -1485,25 +1485,19 @@
         renderApp(h.code, d.app || {}, d.reports || [], b);
       }
 
-      /* ---------- 온라인 마라톤 (20261117a · online-run.js) — 완주 달력 · 기록 · 홈 카드 ----------
-         이미 받아 둔 앱 기록 + 사정 인정 날짜(hub_online_excuse · 117 · 날짜만 · 사유 없음 · 117 전이면 빈 목록) */
-      var RUN = { ym: '', open: '', ex: null };
-      function excuseP() {
-        if (!RUN.ex) RUN.ex = Promise.resolve().then(function () { return rpc('hub_online_excuse', { p_code: h.code }); })
-          .then(function (v) { return Array.isArray(v) ? v : []; }, function () { return []; });
-        return RUN.ex;
-      }
-      function runOf(data, ex, ym) { return OnlineRun.compute(data || {}, ym || OnlineRun.ymOf(todayISO()), { today: todayISO(), excuse: ex }); }
+      /* ---------- 온라인 마라톤 (20261117b · online-run.js) — 완주 달력 · 기록 · 홈 카드 ----------
+         이미 받아 둔 앱 기록만 · 앱 기준 구간만(골든패스 · 사정 인정은 코치룸 「허브 기준」에만 · 학생 · 학부모 화면에는 없음) */
+      var RUN = { ym: '', open: '' };
+      function runOf(data, ym) { return OnlineRun.compute(data || {}, ym || OnlineRun.ymOf(todayISO()), { today: todayISO() }); }
       function openRun() {
         var host = $('#panelRun');
         if (!host || !global.OnlineRun) return;
         if (!host.innerHTML) host.innerHTML = appWaitHtml();
-        Promise.all([appData(h.code), excuseP()]).then(function (x) {
-          var data = x[0], ex = x[1];
+        appData(h.code).then(function (data) {
           if (!data) { host.innerHTML = '<div class="empty">과제 기록이 아직 연결되지 않았습니다.<br>선생님께 문의해 주세요.</div>'; return; }
-          var ms = OnlineRun.months(data, todayISO(), data.startOn || '');
+          var ms = OnlineRun.months(data, todayISO());
           if (!RUN.ym || ms.indexOf(RUN.ym) < 0) RUN.ym = ms[0];
-          host.innerHTML = OnlineRun.calHtml(runOf(data, ex, RUN.ym), { months: ms, open: RUN.open });
+          host.innerHTML = OnlineRun.calHtml(runOf(data, RUN.ym), { months: ms, open: RUN.open });
           host.onclick = function (e) {
             var dd = e.target.closest && e.target.closest('[data-orn-day]'), mm = e.target.closest && e.target.closest('[data-orn-m]');
             if (dd) { RUN.open = RUN.open === dd.getAttribute('data-orn-day') ? '' : dd.getAttribute('data-orn-day'); openRun(); }
@@ -1515,10 +1509,10 @@
         var host = $('#panelApp');
         host.innerHTML = appWaitHtml();
         host.onclick = null;
-        Promise.all([appData(h.code), excuseP(), rpc('hub_scores', { p_code: h.code }).catch(function () { return null; })]).then(function (x) {
+        Promise.all([appData(h.code), Promise.resolve().then(function () { return rpc('hub_scores', { p_code: h.code }); }).catch(function () { return null; })]).then(function (x) {
           var data = x[0];
           if (!data) { host.innerHTML = '<div class="empty">과제 기록이 아직 연결되지 않았습니다.<br>선생님께 문의해 주세요.</div>'; return; }
-          host.innerHTML = OnlineRun.recordHtml(data, runOf(data, x[1]), { scores: Array.isArray(x[2]) ? x[2] : [] }) +
+          host.innerHTML = OnlineRun.recordHtml(data, runOf(data), { scores: Array.isArray(x[1]) ? x[1] : [] }) +
             '<div id="apDetail">' + apDetailHtml(data) + '</div>';
           host.onclick = function (e) {
             var b = e.target.closest && e.target.closest('[data-ap-period]');
@@ -1618,7 +1612,7 @@
           mogo: function () { return MOGO && !MOGO.failed ? MOGO : null; },
           latestVideo: function () { var x = videoWeeks()[0]; return x ? { label: weekName(x.w.week_start) } : null; },
           badges: rpc('hub_badges', { p_code: h.code }).catch(function () { return null; }),
-          run: function () { return global.OnlineRun && MODE.online ? { excuse: excuseP(), compute: function (data, ex) { return runOf(data, ex); } } : null; },   /* 온라인 마라톤 완주 현황 카드 (20261117a) */
+          run: function () { return global.OnlineRun && MODE.online ? { compute: function (data) { return runOf(data); } } : null; },   /* 온라인 마라톤 완주 현황 카드 (20261117a) */
           mode: function () { return MODE; },                                       /* 온라인 반만인지 · 반 이름 줄 (20261114g) */
           /* 학습 분석 — 오답정리 · 지문 장악 점수 숫자만 (migration-101 · 없으면 그 칸 없음 · 20261110l) */
           scoresP: rpc('hub_scores', { p_code: h.code }).catch(function () { return null; }),

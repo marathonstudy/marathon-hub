@@ -290,8 +290,9 @@
       openSubs: window.SubView ? function (from, to) { SubView.openStaff({ student: sid, from: from, to: to, who: s0.name || '', title: (s0.name || '') + ' ' + md(from) + (from === to ? '' : '~' + md(to)) }); } : null };
   }
 
-  /* ---------- 2-2) 온라인 마라톤 구간 완주 (online-run.js · migration-117 · 20261117a) ----------
-     온라인 반 학생만 · 러닝노트 홈과 같은 계산 · 날짜마다 「사정 인정」 체크(직원만 · online_excuse · RLS) · 사유 글은 넣지 않음(학생 · 학부모 화면에 안 보임) */
+  /* ---------- 2-2) 온라인 마라톤 구간 (online-run.js · migration-117 · 20261117a · 20261117b 앱 기준) ----------
+     온라인 반 학생만 · 앱 기준(앱과 같은 정시 제출률 · 기준 % · 학생 화면과 같은 판정) + 허브 기준(골든패스 · 사정 인정 · 직원만)
+     날짜마다 「사정 인정」 체크(직원만 · online_excuse · RLS) · 허브 기준에만 반영 · 학생 · 학부모 화면에는 안 보임 */
   var RN = { sid: '', ex: null, ym: '', busy: false, msg: '', openList: false };
   function rnLoad(sid) {
     var c = window.SB && SB.client;
@@ -307,11 +308,11 @@
     var s0 = stu(sid) || {}, OC = window.OnlineClass;
     if (!window.OnlineRun || !sid || !(OC && OC.isOnline(s0.className || s0.class_name))) return '';
     if (RN.sid !== sid) { RN = { sid: sid, ex: null, ym: '', busy: false, msg: '', openList: false }; rnLoad(sid); }
-    var head = '<h3 class="sc-t">🏁 온라인 마라톤 구간 완주</h3>';
+    var head = '<h3 class="sc-t">🏁 온라인 마라톤 구간</h3>';
     if (AB.sid !== sid || AB.data === null || RN.ex === null) return '<section class="sc-sec sc-run" id="scRun">' + head + '<p class="sc-hint">불러오는 중…</p></section>';
-    var data = AB.data || {}, ms = OnlineRun.months(data, today(), '');
+    var data = AB.data || {}, ms = OnlineRun.months(data, today());
     if (!RN.ym || ms.indexOf(RN.ym) < 0) RN.ym = ms[0];
-    var r = OnlineRun.compute(data, RN.ym, { today: today(), excuse: RN.ex });
+    var r = OnlineRun.compute(data, RN.ym, { today: today(), excuse: RN.ex, staff: true });
     return '<section class="sc-sec sc-run" id="scRun" aria-label="구간 완주">' + head +
       OnlineRun.staffHtml(r, { months: ms, excuse: RN.ex, busy: RN.busy || RN.no117, msg: RN.no117 ? 'migration-117 SQL 을 먼저 실행해 주세요 (사정 인정 체크)' : RN.msg, openList: RN.openList }) + '</section>';
   }

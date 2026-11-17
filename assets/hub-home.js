@@ -143,14 +143,13 @@
   }
   /* 온라인 반만 듣는 학생 (hub.js ctx.mode · migration-112) */
   function isOnline() { var m = H && H.ctx && H.ctx.mode ? H.ctx.mode() : null; return !!(m && m.online); }
-  /* 온라인 마라톤 완주 현황 카드 (online-run.js · 20261117a) — 사정 인정 날짜를 받은 뒤 다시 그린다 */
+  /* 온라인 마라톤 완주 현황 카드 (online-run.js · 20261117b) — 앱 기준 구간만 */
   function runOn() { return !!(global.OnlineRun && H.ctx.run && H.ctx.run()); }
   function runHtml() {
     var rc = H.ctx.run();
-    if (!H.runEx) { H.runEx = 'wait'; var mine = H; rc.excuse.then(function (ex) { if (H !== mine) return; H.runEx = ex || []; paint(); }); }
     if (H.loading) return '<section class="gm-card orn-card" id="ornCard"><h2 class="gm-h">🏁 이번 달 완주 현황</h2><p class="gm-hint">과제 기록을 불러오는 중…</p></section>';
     if (!H.data) return '<section class="gm-card orn-card" id="ornCard"><h2 class="gm-h">🏁 이번 달 완주 현황</h2><p class="gm-hint">과제 기록이 연결되면 여기에 보여요</p></section>';
-    return OnlineRun.cardHtml(rc.compute(H.data, Array.isArray(H.runEx) ? H.runEx : []), { go: true }).replace('data-orn-go="run"', 'data-gm-go="run"');
+    return OnlineRun.cardHtml(rc.compute(H.data), { go: true }).replace('data-orn-go="run"', 'data-gm-go="run"');
   }
   function paintFinish() { if (global.FinishHub && H) FinishHub.mount(document.getElementById('gmFinNew'), document.getElementById('gmFinRow'), H); }
   function paintBadge() {

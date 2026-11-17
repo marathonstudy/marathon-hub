@@ -1396,6 +1396,15 @@ delete from public.staff where email = '조교이메일@example.com';
   sms-send(보내기 직전에 빼고 「온라인 반 · 발송 꺼짐」 실패로 기록) · kakao-send(기록 줄도 안 만들고 건너뜀 이유) · note-remind sendRows(자동 알림 · D-day · 대체 문자 모두) · 107 전이면 함수가 없어 그대로
   켜기 — 반 관리 → 그 반 [반 종류] → 「문자 · 알림톡 · 링크 발송」
 
+### 5-148. 20261117b — 온라인 구간을 앱 실제 코드 기준으로 (migration-117 고침 · 함수 app-sync 다시 배포)
+- 앱(읽기만): shared/sections.ts calculateSections(총 일수 = 종료 - 시작 + 1 · 27일 이상 · has_sections 반만 · base = floor(총 일수/3) · 나머지는 3구간 · 회차 = lectures.order) ·
+  server/storage.ts getSectionOnTimeStats(구간 안 열린 숙제 중 isLate=false 제출 % ≥ 기준(반 refund_threshold → 시스템 → 70)) · 영상은 페이지만 열어도 완료 · 퀴즈는 글만(채점 없음) · 골든패스 · 사정 인정 없음
+- 허브에 있는 값: 강별 order · 열린 숙제 수(totalHomework) · 정시 수(onTimeHomework) · 영상 완료 수 · 과제 isLate · 제출 시각 · 날짜별 제출.
+  없는 값: 반 시작 · 종료일 · has_sections · 환급 기준(앱 응답 classInfo 에 id · title · openType 만) · 퀴즈 답 제출 · 마감 시각 → .local/replit_구간요청.md
+- 앱 기준(학생 · 학부모 · 직원) — 앱과 같은 계산 · 반 정보가 오기 전에는 「앱 기록 확인 전」 · 학생 화면은 기준 % · 금액 없이 「1구간 완주」(구간이 끝나야) · 영상 열어 봄 · 퀴즈 답 제출은 참고만
+- 허브 기준(직원만) — 날짜별 인증 + 골든패스 + 사정 인정 · 학생 카드 · 반 표(앱 기준 · 허브 기준 나란히 · CSV) · 학생 · 학부모 화면에는 골든패스 · 사정 인정 없음(hub_online_excuse 지움)
+- 주말 — 숙제(강 번호)가 걸린 날이면 회차 · app-sync — 앱이 classInfo(openDate · closeDate · hasSections · refundThreshold · sectionStats) · quizAnswered 를 보내면 data.classes · history.quiz 로 저장
+
 ### 5-147. 20261117a — 온라인 마라톤 구간 완주 · 과제 탭 「연결 안 됨」 고침 (migration-117 · 함수 배포 없음)
 - [1] 과제 탭 — 예전에는 `_hub_payload` 의 `app.linked`(앱 공유 코드가 있나)만 보고 「과제 기록이 아직 연결되지 않았습니다」.
   온라인 반 가져오기 학생처럼 공유 코드 없이 앱 학생 번호로만 연결된 학생은 홈(저장해 둔 앱 기록)에는 보이는데 이 탭만 비었음 →
