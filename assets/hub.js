@@ -1387,6 +1387,7 @@
          예전 「이번 주」 · 「내 레포트」는 「레포트」 하나로 합쳤다 */
       root.innerHTML =
         '<section class="hub-panel" id="panelHome" role="tabpanel" hidden></section>' +
+        '<section class="hub-panel" id="panelRun" role="tabpanel" hidden></section>' +
         '<section class="hub-panel" id="panelReport" role="tabpanel"></section>' +
         '<section class="hub-panel" id="panelAward" hidden></section>' +
         '<section class="hub-panel" id="panelVideo" role="tabpanel" hidden></section>' +
@@ -1477,10 +1478,55 @@
       /* 과제 상세 (예전 「앱 과제」) — 처음 열 때 불러온다 */
       var appLoaded = null;
       function openApp() {
+        if (MODE.online && global.OnlineRun) { if (appLoaded === 'online') return; appLoaded = 'online'; openRecord(); return; }
         var b = appBaseDate(d.reports || []);
         if (appLoaded === b) return;
         appLoaded = b;
         renderApp(h.code, d.app || {}, d.reports || [], b);
+      }
+
+      /* ---------- 온라인 마라톤 (20261117a · online-run.js) — 완주 달력 · 기록 · 홈 카드 ----------
+         이미 받아 둔 앱 기록 + 사정 인정 날짜(hub_online_excuse · 117 · 날짜만 · 사유 없음 · 117 전이면 빈 목록) */
+      var RUN = { ym: '', open: '', ex: null };
+      function excuseP() {
+        if (!RUN.ex) RUN.ex = Promise.resolve().then(function () { return rpc('hub_online_excuse', { p_code: h.code }); })
+          .then(function (v) { return Array.isArray(v) ? v : []; }, function () { return []; });
+        return RUN.ex;
+      }
+      function runOf(data, ex, ym) { return OnlineRun.compute(data || {}, ym || OnlineRun.ymOf(todayISO()), { today: todayISO(), excuse: ex }); }
+      function openRun() {
+        var host = $('#panelRun');
+        if (!host || !global.OnlineRun) return;
+        if (!host.innerHTML) host.innerHTML = appWaitHtml();
+        Promise.all([appData(h.code), excuseP()]).then(function (x) {
+          var data = x[0], ex = x[1];
+          if (!data) { host.innerHTML = '<div class="empty">과제 기록이 아직 연결되지 않았습니다.<br>선생님께 문의해 주세요.</div>'; return; }
+          var ms = OnlineRun.months(data, todayISO(), data.startOn || '');
+          if (!RUN.ym || ms.indexOf(RUN.ym) < 0) RUN.ym = ms[0];
+          host.innerHTML = OnlineRun.calHtml(runOf(data, ex, RUN.ym), { months: ms, open: RUN.open });
+          host.onclick = function (e) {
+            var dd = e.target.closest && e.target.closest('[data-orn-day]'), mm = e.target.closest && e.target.closest('[data-orn-m]');
+            if (dd) { RUN.open = RUN.open === dd.getAttribute('data-orn-day') ? '' : dd.getAttribute('data-orn-day'); openRun(); }
+            else if (mm && mm.getAttribute('data-orn-m')) { RUN.ym = mm.getAttribute('data-orn-m'); RUN.open = ''; openRun(); }
+          };
+        });
+      }
+      function openRecord() {
+        var host = $('#panelApp');
+        host.innerHTML = appWaitHtml();
+        host.onclick = null;
+        Promise.all([appData(h.code), excuseP(), rpc('hub_scores', { p_code: h.code }).catch(function () { return null; })]).then(function (x) {
+          var data = x[0];
+          if (!data) { host.innerHTML = '<div class="empty">과제 기록이 아직 연결되지 않았습니다.<br>선생님께 문의해 주세요.</div>'; return; }
+          host.innerHTML = OnlineRun.recordHtml(data, runOf(data, x[1]), { scores: Array.isArray(x[2]) ? x[2] : [] }) +
+            '<div id="apDetail">' + apDetailHtml(data) + '</div>';
+          host.onclick = function (e) {
+            var b = e.target.closest && e.target.closest('[data-ap-period]');
+            if (!b) return;
+            APD.period = b.dataset.apPeriod;
+            $('#apDetail').innerHTML = apDetailHtml(data);
+          };
+        });
       }
 
       /* 내 필기 (예전 「필기 노트」) — date 가 있으면 그 수업일 칸으로 */
@@ -1518,6 +1564,13 @@
         var dd = $('#hubDday'); if (dd) dd.hidden = true;
         var line = MODE.classes.map(function (c) { return c.line; }).filter(Boolean)[0];
         if (line) $('#hubMeta').textContent = [line, st.school, st.grade].filter(Boolean).join(' · ');
+        /* 온라인 마라톤 (20261117a · online-run.js) — 탭 [홈][완주 달력][기록][영상·필기] · 레포트는 있을 때만 · 모의고사 숨김 */
+        if (global.OnlineRun) {
+          var tRun = $('#tabRun'); if (tRun) tRun.hidden = false;
+          var tApp = $('#tabApp'); if (tApp) { tApp.textContent = '기록'; tApp.setAttribute('data-i', '📒'); }
+          appLoaded = null;
+          if ($('#panelApp') && !$('#panelApp').hidden) openApp();
+        }
         layoutTabs();
         var cur = tabs.querySelector('.hub-tab[aria-selected="true"]');
         if ((!cur || cur.hidden) && $('#tabHome') && !$('#tabHome').hidden) { select('home'); try { navPush('home'); } catch (e) { /* 그대로 */ } }
@@ -1565,6 +1618,7 @@
           mogo: function () { return MOGO && !MOGO.failed ? MOGO : null; },
           latestVideo: function () { var x = videoWeeks()[0]; return x ? { label: weekName(x.w.week_start) } : null; },
           badges: rpc('hub_badges', { p_code: h.code }).catch(function () { return null; }),
+          run: function () { return global.OnlineRun && MODE.online ? { excuse: excuseP(), compute: function (data, ex) { return runOf(data, ex); } } : null; },   /* 온라인 마라톤 완주 현황 카드 (20261117a) */
           mode: function () { return MODE; },                                       /* 온라인 반만인지 · 반 이름 줄 (20261114g) */
           /* 학습 분석 — 오답정리 · 지문 장악 점수 숫자만 (migration-101 · 없으면 그 칸 없음 · 20261110l) */
           scoresP: rpc('hub_scores', { p_code: h.code }).catch(function () { return null; }),
@@ -1595,6 +1649,7 @@
         if (media && !(tabVideo && !tabVideo.hidden)) { which = which === 'photo' ? 'photo' : 'report'; media = which === 'photo'; }
         closePlayers(null);
         [['home',   '#tabHome',   '#panelHome'],
+         ['run',    '#tabRun',    '#panelRun'],
          ['report', '#tabReport', '#panelReport'],
          ['video',  '#tabVideo',  '#panelVideo'],
          ['app',    '#tabApp',    '#panelApp'],
@@ -1617,6 +1672,7 @@
           if (which === 'award') { $('#panelReport').hidden = true; $('#tabReport').setAttribute('aria-selected', 'true'); }
         }
         if (which === 'app') openApp();
+        if (which === 'run') openRun();
         if (media) { openPhoto(''); if (tabVideo && !tabVideo.hidden) openVideos(); }
         if (which === 'info') openInfo();
         if (which === 'mogo' && $('#panelMogo') && global.MogoView) $('#panelMogo').innerHTML = MOGO && MOGO.failed ? MogoView.failHtml() : MogoView.panelHtml(MOGO);
@@ -1634,6 +1690,7 @@
       if (homeOn) { document.body.classList.add('hub-bar-on'); drawHome(); }
       if (tabVideo) tabVideo.onclick = function () { select('video'); navPush('videos'); };
       $('#tabApp').onclick    = function () { select('app'); navPush('app'); };
+      if ($('#tabRun')) $('#tabRun').onclick = function () { select('run'); navPush('run'); };
       $('#tabBook').onclick   = function () { select('book'); navPush('book'); };
       $('#tabPhoto').onclick  = function () { select('photo'); navPush('photo'); };
       if (tabInfo) tabInfo.onclick = function () { select('info'); navPush('info'); };
@@ -1673,6 +1730,7 @@
         } else if (v === 'reports') { select('report'); showReportList(); }
         else if (v === 'videos' || v === 'video') select('video');
         else if (v === 'app') select('app');
+        else if (v === 'run') select($('#tabRun') && !$('#tabRun').hidden ? 'run' : 'home');
         else if (v === 'mogo') select(tabMogo && !tabMogo.hidden ? 'mogo' : 'report');
         else if (v === 'photo') { select('photo'); if (arg) openPhoto(arg); }
         else if (v === 'review' || v === 'todo') {
@@ -2480,11 +2538,10 @@
 
   function renderApp(code, app, reports, base) {
     var host = $('#panelApp');
-
-    if (!app.linked) {
-      host.innerHTML = '<div class="empty">과제 기록이 아직 연결되지 않았습니다.<br>선생님께 문의해 주세요.</div>';
-      return;
-    }
+    /* 20261117a — 예전에는 app.linked(앱 「공유 코드」가 있나)만 보고 「연결 안 됨」을 띄웠다.
+       온라인 반 가져오기 학생처럼 공유 코드 없이 「앱 학생 번호」로만 연결된 학생은 홈(저장해 둔 앱 기록)에는 과제가 보이는데 이 탭만 비었음.
+       이제 저장해 둔 앱 기록(hub_app_record)부터 읽고, 기록이 없을 때만 「연결 안 됨」 */
+    var NOLINK = '<div class="empty">과제 기록이 아직 연결되지 않았습니다.<br>선생님께 문의해 주세요.</div>';
 
     host.innerHTML = appMoreHtml(app) + appWaitHtml();
     appWaitSlow(host);
@@ -2492,6 +2549,7 @@
 
     appData(code).then(function (dd) {
       var res = dd ? { ok: true, data: dd } : { ok: false, reason: APP.why || '' };
+      if (!res.ok && !app.linked) { host.innerHTML = NOLINK; return; }
       if (!res || !res.ok) {
         /* Edge Function 이 아직 없거나 앱 서버가 응답하지 않을 때.
            맨 위 「앱에서 자세히 보기 ↗」로 원래 화면을 볼 수 있게 남겨 둔다. */

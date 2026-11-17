@@ -411,6 +411,8 @@
       '<label class="cs-setrow">약속 버튼 더하기 <input class="input" id="csSetProms" placeholder="예) 매일 밤 10시에 하기" value="' + esc((c.promises || []).join(', ')) + '"></label>' +
       '<div class="cs-setact"><button type="button" class="btn btn--sm btn--primary" data-cs-setsave>설정 저장</button><button type="button" class="btn btn--sm" data-cs-set>닫기</button></div></div>';
   }
+  /* 능력치(과제 기록을 먼저 읽음) 다음 온라인 마라톤 구간 완주 (stucard.js · 20261117a · 온라인 반 학생만) */
+  function abOn(SC, sid) { var ab = SC.abilityHtml ? SC.abilityHtml(sid) : ''; return (SC.onlineHtml ? SC.onlineHtml(sid) : '') + ab; }
   function paint() {
     var m = modal(), sid = st.open;
     if (!m || !sid) return;
@@ -425,7 +427,7 @@
     if (cOff) {
       m.innerHTML = '<div class="cs-sheet">' + headHtml(sid) + '<div class="cs-scroll" id="csScroll">' +
         (SC && window.Faces ? Faces.cardHtml(sid) : '') +
-        (SC ? SC.infoHtml(sid) + SC.hwHtml(sid, hwOfFn(sid)) + (SC.abilityHtml ? SC.abilityHtml(sid) : '') + (mOff ? '' : SC.mogoHtml(sid)) : '') +
+        (SC ? SC.infoHtml(sid) + SC.hwHtml(sid, hwOfFn(sid)) + abOn(SC, sid) + (mOff ? '' : SC.mogoHtml(sid)) : '') +
         /* 20261114g — 상담 · 모의고사 칸 대신 짧은 안내 한 줄 */
         '<p class="sc-online" id="scConsult">🌐 온라인 반 학생 · ' + (mOff ? '상담 · 모의고사' : '상담') + ' 꺼짐 <span class="muted-note">(반 관리 → 반 종류에서 켤 수 있어요)</span></p></div></div>';
       m.setAttribute('aria-label', (s.name || '') + ' 학생 카드');
@@ -436,7 +438,7 @@
         /* 학생 카드 — 기본 정보 · 과제 · 모의고사 추이 (stucard.js · 20261109c) */
         /* 머리 — 얼굴 사진(없으면 고른 캐릭터) · [사진 올리기] [사진 지우기] · 레벨 · XP (faces.js · 20261110b) */
         (SC && window.Faces ? Faces.cardHtml(sid) : '') +
-        (SC ? SC.infoHtml(sid) + SC.hwHtml(sid, hwOfFn(sid)) + (SC.abilityHtml ? SC.abilityHtml(sid) : '') + (mOff ? '' : SC.mogoHtml(sid)) : '') +
+        (SC ? SC.infoHtml(sid) + SC.hwHtml(sid, hwOfFn(sid)) + abOn(SC, sid) + (mOff ? '' : SC.mogoHtml(sid)) : '') +
         '<section class="sc-sec sc-consult" id="scConsult" aria-label="상담"><h3 class="sc-t">상담</h3>' +
         tabsHtml() + (st.kind === 'hw' ? prevHtml(sid) : '') + formHtml(sid) +
         (st.err ? '<p class="cs-err" role="alert">' + esc(st.err) + '</p>' : '') +

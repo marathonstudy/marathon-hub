@@ -100,6 +100,9 @@
       /* 배지 모음(주간 · 월간) · 월간 배지 화면 (078 · 077) — 학부모가 보는 것 그대로 (우수자 화면은 보내기 전에도) */
       if (name === 'hub_badges') return sb().rpc('staff_badges', { p_student: cur.sid }).then(function (r) { return r.error ? null : r.data; }, function () { return null; });
       if (name === 'hub_award') return sb().rpc('staff_award_view', { p_student: cur.sid, p_month: String(args && args.p_month || '') + '-01' }).then(function (r) { return r.error ? null : r.data; }, function () { return null; });
+      /* 온라인 마라톤 사정 인정 날짜 (117 · 20261117a) — 날짜만 · 117 전이면 빈 목록 */
+      if (name === 'hub_online_excuse') return Promise.resolve(sb().from('online_excuse').select('day').eq('student_id', cur.sid))
+        .then(function (r) { return r && !r.error && Array.isArray(r.data) ? r.data.map(function (x) { return String(x.day).slice(0, 10); }) : []; }, function () { return []; });
       if (name === 'hub_trend') return sb().rpc('staff_hub_trend', { p_student: cur.sid }).then(unwrap);
       /* 모의고사 (089 · 103) — 미리보기도 러닝노트와 같은 모양으로 (예전에는 빠져 있어 늘 「아직 받은 모의고사 레포트가 없어요」 · 20261110m)
          코치룸이 읽는 저장본(mogo_records) 그 학생 줄 · 연결(ok)일 때만 · 모든 회(완성 여부는 done) */

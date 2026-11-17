@@ -290,8 +290,55 @@
       openSubs: window.SubView ? function (from, to) { SubView.openStaff({ student: sid, from: from, to: to, who: s0.name || '', title: (s0.name || '') + ' ' + md(from) + (from === to ? '' : '~' + md(to)) }); } : null };
   }
 
+  /* ---------- 2-2) 온라인 마라톤 구간 완주 (online-run.js · migration-117 · 20261117a) ----------
+     온라인 반 학생만 · 러닝노트 홈과 같은 계산 · 날짜마다 「사정 인정」 체크(직원만 · online_excuse · RLS) · 사유 글은 넣지 않음(학생 · 학부모 화면에 안 보임) */
+  var RN = { sid: '', ex: null, ym: '', busy: false, msg: '', openList: false };
+  function rnLoad(sid) {
+    var c = window.SB && SB.client;
+    if (!c) { RN.ex = []; return; }
+    Promise.resolve(c.from('online_excuse').select('day').eq('student_id', sid)).then(function (r) {
+      if (RN.sid !== sid) return;
+      RN.ex = r && !r.error && Array.isArray(r.data) ? r.data.map(function (x) { return String(x.day).slice(0, 10); }) : [];
+      RN.no117 = !!(r && r.error);
+      if (window.QuickNote && QuickNote.state().open) QuickNote.repaint();
+    }, function () { if (RN.sid === sid) { RN.ex = []; RN.no117 = true; } });
+  }
+  function onlineHtml(sid) {
+    var s0 = stu(sid) || {}, OC = window.OnlineClass;
+    if (!window.OnlineRun || !sid || !(OC && OC.isOnline(s0.className || s0.class_name))) return '';
+    if (RN.sid !== sid) { RN = { sid: sid, ex: null, ym: '', busy: false, msg: '', openList: false }; rnLoad(sid); }
+    var head = '<h3 class="sc-t">🏁 온라인 마라톤 구간 완주</h3>';
+    if (AB.sid !== sid || AB.data === null || RN.ex === null) return '<section class="sc-sec sc-run" id="scRun">' + head + '<p class="sc-hint">불러오는 중…</p></section>';
+    var data = AB.data || {}, ms = OnlineRun.months(data, today(), '');
+    if (!RN.ym || ms.indexOf(RN.ym) < 0) RN.ym = ms[0];
+    var r = OnlineRun.compute(data, RN.ym, { today: today(), excuse: RN.ex });
+    return '<section class="sc-sec sc-run" id="scRun" aria-label="구간 완주">' + head +
+      OnlineRun.staffHtml(r, { months: ms, excuse: RN.ex, busy: RN.busy || RN.no117, msg: RN.no117 ? 'migration-117 SQL 을 먼저 실행해 주세요 (사정 인정 체크)' : RN.msg, openList: RN.openList }) + '</section>';
+  }
+  function rnToggle(sid, day, on) {
+    var c = window.SB && SB.client;
+    if (!c || RN.busy) return;
+    RN.busy = true; RN.openList = true; RN.msg = '';
+    var q = on ? c.from('online_excuse').upsert({ student_id: sid, day: day }, { onConflict: 'student_id,day' }) : c.from('online_excuse').delete().eq('student_id', sid).eq('day', day);
+    Promise.resolve(q).then(function (r) {
+      RN.busy = false;
+      if (r && r.error) { RN.msg = '저장하지 못했습니다 — ' + r.error.message; }
+      else {
+        RN.ex = (RN.ex || []).filter(function (d) { return d !== day; }).concat(on ? [day] : []);
+        RN.msg = md(day) + (on ? ' 사정 인정으로 표시했어요' : ' 사정 인정을 풀었어요');
+      }
+      if (window.QuickNote) QuickNote.repaint();
+    }, function (e) { RN.busy = false; RN.msg = '저장하지 못했습니다'; if (window.QuickNote) QuickNote.repaint(); });
+  }
+
   /* ---------- 클릭 (창 안) — 처리했으면 true ---------- */
   function onClick(t, sid, root) {
+    var rx = t.closest('[data-orn-ex]');
+    if (rx && t.closest('#scRun')) { rnToggle(sid, rx.getAttribute('data-orn-ex'), !!rx.checked); return true; }
+    var rm = t.closest('#scRun [data-orn-sm]');
+    if (rm) { if (rm.getAttribute('data-orn-sm')) { RN.ym = rm.getAttribute('data-orn-sm'); if (window.QuickNote) QuickNote.repaint(); } return true; }
+    var rs = t.closest('#scRun .orn-sdbox summary');
+    if (rs) { RN.openList = !RN.openList; }
     var sv = t.closest('[data-sc-sub]');
     if (sv && window.SubView) { var dd = sv.getAttribute('data-sc-sub'), s0 = stu(sid) || {}; SubView.openStaff({ student: sid, from: dd, to: dd, who: s0.name || '', title: (s0.name || '') + ' ' + md(dd) }); return true; }
     if (window.Analysis && t.closest('#scAbility [data-an-root]') && Analysis.click(t, anCtx(sid))) return true;
@@ -325,7 +372,7 @@
     return true;
   }
 
-  window.StuCard = { reset: reset, infoHtml: infoHtml, hwHtml: hwHtml, abilityHtml: abilityHtml, mogoHtml: mogoHtml, onClick: onClick, state: function () { return ui; },
+  window.StuCard = { reset: reset, infoHtml: infoHtml, hwHtml: hwHtml, abilityHtml: abilityHtml, onlineHtml: onlineHtml, mogoHtml: mogoHtml, onClick: onClick, state: function () { return ui; },
     mogoChanged: function () { if (window.QuickNote && QuickNote.state().open) QuickNote.repaint(true); } };
   window.StudentCard = window.StuCard;
 })();

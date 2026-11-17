@@ -158,6 +158,8 @@
     var acts = editing === c.name ? '' :
       '<button class="btn btn--sm" type="button" data-ca="rename">이름 바꾸기</button>' +
       (window.OnlineClass && !c.archived ? '<button class="btn btn--sm" type="button" data-ca="kind">반 종류</button>' : '') +
+      /* 온라인 반 — 학생별 1 · 2 · 3구간 완주 표 · 월말 환급 확인용 (online-run-admin.js · 117 · 20261117a) */
+      (window.OnlineRunTable && window.OnlineClass && !c.archived && OnlineClass.isOnline(c.name) ? '<button class="btn btn--sm" type="button" data-ca="run">🏁 구간 완주 표</button>' : '') +
       (c.archived ? '<button class="btn btn--sm btn--primary" type="button" data-ca="restore">되살리기</button>'
                   : '<button class="btn btn--sm" type="button" data-ca="archive">보관</button>') +
       (canDelete(c) ? '<button class="btn btn--sm btn--danger" type="button" data-ca="delete">삭제</button>' : '');
@@ -302,6 +304,7 @@
     var act = b.dataset.ca;
     if (act === 'meta') { openMeta(c); return; }
     if (act === 'kind') { OnlineClass.openKind(c.name); return; }
+    if (act === 'run') { OnlineRunTable.open(c.name); return; }
     if (act === 'rename') { editing = c.name; render(); return; }
     if (act === 'rename-cancel') { editing = ''; render(); return; }
     if (act === 'rename-ok') { doRename(c); return; }

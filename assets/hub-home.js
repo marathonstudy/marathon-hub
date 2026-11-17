@@ -143,6 +143,15 @@
   }
   /* 온라인 반만 듣는 학생 (hub.js ctx.mode · migration-112) */
   function isOnline() { var m = H && H.ctx && H.ctx.mode ? H.ctx.mode() : null; return !!(m && m.online); }
+  /* 온라인 마라톤 완주 현황 카드 (online-run.js · 20261117a) — 사정 인정 날짜를 받은 뒤 다시 그린다 */
+  function runOn() { return !!(global.OnlineRun && H.ctx.run && H.ctx.run()); }
+  function runHtml() {
+    var rc = H.ctx.run();
+    if (!H.runEx) { H.runEx = 'wait'; var mine = H; rc.excuse.then(function (ex) { if (H !== mine) return; H.runEx = ex || []; paint(); }); }
+    if (H.loading) return '<section class="gm-card orn-card" id="ornCard"><h2 class="gm-h">🏁 이번 달 완주 현황</h2><p class="gm-hint">과제 기록을 불러오는 중…</p></section>';
+    if (!H.data) return '<section class="gm-card orn-card" id="ornCard"><h2 class="gm-h">🏁 이번 달 완주 현황</h2><p class="gm-hint">과제 기록이 연결되면 여기에 보여요</p></section>';
+    return OnlineRun.cardHtml(rc.compute(H.data, Array.isArray(H.runEx) ? H.runEx : []), { go: true }).replace('data-orn-go="run"', 'data-gm-go="run"');
+  }
   function paintFinish() { if (global.FinishHub && H) FinishHub.mount(document.getElementById('gmFinNew'), document.getElementById('gmFinRow'), H); }
   function paintBadge() {
     var box = document.getElementById('gmBadgeBox');
@@ -195,7 +204,9 @@
        「📊 내 학습 분석」 — 능력치 바로 아래 (20261110l) */
     /* 20261113g — 프로필 → 🏅 내 배지(접힌 모양) → 이번 주 퀘스트 → 📊 학습 분석 → ⚔️ 능력치 → 새 레포트 → 모의고사 → 수업 영상 */
     /* 🏁 완주증 (20261114b · finish-hub.js) — 새 이달의 완주증 카드는 내 배지 바로 아래 · 「완주증 모음」 한 줄은 능력치 아래 */
-    if (isOnline()) H.host.innerHTML = '<div class="gm-home gm-home--online">' + profileHtml() + badgeHtml() + questHtml() + '<div id="gmFinNew"></div><div id="gmFinRow"></div><div id="gmAnaHost"></div><div id="gmAbilityHost"></div>' + videoHtml() + '</div>';
+    /* 온라인 마라톤 (20261117a) — 맨 위 「이번 달 완주 현황」 → 배지 → 프로필 … (이번 주 퀘스트 대신 완주 현황 · 현강 학생은 그대로) */
+    if (isOnline() && runOn()) H.host.innerHTML = '<div class="gm-home gm-home--online">' + runHtml() + badgeHtml() + profileHtml() + '<div id="gmFinNew"></div><div id="gmFinRow"></div><div id="gmAnaHost"></div><div id="gmAbilityHost"></div>' + videoHtml() + '</div>';
+    else if (isOnline()) H.host.innerHTML = '<div class="gm-home gm-home--online">' + profileHtml() + badgeHtml() + questHtml() + '<div id="gmFinNew"></div><div id="gmFinRow"></div><div id="gmAnaHost"></div><div id="gmAbilityHost"></div>' + videoHtml() + '</div>';
     else H.host.innerHTML = '<div class="gm-home">' + profileHtml() + badgeHtml() + '<div id="gmFinNew"></div>' + questHtml() + '<div id="gmAnaHost"></div><div id="gmAbilityHost"></div><div id="gmFinRow"></div>' + reportCardHtml() + mogoHtml() + videoHtml() + '</div>';
     paintBadge();
     paintFinish();
