@@ -49,7 +49,7 @@
     }).sort(function (a, b) { return (a.name || '').localeCompare(b.name || '', 'ko'); });
   }
 
-  function classNames() { return Store.getClasses().map(function (c) { return c.name; }); }
+  function classNames() { return (window.OnlineClass ? OnlineClass.hyun(Store.getClasses()) : Store.getClasses()).map(function (c) { return c.name; }); }   /* 온라인 반은 출결 없음 (20261117c) */
   function fillClasses() {
     var sel = $('#abClass'), names = classNames();
     if (!st.cls || names.indexOf(st.cls) === -1) {

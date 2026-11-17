@@ -261,7 +261,7 @@
      ============================================================ */
 
   function renderClassPicker() {
-    var classes = Store.getClasses();
+    var classes = (window.OnlineClass ? OnlineClass.hyun(Store.getClasses()) : Store.getClasses());   /* 온라인 반은 수업 레포트 없음 (20261117c) */
     var host = $('#classPicker');
     host.textContent = '';
 

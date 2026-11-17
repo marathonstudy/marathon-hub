@@ -1420,6 +1420,7 @@
       if (global.MogoView && tabMogo) {
         rpc('hub_mogo', { p_code: h.code }).then(function (v) {
           MOGO = v || { reports: [] };
+          if (MODE.online && tabMogo) { tabMogo.hidden = !(MOGO.reports && MOGO.reports.length); layoutTabs(); }
           drawMogoWeek();
           if ($('#panelMogo') && !$('#panelMogo').hidden) $('#panelMogo').innerHTML = MogoView.panelHtml(MOGO);
         }, function () {
@@ -1494,7 +1495,7 @@
         if (!host || !global.OnlineRun) return;
         if (!host.innerHTML) host.innerHTML = appWaitHtml();
         appData(h.code).then(function (data) {
-          if (!data) { host.innerHTML = '<div class="empty">과제 기록이 아직 연결되지 않았습니다.<br>선생님께 문의해 주세요.</div>'; return; }
+          if (!data) { host.innerHTML = '<div class="empty">과제 기록이 아직 연결되지 않았습니다.<br>' + OnlineRun.KAKAO + '</div>'; return; }
           var ms = OnlineRun.months(data, todayISO());
           if (!RUN.ym || ms.indexOf(RUN.ym) < 0) RUN.ym = ms[0];
           host.innerHTML = OnlineRun.calHtml(runOf(data, RUN.ym), { months: ms, open: RUN.open });
@@ -1511,8 +1512,8 @@
         host.onclick = null;
         Promise.all([appData(h.code), Promise.resolve().then(function () { return rpc('hub_scores', { p_code: h.code }); }).catch(function () { return null; })]).then(function (x) {
           var data = x[0];
-          if (!data) { host.innerHTML = '<div class="empty">과제 기록이 아직 연결되지 않았습니다.<br>선생님께 문의해 주세요.</div>'; return; }
-          host.innerHTML = OnlineRun.recordHtml(data, runOf(data), { scores: Array.isArray(x[1]) ? x[1] : [] }) +
+          if (!data) { host.innerHTML = '<div class="empty">과제 기록이 아직 연결되지 않았습니다.<br>' + OnlineRun.KAKAO + '</div>'; return; }
+          host.innerHTML = OnlineRun.recordHtml(data, runOf(data), { scores: Array.isArray(x[1]) ? x[1] : [], parent: d.role !== 'student' }) +
             '<div id="apDetail">' + apDetailHtml(data) + '</div>';
           host.onclick = function (e) {
             var b = e.target.closest && e.target.closest('[data-ap-period]');
@@ -1553,7 +1554,8 @@
 
       /* 온라인 반만 — 탭 · 머리 정리 (20261114g) */
       function applyOnline() {
-        var tm = $('#tabMogo'); if (tm) tm.hidden = true;
+        /* 모의고사 — 온라인 반은 기록이 있을 때만 (20261117c · 예전엔 늘 숨김) */
+        var tm = $('#tabMogo'); if (tm) tm.hidden = !(MOGO && !MOGO.failed && MOGO.reports && MOGO.reports.length);
         var tr = $('#tabReport'); if (tr) tr.hidden = !(d.reports || []).length;
         var dd = $('#hubDday'); if (dd) dd.hidden = true;
         var line = MODE.classes.map(function (c) { return c.line; }).filter(Boolean)[0];
@@ -1612,7 +1614,7 @@
           mogo: function () { return MOGO && !MOGO.failed ? MOGO : null; },
           latestVideo: function () { var x = videoWeeks()[0]; return x ? { label: weekName(x.w.week_start) } : null; },
           badges: rpc('hub_badges', { p_code: h.code }).catch(function () { return null; }),
-          run: function () { return global.OnlineRun && MODE.online ? { compute: function (data) { return runOf(data); } } : null; },   /* 온라인 마라톤 완주 현황 카드 (20261117a) */
+          run: function () { return global.OnlineRun && MODE.online ? { compute: function (data) { return runOf(data); }, parent: d.role !== 'student' } : null; },   /* 학부모 링크는 요약 카드 (20261117c) */   /* 온라인 마라톤 완주 현황 카드 (20261117a) */
           mode: function () { return MODE; },                                       /* 온라인 반만인지 · 반 이름 줄 (20261114g) */
           /* 학습 분석 — 오답정리 · 지문 장악 점수 숫자만 (migration-101 · 없으면 그 칸 없음 · 20261110l) */
           scoresP: rpc('hub_scores', { p_code: h.code }).catch(function () { return null; }),

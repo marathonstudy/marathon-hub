@@ -67,7 +67,7 @@
   function fillClasses() {
     var sel = $('#phClass');
     var keep = sel.value;
-    sel.innerHTML = Store.getClasses().map(function (c) {
+    sel.innerHTML = (window.OnlineClass ? OnlineClass.hyun(Store.getClasses()) : Store.getClasses()).map(function (c) {   /* 온라인 반은 수업 필기 없음 (20261117c) */
       return '<option value="' + esc(c.name) + '">' + esc(c.name) + ' (' + c.count + ')</option>';
     }).join('');
     if (keep && Array.prototype.some.call(sel.options, function (o) { return o.value === keep; })) sel.value = keep;

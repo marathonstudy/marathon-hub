@@ -53,6 +53,12 @@
           return '<tr data-ornt-id="' + esc(x.id) + '"><td>' + esc(x.name) + (x.linked ? '' : ' <span class="muted-note">앱 연결 안 됨</span>') + '</td>' + appTd + hubTd +
             '<td class="num">' + r.okN + '/' + r.n + '</td><td class="num">' + (r.golden ? esc(r.golden.slice(5).replace('-', '/')) : '—') + '</td><td class="num">' + r.exN + '회</td></tr>';
         }).join('') + '</tbody></table></div>';
+      /* 골든패스 · 사정 인정 내역 (허브 기준 · 직원만 · 20261117c) */
+      var hist = rs.filter(function (x) { return x.r.golden || x.r.exN; }).map(function (x) {
+        var ex = x.r.days.filter(function (d) { return d.kind === 'excused'; }).map(function (d) { return d.date.slice(5).replace('-', '/'); });
+        return '<li><b>' + esc(x.name) + '</b> ' + (x.r.golden ? '🎫 골든패스 ' + esc(x.r.golden.slice(5).replace('-', '/')) : '') + (ex.length ? (x.r.golden ? ' · ' : '') + '📋 사정 인정 ' + esc(ex.join(', ')) : '') + '</li>';
+      });
+      body += '<details class="orn-hist"' + (hist.length ? ' open' : '') + '><summary>골든패스 · 사정 인정 내역 (' + hist.length + '명)</summary>' + (hist.length ? '<ul>' + hist.join('') + '</ul>' : '<p class="muted-note">이 달은 없어요</p>') + '</details>';
     }
     el.innerHTML = '<div class="modal__head"><h2 class="modal__title" id="ornTblT">🏁 구간 완주 표 — ' + esc(S.cls) + '</h2>' +
         '<p class="modal__desc">학생마다 1 · 2 · 3구간 — 앱 기준(환급 판정과 같은 계산) · 허브 기준(골든패스 · 사정 인정) · 월말 환급 확인용 · 직원만</p></div>' +

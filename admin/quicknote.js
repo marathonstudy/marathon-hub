@@ -424,10 +424,12 @@
     var SC = window.StuCard;
     /* 온라인 반 (online.js · migration-107 · 20261113b) — 그 반에서 상담 · 모의고사를 껐으면 칸을 접는다 (반 관리 → [반 종류]에서 켬) */
     var OC = window.OnlineClass, cOff = !!(OC && OC.off(s.className || s.class_name, 'consult')), mOff = !!(OC && OC.off(s.className || s.class_name, 'mogo'));
+    /* 온라인 반 학생 — 수업 기간형 「과제 8주」 칸 대신 「🏁 온라인 마라톤 구간」(stucard.js) (20261117c) */
+    var onl = !!(OC && OC.isOnline(s.className || s.class_name));
     if (cOff) {
       m.innerHTML = '<div class="cs-sheet">' + headHtml(sid) + '<div class="cs-scroll" id="csScroll">' +
         (SC && window.Faces ? Faces.cardHtml(sid) : '') +
-        (SC ? SC.infoHtml(sid) + SC.hwHtml(sid, hwOfFn(sid)) + abOn(SC, sid) + (mOff ? '' : SC.mogoHtml(sid)) : '') +
+        (SC ? SC.infoHtml(sid) + (onl ? '' : SC.hwHtml(sid, hwOfFn(sid))) + abOn(SC, sid) + (mOff ? '' : SC.mogoHtml(sid)) : '') +
         /* 20261114g — 상담 · 모의고사 칸 대신 짧은 안내 한 줄 */
         '<p class="sc-online" id="scConsult">🌐 온라인 반 학생 · ' + (mOff ? '상담 · 모의고사' : '상담') + ' 꺼짐 <span class="muted-note">(반 관리 → 반 종류에서 켤 수 있어요)</span></p></div></div>';
       m.setAttribute('aria-label', (s.name || '') + ' 학생 카드');
@@ -438,7 +440,7 @@
         /* 학생 카드 — 기본 정보 · 과제 · 모의고사 추이 (stucard.js · 20261109c) */
         /* 머리 — 얼굴 사진(없으면 고른 캐릭터) · [사진 올리기] [사진 지우기] · 레벨 · XP (faces.js · 20261110b) */
         (SC && window.Faces ? Faces.cardHtml(sid) : '') +
-        (SC ? SC.infoHtml(sid) + SC.hwHtml(sid, hwOfFn(sid)) + abOn(SC, sid) + (mOff ? '' : SC.mogoHtml(sid)) : '') +
+        (SC ? SC.infoHtml(sid) + (onl ? '' : SC.hwHtml(sid, hwOfFn(sid))) + abOn(SC, sid) + (mOff ? '' : SC.mogoHtml(sid)) : '') +
         '<section class="sc-sec sc-consult" id="scConsult" aria-label="상담"><h3 class="sc-t">상담</h3>' +
         tabsHtml() + (st.kind === 'hw' ? prevHtml(sid) : '') + formHtml(sid) +
         (st.err ? '<p class="cs-err" role="alert">' + esc(st.err) + '</p>' : '') +

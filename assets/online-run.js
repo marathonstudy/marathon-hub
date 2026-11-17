@@ -153,7 +153,8 @@
       var c = ix.cal[d] || null, order = c ? +c.order || 0 : 0, h = order ? ix.hist[String(order)] : null, l = order ? ix.lec[String(order)] : null;
       /* 회차 — 숙제(강 번호)가 걸린 날(주말이어도) · 앱 기록이 끝난 뒤의 평일은 「아직 안 옴」 */
       var counted = c ? order > 0 : (!isWeekend(d) && (empty || d > lastCal) && d >= today);
-      var x = { date: d, dow: dowOf(d), counted: counted, order: order, day: order % 1000, title: h ? String(h.title || '') : '',
+      var x = { date: d, dow: dowOf(d), counted: counted, order: order, day: (h && +h.day > 0 ? +h.day : order % 1000), title: h ? String(h.title || '') : '',
+                genre: h && h.parts && h.parts[0] && h.parts[0].c ? String(h.parts[0].c) : '', correct: h && h.total ? +h.correct || 0 : null, total: h && h.total ? +h.total : null,
                 at: h && h.submittedAt ? kst(h.submittedAt) : null, quiz: h && typeof h.quiz === 'boolean' ? h.quiz : null,
                 vids: l && +l.videosTotal > 0 ? { done: +l.videosDone || 0, total: +l.videosTotal } : null, kind: 'off' };
       if (!counted) { x.kind = c || isWeekend(d) ? 'weekend' : 'off'; return x; }
@@ -231,17 +232,109 @@
     var t = x.kind === 'ok' ? '오늘 정시 인증 ✓' + (x.at ? ' · ' + x.at.hm : '') : x.kind === 'late' ? '오늘은 늦게 인증했어요' : x.kind === 'excused' ? '사정 인정 날이에요' : '아직 인증 전 · 오늘 밤 12시까지';
     return '<div class="orn-stat"><span class="orn-stat__i" aria-hidden="true">📖</span><span><b>오늘의 지문' + (x.day ? ' · ' + x.day + '회차' : '') + '</b>' + esc(t) + '</span></div>';
   }
-  /* 홈 맨 위 카드 (학생 · 학부모) */
+  /* 홈 맨 위 카드 (학생 · 학부모) — 20261117c: 오늘의 지문(제목 · 장르는 앱에 있으면) · 「오늘도 완주!」 · 연속 · 구간 진행 · 구간 완주 배지 · 마라토니 · 마라부기 한마디
+     학부모(o.parent) — 맨 위 한 줄 요약(이번 달 인증 n일 · 연속 n일 · 구간) + 같은 구간 + 카카오톡 채널 안내 */
+  var KAKAO = '궁금한 점은 카카오톡 채널 <b>jh국어연구소</b>로 문의해 주세요';
+  function secLine(app) {
+    if (!app || app.status === 'unknown') return '구간 · 앱 기록 확인 전';
+    if (app.status === 'nosec') return '구간 없는 클래스';
+    var run = app.secs.filter(function (s) { return s.state === 'run'; })[0], done = app.secs.filter(function (s) { return s.state === 'done'; }).map(function (s) { return s.no; });
+    return (done.length ? done.join('·') + '구간 완주' : '') + (run ? (done.length ? ' · ' : '') + run.no + '구간 달리는 중' : '') || '구간 시작 전';
+  }
+  function badgesHtml(app) {
+    if (!app || app.status !== 'ok') return '';
+    var done = app.secs.filter(function (s) { return s.state === 'done'; });
+    return done.length ? '<div class="orn-badges">' + done.map(function (s) { return '<span class="orn-badge">🏅 ' + s.no + '구간 완주</span>'; }).join('') + '</div>' : '';
+  }
+  function monthBar(r) {
+    if (r.app && r.app.status === 'ok') return '';
+    var past = r.days.filter(function (x) { return x.counted && x.date <= r.today; }).length, pct = past ? Math.round(r.okN / past * 100) : 0;
+    return '<div class="orn-mbar"><span class="num">지금까지 ' + past + '회차 중 정시 인증 ' + r.okN + '회</span><span class="orn-bar"><i style="width:' + pct + '%"></i></span></div>';
+  }
+  /* 마라토니(장난스럽고 감각적) · 마라부기(차분하고 꾸준) 한마디 — 상황별 · 꼭 · 반드시 · 무조건 · 꾸짖는 말 없음 */
+  function talkOf(r) {
+    var cd = r.days.filter(function (x) { return x.counted && x.date < r.today; }), last = cd[cd.length - 1];
+    var justDone = r.app && r.app.status === 'ok' ? r.app.secs.filter(function (s) { return s.state === 'done' && plus(s.to, 7) >= r.today; }).pop() : null;
+    if (justDone) return { who: 'maratoni', t: justDone.no + '구간 결승선 통과! 🏁 박수 짝짝짝, 다음 구간도 같이 뛰어 보자고~' };
+    if (last && (last.kind === 'miss' || last.kind === 'late') && r.current) return { who: 'marabugi', t: '어제는 쉬어 갔네요. 괜찮아요, 오늘 한 지문부터 천천히 다시 걸어가요.' };
+    if (r.streak >= 3) return (r.streak % 2) ? { who: 'maratoni', t: '벌써 ' + r.streak + '회 연속! 발바닥에 불붙었다 🔥 이 리듬 그대로 가 보자!' } : { who: 'marabugi', t: r.streak + '회째 이어지고 있어요. 꾸준함이 제일 멀리 가요.' };
+    return (+r.today.slice(8) % 2) ? { who: 'maratoni', t: '오늘 지문 한 판 어때? 한 지문이면 몸풀기 끝!' } : { who: 'marabugi', t: '오늘도 한 지문, 한 걸음씩이면 충분해요.' };
+  }
+  function talkHtml(r, base) {
+    var x = talkOf(r), nm = x.who === 'maratoni' ? '마라토니' : '마라부기';
+    return '<div class="orn-talk orn-talk--' + x.who + '"><img class="orn-talk__img" src="' + esc((base || '../assets/chars/') + x.who + '.png') + '" alt="" width="40" height="40" loading="lazy"><p><b>' + nm + '</b>' + esc(x.t) + '</p></div>';
+  }
   function cardHtml(r, o) {
     o = o || {};
+    if (o.parent) {
+      var sum = '이번 달 인증 ' + r.okN + '일 · 연속 ' + r.streak + '일 · ' + secLine(r.app);
+      return '<section class="gm-card orn-card orn-card--parent" id="ornCard" aria-label="이번 달 요약"><div class="orn-card__h"><h2 class="gm-h">🏁 ' + esc(monthName(r.ym)) + ' 한눈에</h2></div>' +
+        '<p class="orn-sum num">' + esc(sum) + '</p>' + appSegsHtml(r.app) + monthBar(r) + badgesHtml(r.app) +
+        '<p class="orn-kakao">' + KAKAO + '</p>' +
+        (o.go ? '<button type="button" class="gm-link orn-card__go" data-orn-go="run">인증 달력 보기 ›</button>' : '') + '</section>';
+    }
     var head = '<div class="orn-card__h"><h2 class="gm-h">🏁 ' + esc(monthName(r.ym)) + ' 완주 현황</h2><span class="orn-card__s num">' + r.n + '회차 중 ' + r.okN + '회 정시 인증</span></div>';
     return '<section class="gm-card orn-card" id="ornCard" aria-label="이번 달 완주 현황">' + head +
-      appSegsHtml(r.app) +
-      '<div class="orn-stats">' + todayHtml(r) +
-        '<div class="orn-stat"><span class="orn-stat__i" aria-hidden="true">🔥</span><span><b>연속 정시 인증</b><em class="num">' + r.streak + '회</em></span></div>' +
-      '</div>' + NOTE +
+      todayCardHtml(r) + appSegsHtml(r.app) + monthBar(r) + badgesHtml(r.app) +
+      '<div class="orn-stats"><div class="orn-stat"><span class="orn-stat__i" aria-hidden="true">🔥</span><span><b>연속 정시 인증</b><em class="num">' + r.streak + '회</em></span></div></div>' +
+      talkHtml(r, o.base) + NOTE +
       (o.go ? '<button type="button" class="gm-link orn-card__go" data-orn-go="run">완주 달력 보기 ›</button>' : '') +
     '</section>';
+  }
+  /* 오늘의 지문 카드 — 제목 · 장르는 앱 과제 기록에 있으면 · 인증하면 「오늘도 완주!」 */
+  function todayCardHtml(r) {
+    var x = r.todayDay;
+    if (!r.current) return '';
+    if (!x || !x.counted) return '<div class="orn-today orn-today--off"><span class="orn-stat__i" aria-hidden="true">🌿</span><div><b>오늘의 지문</b><p>오늘은 숙제가 없는 날이에요 · 주말 자율 과제(어휘테스트 · 모의고사)</p></div></div>';
+    var done = x.kind === 'ok' || x.kind === 'late';
+    return '<div class="orn-today' + (done ? ' is-done' : '') + '"><span class="orn-stat__i" aria-hidden="true">' + (done ? '🎉' : '📖') + '</span><div><b>오늘의 지문' + (x.day ? ' · DAY ' + x.day : '') + '</b>' +
+      (x.title ? '<p class="orn-today__t">' + esc(x.title) + (x.genre ? ' <span class="orn-genre">' + esc(x.genre) + '</span>' : '') + '</p>' : '') +
+      '<p>' + (x.kind === 'ok' ? '오늘도 완주! ✓' + (x.at ? ' · ' + esc(x.at.hm) + ' 인증' : '') : x.kind === 'late' ? '오늘도 완주! (조금 늦게 인증)' : '아직 인증 전 · 오늘 밤 12시까지') + '</p></div></div>';
+  }
+
+  /* 이번 달 지문 목록 — 날짜 · DAY · 제목 · 인증 · 정답 수(있는 것만) */
+  function listHtml(r) {
+    var rows = r.days.filter(function (x) { return x.counted && x.date <= r.today; }).reverse();
+    if (!rows.length) return '';
+    return '<section class="card orn-list"><h2 class="card-title">📚 ' + esc(monthName(r.ym)) + ' 지문 목록</h2><ul class="orn-list__ul">' + rows.map(function (x) {
+      var K = KIND[x.kind] || KIND.off;
+      return '<li class="orn-list__r"><span class="orn-list__d num">' + esc(mdw(x.date)) + '</span><span class="orn-list__day num">' + (x.day ? 'DAY ' + x.day : '') + '</span>' +
+        '<span class="orn-list__t">' + esc(x.title || '—') + '</span><span class="orn-list__k orn-k--' + K.c + '">' + esc(K.t) + '</span>' +
+        (x.total ? '<span class="orn-list__s num">' + x.correct + '/' + x.total + '</span>' : '') + '</li>';
+    }).join('') + '</ul></section>';
+  }
+
+  /* 나의 성장 — 지난 달 vs 이번 달 영역별 정답률 · 풀이 시간(앱에 있을 때만) · 본인 기록끼리만 */
+  function growthHtml(data, today) {
+    data = data || {};
+    var ym = ymOf(today), pm = shiftYm(ym, -1), by = {}, sec = {};
+    [].concat((data.old && data.old.history) || [], data.history || []).forEach(function (h) {
+      var k = h && h.submittedAt ? kst(h.submittedAt) : null;
+      if (!k) return;
+      var m = ymOf(k.day);
+      if (m !== ym && m !== pm) return;
+      (h.parts || []).forEach(function (p) { if (!p || !(+p.n > 0)) return; var b = (by[p.c] = by[p.c] || {}); var x = (b[m] = b[m] || { k: 0, n: 0 }); x.k += +p.k || 0; x.n += +p.n; });
+      if (+h.sec > 0) { var s = (sec[m] = sec[m] || { t: 0, n: 0 }); s.t += +h.sec; s.n++; }
+    });
+    var names = Object.keys(by).filter(function (n) { return by[n][ym] || by[n][pm]; });
+    var rate = function (x) { return x && x.n ? Math.round(x.k / x.n * 100) : null; };
+    var mins = function (s) { return s && s.n ? Math.round(s.t / s.n / 60 * 10) / 10 : null; };
+    if (!names.length && !sec[ym] && !sec[pm]) return '';
+    return '<section class="card orn-rec orn-grow"><h2 class="card-title">🌱 나의 성장 <span class="card-note">' + esc(monthName(pm) + ' → ' + monthName(ym)) + ' · 내 기록끼리만</span></h2>' +
+      (names.length ? '<ul class="orn-grow__ul">' + names.map(function (n) {
+        var a = rate(by[n][pm]), b = rate(by[n][ym]), d = a != null && b != null ? b - a : null;
+        return '<li><span class="orn-grow__n">' + esc(n) + '</span><span class="num">' + (a == null ? '—' : a + '%') + ' → <b>' + (b == null ? '—' : b + '%') + '</b></span>' +
+          (d != null ? '<span class="orn-d num ' + (d > 0 ? 'is-up' : d < 0 ? 'is-down' : '') + '">' + (d > 0 ? '▲' + d : d < 0 ? '▼' + (-d) : '=') + '</span>' : '<span></span>') + '</li>';
+      }).join('') + '</ul>' : '') +
+      (sec[ym] || sec[pm] ? '<p class="orn-hint num">평균 풀이 시간 ' + (mins(sec[pm]) == null ? '—' : mins(sec[pm]) + '분') + ' → <b>' + (mins(sec[ym]) == null ? '—' : mins(sec[ym]) + '분') + '</b></p>' : '') +
+    '</section>';
+  }
+  /* 학부모 — 앱 선생님 피드백 최근 1 ~ 2개(사람이 쓴 것만 · AI 피드백 없음) */
+  function fbHtml(data) {
+    var fb = (data && Array.isArray(data.fb) ? data.fb : []).filter(function (x) { return x && x.t; }).slice(0, 2);
+    if (!fb.length) return '';
+    return '<section class="card orn-rec orn-fb"><h2 class="card-title">💬 선생님 피드백 <span class="card-note">최근 ' + fb.length + '개</span></h2>' +
+      fb.map(function (x) { return '<blockquote class="orn-fb__q"><p>' + esc(x.t) + '</p><footer class="num">' + esc([x.at ? md(x.at) : '', x.title || ''].filter(Boolean).join(' · ')) + '</footer></blockquote>'; }).join('') + '</section>';
   }
 
   /* 완주 달력 (학생 · 학부모 — 골든패스 · 사정 인정 없음) */
@@ -268,7 +361,7 @@
       '<div class="orn-cal" role="group" aria-label="날짜별 인증">' + DOW.map(function (d, j) { return '<span class="orn-cal__w' + (j === 0 || j === 6 ? ' is-we' : '') + '">' + d + '</span>'; }).join('') + cells.join('') + '</div>' +
       (open ? dayHtml(open) : '<p class="orn-hint">날짜를 누르면 그날 지문을 볼 수 있어요</p>') +
       '<ul class="orn-legend">' + legend(false).map(function (k) { var K = KIND[k]; return '<li><i class="orn-k--' + K.c + '">' + (K.i || '') + '</i>' + esc(K.t) + '</li>'; }).join('') + '</ul>' + NOTE +
-    '</section>';
+    '</section>' + listHtml(r);
   }
   function dayHtml(x) {
     var K = KIND[x.kind] || KIND.off, rows = [];
@@ -316,9 +409,12 @@
       }).join('') + '</ul><p class="orn-hint">전체 ' + (tot.n ? Math.round(tot.k / tot.n * 100) : 0) + '% · ' + tot.n + '문항</p>'
         : rates.length ? '<p class="orn-hint">과제 정답률 평균 ' + Math.round(rates.reduce(function (p, q) { return p + q; }, 0) / rates.length) + '% · ' + rates.length + '개 과제</p>'
         : '<p class="orn-hint">과제를 내면 파트별 정답률이 쌓여요</p>') + '</section>';
+    html += growthHtml(data, r.today);
+    if (o.parent) html += fbHtml(data);
     if (w || t) html += '<section class="card orn-rec"><h2 class="card-title">✍️ 오답정리 · 필기 점수</h2><div class="orn-kpis">' +
       (w ? '<div><b class="num">' + w.a + '</b><span>오답정리 평균 · ' + w.n + '회</span></div>' : '') +
       (t ? '<div><b class="num">' + t.a + '</b><span>지문 장악(필기) 평균 · ' + t.n + '회</span></div>' : '') + '</div></section>';
+    html += '<p class="orn-kakao">' + KAKAO + '</p>';
     return html;
   }
 
@@ -376,6 +472,6 @@
   }
 
   global.OnlineRun = { compute: compute, months: months, groups: groups, appSections: appSections, sectionsOf: sectionsOf, appOf: appOf,
-    cardHtml: cardHtml, calHtml: calHtml, dayHtml: dayHtml, recordHtml: recordHtml, staffHtml: staffHtml, appSegsHtml: appSegsHtml,
+    cardHtml: cardHtml, calHtml: calHtml, dayHtml: dayHtml, recordHtml: recordHtml, listHtml: listHtml, growthHtml: growthHtml, fbHtml: fbHtml, talkOf: talkOf, KAKAO: KAKAO, staffHtml: staffHtml, appSegsHtml: appSegsHtml,
     classRow: classRow, csv: csv, appCell: appCell, hubCell: hubCell, KIND: KIND, monthName: monthName, shiftYm: shiftYm, ymOf: ymOf };
 })(window);

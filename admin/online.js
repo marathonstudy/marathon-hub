@@ -26,7 +26,10 @@
       var by = {};
       if (r && r.error) { K.sql = !missing(r.error.message); }
       else (r && r.data || []).forEach(function (x) { if (x && x.name) by[x.name] = x; });
+      var was = JSON.stringify(K.by);
       K.by = by; K.loaded = true;
+      /* 반 종류가 바뀌면 「오늘」 현강 · 온라인 탭을 다시 나눈다 (20261117c) */
+      if (was !== JSON.stringify(by)) { try { window.dispatchEvent(new CustomEvent('jt:classkinds')); } catch (e) { /* 그대로 */ } }
       return by;
     }, function () { return K.by; });
   }
@@ -34,6 +37,8 @@
   var KEY = { time: 'use_time', consult: 'use_consult', mogo: 'use_mogo', send: 'send_on' };
   function off(name, what) { var o = opts(name); return !!(o && KEY[what] && o[KEY[what]] === false); }
   function isOnline(name) { var o = opts(name); return !!(o && o.kind === 'online'); }
+  /* 현강 반만 (20261117c) — 레포트 작성 · 공지 · 출석부 · 필기 · 문자 반 고르기에서 온라인 반을 숨긴다(지우지 않음 · 반 종류를 현강으로 바꾸면 다시 보임) */
+  function hyun(names) { var f = window.OnlineClass && OnlineClass.isOnline || isOnline; return (names || []).filter(function (n) { return !f(typeof n === 'string' ? n : n && n.name); }); }
   /* 반 관리 줄의 작은 표시 — 「온라인 · 발송 꺼짐」 */
   function kindHtml(name) {
     var o = opts(name);
@@ -503,5 +508,5 @@
   window.addEventListener('jt:loaded', function () { load(); });
   window.addEventListener('jt:roster-changed', function () { load(); });
 
-  window.OnlineClass = { load: load, opts: opts, off: off, isOnline: isOnline, kindHtml: kindHtml, openKind: openKind, openImport: openImport, state: function () { return S; } };
+  window.OnlineClass = { load: load, opts: opts, off: off, isOnline: isOnline, hyun: hyun, kindHtml: kindHtml, openKind: openKind, openImport: openImport, state: function () { return S; } };
 })();

@@ -167,7 +167,8 @@
   function classNames() {
     var seen = {};
     active().forEach(function (s) { seen[clsOf(s)] = 1; });
-    return order(Object.keys(seen).filter(function (n) { return n === NOCLS || !Store.isArchivedClass(n); }));
+    /* 온라인 반은 문자 발송이 꺼져 있다(완주증 보내기만) — 문자 탭 반 · 학생 목록에서 숨김 (20261117c) */
+    return order(Object.keys(seen).filter(function (n) { return n === NOCLS || (!Store.isArchivedClass(n) && !(window.OnlineClass && OnlineClass.isOnline(n))); }));
   }
   /* 반 순서 → 이름 순 */
   function sortStudents(list) {

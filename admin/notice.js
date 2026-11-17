@@ -61,7 +61,7 @@
      ============================================================ */
 
   function allClasses() {
-    var names = Store.getClasses().map(function (c) { return c.name; });
+    var names = (window.OnlineClass ? OnlineClass.hyun(Store.getClasses()) : Store.getClasses()).map(function (c) { return c.name; });   /* 온라인 반은 반 공지 없음 (20261117c) */
     /* 지금은 학생이 없어도 예전에 공지를 올린 반은 고를 수 있게 둔다 */
     state.notices.forEach(function (n) {
       if (names.indexOf(n.className) === -1 && !Store.isArchivedClass(n.className)) names.push(n.className);

@@ -2206,6 +2206,65 @@
       ' — 「오늘」 · 필기 알림 · 레포트 발송 대상 · 챙길 학생에서 빠집니다. 지난 레포트와 러닝노트는 그대로이고, 레포트 발송 → 반 고르기 「종강」에서 계속 볼 수 있습니다.</p></details>';
   }
 
+  /* ---------- 현강 · 온라인 탭 · 검색 (20261117c) ---------- */
+  var TAB_KEY = 'mh.td.tab';
+  function tdTab() { if (st.tab) return st.tab; var v = ''; try { v = localStorage.getItem(TAB_KEY) || ''; } catch (e) { /* 그대로 */ } return (st.tab = v === 'online' ? 'online' : 'class'); }
+  function setTab(v) { st.tab = v === 'online' ? 'online' : 'class'; try { localStorage.setItem(TAB_KEY, st.tab); } catch (e) { /* 그대로 */ } render(); }
+  function tabsHtml(nh, no, tab) {
+    var imp = document.getElementById('moreOnlineImport'), canImp = !!(imp && !imp.hidden);
+    return '<div class="td-tabs" role="tablist" aria-label="현강 · 온라인">' +
+        '<button type="button" role="tab" class="td-tab' + (tab === 'class' ? ' is-on' : '') + '" aria-selected="' + (tab === 'class') + '" data-td-tab="class">🏫 현강 <b class="num">' + nh + '</b></button>' +
+        '<button type="button" role="tab" class="td-tab' + (tab === 'online' ? ' is-on' : '') + '" aria-selected="' + (tab === 'online') + '" data-td-tab="online">💻 온라인 <b class="num">' + no + '</b></button>' +
+        '<span class="td-tabs__sp"></span>' +
+        (tab === 'class' ? '<button type="button" class="btn btn--sm" data-td-newcls>+ 현강 반 만들기</button>' : (canImp ? '<button type="button" class="btn btn--sm" data-td-import>📥 온라인 반 가져오기</button>' : '')) +
+      '</div>' +
+      '<div class="td-find"><input class="input td-find__in" id="tdFind" type="search" placeholder="반 · 학생 이름 찾기 (현강 · 온라인 모두)" autocomplete="off" value="' + esc(st.q || '') + '" aria-label="반 · 학생 이름 찾기"><div class="td-find__res" id="tdFindRes" role="list"></div></div>';
+  }
+  function paintSearch() {
+    var box = document.getElementById('tdFindRes'), q = String(st.q || '').trim();
+    if (!box) return;
+    if (!q) { box.innerHTML = ''; return; }
+    var isOn = function (n) { return !!(window.OnlineClass && OnlineClass.isOnline(n)); };
+    var tag = function (n) { return isOn(n) ? '<span class="td-find__tag is-on">💻 온라인</span>' : '<span class="td-find__tag">🏫 현강</span>'; };
+    var hits = [];
+    (st.classes || []).forEach(function (c) { if (c.name !== '(반 없음)' && c.name.indexOf(q) !== -1) hits.push('<button type="button" role="listitem" class="td-find__hit" data-td-goto="' + esc(c.name) + '"><b>' + esc(c.name) + '</b> 반 ' + tag(c.name) + '</button>'); });
+    ((st.data && st.data.students) || []).forEach(function (s) {
+      if (String(s.name || '').indexOf(q) === -1 || hits.length > 30) return;
+      var cn = s.class_name || '(반 없음)';
+      hits.push('<button type="button" role="listitem" class="td-find__hit" data-td-goto="' + esc(cn) + '" data-td-gosid="' + esc(s.id) + '"><b>' + esc(s.name) + '</b> · ' + esc(cn) + ' ' + tag(cn) + '</button>');
+    });
+    box.innerHTML = hits.length ? hits.join('') : '<p class="muted-note">찾는 반 · 학생이 없어요</p>';
+  }
+  function gotoClass(name, sid) {
+    var on = !!(window.OnlineClass && OnlineClass.isOnline(name));
+    st.q = '';
+    if (on && window.OnlineToday) OnlineToday.state().open[name] = true; else st.open[name] = true;
+    setTab(on ? 'online' : 'class');
+    setTimeout(function () {
+      var cd = document.querySelector('#tdBody .tdc-card[data-cls="' + String(name).replace(/["\\]/g, '\\$&') + '"]');
+      if (cd && cd.scrollIntoView) cd.scrollIntoView({ block: 'start' });
+      if (sid && window.QuickNote) QuickNote.open(sid);
+    }, 50);
+  }
+  function newClassAsk() {
+    var old = document.getElementById('tdNewCls'); if (old && old.parentNode) old.parentNode.removeChild(old);
+    var el = document.createElement('dialog'); el.className = 'modal'; el.id = 'tdNewCls'; el.setAttribute('aria-labelledby', 'tdNewClsT');
+    el.innerHTML = '<div class="modal__head"><h2 class="modal__title" id="tdNewClsT">현강 반 만들기</h2><p class="modal__desc">수업일 · 시각은 만든 뒤 반 카드에서 정해요 · 온라인 반은 💻 온라인 탭의 [온라인 반 가져오기]로</p></div>' +
+      '<div class="modal__body"><label class="field"><span class="field__label">반 이름</span><input class="input" id="tdNewClsIn" maxlength="30" autocomplete="off" placeholder="예: 고2 목동 화목반"></label><p class="cs-err" id="tdNewClsErr" role="alert"></p></div>' +
+      '<div class="modal__foot"><div class="spacer"></div><button type="button" class="btn" data-ncl-no>취소</button><button type="button" class="btn btn--primary" data-ncl-yes>만들기</button></div>';
+    document.body.appendChild(el);
+    el.addEventListener('click', function (e) {
+      if (e.target.closest('[data-ncl-no]')) Layer.hide(el);
+      if (e.target.closest('[data-ncl-yes]')) {
+        var v = String(document.getElementById('tdNewClsIn').value || '').trim();
+        Store.addClass(v).then(function (n) { Layer.hide(el); UI.toast('‘' + n + '’ 반을 만들었습니다', 'good'); render(); },
+          function (err) { document.getElementById('tdNewClsErr').textContent = (err && err.message) || '만들지 못했습니다'; });
+      }
+    });
+    Layer.show(el, { outside: false });
+    setTimeout(function () { var i = document.getElementById('tdNewClsIn'); if (i) i.focus(); }, 30);
+  }
+
   function render() {
     var d = st.data;
     if (!d) return;
@@ -2232,17 +2291,35 @@
     $('#tdInfo').setAttribute('aria-expanded', String(!!st.rulesOpen));
 
     setTimeout(renderApp, 0);
+    /* 현강 · 온라인 탭 (20261117c) — 반 종류(classes.kind)로 나눔 · 현강과 연결된 앱 반([현장] 등)은 현강 · 마지막 탭은 이 기기에 기억(기본 현강) */
+    var isOn = function (n) { return !!(window.OnlineClass && OnlineClass.isOnline(n)); };
+    var hyunCls = classes.filter(function (c) { return !isOn(c.name); }), onCls = classes.filter(function (c) { return isOn(c.name); });
+    var tab = tdTab();
+    if (tab === 'online' && !onCls.length && !(window.OnlineClass && OnlineClass.state)) tab = 'class';
+    var head = tabsHtml(hyunCls.length, onCls.length, tab);
+    document.body.classList.toggle('td-online', tab === 'online');      /* 온라인 탭 — 현강 모고 기록 받기 줄(mgOps) 숨김 */
+    if (tab === 'online' && window.OnlineToday) {
+      $('#tdBody').innerHTML = '<div class="td-pending-wrap" id="tdPending" hidden></div>' + head +
+        '<div class="ot-wrap">' + OnlineToday.html(onCls, { repaint: render, rep: function (n) { var c = (st.clsBy || {})[n]; var x = c ? appTitles(c) : null; return x && x.rep ? x.rep : ''; } }) + '</div>' + endedHtml();
+      paintSearch();
+      if (window.Staff && Staff.paintToday) setTimeout(Staff.paintToday, 0);
+      if (window.QuickNote) QuickNote.mount();
+      return;
+    }
+    classes = hyunCls;
     $('#tdBody').innerHTML = '<div class="td-pending-wrap" id="tdPending" hidden></div>' +   /* 맨 위 — 운영진 모두에게 「새 조교 승인 대기 … [승인] [거절]」 (staff.js · migration-051) */
+      head +
       transitionHtml() +
       '<div class="td-rules" id="tdRules"' + (st.rulesOpen ? '' : ' hidden') + '><p class="panel__hint tdc-rule">반 이름 아래 칩 = 최근 3번 수업 레포트를 보낸 학생 비율 (초록 100% · 주황 일부 · 빨강 0% · 회색 수업 당일 작성 중). 칩을 누르면 그 수업 발송 화면으로 갑니다. ' +
         '학생 줄 「과제 n/5일」 = 지난 수업 레포트 기간(수업 전 일주일) 평일 중 과제를 낸 날 (토 · 일은 세지 않음). 회색 「과제 링크 연결 필요」 = 마라톤 앱 공유 링크가 없는 학생(누르면 링크 넣는 칸). ' +
         '챙길 학생 = 마감이 지났는데 복습테스트를 안 낸 학생(그 수업 레포트를 보내면 사라짐) · 결석이 기준(설정)을 넘은 학생(그 뒤 상담 기록을 남기면 사라짐).</p></div>' +
       todoHtml(unsent) +
-      careHtml(careItems(d)) +
+      careHtml(careItems(d).filter(function (it) { return !isOn(it.cls); })) +
       '<div class="td-appbar" id="tdAppBar" hidden role="status" aria-live="polite"></div>' + stampHtml() +
       '<div class="tdc-list-wrap">' + cardsOf(classes).map(function (it) { return it.course ? courseCardHtml(it.course, it.cls) : classCardHtml(it.c); }).join('') + '</div>' +
       endedHtml();
     paintDetail();
+    paintSearch();
     if (window.Notes) setTimeout(Notes.paint, 0);
     if (window.HwStat) setTimeout(HwStat.paint, 0);
     if (window.Staff && Staff.paintToday) setTimeout(Staff.paintToday, 0);
@@ -2422,6 +2499,14 @@
 
   $('#tdBody').addEventListener('click', function (e) {
     if (e.target.closest('.al-box')) return;                 /* 과제 링크 칸 (applink.js) */
+    /* 현강 · 온라인 탭 · 검색 · 온라인 탭 (20261117c) */
+    var tb = e.target.closest('[data-td-tab]');
+    if (tb) { setTab(tb.getAttribute('data-td-tab')); return; }
+    var gt = e.target.closest('[data-td-goto]');
+    if (gt) { gotoClass(gt.getAttribute('data-td-goto'), gt.getAttribute('data-td-gosid') || ''); return; }
+    if (e.target.closest('[data-td-newcls]')) { newClassAsk(); return; }
+    if (e.target.closest('[data-td-import]')) { if (window.OnlineClass) OnlineClass.openImport(); return; }
+    if (window.OnlineToday && e.target.closest('.ot-wrap') && OnlineToday.click(e)) return;
     var rt = e.target.closest('[data-app-retry]');
     if (rt) { loadApp(rt.dataset.appRetry); return; }
     /* 반 · 학생 [새로고침] (20261106h) */
@@ -2586,6 +2671,10 @@
     if (r) r.hidden = !st.rulesOpen;
   });
   $('#tdBody').addEventListener('click', function (e) { if (e.target.id === 'tdTransitionOpen') $('#tdSettingsBtn').click(); });
+  /* 찾기 · 온라인 탭 고르기 (20261117c) */
+  $('#tdBody').addEventListener('input', function (e) { if (e.target && e.target.id === 'tdFind') { st.q = e.target.value; paintSearch(); } });
+  $('#tdBody').addEventListener('change', function (e) { if (window.OnlineToday && e.target.closest && e.target.closest('.ot-wrap')) OnlineToday.change(e); });
+  window.addEventListener('jt:classkinds', function () { if (st.data) render(); });
 
   /* ---------- 설정 (teacher 만 바꿀 수 있다) ---------- */
 

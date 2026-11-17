@@ -61,12 +61,13 @@
   }
   function bodyHtml(cls) {
     var w = weekOf(cls);
-    var calc = '<button type="button" class="btn btn--sm kg-calc" data-kg-calc="' + esc(cls) + '"' + (w ? ' data-kg-lesson="' + esc(w.lesson) + '"' : ' disabled title="이번 주 수업 전 예고가 계산된 뒤에 할 수 있어요"') + (st.busy[cls] ? ' disabled' : '') + '>' + (st.busy[cls] ? '계산 중…' : '후보 다시 계산') + '</button>';
+    var calc = '<button type="button" class="btn btn--sm kg-calc" data-kg-calc="' + esc(cls) + '"' + (w ? ' data-kg-lesson="' + esc(w.lesson) + '"' : ' disabled title="이번 주 후보가 생긴 뒤에 할 수 있어요"') + (st.busy[cls] ? ' disabled' : '') + '>' + (st.busy[cls] ? '계산 중…' : '후보 다시 계산') + '</button>';
     var cfg = st.owner ? '<div class="kg-cfg"><label>자동 확정 <input class="input kg-hours num" type="number" min="0" max="72" step="1" value="' + (+st.cfg.auto_hours || 0) + '" data-kg-hours aria-label="몇 시간 안에 안 누르면 1위 자동 확정"> 시간 (0 = 끔 · 사람이 확정)</label>' +
       '<label><input type="checkbox" data-kg-on' + (st.cfg.on !== false ? ' checked' : '') + '> 매주 후보 자동 계산</label></div>' : '';
-    if (!w) return '<p class="muted-note">아직 이번 주 후보가 없어요 — 수업 전 예고가 계산되면 15분 안에 생겨요</p>' + calc + cfg;
+    var onl = !!(window.OnlineClass && OnlineClass.isOnline(cls));   /* 온라인 반 — 월 ~ 일 한 주 · 일요일 밤 자동 (migration-118 · 20261117c) */
+    if (!w) return '<p class="muted-note">' + (onl ? '아직 이번 주 후보가 없어요 — 일요일 밤이 지나면 지난주(월 ~ 일) 후보가 생겨요' : '아직 이번 주 후보가 없어요 — 수업 전 예고가 계산되면 15분 안에 생겨요') + '</p>' + calc + cfg;
     var order = ['wrong', 'text'];
-    return '<p class="kg-period muted-note num">' + esc(md(w.lesson) + ' 수업 전 주 (' + md(w.from) + '~' + md(w.to) + ')') + ' · 사진을 AI 가 보고 매긴 점수 · 학생 화면엔 확정된 배지만</p>' +
+    return '<p class="kg-period muted-note num">' + esc(onl ? md(w.from) + '~' + md(w.to) + ' 한 주(월 ~ 일)' : md(w.lesson) + ' 수업 전 주 (' + md(w.from) + '~' + md(w.to) + ')') + ' · 사진을 AI 가 보고 매긴 점수 · 학생 화면엔 확정된 배지만</p>' +
       order.map(function (k) { var r = w.rows.find(function (x) { return x.kind === k; }); return r ? kindHtml(r, cls) : ''; }).join('') + calc + cfg;
   }
   function classHtml(cls) {

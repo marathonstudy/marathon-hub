@@ -1006,7 +1006,12 @@
   function onChange(e) {
     var t = e.target;
     if (t.hasAttribute('data-fa-mark')) { if (t.checked) S.mark[t.getAttribute('data-fa-mark')] = true; else delete S.mark[t.getAttribute('data-fa-mark')]; paintTools(); return; }
-    if (t.id === 'faClass') { setClass(t.value); if (!S.month) S.month = prevMonth(today()); load(); return; }
+    if (t.id === 'faClass') {
+      setClass(t.value); if (!S.month) S.month = prevMonth(today());
+      /* 온라인 반(월 단위 클래스)은 이달판이 기본 (20261117c) — 1년판도 고를 수 있음(앱 기록 첫 달 ~ 마지막 달) */
+      if (onlineCls(t.value) && S.kind === 'year') S.kind = 'month';
+      load(); return;
+    }
     if (t.id === 'faFrom' || t.id === 'faTo') { S[t.id === 'faFrom' ? 'from' : 'to'] = t.value; load(); return; }
     if (t.id === 'faMonth') { S.month = t.value; load(); return; }
     if (t.hasAttribute('data-fa-p2')) { setRace(t.checked); return; }

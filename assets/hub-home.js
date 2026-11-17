@@ -148,8 +148,8 @@
   function runHtml() {
     var rc = H.ctx.run();
     if (H.loading) return '<section class="gm-card orn-card" id="ornCard"><h2 class="gm-h">🏁 이번 달 완주 현황</h2><p class="gm-hint">과제 기록을 불러오는 중…</p></section>';
-    if (!H.data) return '<section class="gm-card orn-card" id="ornCard"><h2 class="gm-h">🏁 이번 달 완주 현황</h2><p class="gm-hint">과제 기록이 연결되면 여기에 보여요</p></section>';
-    return OnlineRun.cardHtml(rc.compute(H.data), { go: true }).replace('data-orn-go="run"', 'data-gm-go="run"');
+    if (!H.data) return '<section class="gm-card orn-card" id="ornCard"><h2 class="gm-h">🏁 이번 달 완주 현황</h2><p class="gm-hint">과제 기록이 연결되면 여기에 보여요 · ' + OnlineRun.KAKAO + '</p></section>';
+    return OnlineRun.cardHtml(rc.compute(H.data), { go: true, parent: !!rc.parent, base: H.ctx.base }).replace('data-orn-go="run"', 'data-gm-go="run"');
   }
   function paintFinish() { if (global.FinishHub && H) FinishHub.mount(document.getElementById('gmFinNew'), document.getElementById('gmFinRow'), H); }
   function paintBadge() {

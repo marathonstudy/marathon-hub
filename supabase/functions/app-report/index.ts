@@ -21,7 +21,8 @@
 //    제출률·정시율·강의 시청률, 날짜별 제출, 영역별 정답률, 차시 요약,
 //    과제 기록 전부(제목·날짜·지각 여부·정답률·강 번호) — 러닝노트가 레포트 주차의 과제 기간만 잘라 보여 준다.
 //    (예전 화면을 위해 최근 10건 recent 도 함께)
-//    제출 사진 주소, 선생님 피드백, 학생이 쓴 글, 프로필 사진은 빼고 보낸다.
+//    제출 사진 주소, 학생이 쓴 글, 프로필 사진, AI 피드백은 빼고 보낸다.
+//    선생님 피드백은 사람이 쓴 것(작성자 이름이 있는 것) 최근 2개 · 200자까지만 fb 로 (20261117c · 온라인 학부모 화면)
 //    who — 앱에 등록된 학생 이름 (있을 때만 · 20261031k) — 코치룸이 우리 학생 이름과 달라 보이면 「링크 확인 필요」
 //          (다른 학생의 공유 링크를 잘못 넣었을 때). 앱이 이름을 어느 항목에 담는지 모르므로 흔한 자리를 차례로 본다.
 //    shape — 앱이 실제로 보내는 항목 「이름」만 (값은 없다 · 20261030a). 코치룸 미리보기 「과제 상세」 맨 아래에서
@@ -168,12 +169,22 @@ function pick(src: Any) {
       correctRate: h?.correctRate == null ? null : Math.round(num(h.correctRate)),
       ...countsOf(h),
       ...partsOf(h),
+      /* DAY 번호 · 풀이 시간(초) — 앱 공유 리포트의 lectureDay · solvingTimeSeconds(없으면 분 × 60) · 있을 때만 (20261117c) */
+      ...(num(h?.lectureDay) > 0 ? { day: num(h.lectureDay) } : {}),
+      ...(num(h?.solvingTimeSeconds) > 0 ? { sec: num(h.solvingTimeSeconds) } : num(h?.solvingTimeMinutes) > 0 ? { sec: num(h.solvingTimeMinutes) * 60 } : {}),
       /* 퀴즈 — 답을 냈는지(참 · 거짓)만 · 글은 넘기지 않는다 · 앱이 보낼 때만 (20261117b) */
       ...(typeof h?.quizAnswered === "boolean" ? { quiz: h.quizAnswered } : (h?.quizAnswer ?? h?.quiz_answer) != null ? { quiz: String(h?.quizAnswer ?? h?.quiz_answer).trim() !== "" } : {}),
     }));
 
+  /* 선생님 피드백 — 사람(작성자 이름이 있는 것)이 쓴 teacherFeedback 최근 2개만 · 200자까지 · AI 피드백(learningComment · aiFeedback)은 받지 않는다 (20261117c · 온라인 학부모 화면) */
+  const fb = hist
+    .filter((h: Any) => typeof h?.teacherFeedback === "string" && h.teacherFeedback.trim() && typeof h?.feedbackAuthorName === "string" && h.feedbackAuthorName.trim())
+    .sort((a: Any, b: Any) => String(b?.gradedAt ?? b?.submittedAt ?? "").localeCompare(String(a?.gradedAt ?? a?.submittedAt ?? "")))
+    .slice(0, 2)
+    .map((h: Any) => ({ at: String(h?.gradedAt ?? h?.submittedAt ?? "").slice(0, 10), title: String(h?.title ?? "").slice(0, 60), t: String(h.teacherFeedback).trim().slice(0, 200) }));
   return {
     classTitle: String(src?.classInfo?.title ?? ""),
+    fb,
     classes: (Array.isArray(src?.__classes) ? src.__classes : [classMeta(src?.classInfo, 0, src)]).filter(Boolean),
     who: whoOf(src),
     stats: {
