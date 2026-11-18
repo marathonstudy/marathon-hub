@@ -1373,15 +1373,35 @@
       var st = d.student || {};
       /* 온라인 반만 듣는 학생 (20261114g · migration-112 hub_class_mode) — 모의고사 탭 숨김 · 레포트 탭은 주간 레포트가 있을 때만 · D-day · 수업 일정 숨김
          현강과 온라인을 둘 다 들으면 현강 기준(모든 탭) · 112 전이거나 못 읽으면 예전 그대로 */
-      MODE = { online: false, classes: [] };
+      /* 20261118b — 현강 · 온라인 둘 다 다니면 맨 위 [🏫 현강] [💻 온라인] 고르기(기본 = 최근 활동 쪽 · 고른 것은 이 기기에 기억)
+         미리보기(코치룸)도 같은 답(migration-120 staff_hub_class_mode — 예전에는 미리보기가 반 종류를 못 받아 늘 현강으로 보였다) */
+      MODE = { online: false, classes: [], both: false, pick: '' };
+      var MKEY = 'mh.hub.mode.' + String(h.code || '').slice(-8);
+      function modeRecent(m) { var o = String(m.online_last || ''), c = String(m.hyun_last || ''); return o && (!c || o >= c) ? 'online' : 'class'; }
+      function modeSaved() { if (PV) return MODE.mem || ''; try { var v = localStorage.getItem(MKEY); return v === 'online' || v === 'class' ? v : ''; } catch (e) { return ''; } }
+      function drawModeBar() {
+        var bar = $('#hubMode');
+        if (!MODE.both) { if (bar) bar.hidden = true; return; }
+        if (!bar) { bar = document.createElement('div'); bar.id = 'hubMode'; bar.className = 'hub-mode'; bar.setAttribute('role', 'group'); bar.setAttribute('aria-label', '현강 · 온라인 고르기'); head.parentNode.insertBefore(bar, head.nextSibling); }
+        bar.hidden = false;
+        bar.innerHTML = '<button type="button" class="hub-mode__b' + (MODE.online ? '' : ' is-on') + '" aria-pressed="' + !MODE.online + '" data-hub-mode="class">🏫 현강</button>' +
+          '<button type="button" class="hub-mode__b' + (MODE.online ? ' is-on' : '') + '" aria-pressed="' + MODE.online + '" data-hub-mode="online">💻 온라인</button>';
+        bar.onclick = function (e) { var b = e.target.closest('[data-hub-mode]'); if (b) setMode(b.getAttribute('data-hub-mode'), true); };
+      }
+      function loadOnst() { Promise.resolve().then(function () { return rpc('hub_online_stats', { p_code: h.code }); }).then(function (v) { ONST = v && typeof v === 'object' && v.ym ? v : null; }, function () { ONST = null; }); }
+      function setMode(x, save) {
+        var on = x === 'online';
+        if (save) { if (PV) MODE.mem = x; else try { localStorage.setItem(MKEY, x); } catch (e) { /* 그대로 */ } }
+        if (on === MODE.online && MODE.pick) { drawModeBar(); return; }
+        MODE.online = on; MODE.pick = x;
+        drawModeBar();
+        if (on) { loadOnst(); applyOnline(); } else if (MODE.applied) unapplyOnline();
+      }
       rpc('hub_class_mode', { p_code: h.code }).then(function (m) {
         if (!m || !m.ok) return;
-        MODE = { online: !!m.online, classes: m.classes || [] };
-        if (MODE.online) {
-          /* 서버가 미리 계산해 둔 요약(migration-119 hub_online_stats · 본인 것만 · 앱 기준만) — 홈 카드 인증 일 · 연속은 이 값 (없으면 기록으로 계산) */
-          Promise.resolve().then(function () { return rpc('hub_online_stats', { p_code: h.code }); }).then(function (v) { ONST = v && typeof v === 'object' && v.ym ? v : null; }, function () { ONST = null; });
-          applyOnline();
-        }
+        MODE.classes = m.classes || []; MODE.both = !!m.both;
+        /* 서버가 미리 계산해 둔 요약(migration-119 hub_online_stats · 본인 것만 · 앱 기준만) — 홈 카드 인증 일 · 연속은 이 값 (없으면 기록으로 계산) */
+        setMode(MODE.both ? (modeSaved() || modeRecent(m)) : (m.online ? 'online' : 'class'), false);
       }, function () {});
       $('#hubName').textContent = (st.name || '') + ' 학생의 러닝노트';
       $('#hubMeta').textContent = [st.class_name, st.school, st.grade].filter(Boolean).join(' · ');
@@ -1395,6 +1415,7 @@
       root.innerHTML =
         '<section class="hub-panel" id="panelHome" role="tabpanel" hidden></section>' +
         '<section class="hub-panel" id="panelRun" role="tabpanel" hidden></section>' +
+        '<section class="hub-panel" id="panelBest" role="tabpanel" hidden></section>' +
         '<section class="hub-panel" id="panelReport" role="tabpanel"></section>' +
         '<section class="hub-panel" id="panelAward" hidden></section>' +
         '<section class="hub-panel" id="panelVideo" role="tabpanel" hidden></section>' +
@@ -1427,7 +1448,7 @@
       if (global.MogoView && tabMogo) {
         rpc('hub_mogo', { p_code: h.code }).then(function (v) {
           MOGO = v || { reports: [] };
-          if (MODE.online && tabMogo) { tabMogo.hidden = !(MOGO.reports && MOGO.reports.length); layoutTabs(); }
+          if (MODE.online && tabMogo) { tabMogo.hidden = true; layoutTabs(); }        /* 온라인 — 모의고사 탭 숨김 (20261118b) */
           drawMogoWeek();
           if ($('#panelMogo') && !$('#panelMogo').hidden) $('#panelMogo').innerHTML = MogoView.panelHtml(MOGO);
         }, function () {
@@ -1512,6 +1533,18 @@
         }
         host.innerHTML = '<div class="empty">과제 기록이 아직 연결되지 않았습니다.<br>' + OnlineRun.KAKAO + '</div>';
       }
+      /* 🏅 우수 수행 (20261118b · online-best.js · migration-120 hub_best) — 열 때마다 새로 */
+      function openBest() {
+        var host = $('#panelBest');
+        if (!host || !global.OnlineBest) return;
+        host.innerHTML = OnlineBest.html(undefined);
+        Promise.all([Promise.resolve().then(function () { return rpc('hub_best', { p_code: h.code }); }).then(function (v) { return v && typeof v === 'object' ? v : { __fail: true }; }, function () { return { __fail: true }; }),
+                     appData(h.code)]).then(function (x) {
+          host.innerHTML = OnlineBest.html(x[0], x[1], { today: todayISO(), preview: !!PV });
+          if (!PV) OnlineBest.mountPhotos(host, h.code);
+          host.onclick = function (e) { if (e.target.closest && e.target.closest('[data-ob-retry]')) openBest(); };
+        });
+      }
       function openRun() {
         var host = $('#panelRun');
         if (!host || !global.OnlineRun) return;
@@ -1575,20 +1608,37 @@
       }
 
       /* 온라인 반만 — 탭 · 머리 정리 (20261114g) */
+      /* 온라인 마라톤 탭 (20261118b) — [홈][완주 달력][기록][우수 수행] · 수업 레포트 · 영상 · 필기 · 모의고사 · D-day 는 숨김(지우지 않음 · [현강]을 고르면 다시) */
+      var HIDE_ON = ['#tabReport', '#tabVideo', '#tabPhoto', '#tabMogo'];
       function applyOnline() {
-        /* 모의고사 — 온라인 반은 기록이 있을 때만 (20261117c · 예전엔 늘 숨김) */
-        var tm = $('#tabMogo'); if (tm) tm.hidden = !(MOGO && !MOGO.failed && MOGO.reports && MOGO.reports.length);
-        var tr = $('#tabReport'); if (tr) tr.hidden = !(d.reports || []).length;
+        MODE.applied = true;
+        HIDE_ON.forEach(function (s) { var t = $(s); if (t) t.hidden = true; });
         var dd = $('#hubDday'); if (dd) dd.hidden = true;
-        var line = MODE.classes.map(function (c) { return c.line; }).filter(Boolean)[0];
+        var line = MODE.classes.filter(function (c) { return c.kind === 'online'; }).map(function (c) { return c.line; }).filter(Boolean)[0];
         if (line) $('#hubMeta').textContent = [line, st.school, st.grade].filter(Boolean).join(' · ');
-        /* 온라인 마라톤 (20261117a · online-run.js) — 탭 [홈][완주 달력][기록][영상·필기] · 레포트는 있을 때만 · 모의고사 숨김 */
         if (global.OnlineRun) {
           var tRun = $('#tabRun'); if (tRun) tRun.hidden = false;
           var tApp = $('#tabApp'); if (tApp) { tApp.textContent = '기록'; tApp.setAttribute('data-i', '📒'); }
+          var tBest = $('#tabBest'); if (tBest) tBest.hidden = !global.OnlineBest;
           appLoaded = null;
           if ($('#panelApp') && !$('#panelApp').hidden) openApp();
         }
+        afterMode();
+      }
+      function unapplyOnline() {
+        MODE.applied = false;
+        var tr = $('#tabReport'); if (tr) tr.hidden = false;
+        if (tabVideo) tabVideo.hidden = false;
+        if (tabMogo) tabMogo.hidden = !global.MogoView;
+        ['#tabRun', '#tabBest'].forEach(function (s) { var t = $(s); if (t) t.hidden = true; });
+        var tApp = $('#tabApp'); if (tApp) { tApp.textContent = '과제'; tApp.setAttribute('data-i', '✅'); }
+        $('#hubMeta').textContent = [st.class_name, st.school, st.grade].filter(Boolean).join(' · ');
+        renderDday(d.exam, (st.name || '') + ' 학생');
+        appLoaded = null;
+        if ($('#panelApp') && !$('#panelApp').hidden) openApp();
+        afterMode();
+      }
+      function afterMode() {
         layoutTabs();
         var cur = tabs.querySelector('.hub-tab[aria-selected="true"]');
         if ((!cur || cur.hidden) && $('#tabHome') && !$('#tabHome').hidden) { select('home'); try { navPush('home'); } catch (e) { /* 그대로 */ } }
@@ -1662,6 +1712,9 @@
 
       function select(which) {
         if (which === 'week') which = 'report';
+        /* 온라인 — 수업 레포트 · 영상 · 필기 · 모의고사 탭은 숨김 → 예전 주소로 들어와도 홈으로 (20261118b) */
+        if (MODE.online && /^(report|video|photo|mogo)$/.test(which)) which = homeOn ? 'home' : 'run';
+        if (which === 'best' && !(MODE.online && global.OnlineBest)) which = 'home';
         if (which === 'home' && !homeOn) which = 'report';
         /* 영상 · 필기는 한 탭 — 수업 영상 위 · 내 필기 아래 (20261110b) */
         var media = which === 'video' || which === 'photo';
@@ -1674,6 +1727,7 @@
          ['app',    '#tabApp',    '#panelApp'],
          ['photo',  '#tabPhoto',  '#panelPhoto'],
          ['mogo',   '#tabMogo',   '#panelMogo'],
+         ['best',   '#tabBest',   '#panelBest'],
          ['book',   '#tabBook',   '#panelBook'],
          ['info',   '#tabInfo',   '#panelInfo']].forEach(function (t) {
           if (!$(t[1]) || !$(t[2])) return;
@@ -1692,6 +1746,7 @@
         }
         if (which === 'app') openApp();
         if (which === 'run') openRun();
+        if (which === 'best') openBest();
         if (media) { openPhoto(''); if (tabVideo && !tabVideo.hidden) openVideos(); }
         if (which === 'info') openInfo();
         if (which === 'mogo' && $('#panelMogo') && global.MogoView) $('#panelMogo').innerHTML = MOGO && MOGO.failed ? MogoView.failHtml() : MogoView.panelHtml(MOGO);
@@ -1710,6 +1765,7 @@
       if (tabVideo) tabVideo.onclick = function () { select('video'); navPush('videos'); };
       $('#tabApp').onclick    = function () { select('app'); navPush('app'); };
       if ($('#tabRun')) $('#tabRun').onclick = function () { select('run'); navPush('run'); };
+      if ($('#tabBest')) $('#tabBest').onclick = function () { select('best'); navPush('best'); };
       $('#tabBook').onclick   = function () { select('book'); navPush('book'); };
       $('#tabPhoto').onclick  = function () { select('photo'); navPush('photo'); };
       if (tabInfo) tabInfo.onclick = function () { select('info'); navPush('info'); };
@@ -1750,6 +1806,7 @@
         else if (v === 'videos' || v === 'video') select('video');
         else if (v === 'app') select('app');
         else if (v === 'run') select($('#tabRun') && !$('#tabRun').hidden ? 'run' : 'home');
+        else if (v === 'best') select('best');
         else if (v === 'mogo') select(tabMogo && !tabMogo.hidden ? 'mogo' : 'report');
         else if (v === 'photo') { select('photo'); if (arg) openPhoto(arg); }
         else if (v === 'review' || v === 'todo') {

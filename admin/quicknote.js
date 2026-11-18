@@ -303,7 +303,9 @@
       if (h.live) live = '<p class="cs-live num">이번 주 진행 중 ' + h.live.done + '/' + h.live.total + '</p>';
     } else if (h) line = '<span class="cs-hw is-mute">' + esc(h.period.word + '(' + h.period.label + ') 과제 기록 없음') + '</span>';
     /* 학생 카드 (stucard.js · 20261109c) — 머리에는 이름만 · 과제 줄은 아래 「과제」 칸 */
-    if (window.StuCard) return '<div class="cs-head"><h2 class="cs-name" id="csTitle">' + esc(s.name || '') + '</h2><button type="button" class="cs-x" id="csClose" aria-label="닫기">✕</button></div>';
+    /* 이름이 영문만이면 「이름 확인 필요」 작은 표시(이름은 그대로 · 20261118b) */
+    var nameChk = /^[A-Za-z][A-Za-z\s.'-]*$/.test(String(s.name || '').trim()) ? ' <small class="cs-namechk" title="앱에서 가져온 이름이 영문이에요 · 학생 정보에서 한글 이름을 확인해 주세요">이름 확인 필요</small>' : '';
+    if (window.StuCard) return '<div class="cs-head"><h2 class="cs-name" id="csTitle">' + esc(s.name || '') + nameChk + '</h2><button type="button" class="cs-x" id="csClose" aria-label="닫기">✕</button></div>';
     return '<div class="cs-head"><h2 class="cs-name" id="csTitle">' + esc(s.name || '') + '</h2><button type="button" class="cs-x" id="csClose" aria-label="닫기">✕</button>' +
       (line ? '<p class="cs-hwline">' + line + '</p>' : '') + live + '</div>';
   }
@@ -412,7 +414,8 @@
       '<div class="cs-setact"><button type="button" class="btn btn--sm btn--primary" data-cs-setsave>설정 저장</button><button type="button" class="btn btn--sm" data-cs-set>닫기</button></div></div>';
   }
   /* 능력치(과제 기록을 먼저 읽음) 다음 온라인 마라톤 구간 완주 (stucard.js · 20261117a · 온라인 반 학생만) */
-  function abOn(SC, sid) { var ab = SC.abilityHtml ? SC.abilityHtml(sid) : ''; return (SC.onlineHtml ? SC.onlineHtml(sid) : '') + ab; }
+  /* 20261118b — 온라인 학생은 구간 다음에 「🏅 우수 수행 관리」(online-best-admin.js · 숨김 · 우수 질문 고르기 · 영문 이름 「이름 확인 필요」) */
+  function abOn(SC, sid) { var ab = SC.abilityHtml ? SC.abilityHtml(sid) : ''; return (SC.onlineHtml ? SC.onlineHtml(sid) : '') + (window.OnlineBestAdmin ? OnlineBestAdmin.html(sid) : '') + ab; }
   function paint() {
     var m = modal(), sid = st.open;
     if (!m || !sid) return;

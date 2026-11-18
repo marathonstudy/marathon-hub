@@ -112,6 +112,14 @@
         var ex = m.extra || {};
         return { reports: list, notebookUrl: ex.notebookUrl || null, analysisUrl: ex.analysisUrl || null };
       }, function () { return { reports: [] }; });
+      /* 온라인 학생 화면 판정 · 요약 · 우수 수행 (20261118b · migration-120) — 예전에는 여기서 null 이라 미리보기가 늘 현강 화면이었다 */
+      if (name === 'hub_class_mode') {
+        /* 120 전이거나 못 읽으면 — 코치룸이 아는 반 종류(원래 반)로 */
+        var local = function () { var s0 = student() || {}, cn = s0.className || s0.class_name || '', on = !!(window.OnlineClass && OnlineClass.isOnline(cn)); return { ok: true, online: on, both: false, classes: cn ? [{ name: cn, kind: on ? 'online' : 'class', line: on ? '온라인 · ' + cn : cn }] : [] }; };
+        return sb().rpc('staff_hub_class_mode', { p_student: cur.sid }).then(function (r) { return r.error || !r.data || !r.data.ok ? local() : r.data; }, local);
+      }
+      if (name === 'hub_online_stats') return sb().rpc('staff_hub_online_stats', { p_student: cur.sid }).then(function (r) { return r.error ? null : r.data; }, function () { return null; });
+      if (name === 'hub_best') return sb().rpc('staff_hub_best', { p_student: cur.sid }).then(function (r) { return r.error ? null : r.data; }, function () { return null; });
       /* 학습 분석 점수 (101) — 직원 함수로 */
       if (name === 'hub_scores') return sb().rpc('staff_scores', { p_student: cur.sid }).then(function (r) { return r.error ? null : r.data; }, function () { return null; });
       /* 레포트 복습테스트 칸의 낸 것(맞은 수 / 전체) · 미응시 — 직원 표(review_week)에서 그 학생 줄만 hub_review_week(030)와 같은 모양으로 (메모 없이) */

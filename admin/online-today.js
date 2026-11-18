@@ -37,9 +37,9 @@
             tbl: { cls: '', sort: 'care', filter: 'all', rows: null, busy: false, err: null, at: 0, more: {}, why: {}, pick: {}, draft: false, calc: {} },
             rf: { queue: [], run: [], st: {}, msg: {}, last: 0, until: 0, timer: null, total: 0 } };
   try { var sv = JSON.parse(localStorage.getItem(KEY) || 'null'); if (sv && typeof sv === 'object') S.care = { cls: String(sv.cls || ''), grade: String(sv.grade || '') }; } catch (e) { /* 그대로 */ }
-  try { var tv = JSON.parse(localStorage.getItem(TKEY) || 'null'); if (tv && typeof tv === 'object') { S.tbl.cls = String(tv.cls || ''); S.tbl.sort = String(tv.sort || 'care'); S.tbl.filter = String(tv.filter || 'all'); } } catch (e) { /* 그대로 */ }
+  try { var tv = JSON.parse(localStorage.getItem(TKEY) || 'null'); if (tv && typeof tv === 'object') { S.tbl.cls = String(tv.cls || ''); S.tbl.sort = String(tv.sort || 'care'); S.tbl.dir = tv.dir === 'asc' ? 'asc' : 'desc'; S.tbl.filter = String(tv.filter || 'all'); } } catch (e) { /* 그대로 */ }
   function saveCare() { try { localStorage.setItem(KEY, JSON.stringify(S.care)); } catch (e) { /* 그대로 */ } }
-  function saveTbl() { try { localStorage.setItem(TKEY, JSON.stringify({ cls: S.tbl.cls, sort: S.tbl.sort, filter: S.tbl.filter })); } catch (e) { /* 그대로 */ } }
+  function saveTbl() { try { localStorage.setItem(TKEY, JSON.stringify({ cls: S.tbl.cls, sort: S.tbl.sort, dir: S.tbl.dir, filter: S.tbl.filter })); } catch (e) { /* 그대로 */ } }
 
   /* ============================================================
      예전 길(20261117c) — 반 하나의 앱 기록 통째 · 브라우저 계산 (월말 정리 · 시험에서 씀 · 첫 화면에서는 안 부름)
@@ -225,6 +225,12 @@
   /* ============================================================
      📋 반 현황표 (20261118a) — 누를 때(반을 고를 때) 불러온다
      ============================================================ */
+  /* 학년 표시 — 「1」 · 빈칸이면 반 이름의 학년(「[고2] 11월 …」)으로 보충 · 저장값은 그대로 (20261118b) */
+  function gradeOf(g, cls) {
+    var s = String(g || '').replace(/\s+/g, '');
+    if (!s || /^\d$/.test(s)) { var m = String(cls || '').match(/([중고])\s*([1-3])/); if (m) return m[1] + m[2]; }
+    return gradeLabel(g);
+  }
   function gradeLabel(g) {
     var s = String(g || '').replace(/\s+/g, '');
     var m = s.match(/^(?:중|중학교?|중등|M)([1-3])(?:학년)?$/i); if (m) return '중' + m[1];
@@ -242,6 +248,11 @@
   }
   function stale(x) { var s = x.stat; return !s || !s.calc_day || s.calc_day !== today() || !!s.err; }
   function lateRec(x) { var s = x.stat || {}; var f = Date.parse(s.fetched || ''); return !s.has_rec || !isFinite(f) || Date.now() - f > 2 * 3600000; }
+  /* 앱 기록이 비어 있음 — 기록이 아예 없거나 이번 달 날짜 기록이 0 (정말 안 낸 것과 구분 · 120 month_cal) (20261118b) */
+  function emptyRec(x) { var s = x.stat || {}; return !stale(x) && (!s.has_rec || s.month_cal === 0); }
+  function rateOf(s) { return s && s.open ? Math.round((s.done || 0) / s.open * 100) : null; }
+  /* 오늘 기록을 아직 못 받음 — 오늘 날짜 기록이 없거나(120 today_cal) 마지막 받은 때가 오늘 전 */
+  function todayWait(x) { var s = x.stat || {}, k = kstOf(s.fetched); return s.today === 'today' && (s.today_cal === false || !k || k.day < today()); }
   var TD = { ok: ['✓', 'ok', '제출'], late: ['✓', 'ok', '늦게 제출'], golden: ['✓', 'ok', '늦게 제출(골든패스)'], today: ['✗', 'miss', '미제출'], excused: ['—', 'off', '사정 인정'], none: ['—', 'off', '숙제 없는 날'] };
   var SEC = { done: ['●', 'done', '완주'], run: ['◐', 'run', '진행 중'], risk: ['⚠', 'risk', '위험 — 남은 날 다 내야 완주'], missed: ['✕', 'missed', '놓침'], wait: ['·', 'wait', '아직'] };
   function appSec(st, no) { return (st.app || []).filter(function (s) { return +s.no === no; })[0] || null; }
@@ -275,7 +286,12 @@
       return true;
     });
     var nm = function (a, b) { return String(a.name).localeCompare(String(b.name), 'ko'); };
-    if (T.sort === 'name') list.sort(nm);
+    var dir = T.dir === 'asc' ? 1 : -1, num = function (v) { return v == null || !isFinite(v) ? -1 : v; };
+    /* 열 제목 누르기 — 이름 · 제출률 · 연속 · 마지막 제출 (▲ 오름 · ▼ 내림 · 20261118b) */
+    if (T.sort === 'name') list.sort(function (a, b) { return T.dir === 'desc' ? nm(b, a) : nm(a, b); });
+    else if (T.sort === 'rate') list.sort(function (a, b) { return dir * (num(rateOf(a.stat)) - num(rateOf(b.stat))) || nm(a, b); });
+    else if (T.sort === 'streak') list.sort(function (a, b) { return dir * (((a.stat || {}).streak || 0) - ((b.stat || {}).streak || 0)) || nm(a, b); });
+    else if (T.sort === 'last') list.sort(function (a, b) { return dir * (num(Date.parse((a.stat || {}).last || '')) - num(Date.parse((b.stat || {}).last || ''))) || nm(a, b); });
     else if (T.sort === 'done') list.sort(function (a, b) { return ((b.stat || {}).done || 0) - ((a.stat || {}).done || 0) || nm(a, b); });
     else list.sort(function (a, b) {
       var x = a.stat || {}, y = b.stat || {};
@@ -289,7 +305,10 @@
     var open = ok.filter(function (x) { return /^(ok|late|golden|today)$/.test(s(x).today); }).length, done = ok.filter(function (x) { return /^(ok|late|golden)$/.test(s(x).today); }).length;
     return { open: open, done: done, miss2: ok.filter(function (x) { return s(x).miss_run >= 2; }).length, risk: ok.filter(function (x) { return !!s(x).risk; }).length,
              fin: ok.filter(function (x) { return (s(x).app || []).some(function (a) { return a.state === 'done'; }); }).length, appOk: ok.filter(function (x) { return s(x).app_status === 'ok'; }).length,
-             pending: rows.length - ok.length, late: rows.filter(lateRec).length };
+             pending: rows.length - ok.length, late: rows.filter(lateRec).length,
+             mDone: ok.reduce(function (a, x) { return a + (s(x).done || 0); }, 0), mOpen: ok.reduce(function (a, x) { return a + (s(x).open || 0); }, 0),
+             wait: open > 0 && done === 0 && ok.some(todayWait),
+             fetched: ok.map(function (x) { return s(x).fetched; }).filter(Boolean).sort().pop() || '' };
   }
   function rfText(id) {
     var R = S.rf, st = R.st[id];
@@ -301,14 +320,16 @@
     return '';
   }
   function rowHtml(x) {
-    var T = S.tbl, s = x.stat || {}, id = esc(x.id), pend = stale(x), late = lateRec(x), g = gradeLabel(x.grade);
+    var T = S.tbl, s = x.stat || {}, id = esc(x.id), pend = stale(x), empty = emptyRec(x), late = !empty && lateRec(x), g = gradeOf(x.grade, T.cls), rt = pend ? null : rateOf(s);
     var name = '<td class="ot-tn"><label class="ot-tchk"><input type="checkbox" data-ot-tpick="' + id + '"' + (T.pick[x.id] ? ' checked' : '') + ' aria-label="' + esc(x.name + ' 응원 문자 초안에 넣기') + '"></label>' +
       '<button type="button" class="ot-nm" data-cs-open="' + id + '">' + esc(x.name) + '</button>' + (g ? '<small class="ot-g">' + esc(g) + '</small>' : '') +
+      (empty ? '<span class="ot-tag ot-tag--late" title="앱 기록이 비어 있어요 · 정말 안 낸 것인지 앱에서 다시 받아 확인해요">기록 없음</span>' : '') +
       (late ? '<span class="ot-tag ot-tag--late">기록 늦음</span>' : '') + (pend ? '<span class="ot-tag ot-tag--calc">계산 중</span>' : '') +
       '<button type="button" class="ot-more" data-ot-more="' + id + '" aria-expanded="' + !!T.more[x.id] + '" aria-label="' + esc(x.name) + ' 자세히">' + (T.more[x.id] ? '▴' : '▾') + '</button></td>';
-    var tdk = pend ? null : (TD[s.today] || TD.none);
+    var tdk = pend ? null : T._wait && todayWait(x) ? ['⏳', 'off', '오늘 기록 받는 중'] : (TD[s.today] || TD.none);
     var today_ = '<td class="ot-tc">' + (tdk ? '<span class="ot-td ot-td--' + tdk[1] + '" title="' + esc(tdk[2]) + '">' + tdk[0] + '</span>' : '<span class="muted-note">…</span>') + '</td>';
-    var mon = '<td class="ot-tc num">' + (pend ? '…' : (s.done || 0) + '/' + (s.open || 0)) + '</td>';
+    var mon = '<td class="ot-tc num">' + (pend ? '…' : (s.done || 0) + '/' + (s.open || 0)) + '</td>' +
+      '<td class="ot-tc ot-x num ot-rate">' + (pend ? '…' : rt == null ? '—' : rt + '%') + '</td>';
     var cur = pend ? 0 : curSecNo(s);
     var mcell = '<td class="ot-tc ot-m">' + (pend ? '…' : s.app_status === 'ok' && cur ? cur + '구간 <span class="ot-sg ot-sg--' + SEC[secKey(s, cur)][1] + '">' + SEC[secKey(s, cur)][0] + '</span>' : '<small class="muted-note">정보 없음</small>') + '</td>';
     var streak = '<td class="ot-tc ot-x num">' + (pend ? '…' : (s.streak || 0) + '일') + '</td>';
@@ -321,23 +342,28 @@
       return '<td class="ot-tc ot-x"><span class="ot-sg ot-sg--' + k[1] + '" title="' + esc(no + '구간 ' + k[2]) + '">' + k[0] + '</span>' +
         (hubDiff(s, no) ? '<button type="button" class="ot-hub" data-ot-why="' + id + '|' + no + '" title="허브 기준과 다름 — 누르면 이유">허</button>' : '') + '</td>';
     }).join('');
-    var act = rfText(x.id) || (late && x.linked ? '<button type="button" class="btn btn--sm ot-act" data-ot-refetch="' + id + '">다시 받기</button>' : '') +
+    var act = rfText(x.id) || ((late || empty) && x.linked ? '<button type="button" class="btn btn--sm ot-act" data-ot-refetch="' + id + '">다시 받기</button>' : '') +
       (pend ? '<button type="button" class="btn btn--sm ot-act" data-ot-calc="' + id + '"' + (T.calc[x.id] ? ' disabled' : '') + '>' + (T.calc[x.id] ? '계산 중…' : '지금 계산') + '</button>' : '');
     var last = '<td class="ot-tc ot-x ot-last">' + (pend ? '…' : esc(lastText(s.last))) + (act ? '<span class="ot-acts">' + act + '</span>' : '') + '</td>';
     var why = T.why[x.id];
-    var more = '<tr class="ot-tmore" data-ot-morerow="' + id + '"' + (T.more[x.id] ? '' : ' hidden') + '><td colspan="9"><dl class="ot-tdl">' +
+    var more = '<tr class="ot-tmore" data-ot-morerow="' + id + '"' + (T.more[x.id] ? '' : ' hidden') + '><td colspan="10"><dl class="ot-tdl">' +
+      '<dt>제출률</dt><dd>' + (pend ? '…' : rt == null ? '—' : rt + '%') + '</dd>' +
       '<dt>연속</dt><dd>' + (pend ? '…' : (s.streak || 0) + '일') + '</dd>' +
       (pend ? '' : s.app_status === 'ok' ? [1, 2, 3].map(function (no) { var k = SEC[secKey(s, no)]; return '<dt>' + no + '구간</dt><dd>' + k[0] + ' ' + esc(k[2]) + (hubDiff(s, no) ? ' <button type="button" class="ot-hub" data-ot-why="' + id + '|' + no + '">허</button>' : '') + '</dd>'; }).join('')
         : '<dt>구간</dt><dd>앱 반 정보 없음 — Replit 요청 필요' + (s.risk === 'hub' ? ' <button type="button" class="ot-hub" data-ot-why="' + id + '|' + (s.risk_sec || 0) + '">허 ⚠</button>' : '') + '</dd>') +
       '<dt>마지막 제출</dt><dd>' + (pend ? '…' : esc(lastText(s.last))) + '</dd>' + (act ? '<dt></dt><dd>' + act + '</dd>' : '') + '</dl></td></tr>';
-    var whyRow = why ? '<tr class="ot-twhy"><td colspan="9"><small>' + esc(why) + '</small></td></tr>' : '';
+    var whyRow = why ? '<tr class="ot-twhy"><td colspan="10"><small>' + esc(why) + '</small></td></tr>' : '';
     return '<tr class="ot-tr' + (s.miss_run >= 2 && !pend ? ' is-two' : '') + '" data-ot-row="' + id + '">' + name + today_ + mon + mcell + streak + secs + last + '</tr>' + whyRow + more;
   }
   function tblHeadHtml() {
     var T = S.tbl, rows = T.rows || [], sm = tblSum(rows);
     if (!T.cls || !T.rows) return '';
     var R = S.rf, left = R.queue.length + R.run.length;
-    return '<p class="ot-tsum num" data-ot-tsum>' + (sm.open ? '오늘 제출 <b>' + sm.done + '/' + sm.open + '</b>' : '오늘은 숙제 없는 날') + ' · 이틀 이상 미제출 <b>' + sm.miss2 + '</b>명 · 이번 구간 위험 <b>' + sm.risk + '</b>명 · 이번 달 구간 완주 ' +
+    var fk = kstOf(sm.fetched);
+    return '<p class="ot-tsum num" data-ot-tsum>' + (sm.wait ? '<span class="ot-calc">오늘 기록 받는 중</span> <small class="muted-note">(앱 기록 마지막 받음 ' + esc(fk ? (fk.day === today() ? '오늘 ' : md(fk.day) + ' ') + fk.hm : '—') + ')</small>'
+        : sm.open ? '오늘 제출 <b>' + sm.done + '/' + sm.open + '</b>' : '오늘은 숙제 없는 날') +
+      ' · 이 반 제출률 <b>' + (sm.mOpen ? Math.round(sm.mDone / sm.mOpen * 100) + '%' : '—') + '</b> <small class="muted-note">(제출 ' + sm.mDone + ' / 숙제 ' + sm.mOpen + ' · 이번 달 1일 ~ 오늘)</small>' +
+      ' · 이틀 이상 미제출 <b>' + sm.miss2 + '</b>명 · 이번 구간 위험 <b>' + sm.risk + '</b>명 · 이번 달 구간 완주 ' +
       (sm.appOk ? '<b>' + sm.fin + '</b>명' : '<b>—</b> <small class="muted-note">(앱 반 정보 없음)</small>') + (sm.pending ? ' · <span class="ot-calc">계산 중 ' + sm.pending + '명</span>' : '') + '</p>' +
       (left ? '<p class="ot-rfbar" role="status">' + (R.until > Date.now() ? '한도 대기 — ' + Math.ceil((R.until - Date.now()) / 1000) + '초 뒤 이어서 받아요' : '받는 중… 약 ' + Math.max(1, Math.ceil(left / 28)) + '분') + ' · 남은 ' + left + '명 <small class="muted-note">(분당 28회 한도 · 차례로)</small></p>' : '');
   }
@@ -353,6 +379,13 @@
     else if (!T.rows) body = '<p class="muted-note">불러오는 중…</p>';
     else {
       var rows = tblRows(), all = T.rows, sm = tblSum(all), picked = all.filter(function (x) { return T.pick[x.id]; });
+      T._wait = sm.wait;
+      var noApp = !all.some(function (x) { return !stale(x) && x.stat.app_status === 'ok'; });
+      /* 열 제목 — 누르면 정렬(▲ ▼) · 이름 · 제출률 · 연속 · 마지막 제출 */
+      var sh = function (key, label, cls) {
+        var on = T.sort === key, ar = on ? (T.dir === 'asc' ? ' ▲' : ' ▼') : '';
+        return '<th scope="col"' + (cls ? ' class="' + cls + '"' : '') + ' aria-sort="' + (on ? (T.dir === 'asc' ? 'ascending' : 'descending') : 'none') + '"><button type="button" class="ot-sh' + (on ? ' is-on' : '') + '" data-ot-sh="' + key + '">' + label + ar + '</button></th>';
+      };
       var cnt = { all: all.length, today: all.filter(function (x) { return !stale(x) && x.stat.today === 'today'; }).length, miss2: sm.miss2, risk: sm.risk };
       var chips = [['all', '전체'], ['today', '오늘 미제출'], ['miss2', '이틀 이상 미제출'], ['risk', '구간 위험']].map(function (c) {
         return '<button type="button" class="ot-chip' + (T.filter === c[0] ? ' is-on' : '') + '" aria-pressed="' + (T.filter === c[0]) + '" data-ot-filter="' + c[0] + '">' + c[1] + ' <b class="num">' + cnt[c[0]] + '</b></button>';
@@ -365,9 +398,11 @@
         (T.draft && picked.length ? '<div class="ot-drafts">' + picked.map(function (x) {
           return '<div class="ot-draft"><b>' + esc(x.name) + '</b><textarea class="input ot-draft__t" rows="3" data-ot-dt="' + esc(x.id) + '">' + esc(draftOf(itemOf(x))) + '</textarea><button type="button" class="btn btn--sm" data-ot-copy="' + esc(x.id) + '">복사</button></div>';
         }).join('') + '</div>' : '') +
-        '<div class="ot-twrap"><table class="ot-tb"><thead><tr><th scope="col">이름</th><th scope="col">오늘</th><th scope="col">이번 달 제출</th><th scope="col" class="ot-m">지금 구간</th><th scope="col" class="ot-x">연속</th>' +
-          '<th scope="col" class="ot-x">1구간</th><th scope="col" class="ot-x">2구간</th><th scope="col" class="ot-x">3구간</th><th scope="col" class="ot-x">마지막 제출</th></tr></thead><tbody>' +
-          (rows.length ? rows.map(rowHtml).join('') : '<tr><td colspan="9" class="muted-note">해당하는 학생이 없어요</td></tr>') + '</tbody></table></div>' +
+        '<div class="ot-twrap"><table class="ot-tb"><thead><tr>' + sh('name', '이름') + '<th scope="col">오늘</th><th scope="col">이번 달 제출</th>' + sh('rate', '제출률', 'ot-x') +
+          '<th scope="col" class="ot-m">지금 구간</th>' + sh('streak', '연속', 'ot-x') +
+          (noApp ? '<th scope="col" class="ot-x ot-secs" colspan="3">1 · 2 · 3구간</th>' : '<th scope="col" class="ot-x">1구간</th><th scope="col" class="ot-x">2구간</th><th scope="col" class="ot-x">3구간</th>') +
+          sh('last', '마지막 제출', 'ot-x') + '</tr></thead><tbody>' +
+          (rows.length ? rows.map(rowHtml).join('') : '<tr><td colspan="10" class="muted-note">해당하는 학생이 없어요</td></tr>') + '</tbody></table></div>' +
         '<p class="muted-note ot-tlegend">오늘 ✓ 제출 · ✗ 미제출 · — 숙제 없는 날 &nbsp; 구간 ● 완주 · ◐ 진행 중 · ⚠ 위험(남은 날 다 내야 완주) · ✕ 놓침 · · 아직 (앱 기준 · 「허」 = 허브 기준과 다름)</p>';
     }
     return '<section class="ot-sec ot-tbl" aria-label="반 현황표">' + head + '<div class="ot-tbar">' + pickSel + '<button type="button" class="btn btn--sm btn--ghost" data-ot-treload>다시 읽기</button></div>' +
@@ -478,12 +513,12 @@
 
   function csvText() {
     var T = S.tbl, q = function (v) { v = String(v == null ? '' : v); return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
-    var head = ['이름', '학년', '오늘', '이번 달 제출', '연속', '1구간', '2구간', '3구간', '마지막 제출'];
+    var head = ['이름', '학년', '오늘', '이번 달 제출', '제출률', '연속', '1구간', '2구간', '3구간', '마지막 제출'];
     var rows = tblRows().map(function (x) {
-      var s = x.stat || {}, pend = stale(x);
-      if (pend) return [x.name, gradeLabel(x.grade), '계산 중', '', '', '', '', '', ''];
+      var s = x.stat || {}, pend = stale(x), rt = rateOf(s);
+      if (pend) return [x.name, gradeOf(x.grade, T.cls), '계산 중', '', '', '', '', '', '', ''];
       var sc = function (no) { return s.app_status === 'ok' ? SEC[secKey(s, no)][2] : '앱 반 정보 없음'; };
-      return [x.name, gradeLabel(x.grade), (TD[s.today] || TD.none)[2], (s.done || 0) + '/' + (s.open || 0), (s.streak || 0) + '일', sc(1), sc(2), sc(3), lastText(s.last)];
+      return [x.name, gradeOf(x.grade, T.cls), emptyRec(x) ? '기록 없음' : (TD[s.today] || TD.none)[2], (s.done || 0) + '/' + (s.open || 0), rt == null ? '' : rt + '%', (s.streak || 0) + '일', sc(1), sc(2), sc(3), lastText(s.last)];
     });
     void T;
     return [head].concat(rows).map(function (r) { return r.map(q).join(','); }).join('\r\n');
@@ -534,6 +569,8 @@
     if (b) { pickCls(b.getAttribute('data-ot-pickcls')); return true; }
     b = t.closest('[data-ot-treload]');
     if (b) { S.tbl.autoTried = false; loadTbl(true); if (S.tbl.cls) wantSum(S.tbl.cls, true); return true; }
+    b = t.closest('[data-ot-sh]');
+    if (b) { var sk = b.getAttribute('data-ot-sh'); if (S.tbl.sort === sk) S.tbl.dir = S.tbl.dir === 'asc' ? 'desc' : 'asc'; else { S.tbl.sort = sk; S.tbl.dir = sk === 'name' ? 'asc' : 'desc'; } saveTbl(); paintTbl(); return true; }
     b = t.closest('[data-ot-filter]');
     if (b) { S.tbl.filter = b.getAttribute('data-ot-filter'); saveTbl(); paintTbl(); return true; }
     b = t.closest('[data-ot-more]');
@@ -570,7 +607,7 @@
   function change(e) {
     var t = e.target;
     if (t.matches && t.matches('[data-ot-tcls]')) { if (t.value) pickCls(t.value); else { S.tbl.cls = ''; saveTbl(); paintTbl(); } return true; }
-    if (t.matches && t.matches('[data-ot-sort]')) { S.tbl.sort = t.value; saveTbl(); paintTbl(); return true; }
+    if (t.matches && t.matches('[data-ot-sort]')) { S.tbl.sort = t.value; S.tbl.dir = t.value === 'name' ? 'asc' : 'desc'; saveTbl(); paintTbl(); return true; }
     if (t.matches && t.matches('[data-ot-tpick]')) { S.tbl.pick[t.getAttribute('data-ot-tpick')] = t.checked; S.tbl.draft = false; paintTbl(); return true; }
     if (t.matches && t.matches('[data-ot-pick]')) { S.pick[t.getAttribute('data-ot-pick')] = t.checked; S.draft = false; repaintWrap(); return true; }
     if (t.matches && t.matches('[data-ot-fcls]')) { S.care.cls = t.value; saveCare(); repaintWrap(); return true; }
@@ -590,5 +627,5 @@
     return false;
   }
   window.OnlineToday = { html: html, click: click, change: change, load: load, state: function () { return S; }, rowsOf: rowsOf, draftOf: draftOf, stuOf: stuOf,
-                         boardHtml: boardHtml, careHtml: careHtml, gradeLabel: gradeLabel, lastText: lastText, csvText: csvText, refetch: refetch, pickCls: pickCls };
+                         boardHtml: boardHtml, careHtml: careHtml, gradeLabel: gradeLabel, gradeOf: gradeOf, lastText: lastText, csvText: csvText, refetch: refetch, pickCls: pickCls };
 })();

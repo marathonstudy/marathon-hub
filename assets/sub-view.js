@@ -212,6 +212,6 @@
   }
   function classBtnHtml(cls) { return '<button type="button" class="btn btn--sm sv-cls" data-sub-cls="' + esc(cls) + '">오늘 제출물 보기</button>'; }
 
-  global.SubView = { weekHtml: weekHtml, mountHub: mountHub, openStaff: openStaff, openClass: openClass, classBtnHtml: classBtnHtml, lbOpen: lbOpen, lbClose: lbClose,
+  global.SubView = { weekHtml: weekHtml, mountHub: mountHub, hubFetch: hubFetch /* 온라인 우수 수행 사진 (20261118b) */, openStaff: openStaff, openClass: openClass, classBtnHtml: classBtnHtml, lbOpen: lbOpen, lbClose: lbClose,
                      _inkOf: inkOf, _state: function () { return LB; } };
 })(window);

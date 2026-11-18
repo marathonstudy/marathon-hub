@@ -5257,6 +5257,24 @@ body.td-online #mgOps { display: none !important; }
 .ot-more { display: none; appearance: none; border: 0; background: transparent; color: var(--ink-light, #8A90AC); font-size: 14px; padding: 0 4px; margin-left: 2px; cursor: pointer; min-width: 28px; min-height: 28px; }
 .ot-m { display: none; }
 .ot-tmore { display: none; }
+/* 20261118b — 열 제목 정렬 · 구간 칸 합침 · 학생 카드 우수 수행 관리 · 이름 확인 필요 */
+.ot-sh { appearance: none; border: 0; background: transparent; font: inherit; font-weight: 700; color: inherit; padding: 0; cursor: pointer; white-space: nowrap; }
+.ot-sh.is-on { color: #5B42D6; }
+.ot-tb th.ot-secs, .ot-tb td.ot-noapp { text-align: center; }
+.ot-rate { color: var(--ink, #3A3F5C); }
+.cs-namechk { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 700; color: #B4501B; background: #FFE9DC; border-radius: 999px; padding: 0 7px; vertical-align: middle; }
+.sc-best .sc-t .btn { margin-left: 6px; }
+.oba-h { margin: 10px 0 4px; font-size: 13.5px; }
+.oba-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.oba-it { border: 1px solid var(--line-soft, #EEF0F7); border-radius: 10px; padding: 6px 8px; min-width: 0; }
+.oba-it.is-hidden { opacity: .6; background: #FAFAFD; }
+.oba-it__h { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 13px; }
+.oba-it__h b { flex: 1 1 120px; min-width: 0; overflow-wrap: anywhere; }
+.oba-s { font-weight: 800; color: #5B42D6; }
+.oba-tag { font-size: 11px; font-weight: 700; background: #F1F0F5; color: #6B7090; border-radius: 999px; padding: 0 7px; }
+.oba-ph { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 4px; font-size: 12px; }
+.oba-ph__i.is-hidden { text-decoration: line-through; color: #A2A6BB; }
+.oba-fb { margin: 4px 0 0; font-size: 12.5px; color: var(--ink-light, #8A90AC); overflow-wrap: anywhere; }
 .errko { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
 .errko__t { margin: 0; color: #B4501B; font-size: 13px; }
 .errko__d { flex-basis: 100%; font-size: 12px; color: var(--ink-light, #8A90AC); }

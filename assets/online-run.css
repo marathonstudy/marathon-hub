@@ -137,3 +137,37 @@
   .orn-list__s { grid-area: s; text-align: right; }
 }
 .orn-grow__n { overflow-wrap: anywhere; min-width: 0; }
+
+/* ---------- 20261118b 우수 수행 탭 · 현강 / 온라인 고르기 ---------- */
+.hub-mode { display: flex; gap: 6px; justify-content: center; margin: 8px auto 0; padding: 0 16px; max-width: 720px; }
+.hub-mode__b { flex: 1; max-width: 200px; appearance: none; border: 1px solid #DDD5FF; background: #fff; color: #4A35B8; border-radius: 999px; padding: 8px 12px; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; min-height: 40px; }
+.hub-mode__b.is-on { background: #5B42D6; border-color: #5B42D6; color: #fff; }
+.ob { display: grid; gap: 12px; }
+.ob-lead { margin: 0; font-size: 13px; color: #6B7090; }
+.ob-sec { padding: 14px; }
+.ob-list, .ob-q, .ob-week { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.ob-it { border: 1px solid #EEF0F7; border-radius: 12px; padding: 10px; min-width: 0; }
+.ob-it__h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.ob-it__d { font-size: 12px; color: #8A90AC; }
+.ob-it__t { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; font-size: 14px; }
+.ob-it__s { font-weight: 800; color: #5B42D6; }
+.ob-ph { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.ob-ph__b { appearance: none; border: 1px solid #E2E5F0; background: #F6F7FB; border-radius: 10px; width: 72px; height: 72px; padding: 0; overflow: hidden; cursor: pointer; }
+.ob-ph__b img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ob-ph__w { font-size: 11px; color: #8A90AC; }
+.ob-fb { margin: 8px 0 0; padding: 8px 10px; background: #F6F4FF; border-radius: 10px; font-size: 13px; overflow-wrap: anywhere; }
+.ob-fb__n { display: block; font-size: 11.5px; font-weight: 800; color: #5B42D6; margin-bottom: 2px; }
+.ob-empty { margin: 0; font-size: 13px; color: #8A90AC; }
+.ob-wait { color: #8A6A10; }
+.ob-q__h { margin: 0 0 4px; font-size: 12px; color: #8A90AC; }
+.ob-bub { margin: 4px 0; padding: 8px 12px; border-radius: 14px; font-size: 13.5px; max-width: 85%; overflow-wrap: anywhere; }
+.ob-bub--me { background: #FFF6DA; margin-right: auto; }
+.ob-bub--t { background: #F6F4FF; margin-left: auto; }
+.ob-wk { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-size: 13.5px; min-width: 0; }
+.ob-wk.is-off { color: #A2A6BB; }
+.ob-wk__d { min-width: 64px; color: #6B7090; }
+.ob-wk__day { font-size: 12px; color: #5B42D6; font-weight: 700; }
+.ob-wk__t { flex: 1 1 140px; min-width: 0; overflow-wrap: anywhere; }
+.ob-wk__k { font-size: 12px; font-weight: 700; }
+.ob-k--ok { color: #1E7A4E; } .ob-k--miss { color: #C0392B; } .ob-k--wait { color: #8A6A10; } .ob-k--off { color: #A2A6BB; }
+.ob-note { margin: 8px 0 0; font-size: 12px; color: #8A90AC; }
