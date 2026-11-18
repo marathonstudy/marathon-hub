@@ -29,7 +29,8 @@
   }
   /* 반 환급 기준(허브 · 반 카드에서 바꿈 · 없으면 70 — 앱 반 정보가 없을 때 기본 구간에 씀 · 20261118c) */
   function th() { var o = window.OnlineClass && OnlineClass.opts(S.cls); return o && o.refund_th != null ? o.refund_th : null; }
-  function rows() { return (S.list || []).map(function (s) { return OnlineRun.classRow(s, S.ym, today(), th()); }); }
+  function extra() { var o = window.OnlineClass && OnlineClass.opts(S.cls); return (o && o.extra) || []; }      /* 반 달력 주말 숙제 날 (20261118d) */
+  function rows() { return (S.list || []).map(function (s) { return OnlineRun.classRow(s, S.ym, today(), th(), extra()); }); }
   function paint() {
     var el = dlg(), cur = OnlineRun.ymOf(today());
     var body;

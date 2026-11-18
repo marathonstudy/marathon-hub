@@ -34,12 +34,13 @@
   var KEY = 'mh.ot.care', TKEY = 'mh.ot.tbl';
   var S = { by: {}, busy: {}, err: {}, open: {}, care: { cls: '', grade: '' }, pick: {}, draft: false, repaint: null, kings: {},
             classes: [], sum: {}, sq: [], fly: 0, vis: {}, obs: null,
-            tbl: { cls: '', sort: 'care', filter: 'all', rows: null, busy: false, err: null, at: 0, more: {}, why: {}, pick: {}, draft: false, calc: {} },
+            tbl: { cls: '', sort: 'done', filter: 'all', rows: null, busy: false, err: null, at: 0, more: {}, why: {}, pick: {}, draft: false, calc: {} },
             rf: { queue: [], run: [], st: {}, msg: {}, last: 0, until: 0, timer: null, total: 0 } };
   try { var sv = JSON.parse(localStorage.getItem(KEY) || 'null'); if (sv && typeof sv === 'object') S.care = { cls: String(sv.cls || ''), grade: String(sv.grade || '') }; } catch (e) { /* 그대로 */ }
-  try { var tv = JSON.parse(localStorage.getItem(TKEY) || 'null'); if (tv && typeof tv === 'object') { S.tbl.cls = String(tv.cls || ''); S.tbl.sort = String(tv.sort || 'care'); S.tbl.dir = tv.dir === 'asc' ? 'asc' : 'desc'; S.tbl.filter = String(tv.filter || 'all'); } } catch (e) { /* 그대로 */ }
+  try { var tv = JSON.parse(localStorage.getItem(TKEY) || 'null'); if (tv && typeof tv === 'object') { S.tbl.cls = String(tv.cls || ''); /* 정렬 — 직원이 고른 것만 기억(v 2 · 20261118d) · 예전에 저장된 기본값(챙길 학생 먼저)은 새 기본(제출 많은 순)으로 */
+      if (tv.v === 2) { S.tbl.sort = String(tv.sort || 'done'); S.tbl.dir = tv.dir === 'asc' ? 'asc' : 'desc'; } S.tbl.filter = String(tv.filter || 'all'); } } catch (e) { /* 그대로 */ }
   function saveCare() { try { localStorage.setItem(KEY, JSON.stringify(S.care)); } catch (e) { /* 그대로 */ } }
-  function saveTbl() { try { localStorage.setItem(TKEY, JSON.stringify({ cls: S.tbl.cls, sort: S.tbl.sort, dir: S.tbl.dir, filter: S.tbl.filter })); } catch (e) { /* 그대로 */ } }
+  function saveTbl() { try { localStorage.setItem(TKEY, JSON.stringify({ v: 2, cls: S.tbl.cls, sort: S.tbl.sort, dir: S.tbl.dir, filter: S.tbl.filter })); } catch (e) { /* 그대로 */ } }
 
   /* ============================================================
      예전 길(20261117c) — 반 하나의 앱 기록 통째 · 브라우저 계산 (월말 정리 · 시험에서 씀 · 첫 화면에서는 안 부름)
@@ -57,8 +58,9 @@
   }
   /* 학생 한 명 — 오늘 · 연속 미제출 · 아슬아슬 · 새로 합류 (서버 _online_calc 와 같은 규칙 · e2e151 이 맞춰 본다) */
   function thOf(cls) { var o = window.OnlineClass && OnlineClass.opts(cls); return o && o.refund_th != null ? o.refund_th : null; }
-  function stuOf(s, t, th) {
-    var ym = t.slice(0, 7), r = OnlineRun.compute(s.data || {}, ym, { today: t, excuse: s.excuse || [], staff: true, th: th });
+  function extraOf(cls) { var o = window.OnlineClass && OnlineClass.opts(cls); return (o && o.extra) || []; }
+  function stuOf(s, t, th, extra) {
+    var ym = t.slice(0, 7), r = OnlineRun.compute(s.data || {}, ym, { today: t, excuse: s.excuse || [], staff: true, th: th, extra: extra || [] });
     var cd = r.days.filter(function (x) { return x.counted && x.date < t; });
     var last2 = cd.slice(-2), two = last2.length === 2 && last2.every(function (x) { return (x.gpFrom || x.kind) === 'miss'; });
     var run = 0; for (var i = cd.length - 1; i >= 0; i--) { if ((cd[i].gpFrom || cd[i].kind) === 'miss') run++; else break; }
@@ -83,7 +85,7 @@
   function rowsOf(cls) {
     var x = S.by[cls], t = today();
     if (!x || !window.OnlineRun) return null;
-    if (!x.rows || x.rowsDay !== t) { x.rows = x.list.map(function (s) { return stuOf(s, t, thOf(cls)); }); x.rowsDay = t; }
+    if (!x.rows || x.rowsDay !== t) { x.rows = x.list.map(function (s) { return stuOf(s, t, thOf(cls), extraOf(cls)); }); x.rowsDay = t; }
     return x.rows;
   }
   var TODAY_T = { ok: ['✓ 인증', 'ok'], late: ['⏰ 늦게', 'late'], today: ['아직', 'wait'], excused: ['사정 인정', 'ex'], golden: ['골든패스', 'ex'], none: ['숙제 없음', 'off'], future: ['—', 'off'], miss: ['아직', 'wait'], weekend: ['숙제 없음', 'off'], off: ['숙제 없음', 'off'] };
@@ -296,7 +298,10 @@
     else if (T.sort === 'rate') list.sort(function (a, b) { return dir * (num(rateOf(a.stat)) - num(rateOf(b.stat))) || nm(a, b); });
     else if (T.sort === 'streak') list.sort(function (a, b) { return dir * (((a.stat || {}).streak || 0) - ((b.stat || {}).streak || 0)) || nm(a, b); });
     else if (T.sort === 'last') list.sort(function (a, b) { return dir * (num(Date.parse((a.stat || {}).last || '')) - num(Date.parse((b.stat || {}).last || ''))) || nm(a, b); });
-    else if (T.sort === 'done') list.sort(function (a, b) { return ((b.stat || {}).done || 0) - ((a.stat || {}).done || 0) || nm(a, b); });
+    /* 제출 많은 순(기본 · 20261118d) — 이번 달 제출률 높은 학생부터 · 같으면 연속 긴 순 · 이름순 (계산 중인 학생은 맨 아래) */
+    else if (T.sort === 'done') list.sort(function (a, b) {
+      return num(rateOf(stale(b) ? null : b.stat)) - num(rateOf(stale(a) ? null : a.stat)) || ((b.stat || {}).streak || 0) - ((a.stat || {}).streak || 0) || nm(a, b);
+    });
     else list.sort(function (a, b) {
       var x = a.stat || {}, y = b.stat || {};
       return (y.miss_run || 0) - (x.miss_run || 0) || (y.risk ? 1 : 0) - (x.risk ? 1 : 0) || (y.today === 'today' ? 1 : 0) - (x.today === 'today' ? 1 : 0) || nm(a, b);
@@ -330,7 +335,8 @@
       (empty ? '<span class="ot-tag ot-tag--late" title="앱 기록이 비어 있어요 · 정말 안 낸 것인지 앱에서 다시 받아 확인해요">기록 없음</span>' : '') +
       (late ? '<span class="ot-tag ot-tag--late">기록 늦음</span>' : '') + (pend ? '<span class="ot-tag ot-tag--calc">계산 중</span>' : '') +
       '<button type="button" class="ot-more" data-ot-more="' + id + '" aria-expanded="' + !!T.more[x.id] + '" aria-label="' + esc(x.name) + ' 자세히">' + (T.more[x.id] ? '▴' : '▾') + '</button></td>';
-    var tdk = pend ? null : T._wait && todayWait(x) ? ['⏳', 'off', '오늘 기록 받는 중'] : (TD[s.today] || TD.none);
+    /* 오늘 — 열렸는데 안 냄 ✗ · 냄 ✓ · 오늘 그 학생 기록을 아직 못 받음 「확인 중」(회색 · 20261118d) · 「—」는 반 달력에 오늘 숙제가 없을 때만 */
+    var tdk = pend ? null : todayWait(x) ? ['확인 중', 'wait', '오늘 앱 기록을 아직 못 받았어요'] : (TD[s.today] || TD.none);
     var today_ = '<td class="ot-tc">' + (tdk ? '<span class="ot-td ot-td--' + tdk[1] + '" title="' + esc(tdk[2]) + '">' + tdk[0] + '</span>' : '<span class="muted-note">…</span>') + '</td>';
     var mon = '<td class="ot-tc num">' + (pend ? '…' : (s.done || 0) + '/' + (s.open || 0)) + '</td>' +
       '<td class="ot-tc ot-x num ot-rate">' + (pend ? '…' : rt == null ? '—' : rt + '%') + '</td>';
@@ -397,7 +403,7 @@
       }).join('');
       var late = all.filter(function (x) { return x.linked; }).length;
       body = '<div class="ot-tctl"><div class="ot-chips" role="group" aria-label="거르기">' + chips + '</div>' +
-          '<label class="ot-tsort">정렬 <select class="input input--sm" data-ot-sort><option value="care"' + (T.sort === 'care' ? ' selected' : '') + '>챙길 학생 먼저</option><option value="name"' + (T.sort === 'name' ? ' selected' : '') + '>이름순</option><option value="done"' + (T.sort === 'done' ? ' selected' : '') + '>제출 많은 순</option></select></label></div>' +
+          '<label class="ot-tsort">정렬 <select class="input input--sm" data-ot-sort><option value="done"' + (T.sort === 'done' ? ' selected' : '') + '>제출 많은 순</option><option value="care"' + (T.sort === 'care' ? ' selected' : '') + '>챙길 학생 먼저</option><option value="name"' + (T.sort === 'name' ? ' selected' : '') + '>이름순</option></select></label></div>' +
         '<div class="ot-tacts"><button type="button" class="btn btn--sm" data-ot-rfall' + (late ? '' : ' disabled') + '>↻ 이 반 전부 다시 받기</button><button type="button" class="btn btn--sm" data-ot-csv>📥 엑셀 받기</button>' +
           '<button type="button" class="btn btn--sm" data-ot-tdraft' + (picked.length ? '' : ' disabled') + '>✉️ 고른 ' + picked.length + '명 응원 문자 초안</button><small class="muted-note">문자는 복사만 해요 · 자동으로 보내지 않아요</small></div>' +
         (T.draft && picked.length ? '<div class="ot-drafts">' + picked.map(function (x) {

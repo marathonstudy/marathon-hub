@@ -1519,7 +1519,7 @@
       var RUN = { ym: '', open: '' };
       function runOf(data, ym) {
         /* 반 환급 기준(허브 · 서버 요약 th · 없으면 70) — 앱 반 정보가 없을 때 기본 구간 (20261118c · 학생 · 학부모 화면엔 「기본」 표시 없음) */
-        var r = OnlineRun.compute(data || {}, ym || OnlineRun.ymOf(todayISO()), { today: todayISO(), th: ONST && ONST.th != null ? ONST.th : null });
+        var r = OnlineRun.compute(data || {}, ym || OnlineRun.ymOf(todayISO()), { today: todayISO(), th: ONST && ONST.th != null ? ONST.th : null, extra: (ONST && ONST.extra) || [] });   /* 반 달력 주말 숙제 날 (20261118d) */
         /* 요약표 값이 오늘 · 같은 달이면 그대로 읽는다(서버 · 코치룸과 같은 숫자 · 20261118a) */
         if (ONST && ONST.ym === r.ym && ONST.day === todayISO()) { if (ONST.streak != null) r.streak = +ONST.streak || 0; if (ONST.ok != null) r.okN = +ONST.ok || 0; r.fromStats = true; }
         return r;

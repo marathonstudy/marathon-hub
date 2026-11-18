@@ -5235,6 +5235,7 @@ body.td-online #mgOps { display: none !important; }
 .ot-td--ok { color: #1E7A4E; }
 .ot-td--miss { color: #C0392B; }
 .ot-td--off { color: #A2A6BB; }
+.ot-td--wait { color: #A2A6BB; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
 .ot-sg { font-size: 15px; font-weight: 800; }
 .ot-sg--done { color: #1E7A4E; }
 .ot-sg--run { color: #5B42D6; }

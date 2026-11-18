@@ -134,16 +134,17 @@
      앱 calculateSections 와 같이 3등분(나머지는 3구간) · 회차 = 숙제가 열린 날짜(그 달 며칠째) · 환급 기준 = 반 설정(허브 · 없으면 70)
      구간마다 열린 숙제(날짜 기록 · 오늘까지) 중 정시 제출 비율 · 앱 반 정보가 오면 자동으로 앱 값(def 없음) */
   var DEF_TH = 70;
-  function defaultApp(ym, today, cal, th) {
+  function defaultApp(ym, today, days, th) {      /* days = compute 의 반 달력(20261118d) — 오늘까지 열린 날 · 정시 */
+    var by = {}; (days || []).forEach(function (x) { by[x.date] = x; });
     var total = lastDay(ym), first = ym + '-01';
     th = th != null && isFinite(+th) ? +th : DEF_TH;
     var out = { off: 0, title: '', status: 'ok', def: true, missing: [], threshold: th, open: first, close: ym + '-' + String(total).padStart(2, '0'), totalDays: total, fromApp: false };
     out.secs = sectionsOf(total).map(function (s) {
       var on = 0, n = 0;
       for (var i = s.s; i <= s.e; i++) {
-        var d = ym + '-' + (i < 10 ? '0' : '') + i, c = cal[d];
-        if (!c || !(+c.order > 0) || d > today) continue;
-        n++; if (c.status === 'onTime') on++;
+        var d = ym + '-' + (i < 10 ? '0' : '') + i, x = by[d];
+        if (!x || !x.counted || d > today) continue;
+        n++; if (x.kind === 'ok') on++;
       }
       var rate = n > 0 ? Math.round(on / n * 100) : 0, from = plus(first, s.s - 1), to = plus(first, s.e - 1);
       var ended = today > to, started = today >= from, pass = rate >= th;
@@ -184,11 +185,16 @@
     var ix = index(data), ex = {}, staff = !!o.staff;
     if (staff) (o.excuse || []).forEach(function (d) { if (valid(d)) ex[d] = 1; });
     var all = datesOf(ym), inCal = all.filter(function (d) { return ix.cal[d]; });
-    var lastCal = inCal[inCal.length - 1] || '', empty = !inCal.length;
+    var empty = !inCal.length;
+    /* 반 달력 (20261118d · 서버 _online_calc 와 같은 규칙) — 학생 본인 기록의 날짜 칸이 아니라
+       평일 전부 + 주말은 같은 반 누구든 숙제가 있던 날(o.extra · 서버 online_class_extra) · 앱 반 정보가 다 있으면 그 기간 안만
+       학생마다 그 달 1일 또는 앱 기록 첫날 중 늦은 날부터 · 기록이 빠진 날은 「안 냄」 */
+    var extra = {}; (o.extra || []).forEach(function (d) { if (valid(d)) extra[d] = 1; });
+    var join = Object.keys(ix.cal).filter(function (d) { return +ix.cal[d].order > 0; }).sort()[0] || '';
+    var app0 = appOf(data, ym, today), rOpen = app0 && valid(app0.open) ? app0.open : '', rClose = app0 && valid(app0.close) ? app0.close : '';
     var days = all.map(function (d) {
       var c = ix.cal[d] || null, order = c ? +c.order || 0 : 0, h = order ? ix.hist[String(order)] : null, l = order ? ix.lec[String(order)] : null;
-      /* 회차 — 숙제(강 번호)가 걸린 날(주말이어도) · 앱 기록이 끝난 뒤의 평일은 「아직 안 옴」 */
-      var counted = c ? order > 0 : (!isWeekend(d) && (empty || d > lastCal) && d >= today);
+      var counted = (!isWeekend(d) || extra[d] || (!!c && order > 0)) && (!rOpen || d >= rOpen) && (!rClose || d <= rClose) && (!join || d >= join);
       var x = { date: d, dow: dowOf(d), counted: counted, order: order, day: (h && +h.day > 0 ? +h.day : order % 1000), title: h ? String(h.title || '') : '',
                 genre: h && h.parts && h.parts[0] && h.parts[0].c ? String(h.parts[0].c) : '', correct: h && h.total ? +h.correct || 0 : null, total: h && h.total ? +h.total : null,
                 at: h && h.submittedAt ? kst(h.submittedAt) : null, quiz: h && typeof h.quiz === 'boolean' ? h.quiz : null,
@@ -219,11 +225,11 @@
       });
     }
     /* 앱 기준 구간 · 달력의 구간 경계(회차 → 날짜) */
-    var app = appOf(data, ym, today);
+    var app = app0;
     /* 앱 반 정보가 없으면 기본 구간(그 달 1일 ~ 말일 · o.noDefault 면 예전처럼 「앱 기록 확인 전」) · 구간 반이 아니라고 앱이 알려 주면(nosec) 그대로 */
     if (!o.noDefault && (!app || app.status === 'unknown')) {
-      app = defaultApp(ym, today, ix.cal, o.th);
-      days.forEach(function (x) { if (x.counted && x.order > 0) { var dn = +x.date.slice(8, 10); app.secs.forEach(function (s) { if (dn >= s.s && dn <= s.e) x.seg = s.no; }); } });
+      app = defaultApp(ym, today, days, o.th);
+      days.forEach(function (x) { if (x.counted) { var dn = +x.date.slice(8, 10); app.secs.forEach(function (s) { if (dn >= s.s && dn <= s.e) x.seg = s.no; }); } });
       app.secs.forEach(function (s) { if (s.no > 1) { var f = days.filter(function (x) { return x.seg === s.no; })[0]; if (f) f.segStart = s.no; } });
     } else if (app && app.status === 'ok') app.secs.forEach(function (s) {
       var first = null;
@@ -487,8 +493,8 @@
   }
 
   /* 반 표 한 줄 · CSV (직원) */
-  function classRow(stu, ym, today, th) {
-    var r = compute(stu.data || {}, ym, { today: today, excuse: stu.excuse || [], staff: true, th: th });
+  function classRow(stu, ym, today, th, extra) {
+    var r = compute(stu.data || {}, ym, { today: today, excuse: stu.excuse || [], staff: true, th: th, extra: extra || [] });
     return { id: stu.id, name: stu.name, linked: stu.linked !== false, r: r };
   }
   function appCell(a, no) {
