@@ -130,6 +130,42 @@
     var hit = list.filter(function (a) { return a.ym === ym; });
     return hit[hit.length - 1] || null;
   }
+  /* 기본 구간 (20261118c) — 앱 반 정보가 없으면(없음 · 확인 전) 온라인 반은 그 달 1일 ~ 말일(KST)을 반 기간으로
+     앱 calculateSections 와 같이 3등분(나머지는 3구간) · 회차 = 숙제가 열린 날짜(그 달 며칠째) · 환급 기준 = 반 설정(허브 · 없으면 70)
+     구간마다 열린 숙제(날짜 기록 · 오늘까지) 중 정시 제출 비율 · 앱 반 정보가 오면 자동으로 앱 값(def 없음) */
+  var DEF_TH = 70;
+  function defaultApp(ym, today, cal, th) {
+    var total = lastDay(ym), first = ym + '-01';
+    th = th != null && isFinite(+th) ? +th : DEF_TH;
+    var out = { off: 0, title: '', status: 'ok', def: true, missing: [], threshold: th, open: first, close: ym + '-' + String(total).padStart(2, '0'), totalDays: total, fromApp: false };
+    out.secs = sectionsOf(total).map(function (s) {
+      var on = 0, n = 0;
+      for (var i = s.s; i <= s.e; i++) {
+        var d = ym + '-' + (i < 10 ? '0' : '') + i, c = cal[d];
+        if (!c || !(+c.order > 0) || d > today) continue;
+        n++; if (c.status === 'onTime') on++;
+      }
+      var rate = n > 0 ? Math.round(on / n * 100) : 0, from = plus(first, s.s - 1), to = plus(first, s.e - 1);
+      var ended = today > to, started = today >= from, pass = rate >= th;
+      return { no: s.no, s: s.s, e: s.e, from: from, to: to, on: on, n: n, rate: rate, pass: pass, ended: ended,
+               state: !started ? 'wait' : !ended ? 'run' : pass ? 'done' : 'missed' };
+    });
+    return out;
+  }
+  /* 연속 (20261118c · 서버 _online_calc 와 같은 규칙) — 끝에서부터
+     · 숙제 있는 날(회차)만 · 오늘이 아직 안 낸 상태(마감 전)면 건너뜀 · 앞으로 올 날 건너뜀
+     · 낸 날(정시 · 늦게 · 늦게 낸 날의 골든패스) +1 · 사정 인정은 끊지도 늘리지도 않음 · 안 낸 날(골든패스로 넘긴 미제출 포함)에서 끊김 */
+  function streakOf(days, today) {
+    var n = 0;
+    for (var i = days.length - 1; i >= 0; i--) {
+      var y = days[i];
+      if (!y.counted || y.date > today || y.kind === 'today' || y.kind === 'future') continue;
+      if (y.kind === 'excused') continue;
+      var k = y.kind === 'golden' ? y.gpFrom : y.kind;
+      if (k === 'ok' || k === 'late') n++; else break;
+    }
+    return n;
+  }
 
   /* 볼 수 있는 달 — 앱 기록 첫 달 ~ 이번 달 · 최대 12달 */
   function months(data, today) {
@@ -184,17 +220,17 @@
     }
     /* 앱 기준 구간 · 달력의 구간 경계(회차 → 날짜) */
     var app = appOf(data, ym, today);
-    if (app && app.status === 'ok') app.secs.forEach(function (s) {
+    /* 앱 반 정보가 없으면 기본 구간(그 달 1일 ~ 말일 · o.noDefault 면 예전처럼 「앱 기록 확인 전」) · 구간 반이 아니라고 앱이 알려 주면(nosec) 그대로 */
+    if (!o.noDefault && (!app || app.status === 'unknown')) {
+      app = defaultApp(ym, today, ix.cal, o.th);
+      days.forEach(function (x) { if (x.counted && x.order > 0) { var dn = +x.date.slice(8, 10); app.secs.forEach(function (s) { if (dn >= s.s && dn <= s.e) x.seg = s.no; }); } });
+      app.secs.forEach(function (s) { if (s.no > 1) { var f = days.filter(function (x) { return x.seg === s.no; })[0]; if (f) f.segStart = s.no; } });
+    } else if (app && app.status === 'ok') app.secs.forEach(function (s) {
       var first = null;
       days.forEach(function (x) { if (x.order && x.order < 100000 && Math.floor(x.order / 1000) * 1000 === app.off) { var r = x.order - app.off; if (r >= s.s && r <= s.e) { x.seg = s.no; if (!first) first = x; } } });
       if (first && s.no > 1) first.segStart = s.no;         /* 그 구간 첫 회차 날에 경계 표시 */
     });
-    var streak = 0;
-    for (var i = cd.length - 1; i >= 0; i--) {
-      var y = cd[i];
-      if (y.date > today || y.kind === 'today') continue;
-      if (OKISH[y.kind]) streak++; else break;
-    }
+    var streak = streakOf(days, today);
     return { ym: ym, today: today, days: days, app: app, hub: hub, golden: golden, streak: streak, n: n, empty: empty, staff: staff,
              todayDay: days.filter(function (x) { return x.date === today; })[0] || null,
              okN: cd.filter(function (x) { return x.kind === 'ok'; }).length, hubOkN: cd.filter(function (x) { return OKISH[x.kind]; }).length,
@@ -215,9 +251,11 @@
     if (!app || app.status === 'unknown') return '<div class="orn-wait"><b>앱 기준 구간 · 앱 기록 확인 전</b><span>구간은 앱에서 반 정보를 받은 뒤 보여요</span>' +
       (o.staff && app ? '<small>없는 값: ' + esc(app.missing.join(' · ')) + '</small>' : '') + '</div>';
     if (app.status === 'nosec') return '<div class="orn-wait"><b>이 클래스는 구간 없이 진행돼요</b>' + (o.staff ? '<small>총 ' + app.totalDays + '일 · 구간 반 ' + (app.totalDays > 26 ? '아님' : '아님(26일 이하)') + '</small>' : '') + '</div>';
-    return '<ol class="orn-segs">' + app.secs.map(function (s) {
+    /* 기본 구간(앱 반 정보 없음 · 그 달 1일 ~ 말일) — 직원 화면에만 작은 「기본」 · 학생 · 학부모는 표시 없이 같은 값 (20261118c) */
+    return (o.staff && app.def ? '<p class="orn-def"><span class="orn-def__b">기본</span> 앱 반 정보가 없어 그 달 1일 ~ 말일 · 환급 기준 ' + esc(app.threshold) + '%로 계산했어요 (앱 값이 오면 자동으로 바뀜)</p>' : '') +
+      '<ol class="orn-segs">' + app.secs.map(function (s) {
       var pct = s.n ? Math.round(s.on / s.n * 100) : 0;
-      return '<li class="orn-seg orn-seg--' + s.state + '"><div class="orn-seg__h"><b>' + s.no + '구간</b><span class="num">' + esc(s.s + '~' + s.e + '회차') + '</span>' +
+      return '<li class="orn-seg orn-seg--' + s.state + '"><div class="orn-seg__h"><b>' + s.no + '구간</b><span class="num">' + esc(app.def ? md(s.from) + '~' + md(s.to) : s.s + '~' + s.e + '회차') + '</span>' +
         (o.staff ? '<span class="orn-seg__n num">정시 ' + s.on + '/' + s.n + ' · ' + s.rate + '% (기준 ' + app.threshold + '%)</span>' : '<span class="orn-seg__n num">정시 제출 ' + s.on + '/' + s.n + '</span>') +
         (s.state === 'done' ? '<span class="orn-seg__done">완주</span>' : '') +
         (o.staff && s.state === 'run' ? '<span class="orn-seg__run">' + (s.pass ? '지금 기준 넘음' : '지금 기준 아래') + '</span>' : '') + '</div>' +
@@ -276,7 +314,7 @@
     var head = '<div class="orn-card__h"><h2 class="gm-h">🏁 ' + esc(monthName(r.ym)) + ' 완주 현황</h2><span class="orn-card__s num">' + r.n + '회차 중 ' + r.okN + '회 정시 인증</span></div>';
     return '<section class="gm-card orn-card" id="ornCard" aria-label="이번 달 완주 현황">' + head +
       todayCardHtml(r) + appSegsHtml(r.app) + monthBar(r) + badgesHtml(r.app) +
-      '<div class="orn-stats"><div class="orn-stat"><span class="orn-stat__i" aria-hidden="true">🔥</span><span><b>연속 정시 인증</b><em class="num">' + r.streak + '회</em></span></div></div>' +
+      '<div class="orn-stats"><div class="orn-stat"><span class="orn-stat__i" aria-hidden="true">🔥</span><span><b>연속 인증</b><em class="num">' + r.streak + '일</em></span></div></div>' +
       talkHtml(r, o.base) + NOTE +
       (o.go ? '<button type="button" class="gm-link orn-card__go" data-orn-go="run">완주 달력 보기 ›</button>' : '') +
     '</section>';
@@ -402,7 +440,7 @@
     var html = '<section class="card orn-rec"><h2 class="card-title">📒 ' + esc(monthName(r.ym)) + ' 기록</h2>' +
       '<div class="orn-kpis"><div><b class="num">' + r.okN + '회</b><span>정시 인증 (' + r.n + '회차 중)</span></div>' +
       '<div><b class="num">' + (doneN == null ? '확인 전' : doneN + '/3') + '</b><span>완주 구간</span></div>' +
-      '<div><b class="num">' + r.streak + '회</b><span>연속 정시 인증</span></div></div></section>';
+      '<div><b class="num">' + r.streak + '일</b><span>연속 인증</span></div></div></section>';
     html += '<section class="card orn-rec"><h2 class="card-title">🎯 파트별 정답률 <span class="card-note">지금까지 누적</span></h2>' +
       (list.length ? '<ul class="orn-parts">' + list.map(function (p) {
         return '<li><span class="orn-parts__n">' + esc(p.name) + '</span><span class="orn-bar"><i style="width:' + p.rate + '%"></i></span><b class="num">' + p.rate + '%</b><small class="num">' + p.k + '/' + p.n + '문항</small></li>';
@@ -449,15 +487,15 @@
   }
 
   /* 반 표 한 줄 · CSV (직원) */
-  function classRow(stu, ym, today) {
-    var r = compute(stu.data || {}, ym, { today: today, excuse: stu.excuse || [], staff: true });
+  function classRow(stu, ym, today, th) {
+    var r = compute(stu.data || {}, ym, { today: today, excuse: stu.excuse || [], staff: true, th: th });
     return { id: stu.id, name: stu.name, linked: stu.linked !== false, r: r };
   }
   function appCell(a, no) {
     if (!a || a.status === 'unknown') return '앱 기록 확인 전';
     if (a.status === 'nosec') return '구간 없음';
     var s = a.secs[no - 1];
-    return s.rate + '% ' + (s.state === 'done' ? '환급 가능' : s.state === 'missed' ? '기준 아래' : s.state === 'run' ? '진행 중' : '시작 전');
+    return s.rate + '% ' + (s.state === 'done' ? '환급 가능' : s.state === 'missed' ? '기준 아래' : s.state === 'run' ? '진행 중' : '시작 전') + (a.def ? ' (기본)' : '');
   }
   function hubCell(g) { return !g || g.state === 'none' ? '' : g.state === 'done' ? '완주' : g.state === 'missed' ? '미완주' : g.state === 'run' ? '진행 중' : '시작 전'; }
   function csv(cls, ym, rows) {
@@ -471,7 +509,7 @@
     return out.map(function (r) { return r.map(q).join(','); }).join('\r\n');
   }
 
-  global.OnlineRun = { compute: compute, months: months, groups: groups, appSections: appSections, sectionsOf: sectionsOf, appOf: appOf,
+  global.OnlineRun = { compute: compute, months: months, groups: groups, appSections: appSections, sectionsOf: sectionsOf, appOf: appOf, defaultApp: defaultApp, streakOf: streakOf, DEF_TH: DEF_TH,
     cardHtml: cardHtml, calHtml: calHtml, dayHtml: dayHtml, recordHtml: recordHtml, listHtml: listHtml, growthHtml: growthHtml, fbHtml: fbHtml, talkOf: talkOf, KAKAO: KAKAO, staffHtml: staffHtml, appSegsHtml: appSegsHtml,
     classRow: classRow, csv: csv, appCell: appCell, hubCell: hubCell, KIND: KIND, monthName: monthName, shiftYm: shiftYm, ymOf: ymOf };
 })(window);

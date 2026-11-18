@@ -312,7 +312,8 @@
     if (AB.sid !== sid || AB.data === null || RN.ex === null) return '<section class="sc-sec sc-run" id="scRun">' + head + '<p class="sc-hint">불러오는 중…</p></section>';
     var data = AB.data || {}, ms = OnlineRun.months(data, today());
     if (!RN.ym || ms.indexOf(RN.ym) < 0) RN.ym = ms[0];
-    var r = OnlineRun.compute(data, RN.ym, { today: today(), excuse: RN.ex, staff: true });
+    var o0 = OC.opts ? OC.opts(s0.className || s0.class_name) : null;     /* 반 환급 기준(허브 · 없으면 70 · 기본 구간 · 20261118c) */
+    var r = OnlineRun.compute(data, RN.ym, { today: today(), excuse: RN.ex, staff: true, th: o0 && o0.refund_th != null ? o0.refund_th : null });
     return '<section class="sc-sec sc-run" id="scRun" aria-label="구간 완주">' + head +
       OnlineRun.staffHtml(r, { months: ms, excuse: RN.ex, busy: RN.busy || RN.no117, msg: RN.no117 ? 'migration-117 SQL 을 먼저 실행해 주세요 (사정 인정 체크)' : RN.msg, openList: RN.openList }) + '</section>';
   }

@@ -91,6 +91,8 @@
   .orn-cal__c b { font-size: 12px; }
 }
 /* 20261117b — 앱 기준 확인 전 · 앱 기준 / 허브 기준 제목 */
+.orn-def { margin: 0 0 6px; font-size: 12px; color: #6B7090; }
+.orn-def__b, .ot-def { display: inline-block; font-size: 10.5px; font-weight: 800; color: #6B7090; background: #EEF0F7; border-radius: 6px; padding: 0 5px; margin-left: 3px; vertical-align: middle; }
 .orn-wait { display: grid; gap: 2px; background: #F6F4FF; border-radius: 12px; padding: 8px 12px; font-size: 13px; }
 .orn-wait b { color: var(--ink-deep, #23264A); }
 .orn-wait span, .orn-wait small { color: var(--ink-mid, #565B78); font-size: 12px; overflow-wrap: anywhere; }

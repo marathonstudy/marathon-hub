@@ -56,8 +56,9 @@
     }, function () { S.busy[cls] = false; S.err[cls] = '불러오지 못했어요'; if (S.repaint) S.repaint(); });
   }
   /* 학생 한 명 — 오늘 · 연속 미제출 · 아슬아슬 · 새로 합류 (서버 _online_calc 와 같은 규칙 · e2e151 이 맞춰 본다) */
-  function stuOf(s, t) {
-    var ym = t.slice(0, 7), r = OnlineRun.compute(s.data || {}, ym, { today: t, excuse: s.excuse || [], staff: true });
+  function thOf(cls) { var o = window.OnlineClass && OnlineClass.opts(cls); return o && o.refund_th != null ? o.refund_th : null; }
+  function stuOf(s, t, th) {
+    var ym = t.slice(0, 7), r = OnlineRun.compute(s.data || {}, ym, { today: t, excuse: s.excuse || [], staff: true, th: th });
     var cd = r.days.filter(function (x) { return x.counted && x.date < t; });
     var last2 = cd.slice(-2), two = last2.length === 2 && last2.every(function (x) { return (x.gpFrom || x.kind) === 'miss'; });
     var run = 0; for (var i = cd.length - 1; i >= 0; i--) { if ((cd[i].gpFrom || cd[i].kind) === 'miss') run++; else break; }
@@ -82,7 +83,7 @@
   function rowsOf(cls) {
     var x = S.by[cls], t = today();
     if (!x || !window.OnlineRun) return null;
-    if (!x.rows || x.rowsDay !== t) { x.rows = x.list.map(function (s) { return stuOf(s, t); }); x.rowsDay = t; }
+    if (!x.rows || x.rowsDay !== t) { x.rows = x.list.map(function (s) { return stuOf(s, t, thOf(cls)); }); x.rowsDay = t; }
     return x.rows;
   }
   var TODAY_T = { ok: ['✓ 인증', 'ok'], late: ['⏰ 늦게', 'late'], today: ['아직', 'wait'], excused: ['사정 인정', 'ex'], golden: ['골든패스', 'ex'], none: ['숙제 없음', 'off'], future: ['—', 'off'], miss: ['아직', 'wait'], weekend: ['숙제 없음', 'off'], off: ['숙제 없음', 'off'] };
@@ -207,6 +208,9 @@
         (window.SubView && n ? '<div class="sv-clsbox">' + SubView.classBtnHtml(c.name) + '<span class="ot-miss' + (miss ? ' is-on' : '') + '" data-ot-miss="' + k + '"' + (d ? '' : ' hidden') + '>오늘 미제출 <b class="num">' + miss + '</b>명</span></div>' : '') +
         '<div class="tdc-appcls ot-app"><span>앱 클래스: <b>' + esc(rep || c.name) + '</b> 연결됨</span><button type="button" class="btn btn--sm tdc-appcls__check" data-app-check="' + k + '" title="클래스 이름을 복사하고 앱 관리자를 새 창으로 엽니다">앱에서 확인 ↗</button></div>' +
         '<div class="ot-kings"><label class="chk-inline"><input type="checkbox" data-ot-kings="' + k + '"' + (kingsOn ? ' checked' : '') + '> 이번 주 왕 뽑기 켜기</label><small class="muted-note">월 ~ 일을 한 주로 · 일요일 밤 자동 선정 · 확정은 직원</small></div>' +
+        /* 환급 기준(허브에만 저장 · 기본 70) — 앱 반 정보가 없을 때 기본 구간(그 달 1일 ~ 말일) 판정에 씀 (20261118c · migration-121) */
+        '<div class="ot-th"><label>구간 환급 기준 <input type="number" class="input input--sm ot-th__in" min="0" max="100" step="1" inputmode="numeric" data-ot-th="' + k + '" value="' + esc(thOf(c.name) != null ? thOf(c.name) : 70) + '" aria-label="' + k + ' 구간 환급 기준(%)"> %</label>' +
+          '<button type="button" class="btn btn--sm btn--ghost" data-ot-thsave="' + k + '">저장</button><small class="muted-note">앱 반 정보가 없을 때만 씀 · 허브에만 저장</small></div>' +
         (kingsOn && window.Kings && n ? Kings.classHtml(c.name) : '') +
       '</div><div class="tdc-btns"><button type="button" class="btn btn--sm" data-ot-pickcls="' + k + '">📋 반 현황표</button><button type="button" class="btn btn--sm" data-ot-table="' + k + '">월말 정리</button><button type="button" class="btn btn--sm btn--ghost" data-ot-reload="' + k + '">다시 읽기</button></div></div>' +
     '</div>';
@@ -331,7 +335,7 @@
     var mon = '<td class="ot-tc num">' + (pend ? '…' : (s.done || 0) + '/' + (s.open || 0)) + '</td>' +
       '<td class="ot-tc ot-x num ot-rate">' + (pend ? '…' : rt == null ? '—' : rt + '%') + '</td>';
     var cur = pend ? 0 : curSecNo(s);
-    var mcell = '<td class="ot-tc ot-m">' + (pend ? '…' : s.app_status === 'ok' && cur ? cur + '구간 <span class="ot-sg ot-sg--' + SEC[secKey(s, cur)][1] + '">' + SEC[secKey(s, cur)][0] + '</span>' : '<small class="muted-note">정보 없음</small>') + '</td>';
+    var mcell = '<td class="ot-tc ot-m">' + (pend ? '…' : s.app_status === 'ok' && cur ? cur + '구간 <span class="ot-sg ot-sg--' + SEC[secKey(s, cur)][1] + '">' + SEC[secKey(s, cur)][0] + '</span>' + (s.app_def ? '<span class="ot-def">기본</span>' : '') : '<small class="muted-note">정보 없음</small>') + '</td>';
     var streak = '<td class="ot-tc ot-x num">' + (pend ? '…' : (s.streak || 0) + '일') + '</td>';
     var secs;
     if (pend) secs = '<td class="ot-tc ot-x" colspan="3"><span class="muted-note">…</span></td>';
@@ -340,6 +344,7 @@
     else secs = [1, 2, 3].map(function (no) {
       var k = SEC[secKey(s, no)];
       return '<td class="ot-tc ot-x"><span class="ot-sg ot-sg--' + k[1] + '" title="' + esc(no + '구간 ' + k[2]) + '">' + k[0] + '</span>' +
+        (s.app_def ? '<span class="ot-def" title="앱 반 정보가 없어 그 달 1일 ~ 말일 · 반 환급 기준으로 계산">기본</span>' : '') +
         (hubDiff(s, no) ? '<button type="button" class="ot-hub" data-ot-why="' + id + '|' + no + '" title="허브 기준과 다름 — 누르면 이유">허</button>' : '') + '</td>';
     }).join('');
     var act = rfText(x.id) || ((late || empty) && x.linked ? '<button type="button" class="btn btn--sm ot-act" data-ot-refetch="' + id + '">다시 받기</button>' : '') +
@@ -569,6 +574,21 @@
     if (b) { pickCls(b.getAttribute('data-ot-pickcls')); return true; }
     b = t.closest('[data-ot-treload]');
     if (b) { S.tbl.autoTried = false; loadTbl(true); if (S.tbl.cls) wantSum(S.tbl.cls, true); return true; }
+    b = t.closest('[data-ot-thsave]');
+    if (b) {
+      var thc = b.getAttribute('data-ot-thsave'), inp = document.querySelector('[data-ot-th="' + thc.replace(/["\\]/g, '\\$&') + '"]'), pct = inp ? Math.round(+inp.value) : NaN, c0 = sb();
+      if (!(pct >= 0 && pct <= 100)) { if (window.UI) UI.toast('0 ~ 100 사이 숫자로 적어 주세요', 'bad'); return true; }
+      if (!c0) return true;
+      b.disabled = true;
+      Promise.resolve(c0.rpc('online_threshold_set', { p_class: thc, p_pct: pct })).then(function (r) {
+        b.disabled = false;
+        if (r && r.error) { if (window.UI) UI.toast(needSql(r.error) ? 'migration-121 SQL 을 먼저 실행해 주세요' : '저장하지 못했어요 — ' + (window.ErrKo ? ErrKo.ko(r.error) : r.error.message), 'bad'); return; }
+        var o = window.OnlineClass && OnlineClass.opts(thc); if (o) o.refund_th = pct;
+        if (window.UI) UI.toast(thc + ' — 구간 환급 기준 ' + pct + '% (다시 계산했어요)', 'good');
+        wantSum(thc, true); if (S.tbl.cls === thc) loadTbl(true);
+      }, function () { b.disabled = false; });
+      return true;
+    }
     b = t.closest('[data-ot-sh]');
     if (b) { var sk = b.getAttribute('data-ot-sh'); if (S.tbl.sort === sk) S.tbl.dir = S.tbl.dir === 'asc' ? 'desc' : 'asc'; else { S.tbl.sort = sk; S.tbl.dir = sk === 'name' ? 'asc' : 'desc'; } saveTbl(); paintTbl(); return true; }
     b = t.closest('[data-ot-filter]');
