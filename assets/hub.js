@@ -633,12 +633,14 @@
       APP.p = Promise.all([appReport(code), hwFix(code)]).then(function (x) {
         var r = x[0];
         APP.why = r && !r.ok ? String(r.reason || '') : '';      /* 'expired' — 링크 만료 (과제 상세 탭 안내 · 20261031n) */
+        /* 연결이 안 된 것(nolink · expired · 저장본 없음)과 불러오기 실패(시간 초과 · 서버 · 네트워크)를 가른다 (20261118a · 온라인 화면 [다시 시도]) */
+        APP.fail = !!(r && !r.ok && APP.why && APP.why !== 'nolink' && APP.why !== 'expired');
         if (!(r && r.ok)) return null;
         /* 앱 옛 기록(수강 시작일 앞 · 104) — data.old 로 붙여 두면 능력치 · 학습 분석 · 배지 칸만 합친다(경험치 · 퀘스트 · 과제 칸은 안 씀) */
         var base = r.data || {};
         if (r.old && typeof r.old === 'object' && Array.isArray(r.old.history)) base = Object.assign({}, base, { old: r.old });
         return global.AppWeek && AppWeek.withFix ? AppWeek.withFix(base, x[1]) : base;
-      }, function () { return null; });
+      }, function () { APP.fail = true; return null; });
       /* 실패는 남기지 않는다 — [다시 시도]는 새로 부른다 */
       APP.p.then(function (d) { if (!d && APP.code === code) APP.p = null; });
     }
@@ -890,6 +892,7 @@
        주 시작일(10/12 같은 날짜)은 화면에 쓰지 않는다 — 수업일로 (레포트에 없으면 반 일정의 수업일).
      ============================================================ */
   var MODE = { online: false, classes: [] };   /* 반 종류 (20261114g) */
+  var ONST = null;                             /* 온라인 요약표 (20261118a · migration-119 hub_online_stats) */
   var HUBD = null;        /* hub_get 이 준 것 (낸 복습 점수 · 공지 — 030 부터 확인 단계 없이 낸 점수 그대로) */
   var RVW = {};           /* 주(월요일) → hub_review_week (낸 것 · 맞은 수 / 전체 · 미응시 사유 이름) */
 
@@ -1374,7 +1377,11 @@
       rpc('hub_class_mode', { p_code: h.code }).then(function (m) {
         if (!m || !m.ok) return;
         MODE = { online: !!m.online, classes: m.classes || [] };
-        if (MODE.online) applyOnline();
+        if (MODE.online) {
+          /* 서버가 미리 계산해 둔 요약(migration-119 hub_online_stats · 본인 것만 · 앱 기준만) — 홈 카드 인증 일 · 연속은 이 값 (없으면 기록으로 계산) */
+          Promise.resolve().then(function () { return rpc('hub_online_stats', { p_code: h.code }); }).then(function (v) { ONST = v && typeof v === 'object' && v.ym ? v : null; }, function () { ONST = null; });
+          applyOnline();
+        }
       }, function () {});
       $('#hubName').textContent = (st.name || '') + ' 학생의 러닝노트';
       $('#hubMeta').textContent = [st.class_name, st.school, st.grade].filter(Boolean).join(' · ');
@@ -1489,13 +1496,28 @@
       /* ---------- 온라인 마라톤 (20261117b · online-run.js) — 완주 달력 · 기록 · 홈 카드 ----------
          이미 받아 둔 앱 기록만 · 앱 기준 구간만(골든패스 · 사정 인정은 코치룸 「허브 기준」에만 · 학생 · 학부모 화면에는 없음) */
       var RUN = { ym: '', open: '' };
-      function runOf(data, ym) { return OnlineRun.compute(data || {}, ym || OnlineRun.ymOf(todayISO()), { today: todayISO() }); }
+      function runOf(data, ym) {
+        var r = OnlineRun.compute(data || {}, ym || OnlineRun.ymOf(todayISO()), { today: todayISO() });
+        /* 요약표 값이 오늘 · 같은 달이면 그대로 읽는다(서버 · 코치룸과 같은 숫자 · 20261118a) */
+        if (ONST && ONST.ym === r.ym && ONST.day === todayISO()) { if (ONST.streak != null) r.streak = +ONST.streak || 0; if (ONST.ok != null) r.okN = +ONST.ok || 0; r.fromStats = true; }
+        return r;
+      }
+      /* 불러오기 실패(시간 초과 · 서버 · 네트워크) — 「잠시 후 다시 시도해 주세요 [다시 시도]」 · 연결이 안 된 학생은 예전 안내 (앱에서 새로 받기는 직원 화면에만) */
+      function noData(host, again) {
+        if (APP.fail) {
+          host.innerHTML = '<div class="empty errko" role="alert"><p>잠시 후 다시 시도해 주세요</p><button type="button" class="btn-ghost" data-orn-retry>다시 시도</button></div>';
+          var b = host.querySelector('[data-orn-retry]');
+          if (b) b.onclick = function (e) { e.stopPropagation(); APP.p = null; APP.fail = false; host.innerHTML = ''; again(); };
+          return;
+        }
+        host.innerHTML = '<div class="empty">과제 기록이 아직 연결되지 않았습니다.<br>' + OnlineRun.KAKAO + '</div>';
+      }
       function openRun() {
         var host = $('#panelRun');
         if (!host || !global.OnlineRun) return;
         if (!host.innerHTML) host.innerHTML = appWaitHtml();
         appData(h.code).then(function (data) {
-          if (!data) { host.innerHTML = '<div class="empty">과제 기록이 아직 연결되지 않았습니다.<br>' + OnlineRun.KAKAO + '</div>'; return; }
+          if (!data) { noData(host, openRun); return; }
           var ms = OnlineRun.months(data, todayISO());
           if (!RUN.ym || ms.indexOf(RUN.ym) < 0) RUN.ym = ms[0];
           host.innerHTML = OnlineRun.calHtml(runOf(data, RUN.ym), { months: ms, open: RUN.open });
@@ -1512,7 +1534,7 @@
         host.onclick = null;
         Promise.all([appData(h.code), Promise.resolve().then(function () { return rpc('hub_scores', { p_code: h.code }); }).catch(function () { return null; })]).then(function (x) {
           var data = x[0];
-          if (!data) { host.innerHTML = '<div class="empty">과제 기록이 아직 연결되지 않았습니다.<br>' + OnlineRun.KAKAO + '</div>'; return; }
+          if (!data) { noData(host, openRecord); return; }
           host.innerHTML = OnlineRun.recordHtml(data, runOf(data), { scores: Array.isArray(x[1]) ? x[1] : [], parent: d.role !== 'student' }) +
             '<div id="apDetail">' + apDetailHtml(data) + '</div>';
           host.onclick = function (e) {
@@ -1614,6 +1636,7 @@
           mogo: function () { return MOGO && !MOGO.failed ? MOGO : null; },
           latestVideo: function () { var x = videoWeeks()[0]; return x ? { label: weekName(x.w.week_start) } : null; },
           badges: rpc('hub_badges', { p_code: h.code }).catch(function () { return null; }),
+          appFail: function () { return !!APP.fail; }, appRetry: function () { APP.p = null; APP.fail = false; },
           run: function () { return global.OnlineRun && MODE.online ? { compute: function (data) { return runOf(data); }, parent: d.role !== 'student' } : null; },   /* 학부모 링크는 요약 카드 (20261117c) */   /* 온라인 마라톤 완주 현황 카드 (20261117a) */
           mode: function () { return MODE; },                                       /* 온라인 반만인지 · 반 이름 줄 (20261114g) */
           /* 학습 분석 — 오답정리 · 지문 장악 점수 숫자만 (migration-101 · 없으면 그 칸 없음 · 20261110l) */

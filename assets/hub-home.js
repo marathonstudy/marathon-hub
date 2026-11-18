@@ -148,6 +148,8 @@
   function runHtml() {
     var rc = H.ctx.run();
     if (H.loading) return '<section class="gm-card orn-card" id="ornCard"><h2 class="gm-h">🏁 이번 달 완주 현황</h2><p class="gm-hint">과제 기록을 불러오는 중…</p></section>';
+    /* 불러오기 실패 — 「잠시 후 다시 시도해 주세요 [다시 시도]」 (20261118a · 연결 안 된 학생은 예전 안내) */
+    if (!H.data && H.ctx.appFail && H.ctx.appFail()) return '<section class="gm-card orn-card" id="ornCard" role="alert"><h2 class="gm-h">🏁 이번 달 완주 현황</h2><p class="gm-hint">잠시 후 다시 시도해 주세요</p><button type="button" class="gm-link" data-gm-retry>다시 시도</button></section>';
     if (!H.data) return '<section class="gm-card orn-card" id="ornCard"><h2 class="gm-h">🏁 이번 달 완주 현황</h2><p class="gm-hint">과제 기록이 연결되면 여기에 보여요 · ' + OnlineRun.KAKAO + '</p></section>';
     return OnlineRun.cardHtml(rc.compute(H.data), { go: true, parent: !!rc.parent, base: H.ctx.base }).replace('data-orn-go="run"', 'data-gm-go="run"');
   }
@@ -349,6 +351,7 @@
       if (!H) return;
       var t = e.target;
       if (t.closest('[data-gm-pick]')) { openPicker(); return; }
+      if (t.closest('[data-gm-retry]') && H && H.ctx && H.ctx.appRetry) { H.ctx.appRetry(); render(H.host, H.ctx); return; }
       var go = t.closest('[data-gm-go]');
       if (go && H.ctx.go) { H.ctx.go(go.getAttribute('data-gm-go')); return; }
       var day = t.closest('[data-gm-day]');

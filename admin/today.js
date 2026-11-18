@@ -74,7 +74,7 @@
       st.loading = false;
       $('#tdBody').innerHTML = '<div class="empty-state">' + (isMissing(e)
         ? '「오늘」 화면용 함수가 아직 없습니다. Supabase SQL Editor 에서 <code>migration-007-dashboard.sql</code> 을 먼저 실행해 주세요.'
-        : '불러오지 못했습니다 — ' + esc(e.message)) + '</div>';
+        : (window.ErrKo ? ErrKo.html(e, { retry: 'data-td-retry', staff: true }) : '불러오지 못했습니다 — ' + esc(e.message))) + '</div>';
     });
   }
 
@@ -2499,6 +2499,7 @@
 
   $('#tdBody').addEventListener('click', function (e) {
     if (e.target.closest('.al-box')) return;                 /* 과제 링크 칸 (applink.js) */
+    if (e.target.closest('[data-td-retry]')) { load(true); return; }     /* 첫 화면 불러오기 실패 — [다시 시도] (20261118a · err-ko.js) */
     /* 현강 · 온라인 탭 · 검색 · 온라인 탭 (20261117c) */
     var tb = e.target.closest('[data-td-tab]');
     if (tb) { setTab(tb.getAttribute('data-td-tab')); return; }

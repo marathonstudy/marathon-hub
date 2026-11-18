@@ -20,7 +20,10 @@
   function toast(msg, kind) {
     var el = document.createElement('div');
     el.className = 'toast' + (kind ? ' toast--' + kind : '');
-    el.textContent = msg;
+    /* DB · 네트워크 영어 원문은 한국어로 (원문은 콘솔에만 · err-ko.js · 20261118a) */
+    var ko = window.ErrKo ? ErrKo.fix(msg) : msg;
+    if (ko !== msg) { try { console.warn('[오류 원문]', msg); } catch (e0) { /* 그대로 */ } }
+    el.textContent = ko;
     /* 창이 열려 있으면 맨 앞 창 안에 — 본문에 붙이면 창이 맨 위 층이라 알림이 창 뒤에 숨는다 (20261030b) */
     /* 코치룸 창은 모두 Layer.show() 로 연다 — 맨 앞 창은 Layer.top() (20261111b) */
     var dlgs = Array.prototype.filter.call(document.querySelectorAll('dialog'), function (d) { return d.open; });
