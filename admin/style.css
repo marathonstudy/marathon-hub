@@ -5284,6 +5284,35 @@ body.td-online #mgOps { display: none !important; }
 .errko__t { margin: 0; color: #B4501B; font-size: 13px; }
 .errko__d { flex-basis: 100%; font-size: 12px; color: var(--ink-light, #8A90AC); }
 .errko__d code { display: block; white-space: pre-wrap; word-break: break-all; }
+/* ---------- 20261120b 온라인 탭 한 가지 길 — 반 목록(한 줄 카드) → 반 화면(제목 · 표 머리줄 붙어 있음) · ⚙ 반 설정 창 ---------- */
+.ot-list { display: grid; gap: 8px; }
+.ot-lcard { cursor: pointer; padding: 10px 12px; }
+.ot-lcard:hover { border-color: #B9AEF5; background: #FBFAFF; }
+.ot-lcard:focus-visible { outline: 2px solid #6A55D8; outline-offset: 2px; }
+.ot-lrow { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-width: 0; }
+.ot-lname { font-weight: 800; font-size: 15px; color: var(--ink-deep, #23264A); overflow-wrap: anywhere; min-width: 0; }
+.ot-lcard .ot-line { margin: 0; flex: 1 1 220px; min-width: 0; }
+.ot-lcard .ot-sum { cursor: inherit; display: inline; background: none; padding: 0; overflow-wrap: anywhere; }
+.ot-go { margin-left: auto; color: #8A7FD8; font-size: 20px; font-weight: 800; line-height: 1; }
+.ot-lcard .ot-at { display: block; margin-top: 2px; font-size: 11.5px; }
+.ot-view { --ot-vh: 0px; }
+.ot-vhead { position: sticky; top: var(--td-sticky, 0px); z-index: 6; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px;
+  margin: 0 -4px 8px; padding: 8px 4px; background: var(--paper, #FAFBFF); border-bottom: 1px solid var(--line, #E2E5F0); }
+.ot-vtitle { margin: 0; font-size: 18px; font-weight: 800; color: var(--ink-deep, #23264A); min-width: 0; overflow-wrap: anywhere; }
+.ot-vnav { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ot-vother { max-width: 46vw; width: auto; }
+.ot-view .ot-twrap { overflow: visible; }
+.ot-view .ot-tb thead th { position: sticky; top: calc(var(--td-sticky, 0px) + var(--ot-vh, 0px)); z-index: 5; background: var(--paper, #FAFBFF); }
+.ot-vkings { margin-top: 10px; }
+.ot-set { display: grid; gap: 10px; }
+.ot-set__s { border: 1px solid var(--line-soft, #EEF0F7); border-radius: 12px; padding: 8px 10px; min-width: 0; }
+.ot-set__h { margin: 0 0 4px; font-size: 13.5px; font-weight: 800; }
+.ot-set__p { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: 13px; }
+.ot-set .tdc-appcls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .ot-vtitle { font-size: 16px; flex-basis: 100%; }
+  .ot-vother { max-width: 40vw; }
+}
 @media (max-width: 600px) {
   .ot-tb th.ot-x, .ot-tb td.ot-x { display: none; }
   .ot-tb th.ot-m, .ot-tb td.ot-m { display: table-cell; }

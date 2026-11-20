@@ -712,7 +712,7 @@
   }
   document.addEventListener('click', function (e) {
     var t = e.target;
-    if (!t.closest || !t.closest('#tdBody, #tdSettingsModal')) return;
+    if (!t.closest || !t.closest('#tdBody, #tdSettingsModal, #otSetModal')) return;     /* #otSetModal — 온라인 ⚙ 반 설정 창 [앱에서 확인 ↗] (20261120b) */
     var b;
     if ((b = t.closest('[data-pin-edit]'))) { st.pinEdit = b.dataset.pinEdit; paintAppCls(); var i = document.querySelector('#tdBody [data-pin-input]'); if (i) { i.focus(); if (b.dataset.pinNew) i.select(); } return; }
     if (t.closest('[data-pin-cancel]')) { st.pinEdit = ''; paintAppCls(); return; }
@@ -2238,7 +2238,7 @@
   function gotoClass(name, sid) {
     var on = !!(window.OnlineClass && OnlineClass.isOnline(name));
     st.q = '';
-    if (on && window.OnlineToday) OnlineToday.state().open[name] = true; else st.open[name] = true;
+    if (on && window.OnlineToday) { OnlineToday.state().open[name] = true; OnlineToday.state().view = name; } else st.open[name] = true;   /* 온라인 — 반 화면으로 (20261120b) */
     setTab(on ? 'online' : 'class');
     setTimeout(function () {
       var cd = document.querySelector('#tdBody .tdc-card[data-cls="' + String(name).replace(/["\\]/g, '\\$&') + '"]');

@@ -193,12 +193,22 @@
     if (x.err) return errHtml(x.err, 'data-ot-sumretry="' + k + '"', '다시 불러오기');
     if (!x.d) return '<span class="muted-note">요약 불러오는 중…</span>';
     var d = x.d;
-    return '<button type="button" class="ot-sum" data-ot-pickcls="' + k + '">' +
-      (d.today_open ? '오늘 제출 <b class="num">' + (d.today_done || 0) + '/' + d.today_open + '</b>' : '<span>오늘은 숙제 없는 날</span>') +
-      ' · 이틀 이상 미제출 <b class="num">' + (d.miss2 || 0) + '</b>명 · 구간 위험 <b class="num">' + (d.risk || 0) + '</b>명' +
-      (d.pending ? ' · <span class="ot-calc">계산 중 ' + d.pending + '명</span>' : '') + ' <small>(반 현황표 ›)</small></button>';
+    /* 반 목록 한 줄 (20261120b) — 「n명 · 오늘 제출 n/n · 제출률 n% · 이틀 이상 미제출 n명」 · 학생 수 · 분모 · 제출률 모두 서버 명단(_online_roster · 124) */
+    return '<span class="ot-sum">' + '<b class="num" data-ot-n>' + (d.n || 0) + '명</b>' +
+      ' · ' + (d.today_open ? '오늘 제출 <b class="num">' + (d.today_done || 0) + '/' + d.today_open + '</b>' : '오늘은 숙제 없는 날') +
+      (d.m_open ? ' · 제출률 <b class="num">' + Math.round((d.m_done || 0) / d.m_open * 100) + '%</b>' : '') +
+      ' · 이틀 이상 미제출 <b class="num">' + (d.miss2 || 0) + '</b>명' +
+      (d.pending ? ' · <span class="ot-calc">계산 중 ' + d.pending + '명</span>' : '') + '</span>';
   }
-  function cardHtml(c, rep) {
+  /* 반 목록 카드 (20261120b) — 한 줄만 · 카드 전체를 누르면 반 화면 · 설정(왕 뽑기 · 환급 기준 · 앱 클래스 · 반 종류)은 반 화면 [⚙ 반 설정]으로 옮김 */
+  function cardHtml(c) {
+    var k = esc(c.name), d = (S.sum[c.name] || {}).d || null;
+    return '<div class="tdc-card ot-card ot-lcard" data-cls="' + k + '" data-ot-card="' + k + '" data-ot-open="' + k + '" role="button" tabindex="0" aria-label="' + k + ' 반 화면 열기">' +
+      '<div class="ot-lrow"><span class="ot-lname">💻 ' + esc(c.name) + '</span><span class="ot-line" data-ot-line="' + k + '">' + sumLine(c.name) + '</span><span class="ot-go" aria-hidden="true">›</span></div>' +
+      '<small class="ot-at muted-note" data-ot-at="' + k + '">' + (d && d.fetched ? '앱 기록 받음: ' + esc(ago(d.fetched)) : '') + '</small></div>';
+  }
+  /* 예전 반 카드(20261118a ~ 20261120a · 설정이 현황 사이에 섞여 있던 것) — 지우지 않음 · 쓰지 않음 */
+  function cardHtmlOld(c, rep) {
     var n = c.rows ? c.rows.length : 0, k = esc(c.name), x = S.sum[c.name] || {}, d = x.d || null;
     var miss = d ? Math.max(0, (d.today_open || 0) - (d.today_done || 0)) : 0;
     var kingsOn = !!(window.OnlineClass && (OnlineClass.opts(c.name) || {}).kings_on) || !!S.kings[c.name];
@@ -226,6 +236,7 @@
     if (at) at.textContent = d && d.fetched ? '앱 기록 받음: ' + ago(d.fetched) : '';
     var ms = document.querySelector('[data-ot-miss="' + q + '"]');
     if (ms && d) { var m = Math.max(0, (d.today_open || 0) - (d.today_done || 0)); ms.hidden = false; ms.classList.toggle('is-on', !!m); ms.innerHTML = '오늘 미제출 <b class="num">' + m + '</b>명'; }
+    if (S.tbl.cls === cls) { var vt = document.querySelector('[data-ot-vtitle]'); if (vt) vt.innerHTML = titleOf(cls); }
   }
 
   /* ============================================================
@@ -323,7 +334,7 @@
              fin: ok.filter(function (x) { return (s(x).app || []).some(function (a) { return a.state === 'done'; }); }).length, appOk: ok.filter(function (x) { return s(x).app_status === 'ok'; }).length,
              pending: rows.length - ok.length, late: rows.filter(lateRec).length,
              mDone: ok.reduce(function (a, x) { return a + (s(x).done || 0); }, 0), mOpen: ok.reduce(function (a, x) { return a + (s(x).open || 0); }, 0),
-             wait: open > 0 && done === 0 && ok.some(todayWait),
+             wait: open > 0 && done === 0 && ok.some(todayWait), waitN: ok.filter(todayWait).length,
              fetched: ok.map(function (x) { return s(x).fetched; }).filter(Boolean).sort().pop() || '' };
   }
   function rfText(id) {
@@ -378,23 +389,44 @@
     if (!T.cls || !T.rows) return '';
     var R = S.rf, left = R.queue.length + R.run.length;
     var fk = kstOf(sm.fetched);
-    return '<p class="ot-tsum num" data-ot-tsum>' + (sm.wait ? '<span class="ot-calc">오늘 기록 받는 중</span> <small class="muted-note">(앱 기록 마지막 받음 ' + esc(fk ? (fk.day === today() ? '오늘 ' : md(fk.day) + ' ') + fk.hm : '—') + ')</small>'
-        : sm.open ? '오늘 제출 <b>' + sm.done + '/' + sm.open + '</b>' : '오늘은 숙제 없는 날') +
+    /* 오늘 기록을 아직 못 받은 학생은 「오늘 기록 받는 중 n명」 따로 (20261120b) */
+    return '<p class="ot-tsum num" data-ot-tsum>' + (sm.open ? '오늘 제출 <b>' + sm.done + '/' + sm.open + '</b>' : '오늘은 숙제 없는 날') +
+      (sm.waitN ? ' · <span class="ot-calc">오늘 기록 받는 중 ' + sm.waitN + '명</span> <small class="muted-note">(앱 기록 마지막 받음 ' + esc(fk ? (fk.day === today() ? '오늘 ' : md(fk.day) + ' ') + fk.hm : '—') + ')</small>' : '') +
       ' · 이 반 제출률 <b>' + (sm.mOpen ? Math.round(sm.mDone / sm.mOpen * 100) + '%' : '—') + '</b> <small class="muted-note">(제출 ' + sm.mDone + ' / 숙제 ' + sm.mOpen + ' · 이번 달 1일 ~ 오늘)</small>' +
       ' · 이틀 이상 미제출 <b>' + sm.miss2 + '</b>명 · 이번 구간 위험 <b>' + sm.risk + '</b>명 · 이번 달 구간 완주 ' +
       (sm.appOk ? '<b>' + sm.fin + '</b>명' : '<b>—</b> <small class="muted-note">(앱 반 정보 없음)</small>') + (sm.pending ? ' · <span class="ot-calc">계산 중 ' + sm.pending + '명</span>' : '') + '</p>' +
       (left ? '<p class="ot-rfbar" role="status">' + (R.until > Date.now() ? '한도 대기 — ' + Math.ceil((R.until - Date.now()) / 1000) + '초 뒤 이어서 받아요' : '받는 중… 약 ' + Math.max(1, Math.ceil(left / 28)) + '분') + ' · 남은 ' + left + '명 <small class="muted-note">(분당 28회 한도 · 차례로)</small></p>' : '');
   }
   function paintTblHead() { var h = document.querySelector('[data-ot-thead]'); if (h) h.innerHTML = tblHeadHtml(); }
+  /* 반 화면 제목 — 「💻 반 이름 · n명 · 제출률 n%」 · 학생 수 · 제출률은 표(서버 명단 _online_roster)와 같은 값 (20261120b) */
+  function titleOf(cls) {
+    var T = S.tbl, d = (S.sum[cls] || {}).d, n = null, r = null;
+    if (T.rows && T.for === cls) { var sm = tblSum(T.rows); n = T.rows.length; r = sm.mOpen ? Math.round(sm.mDone / sm.mOpen * 100) : null; }
+    else if (d) { n = d.n; r = d.m_open ? Math.round((d.m_done || 0) / d.m_open * 100) : null; }
+    return '💻 ' + esc(cls) + (n != null ? ' · <span class="num">' + n + '명</span>' : '') + (r != null ? ' · 제출률 <span class="num">' + r + '%</span>' : '');
+  }
+  /* ============================================================
+     반 화면 (20261120b) — 반 목록에서 카드를 누르면 · 맨 위 제목(붙어 있음) [◀ 반 목록] [다른 반 ▾] [⚙ 반 설정]
+     → 요약 줄 → 거르기 칩 → 버튼 → 학생 표(머리줄 붙어 있음) → 표시 기호 설명
+     ============================================================ */
   function tableHtml() {
     var T = S.tbl, cls = S.classes.map(function (c) { return c.name; });
     if (T.cls && cls.indexOf(T.cls) === -1) T.cls = '';
-    var pickSel = '<label class="ot-tpick">반 <select class="input input--sm" data-ot-tcls><option value="">반을 고르세요</option>' + cls.map(function (n) { return '<option value="' + esc(n) + '"' + (T.cls === n ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select></label>';
-    var head = '<h3 class="td-todo__title">📋 반 현황표 <small class="muted-note">' + esc(md(today())) + ' · 서버가 미리 계산해 둔 요약</small></h3>';
-    if (!T.cls) return '<section class="ot-sec ot-tbl" aria-label="반 현황표">' + head + '<div class="ot-tbar">' + pickSel + '</div><p class="muted-note">반을 고르거나 반 카드의 [📋 반 현황표]를 누르면 보여요</p></section>';
+    if (!T.cls) return '<section class="ot-sec ot-tbl" aria-label="반 화면"><p class="muted-note">반 목록에서 반을 골라 주세요</p></section>';
+    var k = esc(T.cls), others = cls.filter(function (n) { return n !== T.cls; });
+    var head = '<div class="ot-vhead" data-ot-vhead><h2 class="ot-vtitle" data-ot-vtitle>' + titleOf(T.cls) + '</h2>' +
+      '<div class="ot-vnav"><button type="button" class="btn btn--sm" data-ot-back>◀ 반 목록</button>' +
+        (others.length ? '<select class="input input--sm ot-vother" data-ot-tcls aria-label="다른 반으로"><option value="" selected>다른 반 ▾</option>' + others.map(function (n) { return '<option value="' + esc(n) + '">' + esc(n) + '</option>'; }).join('') + '</select>' : '') +
+        '<button type="button" class="btn btn--sm" data-ot-set="' + k + '">⚙ 반 설정</button></div></div>';
+    var cardC = S.classes.filter(function (c) { return c.name === T.cls; })[0] || { rows: [] };
+    var kingsOn = !!(window.OnlineClass && (OnlineClass.opts(T.cls) || {}).kings_on) || !!S.kings[T.cls];
+    /* 옮김(지우지 않음): 오늘 제출물 보기 · 월말 정리 · 다시 읽기 · 왕 뽑기 후보(켰을 때) — 예전 반 카드에서 */
+    var more = (window.SubView && cardC.rows && cardC.rows.length ? SubView.classBtnHtml(T.cls) : '') +
+      '<button type="button" class="btn btn--sm" data-ot-table="' + k + '">월말 정리</button><button type="button" class="btn btn--sm btn--ghost" data-ot-treload>다시 읽기</button>';
+    var tail = kingsOn && window.Kings && cardC.rows && cardC.rows.length ? '<div class="ot-vkings">' + Kings.classHtml(T.cls) + '</div>' : '';
     var body;
-    if (T.err && !T.rows) body = errHtml(T.err, 'data-ot-treload', '다시 불러오기');
-    else if (!T.rows) body = '<p class="muted-note">불러오는 중…</p>';
+    if (T.err && !T.rows) body = errHtml(T.err, 'data-ot-treload', '다시 불러오기') + '<div class="ot-tacts">' + more + '</div>';
+    else if (!T.rows) body = '<p class="muted-note">불러오는 중…</p><div class="ot-tacts">' + more + '</div>';
     else {
       var rows = tblRows(), all = T.rows, sm = tblSum(all), picked = all.filter(function (x) { return T.pick[x.id]; });
       T._wait = sm.wait;
@@ -404,7 +436,7 @@
         var on = T.sort === key, ar = on ? (T.dir === 'asc' ? ' ▲' : ' ▼') : '';
         return '<th scope="col"' + (cls ? ' class="' + cls + '"' : '') + ' aria-sort="' + (on ? (T.dir === 'asc' ? 'ascending' : 'descending') : 'none') + '"><button type="button" class="ot-sh' + (on ? ' is-on' : '') + '" data-ot-sh="' + key + '">' + label + ar + '</button></th>';
       };
-      var cnt = { all: all.length, today: all.filter(function (x) { return !stale(x) && x.stat.today === 'today'; }).length, miss2: sm.miss2, risk: sm.risk };
+      var cnt = { all: all.length, today: all.filter(function (x) { return !stale(x) && x.stat.today === 'today' && !todayWait(x); }).length, miss2: sm.miss2, risk: sm.risk };
       var chips = [['all', '전체'], ['today', '오늘 미제출'], ['miss2', '이틀 이상 미제출'], ['risk', '구간 위험']].map(function (c) {
         return '<button type="button" class="ot-chip' + (T.filter === c[0] ? ' is-on' : '') + '" aria-pressed="' + (T.filter === c[0]) + '" data-ot-filter="' + c[0] + '">' + c[1] + ' <b class="num">' + cnt[c[0]] + '</b></button>';
       }).join('');
@@ -412,7 +444,7 @@
       body = '<div class="ot-tctl"><div class="ot-chips" role="group" aria-label="거르기">' + chips + '</div>' +
           '<label class="ot-tsort">정렬 <select class="input input--sm" data-ot-sort><option value="done"' + (T.sort === 'done' ? ' selected' : '') + '>제출 많은 순</option><option value="care"' + (T.sort === 'care' ? ' selected' : '') + '>챙길 학생 먼저</option><option value="name"' + (T.sort === 'name' ? ' selected' : '') + '>이름순</option></select></label></div>' +
         '<div class="ot-tacts"><button type="button" class="btn btn--sm" data-ot-rfall' + (late ? '' : ' disabled') + '>↻ 이 반 전부 다시 받기</button><button type="button" class="btn btn--sm" data-ot-csv>📥 엑셀 받기</button>' +
-          '<button type="button" class="btn btn--sm" data-ot-tdraft' + (picked.length ? '' : ' disabled') + '>✉️ 고른 ' + picked.length + '명 응원 문자 초안</button><small class="muted-note">문자는 복사만 해요 · 자동으로 보내지 않아요</small></div>' +
+          '<button type="button" class="btn btn--sm" data-ot-tdraft' + (picked.length ? '' : ' disabled') + '>✉️ 고른 ' + picked.length + '명 응원 문자 초안</button>' + more + '<small class="muted-note">문자는 복사만 해요 · 자동으로 보내지 않아요</small></div>' +
         (T.draft && picked.length ? '<div class="ot-drafts">' + picked.map(function (x) {
           return '<div class="ot-draft"><b>' + esc(x.name) + '</b><textarea class="input ot-draft__t" rows="3" data-ot-dt="' + esc(x.id) + '">' + esc(draftOf(itemOf(x))) + '</textarea><button type="button" class="btn btn--sm" data-ot-copy="' + esc(x.id) + '">복사</button></div>';
         }).join('') + '</div>' : '') +
@@ -425,8 +457,8 @@
           (rows.length ? rows.map(rowHtml).join('') : '<tr><td colspan="10" class="muted-note">해당하는 학생이 없어요</td></tr>') + '</tbody></table></div>' +
         '<p class="muted-note ot-tlegend">오늘 ✓ 제출 · ✗ 미제출 · — 숙제 없는 날 &nbsp; 구간 ● 완주(구간이 끝난 뒤) · ◕ 완주 예정(남은 숙제 없이 기준 넘음) · ◐ 진행 중 · ⚠ 위험(남은 날 다 내야 완주) · ✕ 놓침 · · 아직 (앱 기준 · 「허」 = 골든패스 · 사정 인정으로 결과가 달라짐)</p>';
     }
-    return '<section class="ot-sec ot-tbl" aria-label="반 현황표">' + head + '<div class="ot-tbar">' + pickSel + '<button type="button" class="btn btn--sm btn--ghost" data-ot-treload>다시 읽기</button></div>' +
-      '<div data-ot-thead>' + tblHeadHtml() + '</div>' + body + '</section>';
+    return '<section class="ot-sec ot-tbl ot-view" aria-label="' + k + ' 반 화면" data-ot-view="' + k + '">' + head +
+      '<div data-ot-thead>' + tblHeadHtml() + '</div>' + body + tail + '</section>';
   }
   function itemOf(x) {
     var s = x.stat || {}, why = [];
@@ -434,7 +466,7 @@
     if (s.risk) why.push({ k: 'tight' });
     return { x: { name: x.name, r: { app: s.app_status === 'ok' ? { status: 'ok', secs: s.app || [] } : null, hub: s.hub || [] } }, why: why };
   }
-  function paintTbl() { var el = document.querySelector('.ot-tbl'); if (el) { var w = document.createElement('div'); w.innerHTML = tableHtml(); el.parentNode.replaceChild(w.firstChild, el); } }
+  function paintTbl() { var el = document.querySelector('.ot-tbl'); if (el) { var w = document.createElement('div'); w.innerHTML = tableHtml(); el.parentNode.replaceChild(w.firstChild, el); fixSticky(); } }
   function loadTbl(force) {
     var T = S.tbl, c = sb(), cls = T.cls;
     if (!cls || !c || T.busy) return;
@@ -557,7 +589,27 @@
   function inner(opts) {
     var classes = S.classes;
     if (!classes.length) return '<p class="panel__hint">온라인 반이 없어요 · [📥 온라인 반 가져오기]로 앱 반 명단을 가져올 수 있어요</p>';
-    return tableHtml() + '<div class="tdc-list-wrap">' + classes.map(function (c) { return cardHtml(c, opts.rep ? opts.rep(c.name) : ''); }).join('') + '</div>';
+    /* 한 가지 길 (20261120b) — 반 목록(첫 화면) → 카드를 누르면 반 화면 · 예전 위쪽 「반 현황표 + 반 고르기」 상자는 없앰 */
+    if (S.view && classes.some(function (c) { return c.name === S.view; })) { S.tbl.cls = S.view; return tableHtml(); }
+    S.view = '';
+    return '<div class="tdc-list-wrap ot-list">' + classes.map(function (c) { return cardHtml(c); }).join('') + '</div>';
+  }
+  /* 반 화면 열기 · 닫기 */
+  function openView(n) {
+    S.view = n; S.tbl.cls = n; S.tbl.autoTried = false; saveTbl();
+    repaintWrap();
+    loadTbl(true); wantSum(n, true);
+    setTimeout(function () { var el = document.querySelector('.ot-view'); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start' }); fixSticky(); }, 30);
+  }
+  function closeView() {
+    var n = S.view; S.view = '';
+    repaintWrap();
+    setTimeout(function () { var el = n && document.querySelector('.ot-card[data-ot-card="' + String(n).replace(/["\\]/g, '\\$&') + '"]'); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'center' }); }, 30);
+  }
+  /* 반 제목 · 표 머리줄이 위에 붙어 있게 — 제목 높이만큼 표 머리줄을 내림 */
+  function fixSticky() {
+    var h = document.querySelector('[data-ot-vhead]'), v = document.querySelector('.ot-view');
+    if (h && v) v.style.setProperty('--ot-vh', Math.ceil(h.getBoundingClientRect().height) + 'px');
   }
   var lastOpts = {};
   function html(classes, opts) {
@@ -566,19 +618,48 @@
     S.classes = classes || [];
     S.repaint = opts.repaint || S.repaint;
     S.classes.forEach(function (c) { wantSum(c.name); });
-    if (S.tbl.cls) setTimeout(function () { loadTbl(); }, 0);
+    if (S.view) setTimeout(function () { loadTbl(); fixSticky(); }, 0);
     setTimeout(observe, 0);
     return inner(opts);
   }
   function repaintWrap() {
     var w = document.querySelector('.ot-wrap');
-    if (w) { w.innerHTML = inner(lastOpts); setTimeout(observe, 0); } else if (S.repaint) S.repaint();
+    if (w) { w.innerHTML = inner(lastOpts); setTimeout(observe, 0); setTimeout(fixSticky, 0); } else if (S.repaint) S.repaint();
   }
-  function pickCls(n) {
-    S.tbl.cls = n; S.tbl.autoTried = false; saveTbl();
-    Array.prototype.forEach.call(document.querySelectorAll('.ot-card'), function (el) { el.classList.toggle('is-pick', el.getAttribute('data-ot-card') === n); });
-    loadTbl(true);
-    setTimeout(function () { var el = document.querySelector('.ot-tbl'); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 30);
+  /* 예전 이름(반 현황표 고르기) — 이제 반 화면 열기 */
+  function pickCls(n) { openView(n); }
+
+  /* ---------- ⚙ 반 설정 창 (20261120b) — 이번 주 왕 뽑기 · 구간 환급 기준 · 앱 클래스 연결 확인 · 반 종류 (반 카드 · 반 화면 본문에서 옮김) ---------- */
+  var setDlg = null;
+  function setHtml(cls) {
+    var k = esc(cls), rep = lastOpts.rep ? lastOpts.rep(cls) : '';
+    var kingsOn = !!(window.OnlineClass && (OnlineClass.opts(cls) || {}).kings_on) || !!S.kings[cls];
+    return '<div class="modal__head"><h2 class="modal__title" id="otSetTitle">⚙ ' + k + ' · 반 설정</h2><p class="modal__desc">바꾸면 바로 저장돼요(환급 기준은 [저장])</p></div>' +
+      '<div class="modal__body ot-set">' +
+        '<section class="ot-set__s"><h3 class="ot-set__h">이번 주 왕 뽑기</h3><div class="ot-kings"><label class="chk-inline"><input type="checkbox" data-ot-kings="' + k + '"' + (kingsOn ? ' checked' : '') + '> 이번 주 왕 뽑기 켜기</label><small class="muted-note">월 ~ 일을 한 주로 · 일요일 밤 자동 선정 · 확정은 직원</small></div></section>' +
+        /* 환급 기준(허브에만 저장 · 기본 70) — 앱 반 정보가 없을 때 기본 구간(그 달 1일 ~ 말일) 판정에 씀 (20261118c · migration-121) */
+        '<section class="ot-set__s"><h3 class="ot-set__h">구간 환급 기준</h3><div class="ot-th"><label><input type="number" class="input input--sm ot-th__in" min="0" max="100" step="1" inputmode="numeric" data-ot-th="' + k + '" value="' + esc(thOf(cls) != null ? thOf(cls) : 70) + '" aria-label="' + k + ' 구간 환급 기준(%)"> %</label>' +
+          '<button type="button" class="btn btn--sm" data-ot-thsave="' + k + '">저장</button></div><small class="muted-note">앱 반 정보가 없을 때만 씀 · 허브에만 저장</small></section>' +
+        '<section class="ot-set__s"><h3 class="ot-set__h">앱 클래스 연결</h3><div class="tdc-appcls ot-app"><span>앱 클래스: <b>' + esc(rep || cls) + '</b> 연결됨</span><button type="button" class="btn btn--sm tdc-appcls__check" data-app-check="' + k + '" title="클래스 이름을 복사하고 앱 관리자를 새 창으로 엽니다">앱에서 확인 ↗</button></div></section>' +
+        '<section class="ot-set__s"><h3 class="ot-set__h">반 종류</h3><p class="ot-set__p">지금: <b>' + (window.OnlineClass && OnlineClass.isOnline(cls) ? '💻 온라인' : '🏫 현강') + '</b> <button type="button" class="btn btn--sm" data-ot-kind="' + k + '">현강 / 온라인 바꾸기</button></p></section>' +
+      '</div><div class="modal__foot"><div class="spacer"></div><button type="button" class="btn" data-ot-setclose>닫기</button></div>';
+  }
+  function openSet(cls) {
+    if (!setDlg) {
+      setDlg = document.createElement('dialog');
+      setDlg.className = 'modal'; setDlg.id = 'otSetModal'; setDlg.setAttribute('aria-labelledby', 'otSetTitle');
+      document.body.appendChild(setDlg);
+      setDlg.addEventListener('click', function (e) {
+        if (e.target.closest('[data-ot-setclose]')) { setDlg.close(); return; }
+        var kb = e.target.closest('[data-ot-kind]');
+        if (kb) { var kn = kb.getAttribute('data-ot-kind'); setDlg.close(); if (window.OnlineClass) OnlineClass.openKind(kn); return; }
+        click(e);
+      });
+      setDlg.addEventListener('change', function (e) { change(e); });
+    }
+    setDlg.setAttribute('data-ot-setfor', cls);
+    setDlg.innerHTML = setHtml(cls);
+    if (window.Layer && Layer.show) Layer.show(setDlg);
   }
 
   function click(e) {
@@ -587,6 +668,13 @@
     if (b) { var n0 = b.getAttribute('data-ot-sumretry'); var x0 = S.sum[n0] = S.sum[n0] || {}; x0.err = null; x0.retry = true; wantSum(n0, true); return true; }
     b = t.closest('[data-ot-pickcls]');
     if (b) { pickCls(b.getAttribute('data-ot-pickcls')); return true; }
+    /* 반 목록 → 반 화면 · ◀ 반 목록 · ⚙ 반 설정 (20261120b) */
+    b = t.closest('[data-ot-back]');
+    if (b) { closeView(); return true; }
+    b = t.closest('[data-ot-set]');
+    if (b) { openSet(b.getAttribute('data-ot-set')); return true; }
+    b = t.closest('[data-ot-open]');
+    if (b && !t.closest('button:not([data-ot-open]), a, input, select, textarea')) { openView(b.getAttribute('data-ot-open')); return true; }
     b = t.closest('[data-ot-treload]');
     if (b) { S.tbl.autoTried = false; loadTbl(true); if (S.tbl.cls) wantSum(S.tbl.cls, true); return true; }
     b = t.closest('[data-ot-thsave]');
@@ -641,7 +729,7 @@
   }
   function change(e) {
     var t = e.target;
-    if (t.matches && t.matches('[data-ot-tcls]')) { if (t.value) pickCls(t.value); else { S.tbl.cls = ''; saveTbl(); paintTbl(); } return true; }
+    if (t.matches && t.matches('[data-ot-tcls]')) { if (t.value) openView(t.value); return true; }
     if (t.matches && t.matches('[data-ot-sort]')) { S.tbl.sort = t.value; S.tbl.dir = t.value === 'name' ? 'asc' : 'desc'; saveTbl(); paintTbl(); return true; }
     if (t.matches && t.matches('[data-ot-tpick]')) { S.tbl.pick[t.getAttribute('data-ot-tpick')] = t.checked; S.tbl.draft = false; paintTbl(); return true; }
     if (t.matches && t.matches('[data-ot-pick]')) { S.pick[t.getAttribute('data-ot-pick')] = t.checked; S.draft = false; repaintWrap(); return true; }
@@ -661,7 +749,13 @@
     }
     return false;
   }
-  window.OnlineToday = { html: html, click: click, change: change, load: load, state: function () { return S; }, rowsOf: rowsOf, draftOf: draftOf, stuOf: stuOf,
+  /* 반 목록 카드 — 키보드(Enter · Space)로도 열기 */
+  if (document.addEventListener) document.addEventListener('keydown', function (e) {
+    var c = e.target && e.target.matches && e.target.matches('.ot-card[data-ot-open]') ? e.target : null;
+    if (c && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openView(c.getAttribute('data-ot-open')); }
+  });
+  if (window.addEventListener) window.addEventListener('resize', function () { fixSticky(); });
+  window.OnlineToday = { html: html, openView: openView, closeView: closeView, openSet: openSet, view: function () { return S.view; }, cardHtmlOld: cardHtmlOld, click: click, change: change, load: load, state: function () { return S; }, rowsOf: rowsOf, draftOf: draftOf, stuOf: stuOf,
                          boardHtml: boardHtml, careHtml: careHtml, gradeLabel: gradeLabel, gradeOf: gradeOf, lastText: lastText, csvText: csvText, refetch: refetch, pickCls: pickCls,
                          secKey: secKey, hubDiff: hubDiff, hubWhy: hubWhy, rowHtml: rowHtml, tableHtml: tableHtml };
 })();
