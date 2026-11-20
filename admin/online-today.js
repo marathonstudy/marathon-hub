@@ -196,7 +196,7 @@
     /* 반 목록 한 줄 (20261120b) — 「n명 · 오늘 제출 n/n · 제출률 n% · 이틀 이상 미제출 n명」 · 학생 수 · 분모 · 제출률 모두 서버 명단(_online_roster · 124) */
     return '<span class="ot-sum">' + '<b class="num" data-ot-n>' + (d.n || 0) + '명</b>' +
       ' · ' + (d.today_open ? '오늘 제출 <b class="num">' + (d.today_done || 0) + '/' + d.today_open + '</b>' : '오늘은 숙제 없는 날') +
-      (d.m_open ? ' · 제출률 <b class="num">' + Math.round((d.m_done || 0) / d.m_open * 100) + '%</b>' : '') +
+      (d.avg != null ? ' · ' + avgHtml(d.avg) : '') +
       ' · 이틀 이상 미제출 <b class="num">' + (d.miss2 || 0) + '</b>명' +
       (d.pending ? ' · <span class="ot-calc">계산 중 ' + d.pending + '명</span>' : '') + '</span>';
   }
@@ -236,7 +236,10 @@
     if (at) at.textContent = d && d.fetched ? '앱 기록 받음: ' + ago(d.fetched) : '';
     var ms = document.querySelector('[data-ot-miss="' + q + '"]');
     if (ms && d) { var m = Math.max(0, (d.today_open || 0) - (d.today_done || 0)); ms.hidden = false; ms.classList.toggle('is-on', !!m); ms.innerHTML = '오늘 미제출 <b class="num">' + m + '</b>명'; }
-    if (S.tbl.cls === cls) { var vt = document.querySelector('[data-ot-vtitle]'); if (vt) vt.innerHTML = titleOf(cls); }
+    if (S.tbl.cls === cls) {
+      var vt = document.querySelector('[data-ot-vtitle]'); if (vt) vt.innerHTML = titleOf(cls);
+      var db = document.querySelector('[data-ot-dbwrap]'); if (db) db.innerHTML = barsHtml(cls);
+    }
   }
 
   /* ============================================================
@@ -392,7 +395,7 @@
     /* 오늘 기록을 아직 못 받은 학생은 「오늘 기록 받는 중 n명」 따로 (20261120b) */
     return '<p class="ot-tsum num" data-ot-tsum>' + (sm.open ? '오늘 제출 <b>' + sm.done + '/' + sm.open + '</b>' : '오늘은 숙제 없는 날') +
       (sm.waitN ? ' · <span class="ot-calc">오늘 기록 받는 중 ' + sm.waitN + '명</span> <small class="muted-note">(앱 기록 마지막 받음 ' + esc(fk ? (fk.day === today() ? '오늘 ' : md(fk.day) + ' ') + fk.hm : '—') + ')</small>' : '') +
-      ' · 이 반 제출률 <b>' + (sm.mOpen ? Math.round(sm.mDone / sm.mOpen * 100) + '%' : '—') + '</b> <small class="muted-note">(제출 ' + sm.mDone + ' / 숙제 ' + sm.mOpen + ' · 이번 달 1일 ~ 오늘)</small>' +
+      (function () { var d0 = (S.sum[T.cls] || {}).d; return d0 && d0.avg != null ? ' · ' + avgHtml(d0.avg) : ''; })() +
       ' · 이틀 이상 미제출 <b>' + sm.miss2 + '</b>명 · 이번 구간 위험 <b>' + sm.risk + '</b>명 · 이번 달 구간 완주 ' +
       (sm.appOk ? '<b>' + sm.fin + '</b>명' : '<b>—</b> <small class="muted-note">(앱 반 정보 없음)</small>') + (sm.pending ? ' · <span class="ot-calc">계산 중 ' + sm.pending + '명</span>' : '') + '</p>' +
       (left ? '<p class="ot-rfbar" role="status">' + (R.until > Date.now() ? '한도 대기 — ' + Math.ceil((R.until - Date.now()) / 1000) + '초 뒤 이어서 받아요' : '받는 중… 약 ' + Math.max(1, Math.ceil(left / 28)) + '분') + ' · 남은 ' + left + '명 <small class="muted-note">(분당 28회 한도 · 차례로)</small></p>' : '');
@@ -400,10 +403,34 @@
   function paintTblHead() { var h = document.querySelector('[data-ot-thead]'); if (h) h.innerHTML = tblHeadHtml(); }
   /* 반 화면 제목 — 「💻 반 이름 · n명 · 제출률 n%」 · 학생 수 · 제출률은 표(서버 명단 _online_roster)와 같은 값 (20261120b) */
   function titleOf(cls) {
-    var T = S.tbl, d = (S.sum[cls] || {}).d, n = null, r = null;
-    if (T.rows && T.for === cls) { var sm = tblSum(T.rows); n = T.rows.length; r = sm.mOpen ? Math.round(sm.mDone / sm.mOpen * 100) : null; }
-    else if (d) { n = d.n; r = d.m_open ? Math.round((d.m_done || 0) / d.m_open * 100) : null; }
-    return '💻 ' + esc(cls) + (n != null ? ' · <span class="num">' + n + '명</span>' : '') + (r != null ? ' · 제출률 <span class="num">' + r + '%</span>' : '');
+    var T = S.tbl, d = (S.sum[cls] || {}).d, n = null;
+    if (T.rows && T.for === cls) n = T.rows.length;
+    else if (d) n = d.n;
+    return '💻 ' + esc(cls) + (n != null ? ' · <span class="num">' + n + '명</span>' : '') + (d && d.avg != null ? ' · ' + avgHtml(d.avg) : '');
+  }
+  /* 이번 달 평균 제출률 (20261120c · migration-125) — 숙제가 열린 날마다 (그날 낸 학생 ÷ 그날 반 학생) · 이번 달 1일 ~ 어제 · 단순 평균
+     오늘은 마감 전이라 빼고 내일부터 · 학생별 「제출률」 열(낸 날 ÷ 열린 날)과 「오늘 제출 n/n」은 그대로 */
+  var AVG_TIP = '매일 그날 낸 학생 비율을 이번 달 1일~어제까지 평균';
+  function avgHtml(v) { return '<span class="ot-avg" title="' + AVG_TIP + '">이번 달 평균 제출률 <b class="num">' + esc(v) + '%</b></span>'; }
+  var DOW = ['일', '월', '화', '수', '목', '금', '토'];
+  /* 날짜별 제출률 막대 — 이번 달 날마다 · 주말 · 숙제 없는 날 · 오늘 이후는 비움 · 막대에 마우스 → 날짜 · n/n · % · 평균선 */
+  function barsHtml(cls) {
+    var d = (S.sum[cls] || {}).d;
+    if (!d || !Array.isArray(d.days)) return '';
+    var by = {}; d.days.forEach(function (x) { if (x && x.d) by[x.d] = x; });
+    var t = today(), y = +t.slice(0, 4), m = +t.slice(5, 7), nd = new Date(Date.UTC(y, m, 0)).getUTCDate(), cols = '', xs = '';
+    for (var i = 1; i <= nd; i++) {
+      var ds = t.slice(0, 8) + (i < 10 ? '0' : '') + i, x = by[ds], dw = DOW[new Date(Date.UTC(y, m - 1, i)).getUTCDay()];
+      if (x && x.n > 0) {
+        var p = Math.round(x.done / x.n * 100), tip = md(ds) + '(' + dw + ') · ' + x.done + '/' + x.n + '명 · ' + p + '%';
+        cols += '<span class="ot-db__c" title="' + esc(tip) + '" aria-label="' + esc(tip) + '" role="img"><i style="height:' + Math.max(p, 2) + '%"></i></span>';
+      } else cols += '<span class="ot-db__c is-off' + (ds === t ? ' is-today' : '') + '" aria-hidden="true"></span>';
+      xs += '<span>' + (i === 1 || i % 5 === 0 ? i : '') + '</span>';
+    }
+    var avg = d.avg != null ? +d.avg : null;
+    return '<figure class="ot-db" data-ot-dbars aria-label="날짜별 제출률"><figcaption class="ot-db__cap">날짜별 제출률 <small class="muted-note">(그날 낸 학생 ÷ 그날 반 학생 · 1일 ~ 어제 · 막대에 마우스를 올리면 날짜 · n/n · %)</small></figcaption>' +
+      (d.days.length ? '<div class="ot-db__plot">' + cols + (avg != null ? '<span class="ot-db__avg" style="bottom:' + avg + '%" title="' + AVG_TIP + '"><small>평균 ' + avg + '%</small></span>' : '') + '</div><div class="ot-db__x" aria-hidden="true">' + xs + '</div>'
+        : '<p class="muted-note ot-db__none">아직 셀 날이 없어요(오늘은 마감 뒤 내일 반영)</p>') + '</figure>';
   }
   /* ============================================================
      반 화면 (20261120b) — 반 목록에서 카드를 누르면 · 맨 위 제목(붙어 있음) [◀ 반 목록] [다른 반 ▾] [⚙ 반 설정]
@@ -458,7 +485,7 @@
         '<p class="muted-note ot-tlegend">오늘 ✓ 제출 · ✗ 미제출 · — 숙제 없는 날 &nbsp; 구간 ● 완주(구간이 끝난 뒤) · ◕ 완주 예정(남은 숙제 없이 기준 넘음) · ◐ 진행 중 · ⚠ 위험(남은 날 다 내야 완주) · ✕ 놓침 · · 아직 (앱 기준 · 「허」 = 골든패스 · 사정 인정으로 결과가 달라짐)</p>';
     }
     return '<section class="ot-sec ot-tbl ot-view" aria-label="' + k + ' 반 화면" data-ot-view="' + k + '">' + head +
-      '<div data-ot-thead>' + tblHeadHtml() + '</div>' + body + tail + '</section>';
+      '<div data-ot-thead>' + tblHeadHtml() + '</div><div data-ot-dbwrap>' + barsHtml(T.cls) + '</div>' + body + tail + '</section>';
   }
   function itemOf(x) {
     var s = x.stat || {}, why = [];
@@ -609,6 +636,9 @@
   /* 반 제목 · 표 머리줄이 위에 붙어 있게 — 제목 높이만큼 표 머리줄을 내림 */
   function fixSticky() {
     var h = document.querySelector('[data-ot-vhead]'), v = document.querySelector('.ot-view');
+    /* 위 탭 막대 높이(--td-sticky · today.js stickyTop 과 같은 값) — 처음 열 때 0 이면 휴대폰에서 제목이 막대 밑에 숨으므로 여기서도 맞춤 */
+    var tb = document.querySelector('.topbar');
+    if (v && tb && tb.offsetHeight) document.documentElement.style.setProperty('--td-sticky', tb.offsetHeight + 'px');
     if (h && v) v.style.setProperty('--ot-vh', Math.ceil(h.getBoundingClientRect().height) + 'px');
   }
   var lastOpts = {};
