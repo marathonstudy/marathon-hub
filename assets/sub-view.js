@@ -19,6 +19,8 @@
   function mdw(d) { if (!d) return ''; var x = new Date(String(d).slice(0, 10) + 'T00:00:00Z'); return md(d) + '(' + DOW[x.getUTCDay()] + ')'; }
   function okOpen(u) { return /^https:\/\/(www\.)?marathonstudy\.com\//.test(String(u || '')) ? String(u) : ''; }
   function okThumb(u) { return /^https:\/\/[a-z0-9-]+\.supabase\.co\/storage\/v1\/object\/sign\//.test(String(u || '')) ? String(u) : ''; }
+  /* 앱 비공개 저장소 서명 주소(5분 · 함수 online-best 가 서버에서 받아 줌 · 20261120d) — https 이미지 주소만 크게 보기에 */
+  function okBig(u) { return /^https:\/\/[^\s"'<>]{8,1900}$/.test(String(u || '')) ? String(u) : ''; }
   var FAIL = '사진이 안 열려요 · 앱에서 열어 주세요';
 
   /* ---------- 러닝노트 — 함수 부르기 ---------- */
@@ -58,7 +60,7 @@
   function lbPaint() {
     var it = lbItem();
     if (!LB.el || !it) return;
-    var f = it.f, t = okThumb(f.thumb), o = okOpen(f.open);
+    var f = it.f, t = okThumb(f.thumb) || okBig(f.big), o = okOpen(f.open);
     LB.el.innerHTML = '<div class="sv-lb__top"><span class="sv-lb__t">' + esc((it.who ? it.who + ' · ' : '') + mdw(f.day) + (f.kind === 'pdf' ? ' · PDF' + (f.page ? ' ' + f.page + '쪽' : '') : '')) + '</span>' +
         '<span class="sv-lb__n num">' + (LB.i + 1) + ' / ' + LB.list.length + '</span><button type="button" class="sv-lb__x" data-sv-close aria-label="닫기">✕</button></div>' +
       '<div class="sv-lb__body" data-sv-zoom>' + (t ? '<img class="sv-lb__img" src="' + esc(t) + '" alt="' + esc(mdw(f.day)) + ' 제출물" data-sv-fail="' + esc(o) + '">'

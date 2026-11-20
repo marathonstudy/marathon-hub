@@ -166,6 +166,9 @@ export function pick(src: Any) {
     .map((h: Any) => ({
       title: String(h?.title ?? "").slice(0, 200),
       order: num(h?.lectureOrder),
+      /* 숙제 id · 강 안 순서 — 강 하나에 숙제가 여럿이면 지문 목록에 모두 · 같은 숙제는 한 번 (20261120d) */
+      ...(num(h?.id) > 0 ? { id: num(h.id) } : {}),
+      ...(h?.itemOrder != null && Number.isFinite(Number(h.itemOrder)) ? { io: num(h.itemOrder) } : {}),
       submittedAt: String(h?.submittedAt ?? ""),
       late: !!h?.isLate,
       correctRate: h?.correctRate == null ? null : Math.round(num(h.correctRate)),
@@ -247,6 +250,15 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
    학생 글 · 파일 이름은 넣지 않는다 · 사진은 주소만(복사하지 않음) · app_records.subs(직원 · 서버만)
    20261118b — 온라인 「우수 수행」(migration-120 hub_best · 그 학생 것만 · 점수 높은 3개): DAY 번호 · 사람이 쓴 선생님 피드백(작성자 이름이 있는 teacherFeedback · 200자) · AI 피드백은 받지 않는다 */
 const SUB_IMG = /^image\/(jpe?g|png|webp|gif)$/i;
+/* 20261120d — 우수 수행 사진(앱 /api/hub/submission-file?submissionId=…&index=… · online-best 함수)용으로 제출 id(sub) · 파일 순서(i · 앱 files 배열 그대로) ·
+   정답 수(k · n · AI 선정 이유 재료) · 숙제 id 도 · 앱이 나중에 url 없이 「개수 · index · name · type」만 보내도(Replit 요청서 1회차) 파일 칸을 남긴다(이름은 받지 않음) */
+const SUB_URL = /^(\/(objects|uploads)\/|https:\/\/(www\.)?marathonstudy\.com\/)/;
+function subFileOk(x: Any): boolean {
+  const t = String(x?.type ?? "").toLowerCase(), u = typeof x?.url === "string" ? x.url : "";
+  const typeOk = SUB_IMG.test(t) || t === "application/pdf";
+  if (u) return u.length <= 400 && SUB_URL.test(u) && (typeOk || (!t && /\.(jpe?g|png|webp|gif|pdf)(\?|$)/i.test(u)));     /* PDF 도 (20261110j · 대표 쪽 미리보기) */
+  return typeOk;                                                                                                        /* 주소 없이 index · type 만 */
+}
 export function subsOf(src: Any) {
   const cut = new Date(Date.now() - 120 * 86400000).toISOString();
   const hist = Array.isArray(src?.homeworkHistory) ? src.homeworkHistory : [];
@@ -259,14 +271,16 @@ export function subsOf(src: Any) {
       submittedAt: String(h.submittedAt),
       wa: sc(h?.wrongAnswerScore),
       tc: sc(h?.textComprehensionScore),
+      ...(num(h?.submissionId) > 0 ? { sub: num(h.submissionId) } : {}),
+      ...(num(h?.id) > 0 ? { id: num(h.id) } : {}),
+      ...(() => { const c = countsOf(h); return c.total ? { k: c.correct, n: c.total } : {}; })(),
       ...(num(h?.lectureDay) > 0 ? { day: num(h.lectureDay) } : {}),
       ...(typeof h?.teacherFeedback === "string" && h.teacherFeedback.trim() && typeof h?.feedbackAuthorName === "string" && h.feedbackAuthorName.trim()
         ? { fb: String(h.teacherFeedback).trim().slice(0, 200) } : {}),
       files: (Array.isArray(h?.files) ? h.files : [])
-        .filter((x: Any) => typeof x?.url === "string" && x.url.length <= 400 && /^(\/(objects|uploads)\/|https:\/\/(www\.)?marathonstudy\.com\/)/.test(x.url)
-          && (SUB_IMG.test(String(x?.type ?? "")) || String(x?.type ?? "").toLowerCase() === "application/pdf"     /* PDF 도 (20261110j · 대표 쪽 미리보기) */
-              || (!x?.type && /\.(jpe?g|png|webp|gif|pdf)(\?|$)/i.test(x.url))))
-        .slice(0, 8).map((x: Any) => ({ url: String(x.url), type: String(x?.type ?? "") })),
+        .map((x: Any, i: number) => ({ x, i: x && Number.isInteger(Number(x.index)) && Number(x.index) >= 0 ? Number(x.index) : i }))
+        .filter((y: Any) => y.x && typeof y.x === "object" && subFileOk(y.x))
+        .slice(0, 8).map((y: Any) => ({ ...(typeof y.x.url === "string" && y.x.url ? { url: String(y.x.url) } : {}), type: String(y.x?.type ?? ""), i: y.i })),
     }))
     .slice(-200);
 }

@@ -164,6 +164,9 @@ function pick(src: Any) {
     .map((h: Any) => ({
       title: String(h?.title ?? "").slice(0, 200),
       order: num(h?.lectureOrder),
+      /* 숙제 id · 강 안 순서 — 강 하나에 숙제가 여럿이면 지문 목록에 모두 · 같은 숙제는 한 번 (20261120d) */
+      ...(num(h?.id) > 0 ? { id: num(h.id) } : {}),
+      ...(h?.itemOrder != null && Number.isFinite(Number(h.itemOrder)) ? { io: num(h.itemOrder) } : {}),
       submittedAt: String(h?.submittedAt ?? ""),
       late: !!h?.isLate,
       correctRate: h?.correctRate == null ? null : Math.round(num(h.correctRate)),

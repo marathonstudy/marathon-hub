@@ -123,10 +123,21 @@
 .orn-list__t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .orn-list__k { font-size: 11px; font-weight: 800; border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
 .orn-grow__ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.orn-grow__ul li { display: grid; grid-template-columns: minmax(0, 1fr) auto 3em; gap: 8px; align-items: center; font-size: 13px; }
-.orn-d { font-size: 12px; font-weight: 800; text-align: right; color: #8A8DA3; }
+.orn-grow__ul li { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(3em, auto); gap: 8px; align-items: center; font-size: 13px; }
+.orn-grow__ul--t { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #ECEAF5; }
+.orn-d { font-size: 12px; font-weight: 800; text-align: right; color: #8A8DA3; white-space: nowrap; }
 .orn-d.is-up { color: #1E7A4E; }
-.orn-d.is-down { color: #B4501B; }
+.orn-d.is-down, .orn-d.is-same { color: #8A8DA3; }              /* 내려가도 회색 — 빨강 · 꾸짖는 느낌 없음 (20261120d) */
+.orn-first { font-size: 11px; font-weight: 600; color: #8A90AC; white-space: nowrap; }
+/* 지문 목록 (20261120d) — 제목 한 줄 말줄임 · 누르면 전체 · 같은 날 숙제 여럿은 아래 줄 · 합류 전 · 기록 다시 받는 중 */
+.orn-list__t { appearance: none; -webkit-appearance: none; border: 0; background: none; padding: 0; margin: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.orn-list__t.is-full { white-space: normal; overflow-wrap: anywhere; }
+.orn-list__t--wait { color: #A2A6BB; cursor: default; font-size: 12px; }
+.orn-list__r--more { border-top: 0; padding-top: 0; }
+.orn-list__r.is-pre { color: #A2A6BB; }
+.orn-k--pre { background: #F4F4F8; color: #A2A6BB; }
+.orn-stale { margin: 0 0 8px; font-size: 12.5px; color: #6B7090; background: #F7F7FB; border-radius: 10px; padding: 6px 10px; overflow-wrap: anywhere; }
+.orn-stale__b { margin-left: 4px; min-height: 32px; }
 .orn-fb__q { margin: 0; background: #F8F7FF; border-left: 3px solid #A88BFF; border-radius: 8px; padding: 8px 10px; font-size: 13px; }
 .orn-fb__q p { margin: 0; overflow-wrap: anywhere; }
 .orn-fb__q footer { margin-top: 4px; font-size: 11.5px; color: var(--ink-light, #7A7F99); }
@@ -152,7 +163,16 @@
 .ob-it__h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
 .ob-it__d { font-size: 12px; color: #8A90AC; }
 .ob-it__t { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; font-size: 14px; }
-.ob-it__s { font-weight: 800; color: #5B42D6; }
+.ob-it__s { font-weight: 800; color: #5B42D6; white-space: nowrap; }
+/* 20261120d — 제목 한 줄 말줄임 · 누르면 전체 · 제출일 · 선정 이유 */
+.ob-it__t { appearance: none; -webkit-appearance: none; border: 0; background: none; padding: 0; margin: 0; font: inherit; font-weight: 800; color: inherit; text-align: left; cursor: pointer;
+  flex: 1 1 8em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ob-it__t.is-full { white-space: normal; overflow-wrap: anywhere; }
+.ob-it__sd { font-size: 11px; color: #A2A6BB; }
+.ob-why { margin: 8px 0 0; padding: 8px 10px; background: #F4FBF6; border-radius: 10px; font-size: 13px; overflow-wrap: anywhere; white-space: pre-line; }
+.ob-why.is-wait { background: #F7F7FB; color: #8A90AC; font-size: 12.5px; }
+.ob-ph__b.is-pdf { background: #FFF6EC; }
+.ob-appwait { color: #8A6A10; }
 .ob-ph { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .ob-ph__b { appearance: none; border: 1px solid #E2E5F0; background: #F6F7FB; border-radius: 10px; width: 72px; height: 72px; padding: 0; overflow: hidden; cursor: pointer; }
 .ob-ph__b img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -171,5 +191,5 @@
 .ob-wk__day { font-size: 12px; color: #5B42D6; font-weight: 700; }
 .ob-wk__t { flex: 1 1 140px; min-width: 0; overflow-wrap: anywhere; }
 .ob-wk__k { font-size: 12px; font-weight: 700; }
-.ob-k--ok { color: #1E7A4E; } .ob-k--miss { color: #C0392B; } .ob-k--wait { color: #8A6A10; } .ob-k--off { color: #A2A6BB; }
+.ob-k--ok { color: #1E7A4E; } .ob-k--miss { color: #8A8DA3; } .ob-k--wait { color: #8A6A10; } .ob-k--off { color: #A2A6BB; }
 .ob-note { margin: 8px 0 0; font-size: 12px; color: #8A90AC; }

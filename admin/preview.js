@@ -213,6 +213,25 @@
       });
     },
 
+    /* 20261120d — 러닝노트 온라인 화면(지문 목록 · 나의 성장)의 [다시 받기] — 그 학생만 앱에서 새로(app-sync refresh · 반 현황표 [다시 받기]와 같은 길 · 분당 28회 한도 그대로) */
+    refetch: function () {
+      var sid = cur.sid;
+      if (!sid) return Promise.resolve({ ok: false });
+      var call = window.AppErr ? AppErr.call({ action: 'refresh', students: [sid] })
+        : Promise.resolve(sb().functions.invoke('app-sync', { body: { action: 'refresh', students: [sid] } })).then(function (r) { return r && !r.error && r.data ? r.data : { ok: false }; });
+      return Promise.resolve(call).then(function (d) {
+        d = d || { ok: false };
+        return d.ok ? { ok: true } : { ok: false, message: window.AppErr && AppErr.text ? AppErr.text(d) : '지금은 받지 못했어요 · 잠시 후 다시' };
+      }, function () { return { ok: false, message: '지금은 받지 못했어요 · 잠시 후 다시' }; });
+    },
+
+    /* 우수 수행 사진 (20261120d) — 함수 online-best 를 직원 권한으로(앱 서명 주소 · 숨긴 사진도 보임) · 없으면 PV.staffFiles 가 null → 자리표시 */
+    bestFiles: function (items) {
+      var f = sb() && sb().functions;
+      if (!f || !f.invoke || !cur.sid) return Promise.resolve(null);
+      return Promise.resolve(f.invoke('online-best', { body: { action: 'files', student: cur.sid, items: items } })).then(function (r) { return r && !r.error && r.data && r.data.ok ? r.data : null; }, function () { return null; });
+    },
+
     /* 과제 기록 — 앱 서버는 학부모 링크 코드로만 받는다 (서버 사이에서만 쓰이고 화면 주소에는 안 나온다) */
     app: function () {
       var code = Store.linkOf(cur.sid).hubCode;

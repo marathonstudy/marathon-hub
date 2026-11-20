@@ -5,7 +5,8 @@
      · 우수 지문 장악 — 필기 점수 높은 것 3개(같은 모양)
      · 우수 질문 — 선생님과 주고받은 메시지에서 직원이 고른 것만(자동 공개 없음) · 앱이 아직 메시지를 안 보내면 「앱 연결 준비 중」
      · 이번 주 공부한 지문 — 월 ~ 일 날짜마다 지문 제목 · DAY · 제출 여부 (영상 · 필기노트 링크는 앱 연결 준비 중)
-   서버: hub_best(링크 · 그 학생 것만 · 직원이 숨긴 항목 · 사진 빼고 · migration-120) · 사진은 sub-view 함수(10분짜리 서명 주소 · 그 학생 것만)
+   서버: hub_best(링크 · 그 학생 것만 · 직원이 숨긴 항목 · 사진 빼고 · migration-120 · 126 지문 날짜 · 선정 이유)
+   사진은 함수 online-best(앱 /api/hub/submission-file 5분 서명 주소 · 서버에서만 · 20261120d) · 앱 주소가 아직 없으면 예전 sub-view 미리보기 · 자리표시
    다른 학생과 비교 · 순위 · 상담 · 금액 · 전화번호 · AI 피드백 없음
    ============================================================ */
 (function (global) {
@@ -23,14 +24,25 @@
   var QW = /[?？]|궁금|모르겠|모르겟|몰라요|왜\s|왜요|왜[가-힣]|어떻게|어떡|질문|헷갈|이해가\s*안|이해\s*안|맞나요|맞을까요|되나요|인가요|일까요/;
   function isQuestion(t) { return QW.test(String(t || '')); }
 
+  function md(d) { return valid(d) ? (+d.slice(5, 7)) + '/' + (+d.slice(8, 10)) : ''; }
+  function clean(t) { return global.OnlineRun && OnlineRun.cleanTitle ? OnlineRun.cleanTitle(t) : String(t || ''); }
+  /* 카드 한 장 (20261120d · migration-126)
+     · 날짜 = 지문 날짜(반 달력) · 제출일이 다르면 작게 「11/20 제출」 · 제목은 지문 목록과 같이 다듬기(한 줄 넘으면 말줄임 · 누르면 전체)
+     · 점수에 종류(「오답정리 100점」 · 「필기 100점」)
+     · 사진 — 썸네일 → 누르면 크게(앱 서명 주소 · 함수 online-best · 그 학생 것만) · 앱 주소가 아직 없으면 자리표시(직원 화면에만 「앱 사진 연결 준비 중」)
+     · 선생님 한마디(사람이 쓴 피드백) · 피드백이 없거나 한 줄 이하면 「선정 이유」(직원이 [확인]한 글만 · 확인 전 「선정 이유 준비 중」) */
   function itemHtml(x, kind) {
-    var ph = (x.photos || []).filter(function (p) { return p && p.id; });
-    return '<li class="ob-it"><div class="ob-it__h"><span class="ob-it__d num">' + esc(mdw(x.day)) + '</span><b class="ob-it__t">' + esc(x.title || '지문') + '</b>' +
-      '<span class="ob-it__s num" aria-label="' + (kind === 'wrong' ? '오답정리' : '지문 장악') + ' 점수 ' + esc(x.s) + '점">' + esc(x.s) + '점</span></div>' +
-      (ph.length ? '<div class="ob-ph" data-ob-day="' + esc(x.day) + '">' + ph.slice(0, 4).map(function (p) {
-        return '<button type="button" class="ob-ph__b" data-ob-ph="' + esc(p.id) + '" aria-label="' + esc(mdw(x.day)) + ' 제출 사진 크게 보기"><span class="ob-ph__w">' + (p.kind === 'pdf' ? 'PDF' : '사진') + '</span></button>';
+    var ph = (x.photos || []).filter(function (p) { return p && p.i != null; });
+    var lab = kind === 'wrong' ? '오답정리' : '필기', t = clean(x.title) || '지문';
+    return '<li class="ob-it"><div class="ob-it__h"><span class="ob-it__d num">' + esc(mdw(x.day)) + (x.sday && x.day && x.sday !== x.day ? ' <small class="ob-it__sd">' + esc(md(x.sday)) + ' 제출</small>' : '') + '</span>' +
+      '<button type="button" class="ob-it__t" data-ob-t aria-expanded="false" title="' + esc(x.title || t) + '">' + esc(t) + '</button>' +
+      '<span class="ob-it__s num" aria-label="' + lab + ' 점수 ' + esc(x.s) + '점">' + lab + ' ' + esc(x.s) + '점</span></div>' +
+      (ph.length ? '<div class="ob-ph">' + ph.slice(0, 4).map(function (p) {
+        return '<button type="button" class="ob-ph__b" data-ob-ph="' + esc(x.key + '|' + p.i) + '"' + (p.id ? ' data-ob-id="' + esc(p.id) + '" data-ob-day="' + esc(x.sday || x.day) + '"' : '') + ' data-ob-kind="' + (p.kind === 'pdf' ? 'pdf' : 'image') + '" data-ob-d="' + esc(x.day || '') + '"' +
+          ' aria-label="' + esc(mdw(x.day)) + ' 제출 ' + (p.kind === 'pdf' ? 'PDF' : '사진') + ' 크게 보기"><span class="ob-ph__w">' + (p.kind === 'pdf' ? 'PDF' : '사진') + '</span></button>';
       }).join('') + '</div>' : '') +
-      (x.fb ? '<p class="ob-fb"><span class="ob-fb__n">선생님 한마디</span>' + esc(x.fb) + '</p>' : '') + '</li>';
+      (x.fb ? '<p class="ob-fb"><span class="ob-fb__n">선생님 한마디</span>' + esc(x.fb) + '</p>' : '') +
+      (x.need === false ? '' : x.reason ? '<p class="ob-why"><span class="ob-fb__n">선정 이유</span>' + esc(x.reason) + '</p>' : '<p class="ob-why is-wait">선정 이유 준비 중</p>') + '</li>';
   }
   function listHtml(title, icon, list, kind, empty) {
     return '<section class="card ob-sec"><h2 class="card-title">' + icon + ' ' + esc(title) + '</h2>' +
@@ -65,7 +77,7 @@
         if (!x.counted) return '<li class="ob-wk is-off"><span class="ob-wk__d num">' + esc(mdw(x.date)) + '</span><span class="ob-wk__t">숙제 없는 날</span></li>';
         var k = K[x.kind] || K.future;
         return '<li class="ob-wk"><span class="ob-wk__d num">' + esc(mdw(x.date)) + '</span>' + (x.day ? '<span class="ob-wk__day num">DAY ' + esc(x.day) + '</span>' : '') +
-          '<span class="ob-wk__t">' + esc(x.title || '오늘의 지문') + '</span><span class="ob-wk__k ob-k--' + k[1] + '">' + k[0] + '</span></li>';
+          '<span class="ob-wk__t">' + esc(clean(x.title) || '오늘의 지문') + '</span><span class="ob-wk__k ob-k--' + k[1] + '">' + k[0] + '</span></li>';
       }).join('') + '</ul>' : '<p class="ob-empty">과제 기록이 연결되면 여기에 보여요</p>') +
       '<p class="ob-note">영상 바로 보기 · 필기노트 · ' + WAIT + '</p></section>';
   }
@@ -77,28 +89,63 @@
     var top = fail ? '<div class="empty errko" role="alert"><p>잠시 후 다시 시도해 주세요</p><button type="button" class="btn-ghost" data-ob-retry>다시 시도</button></div>'
       : listHtml('우수 오답정리', '🏅', best.wrong, 'wrong', best.scores ? '아직 선생님 점수가 매겨진 오답정리가 없어요' : '선생님 점수는 ' + WAIT) +
         listHtml('우수 지문 장악', '🔍', best.text, 'text', best.scores ? '아직 선생님 점수가 매겨진 필기가 없어요' : '선생님 점수는 ' + WAIT) + qHtml(best.q);
-    return '<div class="ob">' + '<p class="ob-lead">선생님이 높게 본 내 제출물 · 질문 · 이번 주 공부</p>' + top + weekHtml(data, today) +
-      (o.preview ? '<p class="ob-note">미리보기에서는 제출 사진을 열지 않아요</p>' : '') + '</div>';
+    return '<div class="ob">' + '<p class="ob-lead">선생님이 높게 본 내 제출물 · 질문 · 이번 주 공부</p>' + top + weekHtml(data, today) + '</div>';
   }
-  /* 사진 — 날짜마다 sub-view(그 학생 것만 · 10분 서명 주소)로 · 숨긴 사진은 서버가 이미 뺌 */
-  function mountPhotos(host, code) {
-    var SV = global.SubView;
-    if (!host || !SV || !SV.hubFetch) return;
-    var boxes = host.querySelectorAll('[data-ob-day]'), days = {};
-    Array.prototype.forEach.call(boxes, function (b) { days[b.getAttribute('data-ob-day')] = 1; });
-    var all = [];
+  /* 사진 (20261120d) — 함수 online-best(앱 /api/hub/submission-file 서명 주소 · 서버에서만 · 그 학생 것만 · 숨긴 사진 빼고)
+     o.code — 러닝노트 링크 · o.staffFiles(items) — 코치룸 미리보기 · 학생 카드(직원 권한)
+     앱 주소가 아직 없으면(wait) — 예전 미리보기(sub-view · 있으면)로 · 없으면 자리표시 그대로 · o.staff 면 「앱 사진 연결 준비 중」 한 줄 */
+  var APP_WAIT = '앱 사진 연결 준비 중';
+  function callFiles(o, items) {
+    if (o.staffFiles) return Promise.resolve(o.staffFiles(items)).catch(function () { return null; });
+    var C = global.CONFIG && global.CONFIG.supabase;
+    if (!C || !o.code) return Promise.resolve(null);
+    return fetch(C.url + '/functions/v1/online-best', { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: C.key }, body: JSON.stringify({ action: 'files', code: o.code, items: items }) })
+      .then(function (r) { return r.json(); }).then(function (d) { return d && d.ok ? d : null; }, function () { return null; });
+  }
+  function oldThumbs(host, code, btns) {
+    var SV = global.SubView, days = {};
+    if (!SV || !SV.hubFetch || !code) return;
+    btns.forEach(function (b) { if (b.getAttribute('data-ob-id')) days[b.getAttribute('data-ob-day')] = 1; });
     Object.keys(days).forEach(function (d) {
       SV.hubFetch(code, d, d).then(function (res) {
         var files = (res && res.files) || [];
-        files.forEach(function (f) { all.push(f); });
-        Array.prototype.forEach.call(host.querySelectorAll('[data-ob-day="' + d + '"] [data-ob-ph]'), function (b) {
-          var f = files.filter(function (x) { return String(x.id) === b.getAttribute('data-ob-ph'); })[0];
-          if (!f) { b.hidden = true; return; }
-          if (f.thumb) b.innerHTML = '<img src="' + esc(f.thumb) + '" alt="" loading="lazy">';
+        btns.forEach(function (b) {
+          if (b.getAttribute('data-ob-day') !== d || b.__ob) return;
+          var f = files.filter(function (x) { return String(x.id) === b.getAttribute('data-ob-id'); })[0];
+          if (!f || !f.thumb) return;
+          b.__ob = 1; b.innerHTML = '<img src="' + esc(f.thumb) + '" alt="" loading="lazy">';
           b.onclick = function () { if (SV.lbOpen) SV.lbOpen([{ f: f }], 0); };
         });
       });
     });
   }
-  global.OnlineBest = { html: html, weekRows: weekRows, isQuestion: isQuestion, mountPhotos: mountPhotos, WAIT: WAIT };
+  function mountPhotos(host, code, o) {
+    o = o || {}; if (code && !o.code) o.code = code;
+    if (!host) return Promise.resolve(null);
+    var btns = Array.prototype.slice.call(host.querySelectorAll('[data-ob-ph]'));
+    if (!btns.length) return Promise.resolve(null);
+    var items = btns.slice(0, 12).map(function (b) { var p = b.getAttribute('data-ob-ph').split('|'); return { key: p[0], i: +p[1] }; });
+    return callFiles(o, items).then(function (res) {
+      var files = (res && res.files) || [], wait = !res || res.wait || files.some(function (f) { return !f.ok && f.reason === 'wait'; });
+      btns.forEach(function (b) {
+        var p = b.getAttribute('data-ob-ph').split('|');
+        var f = files.filter(function (x) { return x.key === p[0] && String(x.i) === p[1]; })[0];
+        if (!f || !f.ok || !f.url) { if (f && f.reason === 'hidden') b.hidden = true; return; }
+        b.__ob = 1;
+        var pdf = (f.kind || b.getAttribute('data-ob-kind')) === 'pdf';
+        if (pdf) { b.classList.add('is-pdf'); b.onclick = function () { global.open(f.url, '_blank', 'noopener'); }; return; }
+        b.innerHTML = '<img src="' + esc(f.url) + '" alt="" loading="lazy" decoding="async">';
+        b.onclick = function () { var SV = global.SubView; if (SV && SV.lbOpen) SV.lbOpen([{ f: { big: f.url, kind: 'image', day: b.getAttribute('data-ob-d') || '' } }], 0); };
+      });
+      if (wait) {
+        oldThumbs(host, o.code, btns);
+        if (o.staff && !host.querySelector('.ob-appwait')) {
+          var n = document.createElement('p'); n.className = 'ob-note ob-appwait'; n.textContent = APP_WAIT + ' · 앱에 사진 주소가 생기면 코드 수정 없이 바로 보여요';
+          var lead = host.querySelector('.ob-lead'); if (lead && lead.parentNode) lead.parentNode.insertBefore(n, lead.nextSibling); else host.insertBefore(n, host.firstChild);
+        }
+      }
+      return { wait: wait, files: files };
+    });
+  }
+  global.OnlineBest = { html: html, itemHtml: itemHtml, weekRows: weekRows, isQuestion: isQuestion, mountPhotos: mountPhotos, WAIT: WAIT, APP_WAIT: APP_WAIT };
 })(window);

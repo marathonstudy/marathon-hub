@@ -1534,6 +1534,22 @@
         }
         host.innerHTML = '<div class="empty">과제 기록이 아직 연결되지 않았습니다.<br>' + OnlineRun.KAKAO + '</div>';
       }
+      /* 20261120d — 지문 제목 누르면 전체(한 줄 말줄임 풀기) · [다시 받기](직원 미리보기만 · 코치룸이 그 학생만 앱에서 새로 받음 → 다시 그림) */
+      function ornTap(e, again) {
+        var t = e.target.closest && e.target.closest('[data-orn-t]');
+        if (t) { var on = !t.classList.contains('is-full'); t.classList.toggle('is-full', on); t.setAttribute('aria-expanded', on ? 'true' : 'false'); return true; }
+        var rb = e.target.closest && e.target.closest('[data-orn-refetch]');
+        if (!rb) return false;
+        if (!PV || !PV.refetch || rb.disabled) return true;
+        rb.disabled = true; rb.textContent = '받는 중…';
+        Promise.resolve(PV.refetch()).then(function (res) {
+          if (res && res.ok) { APP.p = null; again(); return; }
+          rb.disabled = false; rb.textContent = '다시 받기';
+          var m = document.createElement('span'); m.className = 'orn-stale__m'; m.setAttribute('role', 'status'); m.textContent = ' ' + ((res && res.message) || '지금은 받지 못했어요 · 잠시 후 다시');
+          if (rb.parentNode && !rb.parentNode.querySelector('.orn-stale__m')) rb.parentNode.appendChild(m);
+        }, function () { rb.disabled = false; rb.textContent = '다시 받기'; });
+        return true;
+      }
       /* 🏅 우수 수행 (20261118b · online-best.js · migration-120 hub_best) — 열 때마다 새로 */
       function openBest() {
         var host = $('#panelBest');
@@ -1542,8 +1558,13 @@
         Promise.all([Promise.resolve().then(function () { return rpc('hub_best', { p_code: h.code }); }).then(function (v) { return v && typeof v === 'object' ? v : { __fail: true }; }, function () { return { __fail: true }; }),
                      appData(h.code)]).then(function (x) {
           host.innerHTML = OnlineBest.html(x[0], x[1], { today: todayISO(), preview: !!PV });
-          if (!PV) OnlineBest.mountPhotos(host, h.code);
-          host.onclick = function (e) { if (e.target.closest && e.target.closest('[data-ob-retry]')) openBest(); };
+          /* 사진 — 함수 online-best(앱 서명 주소 · 20261120d) · 미리보기는 코치룸이 직원 권한으로 · 직원(미리보기)에만 「앱 사진 연결 준비 중」 */
+          OnlineBest.mountPhotos(host, PV ? '' : h.code, PV ? { staff: true, staffFiles: PV.bestFiles } : {});
+          host.onclick = function (e) {
+            var t = e.target.closest && e.target.closest('[data-ob-t]');
+            if (t) { var on = !t.classList.contains('is-full'); t.classList.toggle('is-full', on); t.setAttribute('aria-expanded', on ? 'true' : 'false'); return; }
+            if (e.target.closest && e.target.closest('[data-ob-retry]')) openBest();
+          };
         });
       }
       function openRun() {
@@ -1554,8 +1575,9 @@
           if (!data) { noData(host, openRun); return; }
           var ms = OnlineRun.months(data, todayISO());
           if (!RUN.ym || ms.indexOf(RUN.ym) < 0) RUN.ym = ms[0];
-          host.innerHTML = OnlineRun.calHtml(runOf(data, RUN.ym), { months: ms, open: RUN.open });
+          host.innerHTML = OnlineRun.calHtml(runOf(data, RUN.ym), { months: ms, open: RUN.open, staff: !!PV });   /* 직원(미리보기)만 [다시 받기] (20261120d) */
           host.onclick = function (e) {
+            if (ornTap(e, openRun)) return;
             var dd = e.target.closest && e.target.closest('[data-orn-day]'), mm = e.target.closest && e.target.closest('[data-orn-m]');
             if (dd) { RUN.open = RUN.open === dd.getAttribute('data-orn-day') ? '' : dd.getAttribute('data-orn-day'); openRun(); }
             else if (mm && mm.getAttribute('data-orn-m')) { RUN.ym = mm.getAttribute('data-orn-m'); RUN.open = ''; openRun(); }
@@ -1569,9 +1591,10 @@
         Promise.all([appData(h.code), Promise.resolve().then(function () { return rpc('hub_scores', { p_code: h.code }); }).catch(function () { return null; })]).then(function (x) {
           var data = x[0];
           if (!data) { noData(host, openRecord); return; }
-          host.innerHTML = OnlineRun.recordHtml(data, runOf(data), { scores: Array.isArray(x[1]) ? x[1] : [], parent: d.role !== 'student' }) +
+          host.innerHTML = OnlineRun.recordHtml(data, runOf(data), { scores: Array.isArray(x[1]) ? x[1] : [], parent: d.role !== 'student', staff: !!PV }) +
             '<div id="apDetail">' + apDetailHtml(data) + '</div>';
           host.onclick = function (e) {
+            if (ornTap(e, openRecord)) return;
             var b = e.target.closest && e.target.closest('[data-ap-period]');
             if (!b) return;
             APD.period = b.dataset.apPeriod;

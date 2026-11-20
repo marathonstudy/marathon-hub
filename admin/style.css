@@ -5280,6 +5280,18 @@ body.td-online #mgOps { display: none !important; }
 .oba-ph { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 4px; font-size: 12px; }
 .oba-ph__i.is-hidden { text-decoration: line-through; color: #A2A6BB; }
 .oba-fb { margin: 4px 0 0; font-size: 12.5px; color: var(--ink-light, #8A90AC); overflow-wrap: anywhere; }
+/* 20261120d 우수 수행 관리 — 사진 썸네일 · 선정 이유(AI 초안 → 고치기 → [확인]) */
+.oba-ph__i { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; }
+.oba-ph__i .ob-ph__b { width: 64px; height: 64px; }
+.oba-it__t { overflow-wrap: anywhere; }
+.oba-wait { color: #8A6A10; }
+.oba-why { margin-top: 6px; padding: 6px 8px; border-radius: 8px; background: #F7F8FC; min-width: 0; }
+.oba-why__h { margin: 0 0 4px; font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
+.oba-why__st { color: #6B7090; }
+.oba-why__st.is-ok { color: #1E7A4E; font-weight: 700; }
+.oba-why__st.is-err { color: #B4501B; font-weight: 700; }
+.oba-why__t { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; line-height: 1.5; border: 1px solid #DCDFEA; border-radius: 8px; padding: 6px 8px; resize: vertical; }
+.oba-why__b { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0; }
 .errko { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
 .errko__t { margin: 0; color: #B4501B; font-size: 13px; }
 .errko__d { flex-basis: 100%; font-size: 12px; color: var(--ink-light, #8A90AC); }
