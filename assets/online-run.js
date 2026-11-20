@@ -201,6 +201,7 @@
                 vids: l && +l.videosTotal > 0 ? { done: +l.videosDone || 0, total: +l.videosTotal } : null, kind: 'off' };
       if (!counted) { x.kind = c || isWeekend(d) ? 'weekend' : 'off'; return x; }
       var st = c ? c.status : 'none';
+      x.st = st;
       if (st === 'onTime') x.kind = 'ok';
       else if (ex[d]) x.kind = 'excused';
       else if (d > today) x.kind = 'future';
@@ -235,6 +236,20 @@
       var first = null;
       days.forEach(function (x) { if (x.order && x.order < 100000 && Math.floor(x.order / 1000) * 1000 === app.off) { var r = x.order - app.off; if (r >= s.s && r <= s.e) { x.seg = s.no; if (!first) first = x; } } });
       if (first && s.no > 1) first.segStart = s.no;         /* 그 구간 첫 회차 날에 경계 표시 */
+    });
+    /* 20261120a (서버 _online_calc · migration-123 과 같은 규칙) — 구간마다 같은 기간 · 같은 판정 시점으로
+       left = 남은 숙제(오늘 아직 · 앞으로) · hx = 오늘까지 골든패스 · 사정 인정 날(직원만) · pass = 앱 기준 · hpass = 허브 기준(정시 + 인정)
+       반 현황표: pass ≠ hpass 일 때만 「허」 · 끝나기 전에 남은 숙제 없이 기준을 넘으면 「◕ 완주 예정」 */
+    if (app && app.status === 'ok') app.secs.forEach(function (s) {
+      var l = 0, hx = 0;
+      days.forEach(function (x) {
+        if (!x.counted || x.date < s.from || x.date > s.to) return;
+        var me = x.kind === 'excused' ? (x.date > today ? 'future' : x.date === today && x.st !== 'late' ? 'today' : '') : x.kind;
+        if (me === 'future' || me === 'today') l++;
+        if (x.date <= today && (x.kind === 'golden' || x.kind === 'excused')) hx++;
+      });
+      var hr = hx === 0 ? s.rate : s.n > 0 ? Math.round(Math.min(s.on + hx, s.n) / s.n * 100) : 0;
+      s.left = l; s.hx = hx; s.pass = s.rate >= app.threshold; s.hpass = hr >= app.threshold;
     });
     var streak = streakOf(days, today);
     return { ym: ym, today: today, days: days, app: app, hub: hub, golden: golden, streak: streak, n: n, empty: empty, staff: staff,

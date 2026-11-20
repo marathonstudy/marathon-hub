@@ -260,22 +260,29 @@
   /* 오늘 기록을 아직 못 받음 — 오늘 날짜 기록이 없거나(120 today_cal) 마지막 받은 때가 오늘 전 */
   function todayWait(x) { var s = x.stat || {}, k = kstOf(s.fetched); return s.today === 'today' && (s.today_cal === false || !k || k.day < today()); }
   var TD = { ok: ['✓', 'ok', '제출'], late: ['✓', 'ok', '늦게 제출'], golden: ['✓', 'ok', '늦게 제출(골든패스)'], today: ['✗', 'miss', '미제출'], excused: ['—', 'off', '사정 인정'], none: ['—', 'off', '숙제 없는 날'] };
-  var SEC = { done: ['●', 'done', '완주'], run: ['◐', 'run', '진행 중'], risk: ['⚠', 'risk', '위험 — 남은 날 다 내야 완주'], missed: ['✕', 'missed', '놓침'], wait: ['·', 'wait', '아직'] };
+  var SEC = { done: ['●', 'done', '완주'], soon: ['◕', 'soon', '완주 예정'], run: ['◐', 'run', '진행 중'], risk: ['⚠', 'risk', '위험 — 남은 날 다 내야 완주'], missed: ['✕', 'missed', '놓침'], wait: ['·', 'wait', '아직'] };
   function appSec(st, no) { return (st.app || []).filter(function (s) { return +s.no === no; })[0] || null; }
   function hubSec(st, no) { return (st.hub || []).filter(function (s) { return +s.no === no; })[0] || null; }
+  /* 구간 칸 — 앱 · 허브 둘 다 「구간이 끝나야 완주 확정」 · 끝나기 전에 남은 숙제 없이 기준을 넘으면 ◕ 완주 예정 (20261120a · 123 left · pass) */
   function secKey(st, no) {
     var a = appSec(st, no);
     if (!a) return 'wait';
     if (a.state === 'run' && st.risk === 'app' && +st.risk_sec === no) return 'risk';
+    if (a.state === 'run' && +a.left === 0 && a.left != null && a.pass === true) return 'soon';
     return SEC[a.state] ? a.state : 'wait';
   }
+  /* 「허」 — 골든패스 · 사정 인정 때문에 결과가 실제로 달라질 때만(같은 구간 · 같은 시점 · 시작한 구간 · 123 hpass) */
   function hubDiff(st, no) {
-    var a = appSec(st, no), h = hubSec(st, no);
-    if (!a || !h) return false;
-    var hs = h.state === 'none' ? 'wait' : h.state;
-    return hs !== a.state;
+    var a = appSec(st, no);
+    return !!a && a.state !== 'wait' && typeof a.hpass === 'boolean' && typeof a.pass === 'boolean' && a.hpass !== a.pass;
   }
   function hubWhy(st, no) {
+    var a = appSec(st, no);
+    if (a && typeof a.hpass === 'boolean') {
+      var res = function (p) { return a.state === 'run' ? (p ? '지금 기준 넘음' : '지금 기준 아래') : p ? '완주' : '놓침'; };
+      return '허브 기준 ' + no + '구간: ' + res(a.hpass) + ' (인정 ' + Math.min((+a.on || 0) + (+a.hx || 0), +a.n || 0) + '/' + (+a.n || 0) + '회 · 앱 기준 ' + res(a.pass) + ')' +
+        (st.golden ? ' · 골든패스 ' + md(st.golden) + ' 사용' : '') + (st.ex_n ? ' · 사정 인정 ' + st.ex_n + '일' : '');
+    }
     var h = hubSec(st, no) || {}, T = { done: '완주', run: '진행 중', missed: '놓침', wait: '아직', none: '회차 없음' };
     return '허브 기준 ' + no + '구간: ' + (T[h.state] || '—') + (h.n ? ' (인정 ' + (h.ok || 0) + '/' + h.n + '회)' : '') +
       (st.golden ? ' · 골든패스 ' + md(st.golden) + ' 사용' : '') + (st.ex_n ? ' · 사정 인정 ' + st.ex_n + '일' : '') + (st.risk === 'hub' && +st.risk_sec === no ? ' · 남은 날 다 내야 완주' : '');
@@ -341,7 +348,7 @@
     var mon = '<td class="ot-tc num">' + (pend ? '…' : (s.done || 0) + '/' + (s.open || 0)) + '</td>' +
       '<td class="ot-tc ot-x num ot-rate">' + (pend ? '…' : rt == null ? '—' : rt + '%') + '</td>';
     var cur = pend ? 0 : curSecNo(s);
-    var mcell = '<td class="ot-tc ot-m">' + (pend ? '…' : s.app_status === 'ok' && cur ? cur + '구간 <span class="ot-sg ot-sg--' + SEC[secKey(s, cur)][1] + '">' + SEC[secKey(s, cur)][0] + '</span>' + (s.app_def ? '<span class="ot-def">기본</span>' : '') : '<small class="muted-note">정보 없음</small>') + '</td>';
+    var mcell = '<td class="ot-tc ot-m">' + (pend ? '…' : s.app_status === 'ok' && cur ? cur + '구간 <span class="ot-sg ot-sg--' + SEC[secKey(s, cur)][1] + '">' + SEC[secKey(s, cur)][0] + '</span>' : '<small class="muted-note">정보 없음</small>') + '</td>';
     var streak = '<td class="ot-tc ot-x num">' + (pend ? '…' : (s.streak || 0) + '일') + '</td>';
     var secs;
     if (pend) secs = '<td class="ot-tc ot-x" colspan="3"><span class="muted-note">…</span></td>';
@@ -350,13 +357,13 @@
     else secs = [1, 2, 3].map(function (no) {
       var k = SEC[secKey(s, no)];
       return '<td class="ot-tc ot-x"><span class="ot-sg ot-sg--' + k[1] + '" title="' + esc(no + '구간 ' + k[2]) + '">' + k[0] + '</span>' +
-        (s.app_def ? '<span class="ot-def" title="앱 반 정보가 없어 그 달 1일 ~ 말일 · 반 환급 기준으로 계산">기본</span>' : '') +
         (hubDiff(s, no) ? '<button type="button" class="ot-hub" data-ot-why="' + id + '|' + no + '" title="허브 기준과 다름 — 누르면 이유">허</button>' : '') + '</td>';
     }).join('');
     var act = rfText(x.id) || ((late || empty) && x.linked ? '<button type="button" class="btn btn--sm ot-act" data-ot-refetch="' + id + '">다시 받기</button>' : '') +
       (pend ? '<button type="button" class="btn btn--sm ot-act" data-ot-calc="' + id + '"' + (T.calc[x.id] ? ' disabled' : '') + '>' + (T.calc[x.id] ? '계산 중…' : '지금 계산') + '</button>' : '');
     var last = '<td class="ot-tc ot-x ot-last">' + (pend ? '…' : esc(lastText(s.last))) + (act ? '<span class="ot-acts">' + act + '</span>' : '') + '</td>';
-    var why = T.why[x.id];
+    /* 줄 아래 「허브 기준 n구간 …」 — 「허」가 있을 때만(다시 읽어 「허」가 없어지면 같이 숨김 · 20261120a) */
+    var wno = T.why[x.id], why = !wno || pend ? '' : hubDiff(s, wno) || (s.app_status !== 'ok' && s.risk === 'hub') ? hubWhy(s, wno) : '';
     var more = '<tr class="ot-tmore" data-ot-morerow="' + id + '"' + (T.more[x.id] ? '' : ' hidden') + '><td colspan="10"><dl class="ot-tdl">' +
       '<dt>제출률</dt><dd>' + (pend ? '…' : rt == null ? '—' : rt + '%') + '</dd>' +
       '<dt>연속</dt><dd>' + (pend ? '…' : (s.streak || 0) + '일') + '</dd>' +
@@ -409,12 +416,14 @@
         (T.draft && picked.length ? '<div class="ot-drafts">' + picked.map(function (x) {
           return '<div class="ot-draft"><b>' + esc(x.name) + '</b><textarea class="input ot-draft__t" rows="3" data-ot-dt="' + esc(x.id) + '">' + esc(draftOf(itemOf(x))) + '</textarea><button type="button" class="btn btn--sm" data-ot-copy="' + esc(x.id) + '">복사</button></div>';
         }).join('') + '</div>' : '') +
+        /* 「기본」은 칸마다 붙이지 않고 표 맨 위에 한 줄만 (20261120a) */
+        (all.some(function (x) { return !stale(x) && x.stat.app_def; }) ? '<p class="ot-defline">구간은 기본값(그 달 1일~말일, 기준 ' + esc(thOf(T.cls) != null ? thOf(T.cls) : 70) + '%)으로 계산 중 · 앱 반 정보가 오면 자동으로 바뀜</p>' : '') +
         '<div class="ot-twrap"><table class="ot-tb"><thead><tr>' + sh('name', '이름') + '<th scope="col">오늘</th><th scope="col">이번 달 제출</th>' + sh('rate', '제출률', 'ot-x') +
           '<th scope="col" class="ot-m">지금 구간</th>' + sh('streak', '연속', 'ot-x') +
           (noApp ? '<th scope="col" class="ot-x ot-secs" colspan="3">1 · 2 · 3구간</th>' : '<th scope="col" class="ot-x">1구간</th><th scope="col" class="ot-x">2구간</th><th scope="col" class="ot-x">3구간</th>') +
           sh('last', '마지막 제출', 'ot-x') + '</tr></thead><tbody>' +
           (rows.length ? rows.map(rowHtml).join('') : '<tr><td colspan="10" class="muted-note">해당하는 학생이 없어요</td></tr>') + '</tbody></table></div>' +
-        '<p class="muted-note ot-tlegend">오늘 ✓ 제출 · ✗ 미제출 · — 숙제 없는 날 &nbsp; 구간 ● 완주 · ◐ 진행 중 · ⚠ 위험(남은 날 다 내야 완주) · ✕ 놓침 · · 아직 (앱 기준 · 「허」 = 허브 기준과 다름)</p>';
+        '<p class="muted-note ot-tlegend">오늘 ✓ 제출 · ✗ 미제출 · — 숙제 없는 날 &nbsp; 구간 ● 완주(구간이 끝난 뒤) · ◕ 완주 예정(남은 숙제 없이 기준 넘음) · ◐ 진행 중 · ⚠ 위험(남은 날 다 내야 완주) · ✕ 놓침 · · 아직 (앱 기준 · 「허」 = 골든패스 · 사정 인정으로 결과가 달라짐)</p>';
     }
     return '<section class="ot-sec ot-tbl" aria-label="반 현황표">' + head + '<div class="ot-tbar">' + pickSel + '<button type="button" class="btn btn--sm btn--ghost" data-ot-treload>다시 읽기</button></div>' +
       '<div data-ot-thead>' + tblHeadHtml() + '</div>' + body + '</section>';
@@ -602,7 +611,7 @@
     b = t.closest('[data-ot-more]');
     if (b) { var id = b.getAttribute('data-ot-more'); S.tbl.more[id] = !S.tbl.more[id]; paintTbl(); return true; }
     b = t.closest('[data-ot-why]');
-    if (b) { var p = b.getAttribute('data-ot-why').split('|'), row = (S.tbl.rows || []).filter(function (x) { return x.id === p[0]; })[0]; if (row) { S.tbl.why[p[0]] = S.tbl.why[p[0]] ? '' : hubWhy(row.stat || {}, +p[1] || 1); paintTbl(); } return true; }
+    if (b) { var p = b.getAttribute('data-ot-why').split('|'), row = (S.tbl.rows || []).filter(function (x) { return x.id === p[0]; })[0]; if (row) { S.tbl.why[p[0]] = S.tbl.why[p[0]] ? 0 : +p[1] || 1; paintTbl(); } return true; }
     b = t.closest('[data-ot-calc]');
     if (b) { calc([b.getAttribute('data-ot-calc')]); return true; }
     b = t.closest('[data-ot-refetch]');
@@ -653,5 +662,6 @@
     return false;
   }
   window.OnlineToday = { html: html, click: click, change: change, load: load, state: function () { return S; }, rowsOf: rowsOf, draftOf: draftOf, stuOf: stuOf,
-                         boardHtml: boardHtml, careHtml: careHtml, gradeLabel: gradeLabel, gradeOf: gradeOf, lastText: lastText, csvText: csvText, refetch: refetch, pickCls: pickCls };
+                         boardHtml: boardHtml, careHtml: careHtml, gradeLabel: gradeLabel, gradeOf: gradeOf, lastText: lastText, csvText: csvText, refetch: refetch, pickCls: pickCls,
+                         secKey: secKey, hubDiff: hubDiff, hubWhy: hubWhy, rowHtml: rowHtml, tableHtml: tableHtml };
 })();
