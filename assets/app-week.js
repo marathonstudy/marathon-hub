@@ -224,8 +224,18 @@
       if (day >= from && day <= to) rates.push(Number(h.correctRate));
     });
     var rate = rates.length ? Math.round(rates.reduce(function (a, b) { return a + b; }, 0) / rates.length) : null;
+    /* 오답정리 · 지문 장악 평균 (20261121a · 앱 점수 wa · tc 가 있을 때만 · 그 기간 낸 숙제) */
+    var was = [], tcs = [];
+    (data.history || data.recent || []).forEach(function (h) {
+      if (!h || !h.submittedAt) return;
+      var day = hwDateOf(h, dateOfOrder).date;
+      if (day < from || day > to) return;
+      if (typeof h.wa === 'number') was.push(h.wa);
+      if (typeof h.tc === 'number') tcs.push(h.tc);
+    });
+    var mean = function (v) { return v.length ? Math.round(v.reduce(function (a, b) { return a + b; }, 0) / v.length) : null; };
 
-    return { from: from, to: to, days: days, hwDone: hwDone, hwOnTime: hwOnTime, hwDays: hwDays, lecDone: lecDone, lecDays: lecDays, rate: rate,
+    return { from: from, to: to, days: days, hwDone: hwDone, hwOnTime: hwOnTime, hwDays: hwDays, lecDone: lecDone, lecDays: lecDays, rate: rate, wa: mean(was), tc: mean(tcs),
              wkDays: wkDays, wkDone: wkDone, newDays: newDays,
              allNew: newDays > 0 && !days.some(function (x) { return x.hw !== 'new' && !x.weekend; }),
              any: hwDays > 0 || lecDays > 0 };
@@ -312,7 +322,10 @@
                  '주중<br>복습' + (d.hw === 'wkDone' ? '<b> ✓</b>' : '') + '</span>';
         }
         var v = d[kind], mark = kind === 'hw' ? HW_MARK[v] : LEC_MARK[v], tip = kind === 'hw' ? HW_TIP[v] : LEC_TIP[v];
-        return '<span class="aw-cell aw-' + kind + ' aw-' + kind + '--' + v + '" title="' + esc(md(d.date) + ' ' + tip) + '">' +
+        /* 과제 칸(●·△·✕·오늘)을 누르면 그날 하루 활동 · 숙제 카드가 아래로 (20261121a · hub.js · hw-card.js) */
+        var tap = kind === 'hw' && (v === 'onTime' || v === 'late' || v === 'none' || v === 'today');
+        return '<span class="aw-cell aw-' + kind + ' aw-' + kind + '--' + v + '" title="' + esc(md(d.date) + ' ' + tip) + '"' +
+               (tap ? ' data-awd="' + d.date + '" role="button" tabindex="0" aria-expanded="false"' : '') + '>' +
                (mark || '<span class="aw-blank" aria-hidden="true"></span>') + '<span class="sr-only">' + esc(tip) + '</span></span>';
       }).join('');
     }
@@ -324,13 +337,16 @@
         '<span class="aw-label">과제</span>' + cells('hw') +
         (w.allNew ? '<span class="aw-sum aw-sum--new">신입생</span>'
           : pending && !w.hwDays ? '<span class="aw-sum aw-sum--wait">아직 과제 시작 전</span>'
-          : '<span class="aw-sum aw-sum--' + tone(w.hwDone, w.hwDays) + ' num">' + w.hwDone + '/' + w.hwDays + '일 제출' + (w.rate != null ? '<small>정답률 ' + w.rate + '%</small>' : '') + '</span>') +
+          : '<span class="aw-sum aw-sum--' + tone(w.hwDone, w.hwDays) + ' num">' + w.hwDone + '/' + w.hwDays + '일 제출' + (w.rate != null ? '<small>정답률 ' + w.rate + '%</small>' : '') +
+            (w.wa != null || w.tc != null ? '<small class="aw-sum__sc">' + [w.wa != null ? '오답정리 평균 ' + w.wa + '점' : '', w.tc != null ? '지문 장악 평균 ' + w.tc + '점' : ''].filter(Boolean).join(' · ') + '</small>' : '') + '</span>') +
         '<span class="aw-label">강의</span>' + cells('lec') +
         (w.allNew ? '<span class="aw-sum aw-sum--new">신입생</span>'
           : pending && !w.lecDays ? '<span class="aw-sum aw-sum--wait">아직 강의 전</span>'
           : '<span class="aw-sum num">' + w.lecDone + '/' + w.lecDays + '일 시청</span>') +
       '</div>' +
       '<p class="aw-legend">' + esc(LEGEND + (w.days.some(function (d) { return d.hw === 'exempt'; }) ? ' 「면제」인 날은 제출 수에 넣지 않아요.' : '')) + '</p>' +
+      (w.days.some(function (d) { return d.hw === 'onTime' || d.hw === 'late' || d.hw === 'none' || d.hw === 'today'; }) ? '<p class="aw-tap">과제 칸(● △ ✕)을 누르면 그날 활동을 볼 수 있어요</p>' : '') +
+      '<div class="hwx" data-hwx hidden></div>' +
     '</div>';
   }
 

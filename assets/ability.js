@@ -460,6 +460,11 @@
     c.areas.forEach(function (a) { if (names.indexOf(a.name) < 0) names.push(a.name); });
     var body = !c.areas.length ? '<p class="ab-note">' + (c.items || c.src === 'app' ? '이 기간에는 정답률이 있는 과제가 없어요' : '낸 과제 ' + c.submitted + '개 · 정답 수가 적힌 과제가 쌓이면 영역별 능력치가 보여요') + '</p>'
       : statHtml(c, names, isOpen(st, opt));
+    /* 영역별 점수 아래 — 「오답정리 평균」 「지문 장악 평균」 두 칸(그 기간 · 앱 선생님 점수 · 등급 기준은 스탯과 같게) · 기록 없으면 숨김 (20261121a) */
+    var sk = global.HwCard && c.range ? HwCard.avg(withOld(data), c.range.from || '', c.range.to || '') : null;
+    if (sk && (sk.wa || sk.tc)) body += '<div class="ab-sk">' +
+      (sk.wa ? '<div><span>오답정리 평균</span><b class="num">' + sk.wa.a + '</b><span class="ab-gr ab-gr--' + grade(sk.wa.a) + '">' + grade(sk.wa.a) + '</span><small class="num">' + sk.wa.n + '회</small></div>' : '') +
+      (sk.tc ? '<div><span>지문 장악 평균</span><b class="num">' + sk.tc.a + '</b><span class="ab-gr ab-gr--' + grade(sk.tc.a) + '">' + grade(sk.tc.a) + '</span><small class="num">' + sk.tc.n + '회</small></div>' : '') + '</div>';
     return '<section class="ab' + (opt.small ? ' ab--small' : '') + (opt.card === false ? '' : ' gm-card') + '" id="' + (opt.id || 'gmAbility') + '" data-ab-root>' + head +
       '<p class="ab-range num">' + esc(c.range.note) + (c.range.prev ? ' · 앞 기간과 비교' : '') + '</p>' +
       (c.auto ? '<p class="ab-auto">최근 기록이 적어 전체 기간으로 보여 줘요</p>' : '') + body +

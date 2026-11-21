@@ -793,6 +793,26 @@
       });
     });
   }
+  /* 「이 수업 과제」 · 레포트 과제 칸 — 날짜 칸(●·△·✕·오늘)을 누르면 그날 하루 활동 · 숙제 한 건 카드가 표 아래로 (20261121a · hw-card.js) · 다시 누르면 접기 */
+  function awdOpen(cell) {
+    var blk = cell.closest('.awb'), info = blk && AWB.list[blk.id], aw = cell.closest('.aw'), box = aw && aw.querySelector('[data-hwx]');
+    if (!info || !box || !global.HwCard) return;
+    var date = cell.getAttribute('data-awd'), again = box.getAttribute('data-date') === date && !box.hidden;
+    aw.querySelectorAll('[data-awd].is-open').forEach(function (x) { x.classList.remove('is-open'); x.setAttribute('aria-expanded', 'false'); });
+    if (again) { box.hidden = true; box.innerHTML = ''; box.removeAttribute('data-date'); return; }
+    cell.classList.add('is-open'); cell.setAttribute('aria-expanded', 'true');
+    box.setAttribute('data-date', date);
+    box.innerHTML = HwCard.dayHtml(AppWeek.normalize ? AppWeek.normalize(info.data) : info.data, date);
+    box.hidden = false;
+  }
+  document.addEventListener('click', function (e) {
+    var c = e.target.closest && e.target.closest('[data-awd]');
+    if (c) awdOpen(c);
+  });
+  document.addEventListener('keydown', function (e) {
+    var c = (e.key === 'Enter' || e.key === ' ') && e.target.closest && e.target.closest('[data-awd]');
+    if (c) { e.preventDefault(); awdOpen(c); }
+  });
   document.addEventListener('click', function (e) {
     var b = e.target.closest && e.target.closest('[data-cal-step]');
     if (!b || b.disabled) return;
@@ -1127,6 +1147,18 @@
     return null;
   }
 
+  /* 그 기간(지문 날짜 from ~ to) 낸 숙제 — 「숙제 한 건」 카드를 날짜 순으로 · 접어 두고 펼치기 (20261121a) */
+  function periodCardsHtml(dd, from, to) {
+    if (!global.HwCard || !dd) return '';
+    var d = AppWeek.normalize ? AppWeek.normalize(dd) : dd, its = [];
+    [].concat(d.history || d.recent || []).forEach(function (h) { if (!h || !h.submittedAt) return; var day = HwCard.dayOf(h, d); if (day >= from && day <= to) its.push({ h: h, day: day }); });
+    if (!its.length) return '';
+    its.sort(function (a, b) { return a.day.localeCompare(b.day) || String(a.h.submittedAt).localeCompare(String(b.h.submittedAt)); });
+    var av = HwCard.avg(d, from, to), at = HwCard.avgText(av);
+    return '<div class="card hwm-list rp-hw"><h2 class="card-title">📝 이 기간 숙제<span class="card-note">' + its.length + '개 · 눌러서 펼치기</span></h2>' +
+      (at ? '<p class="hwm-avg num">' + esc(at) + '</p>' : '') +
+      its.map(function (x) { return HwCard.itemHtml(x.h, d, { date: x.day, fold: true }); }).join('') + '</div>';
+  }
   /* 레포트의 앱 과제 요약 — 그 레포트 수업일 D 기준 「지난 일주일」 D-7 ~ D-1 (20261029h).
      지금 진행 중인 주(D ~ 다음 수업 전날)는 「과제 상세」 탭에서만. 수업일을 모르는 예전 레포트는 저장된 과제 기간으로 */
   function drawReportApp(box, code, r, data, idx) {
@@ -1143,13 +1175,17 @@
         box.innerHTML = appFailHtml('report');      /* 멈춰 있지 않고 다시 시도 (20261031b) */
         return;
       }
-      if (ld) box.innerHTML = reportAppHtml(dd, ld);
+      var pr = null;
+      if (ld) { box.innerHTML = reportAppHtml(dd, ld); pr = AppWeek.lastWeek(ld); }
       else {
         var L = lessonOf(r.week_start) || {};
         var from = data.hwFrom || L.hwFrom, to = data.hwTo || L.hwTo;
         var aw = from && to ? AppWeek.compute(dd, from, to, todayISO()) : null;
         box.innerHTML = aw && aw.any ? appBlockHtml(dd, aw, { title: periodTitle('과제 기간', from, to), month: to.slice(0, 7) }) : '';
+        if (from && to) pr = { from: from, to: to };
       }
+      /* 그 기간 숙제 — 「숙제 한 건」 카드(접어 두고 펼치기 · 20261121a) */
+      if (box.innerHTML && pr) box.innerHTML += periodCardsHtml(dd, pr.from, pr.to);
       /* 과제 요약 칸 아래 작은 한 줄 — 「앱에서 자세히 보기 ↗」 */
       if (box.innerHTML) box.innerHTML += appMoreHtml(APP.info, true);
       animateRings(box);
@@ -1575,8 +1611,11 @@
           if (!data) { noData(host, openRun); return; }
           var ms = OnlineRun.months(data, todayISO());
           if (!RUN.ym || ms.indexOf(RUN.ym) < 0) RUN.ym = ms[0];
-          host.innerHTML = OnlineRun.calHtml(runOf(data, RUN.ym), { months: ms, open: RUN.open, staff: !!PV });   /* 직원(미리보기)만 [다시 받기] (20261120d) */
+          var rr = runOf(data, RUN.ym);
+          host.innerHTML = OnlineRun.calHtml(rr, { months: ms, open: RUN.open, staff: !!PV, data: data });   /* 직원(미리보기)만 [다시 받기] (20261120d) · 날짜 → 하루 활동(20261121a) */
           host.onclick = function (e) {
+            var rw = e.target.closest && e.target.closest('[data-orn-row]');
+            if (rw && OnlineRun.rowTap) { OnlineRun.rowTap(rw, rr, data); return; }
             if (ornTap(e, openRun)) return;
             var dd = e.target.closest && e.target.closest('[data-orn-day]'), mm = e.target.closest && e.target.closest('[data-orn-m]');
             if (dd) { RUN.open = RUN.open === dd.getAttribute('data-orn-day') ? '' : dd.getAttribute('data-orn-day'); openRun(); }
@@ -2567,6 +2606,7 @@
             dp + '<span class="' + st[1] + '">' + st[0] + '</span>' +
             (dr && !dp ? '<span class="ap-day__r num">' + dr + '</span>' : '') +
             (x.items.length >= 2 ? '<span class="ap-muted">과제 ' + x.items.length + '개</span>' : '') +
+            (global.HwCard ? x.items.map(HwCard.chipHtml).join('') : '') +            /* 오답정리 · 지문 장악 점수 (20261121a) */
           '</summary><div class="ap-day__body">' +
             (L && L.videosTotal ? '<p class="ap-lec">▶ 강의 ' + (L.videosDone >= L.videosTotal ? '다 봄' : '안 봄') + '</p>' : '') +
             (x.items.length ? '<ul class="app-recent">' + x.items.map(function (h) {
@@ -2582,6 +2622,8 @@
                 tag + rate +
               '</li>';
             }).join('') + '</ul>' : '<p class="ap-muted">' + (x.weekend ? '토 · 일은 주중 복습 날입니다 (제출 수에 넣지 않아요)' : x.status === 'exempt' ? '면제한 날입니다 (제출 수에 넣지 않아요)' : x.status === 'today' ? '오늘은 밤 12시 마감 전이에요 (아직 세지 않아요)' : x.status === 'none' ? '제출한 과제가 없습니다' : '과제 기록이 없습니다') + '</p>') +
+            /* 그 아래 — 그날 하루 활동 타임라인 + 숙제 한 건 카드 (20261121a · 예전 한 줄 목록은 그대로) */
+            (global.HwCard && APD.data && x.items.length ? HwCard.dayHtml(APD.data, x.date) : '') +
           '</div></details>';
       }).join('') + '</div>';
   }
@@ -2600,6 +2642,7 @@
   }
 
   function apDetailHtml(d) {
+    APD.data = AppWeek.normalize ? AppWeek.normalize(d) : d;            /* 날짜를 펼치면 그날 하루 활동 · 숙제 카드 (20261121a) */
     var r = periodRange(d, APD.period), list = appDays(d, r.from, r.to);
     return '<div class="card ap-period">' +
         '<h2 class="card-title">📊 기간별 기록</h2>' +

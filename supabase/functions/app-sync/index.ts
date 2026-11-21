@@ -152,13 +152,58 @@ export function classMeta(ci: Any, off: number, rec?: Any): Any {
   if (Array.isArray(ss)) o.sectionStats = ss.slice(0, 3).map((s: Any) => ({ section: num(s?.section), on: num(s?.onTimeCount), n: num(s?.totalCount), rate: num(s?.onTimeRate) })).filter((s: Any) => s.section >= 1 && s.section <= 3);
   return o;
 }
+/* 20261121a — 「숙제 한 건」 카드 · 하루 활동 타임라인(러닝노트 · 그 학생 링크로만) — 앱이 주는데 버리던 값 + 앱이 보내 주면 받을 값
+   wa · tc = 오답정리 · 지문 장악 점수(wrongAnswerScore · textComprehensionScore · 0~100 · 숫자일 때만) · g = 채점 끝(status graded · 점수가 비면 「채점 전」 판단용)
+   rj = 지금 반려 상태(status rejected · 반려 사유 글은 받지 않음) · re = 반려됐다 다시 냄(앱이 resubmitted · resubmittedAt · resubmitCount 를 보내 줄 때 · Replit 1회차)
+   fb · fbAt = 사람이 쓴 선생님 피드백(작성자 이름이 있는 teacherFeedback · 500자) · 작성 시각(teacherFeedbackUpdatedAt → gradedAt) — AI 피드백(learningComment · aiFeedback)은 받지 않는다
+   fc = 첨부 수 · sp · im · qa = 스스로 칭찬해 주고 싶은 점 · 발전하고 싶은 점 · 영상 강의 퀴즈 답변(학생 글 그대로 · 500자 · 앱이 보내 줄 때만 · 지금 공유 리포트는 빼고 보냄)
+   글(sp · im · qa · fb)은 최근 200일 낸 것만(저장 크기) · 점수 · 표시는 전부 */
+const TXT_DAYS = 200;
+const txtOf = (v: unknown, n = 500) => (typeof v === "string" && v.trim() ? v.trim().slice(0, n) : "");
+const scOf = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? Math.max(0, Math.min(100, Math.round(v))) : null);
+export function hwMore(h: Any): Any {
+  const o: Any = {};
+  const wa = scOf(h?.wrongAnswerScore), tc = scOf(h?.textComprehensionScore);
+  if (wa != null) o.wa = wa;
+  if (tc != null) o.tc = tc;
+  const st = String(h?.status ?? "");
+  if (st === "graded") o.g = 1;
+  if (st === "rejected") o.rj = 1;
+  const rc = num(h?.resubmitCount ?? h?.resubmissionCount);
+  if (h?.resubmitted === true || h?.isResubmitted === true || rc > 0 || (typeof h?.resubmittedAt === "string" && h.resubmittedAt)) o.re = 1;
+  if (Array.isArray(h?.files) && h.files.length) o.fc = Math.min(99, h.files.length);
+  const recent = typeof h?.submittedAt === "string" && h.submittedAt >= new Date(Date.now() - TXT_DAYS * 86400000).toISOString();
+  if (recent) {
+    const human = typeof h?.feedbackAuthorName === "string" && h.feedbackAuthorName.trim();
+    const fb = human ? txtOf(h?.teacherFeedback) : "";
+    if (fb) {
+      o.fb = fb;
+      const at = String(h?.teacherFeedbackUpdatedAt ?? h?.feedbackAt ?? h?.gradedAt ?? "");
+      if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(at)) o.fbAt = at.slice(0, 25);
+    }
+    const sp = txtOf(h?.selfPraise ?? h?.self_praise), im = txtOf(h?.improvement), qa = txtOf(h?.quizAnswer ?? h?.quiz_answer);
+    if (sp) o.sp = sp;
+    if (im) o.im = im;
+    if (qa) o.qa = qa;
+  }
+  return o;
+}
+/* 강의 한 줄 — 영상 · 필기노트를 처음 연 시각(앱이 보내 줄 때만 · Replit 1회차 · 지금은 없음) */
+function lecMore(l: Any): Any {
+  const o: Any = {};
+  const va = String(l?.videoOpenedAt ?? l?.videoCompletedAt ?? ""), na = String(l?.noteOpenedAt ?? l?.materialOpenedAt ?? "");
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(va)) o.va = va.slice(0, 25);
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(na)) o.na = na.slice(0, 25);
+  if (typeof l?.noteOpenedAt === "string" || l?.noteOpenedAt === null) o.nk = 1;     /* 앱이 필기노트 칸을 보냄(안 열었으면 0회로 셈) */
+  return o;
+}
 export function pick(src: Any) {
   const st = src?.stats ?? {};
   const lectures = Array.isArray(src?.lectures) ? src.lectures : [];
   const cal = Array.isArray(src?.calendarData) ? src.calendarData : [];
   const cats = Array.isArray(src?.categoryStats) ? src.categoryStats : [];
   const hist = Array.isArray(src?.homeworkHistory) ? src.homeworkHistory : [];
-  /* 과제 기록 — 제목 · 날짜 · 지각 여부 · 정답률 · 강 번호만 (사진 · 피드백 · 학생 글은 넘기지 않는다). 오래된 것부터 */
+  /* 과제 기록 — 제목 · 날짜 · 지각 여부 · 정답률 · 강 번호 · 점수 · 사람이 쓴 피드백 · 학생 글(hwMore · 20261121a · 사진 주소는 넘기지 않는다). 오래된 것부터 */
   const hw = hist
     .slice()
     .sort((a: Any, b: Any) => String(a?.submittedAt ?? "").localeCompare(String(b?.submittedAt ?? "")))
@@ -179,6 +224,7 @@ export function pick(src: Any) {
       ...(num(h?.solvingTimeSeconds) > 0 ? { sec: num(h.solvingTimeSeconds) } : num(h?.solvingTimeMinutes) > 0 ? { sec: num(h.solvingTimeMinutes) * 60 } : {}),
       /* 퀴즈 — 답을 냈는지(참 · 거짓)만 · 글은 넘기지 않는다 · 앱이 보낼 때만 (20261117b) */
       ...(typeof h?.quizAnswered === "boolean" ? { quiz: h.quizAnswered } : (h?.quizAnswer ?? h?.quiz_answer) != null ? { quiz: String(h?.quizAnswer ?? h?.quiz_answer).trim() !== "" } : {}),
+      ...hwMore(h),
     }));
 
   /* 선생님 피드백 — 사람(작성자 이름이 있는 것)이 쓴 teacherFeedback 최근 2개만 · 200자까지 · AI 피드백(learningComment · aiFeedback)은 받지 않는다 (20261117c · 온라인 학부모 화면) */
@@ -222,7 +268,10 @@ export function pick(src: Any) {
       hwSubmitted: num(l?.submittedHomework),
       hwOnTime: num(l?.onTimeHomework),
       hwTotal: num(l?.totalHomework),
+      ...lecMore(l),
     })),
+    /* 앱이 점수 칸을 보냄(비어 있으면 「채점 전」) · 20261121a */
+    ...(hist.some((h: Any) => h && typeof h === "object" && ("wrongAnswerScore" in h || "textComprehensionScore" in h)) ? { sk: 1 } : {}),
     history: hw,
     recent: hw.slice().reverse().slice(0, 10),
     shape: shapeOf(src),

@@ -293,7 +293,7 @@
     return { ym: ym, today: today, days: days, app: app, hub: hub, golden: golden, streak: streak, n: n, empty: empty, staff: staff,
              todayDay: days.filter(function (x) { return x.date === today; })[0] || null,
              okN: cd.filter(function (x) { return x.kind === 'ok'; }).length, hubOkN: cd.filter(function (x) { return OKISH[x.kind]; }).length,
-             exN: days.filter(function (x) { return x.kind === 'excused'; }).length, current: ym === ymOf(today) };
+             exN: days.filter(function (x) { return x.kind === 'excused'; }).length, current: ym === ymOf(today), sk: !!data.sk };
   }
 
   /* ---------- 화면 조각 ---------- */
@@ -386,7 +386,9 @@
     var done = x.kind === 'ok' || x.kind === 'late';
     return '<div class="orn-today' + (done ? ' is-done' : '') + '"><span class="orn-stat__i" aria-hidden="true">' + (done ? '🎉' : '📖') + '</span><div><b>오늘의 지문' + (x.day ? ' · DAY ' + x.day : '') + '</b>' +
       (x.title ? '<p class="orn-today__t">' + esc(cleanTitle(x.title)) + (x.genre ? ' <span class="orn-genre">' + esc(x.genre) + '</span>' : '') + '</p>' : '') +
-      '<p>' + (x.kind === 'ok' ? '오늘도 완주! ✓' + (x.at ? ' · ' + esc(x.at.hm) + ' 인증' : '') : x.kind === 'late' ? '오늘도 완주! (조금 늦게 인증)' : '아직 인증 전 · 오늘 밤 12시까지') + '</p></div></div>';
+      '<p>' + (x.kind === 'ok' ? '오늘도 완주! ✓' + (x.at ? ' · ' + esc(x.at.hm) + ' 인증' : '') : x.kind === 'late' ? '오늘도 완주! (조금 늦게 인증)' : '아직 인증 전 · 오늘 밤 12시까지') + '</p>' +
+      /* 오늘 낸 숙제 — 점수 줄 · 스스로 칭찬 · 발전 한 줄씩 (20261121a · hw-card.js) */
+      (global.HwCard && x.items ? HwCard.todayHtml(x.items, { sk: r.sk }) : '') + '</div></div>';
   }
 
   /* 이번 달 지문 목록 (20261120d) — 반 달력에서 숙제가 열린 날을 DAY 순서대로 빠짐없이(오늘까지)
@@ -428,12 +430,16 @@
         if (y.kind === 'pre') return '<li class="orn-list__r is-pre"><span class="orn-list__d num">' + esc(mdw(x.date)) + '</span><span class="orn-list__day num"></span>' +
           '<span class="orn-list__t orn-list__t--wait num">' + (y.n > 1 ? '~ ' + esc(mdw(y.to)) + ' · ' + y.n + '일' : '') + '</span><span class="orn-list__k orn-k--pre">' + PRE.t + '</span><span class="orn-list__s"></span></li>';
         var t = y.stale ? '' : y.title;
-        return '<li class="orn-list__r' + (y.first ? '' : ' orn-list__r--more') + '">' +
-          '<span class="orn-list__d num">' + (y.first ? esc(mdw(x.date)) : '') + '</span><span class="orn-list__day num">' + (y.first && x.day ? 'DAY ' + x.day : '') + '</span>' +
+        /* 날짜를 누르면 그날 하루 활동 · 숙제 카드(20261121a · hub.js · hw-card.js) · 줄 끝에 오답정리 · 지문 장악 점수 작게 */
+        var dcell = y.first ? (o.tap ? '<button type="button" class="orn-list__d orn-list__go num" data-orn-row="' + esc(x.date) + '" aria-expanded="false" aria-label="' + esc(mdw(x.date) + ' 하루 활동 보기') + '">' + esc(mdw(x.date)) + ' ›</button>'
+                                     : '<span class="orn-list__d num">' + esc(mdw(x.date)) + '</span>') : '<span class="orn-list__d num"></span>';
+        var chip = y.it && global.HwCard ? HwCard.chipHtml(y.it) : '';
+        return '<li class="orn-list__r' + (y.first ? '' : ' orn-list__r--more') + '" data-orn-li="' + esc(x.date) + '">' +
+          dcell + '<span class="orn-list__day num">' + (y.first && x.day ? 'DAY ' + x.day : '') + '</span>' +
           (t ? '<button type="button" class="orn-list__t" data-orn-t aria-expanded="false" title="' + esc(y.full || t) + '">' + esc(t) + '</button>'
              : '<span class="orn-list__t orn-list__t--wait">' + (y.kind === 'pre' ? '' : STALE) + '</span>') +
           '<span class="orn-list__k orn-k--' + K.c + '">' + esc(K.t) + '</span>' +
-          (y.total ? '<span class="orn-list__s num">' + y.correct + '/' + y.total + '</span>' : '<span class="orn-list__s"></span>') + '</li>';
+          (y.total || chip ? '<span class="orn-list__s num">' + (y.total ? y.correct + '/' + y.total : '') + chip + '</span>' : '<span class="orn-list__s"></span>') + '</li>';
       }).join('') + '</ul></section>';
   }
 
@@ -508,11 +514,36 @@
         '<button type="button" class="orn-mnav__b" data-orn-m="' + esc(next) + '"' + (next ? '' : ' disabled') + ' aria-label="다음 달">▶</button></div>' +
       appSegsHtml(r.app) +
       '<div class="orn-cal" role="group" aria-label="날짜별 인증">' + DOW.map(function (d, j) { return '<span class="orn-cal__w' + (j === 0 || j === 6 ? ' is-we' : '') + '">' + d + '</span>'; }).join('') + cells.join('') + '</div>' +
-      (open ? dayHtml(open) : '<p class="orn-hint">날짜를 누르면 그날 지문을 볼 수 있어요</p>') +
+      (open ? dayHtml(open, o.data) : '<p class="orn-hint">날짜를 누르면 그날 지문 · 활동을 볼 수 있어요</p>') +
       '<ul class="orn-legend">' + legend(false).map(function (k) { var K = KIND[k]; return '<li><i class="orn-k--' + K.c + '">' + (K.i || '') + '</i>' + esc(K.t) + '</li>'; }).join('') + '</ul>' + NOTE +
-    '</section>' + listHtml(r, { staff: o.staff });
+    '</section>' + listHtml(r, { staff: o.staff, tap: !!(o.data && global.HwCard) });
   }
-  function dayHtml(x) {
+  /* 날짜 칸 — 그날 지문 · 상태 + (앱 기록이 있으면) 하루 활동 타임라인 · 숙제 한 건 카드 (20261121a) */
+  function dayHtml(x, data) {
+    var base = dayBase(x);
+    if (!data || !global.HwCard || !x.counted || x.pre) return base;
+    var its = (x.items && x.items.length ? x.items : HwCard.itemsOn(data, x.date)).filter(function (h) { return h && h.submittedAt; });
+    if (!its.length && !HwCard.timeline(data, x.date, [])) return base;
+    return base.replace(/<\/div>$/, '') + HwCard.dayHtml(data, x.date, { day: x.day, items: its }) + '</div>';
+  }
+  /* 지문 목록 줄 — 날짜를 누르면 그 줄 아래에 하루 활동 · 숙제 카드 (다시 누르면 접기 · 20261121a) */
+  function rowTap(btn, r, data) {
+    var date = btn.getAttribute('data-orn-row'), ul = btn.closest('ul'), open = btn.getAttribute('aria-expanded') === 'true';
+    if (!ul) return;
+    ul.querySelectorAll('.orn-list__x').forEach(function (n) { n.parentNode.removeChild(n); });
+    ul.querySelectorAll('[data-orn-row]').forEach(function (b) { b.setAttribute('aria-expanded', 'false'); });
+    if (open) return;
+    var x = (r.days || []).filter(function (d) { return d.date === date; })[0];
+    var rows = ul.querySelectorAll('[data-orn-li="' + date + '"]'), last = rows[rows.length - 1];
+    if (!x || !last) return;
+    var li = document.createElement('li');
+    li.className = 'orn-list__x';
+    var its = (x.items || []).filter(function (h) { return h && h.submittedAt; });
+    li.innerHTML = global.HwCard ? HwCard.dayHtml(data, date, { day: x.day, items: its }) : '';
+    last.parentNode.insertBefore(li, last.nextSibling);
+    btn.setAttribute('aria-expanded', 'true');
+  }
+  function dayBase(x) {
     var K = KIND[x.kind] || KIND.off, rows = [];
     if (!x.counted) rows.push(x.kind === 'weekend' ? '숙제가 없는 날이에요' + (isWeekend(x.date) ? ' · 주말 자율 과제(어휘테스트 · 모의고사)' : '') : '지문이 없는 날이에요');
     else {
@@ -550,7 +581,9 @@
     function avg(k) { var v = sc.filter(function (x) { return x.k === k; }).map(function (x) { return +x.s; }); return v.length ? { a: Math.round(v.reduce(function (p, q) { return p + q; }, 0) / v.length), n: v.length } : null; }
     var w = avg('wrong'), t = avg('text');
     var app = r.app, doneN = app && app.status === 'ok' ? app.secs.filter(function (s) { return s.state === 'done'; }).length : null;
-    var html = '<section class="card orn-rec"><h2 class="card-title">📒 ' + esc(monthName(r.ym)) + ' 기록</h2>' +
+    /* 맨 위 — 이번 달 활동 한눈에 · 오답정리 · 지문 장악 평균 · 날짜별 추이 · 숙제 카드(최신순) (20261121a · hw-card.js) */
+    var html = (global.HwCard ? HwCard.monthHtml(data, r.ym, r.today) : '') +
+      '<section class="card orn-rec"><h2 class="card-title">📒 ' + esc(monthName(r.ym)) + ' 기록</h2>' +
       '<div class="orn-kpis"><div><b class="num">' + r.okN + '회</b><span>정시 인증 (' + r.n + '회차 중)</span></div>' +
       '<div><b class="num">' + (doneN == null ? '확인 전' : doneN + '/3') + '</b><span>완주 구간</span></div>' +
       '<div><b class="num">' + r.streak + '일</b><span>연속 인증</span></div></div></section>';
@@ -562,9 +595,11 @@
         : '<p class="orn-hint">과제를 내면 파트별 정답률이 쌓여요</p>') + '</section>';
     html += growthHtml(data, r.today, { staff: o.staff });
     if (o.parent) html += fbHtml(data);
-    if (w || t) html += '<section class="card orn-rec"><h2 class="card-title">✍️ 오답정리 · 필기 점수</h2><div class="orn-kpis">' +
+    /* 왕 뽑기 점수(hub_scores) 칸 — 앱 선생님 점수(wa · tc)가 있으면 맨 위 「활동 한눈에」 평균과 겹치니 그릴 때만(20261121a) */
+    var appSc = global.HwCard ? HwCard.avg(data, '', '') : null;
+    if ((w || t) && !(appSc && (appSc.wa || appSc.tc))) html += '<section class="card orn-rec"><h2 class="card-title">✍️ 오답정리 · 지문 장악</h2><div class="orn-kpis">' +
       (w ? '<div><b class="num">' + w.a + '</b><span>오답정리 평균 · ' + w.n + '회</span></div>' : '') +
-      (t ? '<div><b class="num">' + t.a + '</b><span>지문 장악(필기) 평균 · ' + t.n + '회</span></div>' : '') + '</div></section>';
+      (t ? '<div><b class="num">' + t.a + '</b><span>지문 장악 평균 · ' + t.n + '회</span></div>' : '') + '</div></section>';
     html += '<p class="orn-kakao">' + KAKAO + '</p>';
     return html;
   }
@@ -623,6 +658,6 @@
   }
 
   global.OnlineRun = { compute: compute, months: months, groups: groups, appSections: appSections, sectionsOf: sectionsOf, appOf: appOf, defaultApp: defaultApp, streakOf: streakOf, DEF_TH: DEF_TH,
-    cardHtml: cardHtml, calHtml: calHtml, dayHtml: dayHtml, recordHtml: recordHtml, listHtml: listHtml, listRows: listRows, cleanTitle: cleanTitle, growthHtml: growthHtml, fbHtml: fbHtml, talkOf: talkOf, KAKAO: KAKAO, staffHtml: staffHtml, appSegsHtml: appSegsHtml,
+    cardHtml: cardHtml, calHtml: calHtml, dayHtml: dayHtml, rowTap: rowTap, recordHtml: recordHtml, listHtml: listHtml, listRows: listRows, cleanTitle: cleanTitle, growthHtml: growthHtml, fbHtml: fbHtml, talkOf: talkOf, KAKAO: KAKAO, staffHtml: staffHtml, appSegsHtml: appSegsHtml,
     classRow: classRow, csv: csv, appCell: appCell, hubCell: hubCell, KIND: KIND, monthName: monthName, shiftYm: shiftYm, ymOf: ymOf };
 })(window);

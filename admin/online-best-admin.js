@@ -47,7 +47,7 @@
       '<p class="sc-hint">사진에서 확인되는 것만 · 다른 학생과 비교 · 과장 · 「꼭 · 반드시 · 무조건」 없이 · [확인]해야 학생 · 학부모에게 보여요</p></div>';
   }
   function rowHtml(x, sid, kind) {
-    var ref = esc(sid + '|item|' + x.key), lab = kind === 'wrong' ? '오답정리' : '필기';
+    var ref = esc(sid + '|item|' + x.key), lab = kind === 'wrong' ? '오답정리' : '지문 장악';
     return '<li class="oba-it' + (x.hidden ? ' is-hidden' : '') + '"><div class="oba-it__h"><span class="muted-note num">' + esc(md(x.day)) + (x.sday && x.sday !== x.day ? ' · ' + esc(md(x.sday)) + ' 제출' : '') + '</span>' +
       '<b class="oba-it__t" title="' + esc(x.title || '') + '">' + esc(clean(x.title) || '지문') + '</b><span class="oba-s num">' + lab + ' ' + esc(x.s) + '점</span>' +
       (x.hidden ? '<span class="oba-tag">숨김</span>' : '') +

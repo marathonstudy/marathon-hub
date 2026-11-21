@@ -2,7 +2,7 @@
    online-best.js — 온라인 학생 「🏅 우수 수행」 탭 (20261118b · 러닝노트 학생 · 학부모 · 영상·필기 탭 자리)
 
      · 우수 오답정리 — 이 학생 제출 중 선생님 오답정리 점수 높은 것 3개(날짜 · 지문 제목 · 점수 · 제출 사진 · 선생님 한마디)
-     · 우수 지문 장악 — 필기 점수 높은 것 3개(같은 모양)
+     · 우수 지문 장악 — 지문 장악 점수 높은 것 3개(같은 모양) · 20261121a: 카드에 스스로 칭찬 · 발전 · 퀴즈 답변(앱 기록에 있을 때만)
      · 우수 질문 — 선생님과 주고받은 메시지에서 직원이 고른 것만(자동 공개 없음) · 앱이 아직 메시지를 안 보내면 「앱 연결 준비 중」
      · 이번 주 공부한 지문 — 월 ~ 일 날짜마다 지문 제목 · DAY · 제출 여부 (영상 · 필기노트 링크는 앱 연결 준비 중)
    서버: hub_best(링크 · 그 학생 것만 · 직원이 숨긴 항목 · 사진 빼고 · migration-120 · 126 지문 날짜 · 선정 이유)
@@ -28,12 +28,25 @@
   function clean(t) { return global.OnlineRun && OnlineRun.cleanTitle ? OnlineRun.cleanTitle(t) : String(t || ''); }
   /* 카드 한 장 (20261120d · migration-126)
      · 날짜 = 지문 날짜(반 달력) · 제출일이 다르면 작게 「11/20 제출」 · 제목은 지문 목록과 같이 다듬기(한 줄 넘으면 말줄임 · 누르면 전체)
-     · 점수에 종류(「오답정리 100점」 · 「필기 100점」)
+     · 점수에 종류(「오답정리 100점」 · 「지문 장악 100점」)
      · 사진 — 썸네일 → 누르면 크게(앱 서명 주소 · 함수 online-best · 그 학생 것만) · 앱 주소가 아직 없으면 자리표시(직원 화면에만 「앱 사진 연결 준비 중」)
      · 선생님 한마디(사람이 쓴 피드백) · 피드백이 없거나 한 줄 이하면 「선정 이유」(직원이 [확인]한 글만 · 확인 전 「선정 이유 준비 중」) */
-  function itemHtml(x, kind) {
+  /* 그 제출의 앱 기록 한 줄(제출 열쇠 = 제출 시각 앞 19자 + '#' + 강 번호) — 스스로 칭찬 · 발전 · 퀴즈 답변 (20261121a) */
+  function histOf(x, data) {
+    var k = String(x && x.key || ''), i = k.lastIndexOf('#');
+    if (!data || i < 0) return null;
+    var at = k.slice(0, i), ord = +k.slice(i + 1);
+    return [].concat((data.old && data.old.history) || [], data.history || []).filter(function (h) { return h && String(h.submittedAt || '').slice(0, 19) === at && +h.order === ord; })[0] || null;
+  }
+  function selfHtml(h) {
+    if (!h) return '';
+    var b = function (n, t, c) { return t ? '<div class="hwc-bub ' + c + '"><span class="hwc-bub__n">' + n + '</span><p class="hwc-txt' + (t.length > 70 ? ' is-clamp' : '') + '">' + esc(t) + '</p>' + (t.length > 70 ? '<button type="button" class="hwc-more" data-hwc-more aria-expanded="false">더 보기</button>' : '') + '</div>' : ''; };
+    var s = function (v) { return typeof v === 'string' ? v.trim() : ''; };
+    return b('스스로 칭찬해 주고 싶은 점', s(h.sp), 'hwc-bub--me') + b('발전하고 싶은 점', s(h.im), 'hwc-bub--me') + b('영상 강의 퀴즈 답변', s(h.qa), 'hwc-bub--q');
+  }
+  function itemHtml(x, kind, data) {
     var ph = (x.photos || []).filter(function (p) { return p && p.i != null; });
-    var lab = kind === 'wrong' ? '오답정리' : '필기', t = clean(x.title) || '지문';
+    var lab = kind === 'wrong' ? '오답정리' : '지문 장악', t = clean(x.title) || '지문';
     return '<li class="ob-it"><div class="ob-it__h"><span class="ob-it__d num">' + esc(mdw(x.day)) + (x.sday && x.day && x.sday !== x.day ? ' <small class="ob-it__sd">' + esc(md(x.sday)) + ' 제출</small>' : '') + '</span>' +
       '<button type="button" class="ob-it__t" data-ob-t aria-expanded="false" title="' + esc(x.title || t) + '">' + esc(t) + '</button>' +
       '<span class="ob-it__s num" aria-label="' + lab + ' 점수 ' + esc(x.s) + '점">' + lab + ' ' + esc(x.s) + '점</span></div>' +
@@ -41,12 +54,13 @@
         return '<button type="button" class="ob-ph__b" data-ob-ph="' + esc(x.key + '|' + p.i) + '"' + (p.id ? ' data-ob-id="' + esc(p.id) + '" data-ob-day="' + esc(x.sday || x.day) + '"' : '') + ' data-ob-kind="' + (p.kind === 'pdf' ? 'pdf' : 'image') + '" data-ob-d="' + esc(x.day || '') + '"' +
           ' aria-label="' + esc(mdw(x.day)) + ' 제출 ' + (p.kind === 'pdf' ? 'PDF' : '사진') + ' 크게 보기"><span class="ob-ph__w">' + (p.kind === 'pdf' ? 'PDF' : '사진') + '</span></button>';
       }).join('') + '</div>' : '') +
+      selfHtml(histOf(x, data)) +
       (x.fb ? '<p class="ob-fb"><span class="ob-fb__n">선생님 한마디</span>' + esc(x.fb) + '</p>' : '') +
       (x.need === false ? '' : x.reason ? '<p class="ob-why"><span class="ob-fb__n">선정 이유</span>' + esc(x.reason) + '</p>' : '<p class="ob-why is-wait">선정 이유 준비 중</p>') + '</li>';
   }
-  function listHtml(title, icon, list, kind, empty) {
+  function listHtml(title, icon, list, kind, empty, data) {
     return '<section class="card ob-sec"><h2 class="card-title">' + icon + ' ' + esc(title) + '</h2>' +
-      (list && list.length ? '<ol class="ob-list">' + list.map(function (x) { return itemHtml(x, kind); }).join('') + '</ol>' : '<p class="ob-empty">' + esc(empty) + '</p>') + '</section>';
+      (list && list.length ? '<ol class="ob-list">' + list.map(function (x) { return itemHtml(x, kind, data); }).join('') + '</ol>' : '<p class="ob-empty">' + esc(empty) + '</p>') + '</section>';
   }
   function qHtml(q) {
     q = q || {};
@@ -87,8 +101,8 @@
     if (best === undefined) return '<div class="card app-wait"><p class="tw-loading"><i class="spin" aria-hidden="true"></i> 불러오는 중</p></div>';
     var fail = !best || best.__fail;
     var top = fail ? '<div class="empty errko" role="alert"><p>잠시 후 다시 시도해 주세요</p><button type="button" class="btn-ghost" data-ob-retry>다시 시도</button></div>'
-      : listHtml('우수 오답정리', '🏅', best.wrong, 'wrong', best.scores ? '아직 선생님 점수가 매겨진 오답정리가 없어요' : '선생님 점수는 ' + WAIT) +
-        listHtml('우수 지문 장악', '🔍', best.text, 'text', best.scores ? '아직 선생님 점수가 매겨진 필기가 없어요' : '선생님 점수는 ' + WAIT) + qHtml(best.q);
+      : listHtml('우수 오답정리', '🏅', best.wrong, 'wrong', best.scores ? '아직 선생님 점수가 매겨진 오답정리가 없어요' : '선생님 점수는 ' + WAIT, data) +
+        listHtml('우수 지문 장악', '🔍', best.text, 'text', best.scores ? '아직 선생님 점수가 매겨진 지문 장악이 없어요' : '선생님 점수는 ' + WAIT, data) + qHtml(best.q);
     return '<div class="ob">' + '<p class="ob-lead">선생님이 높게 본 내 제출물 · 질문 · 이번 주 공부</p>' + top + weekHtml(data, today) + '</div>';
   }
   /* 사진 (20261120d) — 함수 online-best(앱 /api/hub/submission-file 서명 주소 · 서버에서만 · 그 학생 것만 · 숨긴 사진 빼고)
