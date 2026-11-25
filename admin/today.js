@@ -2106,7 +2106,8 @@
             (c.rows.length ? '<button type="button" class="btn btn--sm tdc-sms" data-sms-cls="' + esc(c.name) + '" aria-label="' + esc(c.name) + ' 전체 문자 발송">전체 문자 발송</button>' : '') + '</div>' +
             linesHtml(c, chipsOf(c)) + attHtml(c.name, Course.shortName(c.name)) + '</div>';
         }).join('') +
-      '</div><div class="tdc-btns"><button type="button" class="btn btn--sm btn--primary tdc-write" data-write-course="' + esc(ckey) + '">레포트 작성</button></div></div>' +
+      '</div><div class="tdc-btns"><button type="button" class="btn btn--sm btn--primary tdc-write" data-write-course="' + esc(ckey) + '">레포트 작성</button>' +
+        (window.Roster ? Roster.btnHtml(cls.map(function (c) { return c.name; })) : '') + '</div></div>' +   /* 📋 명단 받기 — 과정의 반 모두 골라 둠 (20261125a) */
       /* 과정 — 반마다 수업일이 달라 반별 목록마다 머리칸을 따로 */
       (n ? toggleBar(co.name, n, open, null) : '') +
       (open ? '<div class="tdc-list">' + cls.map(function (c) {
@@ -2137,6 +2138,7 @@
         '<div class="tdc-btns">' +
           (c.name === '(반 없음)' || !n ? '' : '<button type="button" class="btn btn--sm tdc-sms" data-sms-cls="' + esc(c.name) + '" aria-label="' + esc(c.name) + ' 전체 문자 발송">전체 문자 발송</button>') +
           (c.name === '(반 없음)' ? '' : '<button type="button" class="btn btn--sm btn--primary tdc-write" data-write="' + esc(c.name) + '">레포트 작성</button>') +
+          (c.name === '(반 없음)' || !window.Roster ? '' : Roster.btnHtml(c.name)) +   /* 📋 명단 받기 — 이 반 골라 둠 (20261125a) */
         '</div>' +
       '</div>' +
       (n ? toggleBar(c.name, n, open, c) : '') +
@@ -2216,6 +2218,7 @@
         '<button type="button" role="tab" class="td-tab' + (tab === 'class' ? ' is-on' : '') + '" aria-selected="' + (tab === 'class') + '" data-td-tab="class">🏫 현강 <b class="num">' + nh + '</b></button>' +
         '<button type="button" role="tab" class="td-tab' + (tab === 'online' ? ' is-on' : '') + '" aria-selected="' + (tab === 'online') + '" data-td-tab="online">💻 온라인 <b class="num">' + no + '</b></button>' +
         '<span class="td-tabs__sp"></span>' +
+        (window.Roster ? Roster.btnHtml([], 'td-roster') : '') +   /* 📋 명단 받기 — 반 고르기부터 (roster.js · 128 · 20261125a) */
         (tab === 'class' ? '<button type="button" class="btn btn--sm" data-td-newcls>+ 현강 반 만들기</button>' : (canImp ? '<button type="button" class="btn btn--sm" data-td-import>📥 온라인 반 가져오기</button>' : '')) +
       '</div>' +
       '<div class="td-find"><input class="input td-find__in" id="tdFind" type="search" placeholder="반 · 학생 이름 찾기 (현강 · 온라인 모두)" autocomplete="off" value="' + esc(st.q || '') + '" aria-label="반 · 학생 이름 찾기"><div class="td-find__res" id="tdFindRes" role="list"></div></div>';

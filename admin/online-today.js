@@ -444,7 +444,8 @@
     var head = '<div class="ot-vhead" data-ot-vhead><h2 class="ot-vtitle" data-ot-vtitle>' + titleOf(T.cls) + '</h2>' +
       '<div class="ot-vnav"><button type="button" class="btn btn--sm" data-ot-back>◀ 반 목록</button>' +
         (others.length ? '<select class="input input--sm ot-vother" data-ot-tcls aria-label="다른 반으로"><option value="" selected>다른 반 ▾</option>' + others.map(function (n) { return '<option value="' + esc(n) + '">' + esc(n) + '</option>'; }).join('') + '</select>' : '') +
-        '<button type="button" class="btn btn--sm" data-ot-set="' + k + '">⚙ 반 설정</button></div></div>';
+        '<button type="button" class="btn btn--sm" data-ot-set="' + k + '">⚙ 반 설정</button>' +
+        (window.Roster ? Roster.btnHtml(T.cls) : '') + '</div></div>';   /* 📋 명단 받기 — 이 반 골라 둠 (roster.js · 20261125a) */
     var cardC = S.classes.filter(function (c) { return c.name === T.cls; })[0] || { rows: [] };
     var kingsOn = !!(window.OnlineClass && (OnlineClass.opts(T.cls) || {}).kings_on) || !!S.kings[T.cls];
     /* 옮김(지우지 않음): 오늘 제출물 보기 · 월말 정리 · 다시 읽기 · 왕 뽑기 후보(켰을 때) — 예전 반 카드에서 */

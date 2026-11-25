@@ -5351,3 +5351,49 @@ body.td-online #mgOps { display: none !important; }
   .ot-tn { white-space: normal; word-break: keep-all; }
   .ot-tacts > .muted-note { flex-basis: 100%; }
 }
+
+/* ============================================================
+   📋 명단 받기 (roster.js · 20261125a · migration-128) — 반 고르기 · 파일 모양 · 열 · 퇴원생 포함 · 받기 기록
+   ============================================================ */
+dialog.rs-modal { width: min(640px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); }
+dialog.rs-modal[open] { display: flex; flex-direction: column; }
+.rs-modal .modal__head, .rs-modal .modal__foot { flex: none; }
+.rs-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; display: grid; gap: 14px; }
+.rs-s { min-width: 0; }
+.rs-h { font-size: 14px; font-weight: 800; color: var(--ink-deep); margin: 0 0 6px; }
+.rs-h small { font-weight: 600; }
+.rs-find { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+.rs-find .input { flex: 1 1 auto; min-width: 0; }
+.rs-g { margin-top: 8px; min-width: 0; }
+.rs-g__h { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 13px; margin-bottom: 4px; }
+.rs-g__all { margin-left: auto; }
+.rs-g__list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 180px), 1fr)); gap: 6px; }
+.rs-c { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; min-width: 0; min-height: 44px; padding: 6px 10px; border: 1px solid #DDD8F5; border-radius: 12px; background: #fff; cursor: pointer; font-size: 13.5px; }
+.rs-c.is-on { border-color: #5B42D6; background: #F3F0FF; }
+.rs-c input { width: 18px; height: 18px; flex: none; }
+.rs-c__n { font-weight: 700; min-width: 0; overflow-wrap: anywhere; flex: 1 1 auto; }
+.rs-c__k { color: var(--ink-light); font-size: 12px; }
+.rs-tag { font-size: 11.5px; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: #EEF0F6; color: #6B6F8A; }
+.rs-opts { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.rs-r { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; font-size: 13.5px; cursor: pointer; overflow-wrap: anywhere; }
+.rs-r input { width: 18px; height: 18px; flex: none; }
+.rs-left { font-weight: 800; margin-right: 8px; }
+.rs-note { margin: 4px 0 0; }
+.rs-sum { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--surface-2, #F6F7FB); font-size: 13.5px; line-height: 1.7; overflow-wrap: anywhere; }
+.rs-file { font-size: 12.5px; color: var(--ink-light); }
+.rs-err { margin: 0; }
+.rs-foot { border-top: 1px solid var(--line-soft); padding-top: 10px; }
+.rs-log { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.rs-log__i { padding: 8px 10px; border: 1px solid var(--line-soft); border-radius: 12px; font-size: 13.5px; line-height: 1.6; overflow-wrap: anywhere; }
+.rs-log__c { font-weight: 700; }
+.tdc-btns .rs-open { white-space: nowrap; }
+@media (max-width: 720px) {
+  .tdc-btns { flex-wrap: wrap; }
+}
+@media (max-width: 480px) {
+  .rs-body { padding: 12px 14px; }
+  .rs-modal .modal__head { padding: 14px 14px 10px; }
+  .rs-modal .modal__foot { padding: 10px 14px 14px; }
+  .rs-foot .btn { flex: 1 1 auto; }
+  .rs-foot .spacer { display: none; }
+}
