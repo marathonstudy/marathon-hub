@@ -667,7 +667,7 @@
     else if (t.id === 'csBodyIn') st.draft.body = t.value;
   });
   document.addEventListener('change', function (e) {
-    if (e.target && e.target.id === 'csFollow') st.draft.follow = e.target.checked;
+    if (e.target && e.target.id === 'csFollow') { st.draft.follow = e.target.checked; if (window.StuCard && StuCard.pinRefresh) StuCard.pinRefresh(st.open); }   /* 학생 카드 📌 모양도 바로 (20261126a) */
   });
   document.addEventListener('focusin', function (e) {
     var t = e.target, m = modal();

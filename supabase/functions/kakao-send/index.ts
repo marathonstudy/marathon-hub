@@ -22,6 +22,9 @@
 //    학부모 템플릿 코드 (migration-072 · 20261108d) — 설정(app_settings 'kakao_tpl' parent · 원장만 고침)에 있으면 그 코드,
 //                      비어 있으면 지금처럼 Secrets 의 SOLAPI_TEMPLATE_ID. 새 템플릿(「주간레포트안내_v2」)은 설정에 코드만 넣으면 바로 바뀐다
 //    action "test" { tpl, latest: true } — 설정 칸 옆 [시험 발송]: 원장만 · 칸에 넣은 코드(저장 전에도)로 · 가장 최근 공개 레포트 내용으로 내 시험 번호에 한 통
+//    kind "online" (migration-129 · 20261126a) — 온라인 반 레포트 알림톡(학생 / 학부모 × 다 완주 · 1~n일 빠짐 · 더 빠짐 = 템플릿 6개)
+//                      템플릿 코드는 설정(app_settings 'online_report' · 원장만) · 줄은 online_report_prepare · 기록 online_report_record
+//                      test = 내 시험 번호로 경우마다 한 통 · 대체 문자는 위 084 와 같은 길(kakao_alt) · 현강 흐름은 그대로
 //  솔라피는 「접수」 결과만 바로 알려 준다 (실제 도착 여부는 솔라피 콘솔의 발송 내역에서 본다).
 //
 //  키 — Supabase 대시보드 → Edge Functions → Secrets 에만 넣는다. 이 파일 · 저장소 · 화면에는 어떤 키도 없다.
@@ -120,6 +123,9 @@ async function handle(req: Request, cors: Record<string, string>) {
   if (action === "status") {
     return json({ ok: true, keys: have, templateSet: have.SOLAPI_TEMPLATE_ID, templateFrom: parentTpl ? "settings" : (env("SOLAPI_TEMPLATE_ID") ? "secrets" : ""), studentTpl, cfg }, cors);
   }
+  /* 온라인 반 레포트 알림톡 (migration-129 · 20261126a) — 아래 현강 흐름과 따로 (현강 코드는 그대로) */
+  if (body.kind === "online") return await onlineReport(auth, apikey, body, action, have, cors);
+
   /* 설정 칸 옆 [시험 발송] — 원장만 · 칸의 코드로 (저장 전에도) · 가장 최근 공개 레포트 */
   let testTpl = "";
   if (action === "test" && body.latest === true) {
@@ -234,6 +240,99 @@ async function handle(req: Request, cors: Record<string, string>) {
   return json({
     ok: true, test: action === "test", who, sent, failed: results.length - sent, skipped, tpl: who === "parent" ? (testTpl ? "input" : parentTpl ? "settings" : "secrets") : "student",
     results: results.map((x) => ({ student_id: x.student_id, ok: x.ok, error: x.error })),
+  }, cors);
+}
+
+/* ------------------------------------------------------------
+   온라인 반 레포트 알림톡 (migration-129 · 20261126a)
+   { kind: "online", action: "test" | "send", cls, week, target: "student" | "parent", items: [{ id, case }], resend, fallback }
+   번호 · 이름 · 링크 · 템플릿 코드 · 변수는 DB 함수 online_report_prepare 가 부른 직원의 로그인으로 찾는다(화면은 학생 id · 경우만)
+   템플릿 코드는 설정 표(app_settings 'online_report' · 원장만 고침) · 키는 Secrets 그대로 (SOLAPI_TEMPLATE_ID 는 쓰지 않음)
+   test — 내 시험 번호로 경우마다 한 통 · send — 대체 문자(fallback 또는 설정 「문자로 대신」) 켜져 있으면 kakao_alt 에 남겨
+          note-remind 가 실패한 사람만 같은 문구 문자(본문에 링크)로 (현강과 같은 길)
+   ------------------------------------------------------------ */
+const ONLINE_REASON: Record<string, string> = {
+  noname: "이름 없음", nocase: "경우 없음", notpl: "템플릿 등록 전", nophone: "번호 없음", same: "학부모와 같은 번호",
+  nolink: "링크 없음", already: "이번 주 이미 보냄", notroster: "이 반 학생 아님",
+};
+async function onlineReport(auth: string, apikey: string, body: Any, action: string, have: Record<string, boolean>, cors: Record<string, string>) {
+  if (action !== "send" && action !== "test") return json({ ok: false, reason: "input", message: "알 수 없는 요청입니다." }, cors, 400);
+  const week = String(body.week ?? "");
+  const cls = String(body.cls ?? "").trim();
+  const target = body.target === "parent" ? "parent" : "student";
+  const items = (Array.isArray(body.items) ? body.items : [])
+    .map((x: Any) => ({ id: String(x?.id ?? ""), case: String(x?.case ?? "") }))
+    .filter((x: Any) => /^[0-9a-f-]{36}$/i.test(x.id) && ["full", "some", "many"].includes(x.case));
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(week)) return json({ ok: false, reason: "input", message: "주를 골라 주세요." }, cors, 400);
+  if (!cls || cls.length > 80) return json({ ok: false, reason: "input", message: "반을 골라 주세요." }, cors, 400);
+  if (!items.length) return json({ ok: false, reason: "input", message: "보낼 학생을 골라 주세요." }, cors, 400);
+  if (items.length > 100) return json({ ok: false, reason: "max", message: "한 번에 100명까지 보낼 수 있습니다." }, cors, 400);
+  const need = ["SOLAPI_API_KEY", "SOLAPI_API_SECRET", "SOLAPI_PFID", "SOLAPI_SENDER"];
+  const missing = need.filter((k) => !have[k]);
+  if (missing.length) return json({ ok: false, reason: "nokeys", missing, message: "알림톡 키가 아직 다 들어가지 않았습니다 (" + missing.join(", ") + "). Supabase Secrets 에 넣어 주세요." }, cors, 200);
+
+  let prep: Any;
+  try {
+    prep = await rpcAs(auth, apikey, "online_report_prepare", {
+      p_class: cls, p_week: week, p_target: target, p_items: items, p_test: action === "test", p_resend: body.resend === true, p_site: SITE,
+    });
+  } catch (e) {
+    const m = String((e as Error).message || e);
+    if (/Could not find the function|schema cache/i.test(m)) return json({ ok: false, reason: "nosql", message: "migration-129 SQL 을 먼저 실행해 주세요." }, cors, 200);
+    return json({ ok: false, reason: "prepare", message: m }, cors, 200);
+  }
+  const skipped = (prep?.skipped || []).map((s: Any) => ({ id: s.id, name: s.name, reason: s.reason, case: s.case || "", label: ONLINE_REASON[s.reason] || s.reason }));
+  if (!prep?.ok) return json({ ok: false, reason: prep?.reason || "prepare", message: prep?.message || "보낼 수 없습니다.", skipped }, cors, 200);
+  const rows: Any[] = prep.rows || [];
+  if (!rows.length) return json({ ok: true, test: action === "test", sent: 0, failed: 0, skipped, results: [] }, cors);
+
+  const messages = rows.map((r) => ({
+    to: String(r.to),
+    from: env("SOLAPI_SENDER").replace(/\D/g, ""),
+    kakaoOptions: { pfId: env("SOLAPI_PFID"), templateId: String(r.tpl), variables: r.vars || {}, disableSms: true },
+    customFields: { log: String(r.log_id) },
+  }));
+  const results: Any[] = rows.map((r) => ({ log_id: r.log_id, student_id: r.student_id, case: r.case, ok: true, error: "", message_id: "" }));
+  try {
+    const res = await fetch(SOLAPI, {
+      method: "POST",
+      headers: { Authorization: await solapiAuth(env("SOLAPI_API_KEY"), env("SOLAPI_API_SECRET")), "Content-Type": "application/json" },
+      body: JSON.stringify({ messages, allowDuplicates: true, showMessageList: true }),
+    });
+    const out: Any = await res.json().catch(() => null);
+    if (!res.ok) {
+      const why = (out && (out.errorMessage || out.message || out.errorCode)) || `솔라피 오류 (${res.status})`;
+      results.forEach((x) => { x.ok = false; x.error = String(why).slice(0, 200); });
+    } else {
+      const failed = new Map<string, string>();
+      (out?.failedMessageList || []).forEach((f: Any) => {
+        const id = f?.customFields?.log;
+        if (id) failed.set(String(id), `${f.statusCode || ""} ${f.statusMessage || ""}`.trim() || "접수 실패");
+      });
+      const ids = new Map<string, string>();
+      (out?.messageList || []).forEach((m: Any) => { if (m?.customFields?.log) ids.set(String(m.customFields.log), String(m.messageId || "")); });
+      results.forEach((x) => {
+        if (failed.has(String(x.log_id))) { x.ok = false; x.error = failed.get(String(x.log_id)); }
+        x.message_id = ids.get(String(x.log_id)) || "";
+      });
+    }
+  } catch {
+    results.forEach((x) => { x.ok = false; x.error = "솔라피에 연결하지 못했습니다."; });
+  }
+  await rpcAs(auth, apikey, "online_report_record", { p_results: results.map(({ log_id, ok, error, message_id }) => ({ log_id, ok, error, message_id })) }).catch(() => {});
+  /* 대체 문자 — 실패한 사람만 note-remind 가 같은 문구 문자로 (바로 받지 않은 줄은 다음 분에 바로 · 084 와 같음) */
+  let altN = 0;
+  if (action === "send" && (prep.smsFallback || body.fallback === true)) {
+    const altRows = rows.map((r, i) => ({
+      src: "report", log_id: r.log_id, student_id: r.student_id, target, to: String(r.to), text: String(r.alt || ""),
+      name: String(r.name || ""), lesson: "", link: String(r.link || ""), message_id: results[i].message_id || "", failed: !results[i].ok,
+    })).filter((x) => x.text);
+    if (altRows.length) { await rpcAs(auth, apikey, "kakao_alt_put", { p_rows: altRows }).catch(() => {}); altN = altRows.length; }
+  }
+  const sent = results.filter((x) => x.ok).length;
+  return json({
+    ok: true, test: action === "test", kind: "online", target, sent, failed: results.length - sent, skipped, alt: altN,
+    results: results.map((x) => ({ student_id: x.student_id, case: x.case, ok: x.ok, error: x.error })),
   }, cors);
 }
 

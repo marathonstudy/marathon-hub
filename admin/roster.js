@@ -357,7 +357,7 @@
     S.pick = {}; S.q = ''; S.view = 'form'; S.msg = ''; S.busy = false; S.leftTouched = false; S.left = false;
     (pre || []).forEach(function (n) { n = String(n || '').trim(); if (n && n !== '(반 없음)') S.pick[n] = true; });
     paint();
-    if (global.Layer && Layer.show) Layer.show(dlg); else if (dlg.showModal) dlg.showModal();
+    if (global.Layer && Layer.show) Layer.show(dlg);
   }
   /* 버튼 — names = 미리 고를 반(하나 · 여럿 · 없음) */
   function btnHtml(names, cls) {

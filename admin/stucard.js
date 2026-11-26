@@ -31,12 +31,59 @@
   function reset(sid) { ui = { sid: sid, infoMore: false, edit: false, hwMore: false, wk: -1, mgMore: false, mgMode: 'score', mgPt: -1 }; }
 
   /* ---------- 1) 기본 정보 ---------- */
+  /* 문자 버튼 (20261126a) — 예전엔 PC 에서도 sms: 링크라 문자 앱이 없는 PC 에서는 눌러도 아무 일이 없어 꺼진 것처럼 보였다
+       휴대폰(터치 · 좁은 화면) → 문자 앱 열기(sms:) · PC → 누르면 번호 복사 + 「휴대폰에서 문자 보내세요」
+       못 쓸 때(휴대폰 번호가 아님 01X…)는 꺼 두고 이유를 작은 글씨로 */
+  function isPhoneDevice() {
+    var ua = navigator.userAgent || '';
+    if (/Android|iPhone|iPad|iPod|Mobile/i.test(ua)) return true;
+    if (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) return true;   /* 아이패드 데스크톱 모드 */
+    return false;
+  }
   function phoneHtml(label, num) {
     var d = digits(num);
     if (d.length < 9) return '<span class="sc-ph is-none">' + esc(label) + ' 번호 없음</span>';
-    return '<span class="sc-ph"><a class="sc-ph__call" href="tel:' + d + '" aria-label="' + esc(label + ' 전화 ' + phoneFmt(num)) + '">📞 ' + esc(label) + '</a>' +
-      '<a class="sc-ph__sms" href="sms:' + d + '" aria-label="' + esc(label + ' 문자') + '">문자</a></span>';
+    var call = '<a class="sc-ph__call" href="tel:' + d + '" aria-label="' + esc(label + ' 전화 ' + phoneFmt(num)) + '">📞 ' + esc(label) + '</a>';
+    var sms;
+    if (!/^01\d{8,9}$/.test(d)) sms = '<button type="button" class="sc-ph__sms" disabled aria-label="' + esc(label + ' 문자 — 휴대폰 번호가 아니에요') + '">문자</button><small class="sc-ph__why">휴대폰 번호 아님</small>';
+    else if (isPhoneDevice()) sms = '<a class="sc-ph__sms" href="sms:' + d + '" aria-label="' + esc(label + ' 문자') + '">문자</a>';
+    else sms = '<button type="button" class="sc-ph__sms" data-sc-smscopy="' + d + '" title="PC 에는 문자 앱이 없어요 — 누르면 번호를 복사해요" aria-label="' + esc(label + ' 문자 — 번호 복사') + '">문자</button>';
+    return '<span class="sc-ph">' + call + sms + '</span>';
   }
+  /* 📌 확인 필요 (20261126a) — 상담 기록의 「확인 필요」(follow_up · 다음 상담 때 확인)
+       저장된 것 있음 → 진한 「📌 확인 필요 n」 + [해제](저장된 n개를 한 번에 확인 완료) · 없음 → 연한 테두리 「📌 확인 필요로 표시」(누르면 상담 칸 체크)
+       상담 칸에 체크만 하고 아직 저장 전 → 「📌 표시됨 · 상담 저장 때 남아요」 */
+  function pinHtml(sid) {
+    var n = window.Card && Card.followCount ? Card.followCount(sid) : 0;
+    if (n > 0) {
+      return '<span class="sc-pinset"><button type="button" class="sc-pin is-on" data-sc-pin aria-pressed="true" title="상담 기록에 확인 필요가 ' + n + '개 저장돼 있어요 — 누르면 상담 칸으로">📌 확인 필요 <b class="num">' + n + '</b></button>' +
+        '<button type="button" class="sc-unpin" data-sc-unpin aria-label="확인 필요 ' + n + '개 해제">해제</button></span>';
+    }
+    var qs = window.QuickNote && QuickNote.state ? QuickNote.state() : null;
+    var draft = !!(qs && qs.open === sid && qs.draft && qs.draft.follow);
+    if (draft) return '<button type="button" class="sc-pin is-draft" data-sc-pin aria-pressed="true" title="상담을 저장하면 확인 필요로 남아요">📌 표시됨 · 상담 저장 때 남아요</button>';
+    return '<button type="button" class="sc-pin" data-sc-pin aria-pressed="false" title="누르면 상담 칸의 「확인 필요」에 체크해요">📌 확인 필요로 표시</button>';
+  }
+  function unpin(sid) {
+    var n = window.Card && Card.followCount ? Card.followCount(sid) : 0;
+    if (!n) return;
+    UI.confirmAsk('확인 필요 해제', '이 학생의 「확인 필요」 상담 ' + n + '개를 모두 확인 완료로 바꿉니다. 기록은 지워지지 않고 일반 기록으로 내려가요.', '해제').then(function (ok) {
+      if (!ok) return;
+      SB.client.from('student_notes').update({ followed_at: new Date().toISOString() })
+        .eq('student_id', sid).eq('follow_up', true).is('followed_at', null).is('deleted_at', null).select('id')
+        .then(function (r) {
+          if (r.error) { UI.toast('해제하지 못했습니다 — ' + r.error.message, 'bad'); return; }
+          UI.toast('확인 필요 ' + ((r.data || []).length || n) + '개를 해제했어요', 'good');
+          if (window.Card && Card.notesChanged) Card.notesChanged(sid);
+        });
+    });
+  }
+  function smsCopy(d) {
+    UI.copyText(d).then(function () { UI.toast('번호(' + phoneFmt(d) + ')를 복사했어요 — 휴대폰에서 문자 보내세요', 'good'); },
+      function (e) { UI.toast((e && e.message) || '복사하지 못했습니다', 'bad'); });
+  }
+  /* 확인 필요 개수가 바뀌면(저장 · 해제) 열린 카드를 다시 그린다 */
+  window.addEventListener('jt:roster-changed', function () { if (window.QuickNote && QuickNote.state && QuickNote.state().open) QuickNote.repaint(true); });
   function whenOf(cls) {
     var sc = Store.schedOf ? Store.schedOf(cls) : null, m = (Store.metaOf && Store.metaOf(cls)) || {};
     var ds = sc ? [sc.dow].concat(sc.extra || []).filter(function (x) { return x !== null && x !== undefined && x !== '' && !isNaN(+x); }).map(function (x) { return DOWK[+x % 7]; }) : [];
@@ -50,7 +97,7 @@
       (ln ? ' <span class="sc-mg is-' + esc(ln.k) + '">모고 ' + esc(ln.t) + '</span>' : '') + alTagHtml(sid);
     var p2 = digits(s.parentPhone2) && digits(s.parentPhone2) !== digits(s.parentPhone);
     var line2 = phoneHtml('학생', s.studentPhone) + phoneHtml('학부모', s.parentPhone) + (p2 ? phoneHtml('학부모2', s.parentPhone2) : '') +
-      '<button type="button" class="sc-pin" data-sc-pin aria-label="확인 필요로 표시 — 상담 칸의 체크">📌 확인 필요</button>';
+      '<span class="sc-pinwrap" data-sc-pinwrap>' + pinHtml(sid) + '</span>';
     var more = '';
     if (ui.edit) {
       var f = function (k, label, v, type) { return '<label class="sc-f"><span>' + label + '</span><input class="input" data-sc-f="' + k + '"' + (type ? ' type="' + type + '" inputmode="numeric"' : '') + ' value="' + esc(v || '') + '"></label>'; };
@@ -359,8 +406,10 @@
       if (window.QuickNote) QuickNote.repaint();
       return true;
     }
-    var b = t.closest('[data-sc-tg], [data-sc-wk], [data-sc-mode], [data-sc-pt], [data-sc-edit], [data-sc-save], [data-sc-pv], [data-sc-hwall], [data-sc-pin]');
+    var b = t.closest('[data-sc-tg], [data-sc-wk], [data-sc-mode], [data-sc-pt], [data-sc-edit], [data-sc-save], [data-sc-pv], [data-sc-hwall], [data-sc-pin], [data-sc-unpin], [data-sc-smscopy]');
     if (!b) return false;
+    if (b.hasAttribute('data-sc-unpin')) { unpin(sid); return true; }
+    if (b.hasAttribute('data-sc-smscopy')) { smsCopy(b.getAttribute('data-sc-smscopy')); return true; }
     if (b.hasAttribute('data-sc-tg')) { var k = b.getAttribute('data-sc-tg'); ui[k] = !ui[k]; if (k === 'hwMore' && !ui[k]) ui.wk = -1; }
     else if (b.hasAttribute('data-sc-wk')) { var i = +b.getAttribute('data-sc-wk'); ui.wk = ui.wk === i ? -1 : i; }
     else if (b.hasAttribute('data-sc-mode')) ui.mgMode = b.getAttribute('data-sc-mode') === 'grade' ? 'grade' : 'score';
@@ -374,7 +423,7 @@
     return true;
   }
 
-  window.StuCard = { reset: reset, infoHtml: infoHtml, hwHtml: hwHtml, abilityHtml: abilityHtml, onlineHtml: onlineHtml, mogoHtml: mogoHtml, onClick: onClick, state: function () { return ui; },
+  window.StuCard = { reset: reset, pinRefresh: function (sid) { var w = document.querySelector('[data-sc-pinwrap]'); if (w) w.innerHTML = pinHtml(sid); }, infoHtml: infoHtml, hwHtml: hwHtml, abilityHtml: abilityHtml, onlineHtml: onlineHtml, mogoHtml: mogoHtml, onClick: onClick, state: function () { return ui; },
     mogoChanged: function () { if (window.QuickNote && QuickNote.state().open) QuickNote.repaint(true); } };
   window.StudentCard = window.StuCard;
 })();

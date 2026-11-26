@@ -4691,7 +4691,17 @@ dialog.vl-modal[open] { display: flex; flex-direction: column; overflow: hidden;
 .sc-ph { display: inline-flex; align-items: center; gap: 2px; font-size: 13px; }
 .sc-ph a { display: inline-flex; align-items: center; min-height: 36px; padding: 0 8px; border: 1px solid var(--line-soft); border-radius: 999px; color: #4A34B8; font-weight: 700; text-decoration: none; white-space: nowrap; }
 .sc-ph.is-none { color: var(--ink-light); opacity: .7; padding: 0 4px; }
-.sc-pin { min-height: 36px; padding: 0 10px; border: 1px solid #F0D7DE; border-radius: 999px; background: #FDF2F5; color: #97364E; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.sc-pin { min-height: 36px; padding: 0 10px; border: 1px solid #F0D7DE; border-radius: 999px; background: #fff; color: #97364E; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+/* 📌 확인 필요 (20261126a) — 연한 테두리(없음) · 진한 색(저장된 것 있음 + 개수) · 점선(상담 칸 체크 · 저장 전) · [해제] */
+.sc-pin.is-on { background: #97364E; border-color: #97364E; color: #fff; }
+.sc-pin.is-on .num { display: inline-block; min-width: 18px; margin-left: 2px; padding: 0 5px; border-radius: 999px; background: #fff; color: #97364E; font-size: 12px; text-align: center; }
+.sc-pin.is-draft { background: #FDF2F5; border-style: dashed; border-color: #C9708A; }
+.sc-pinset { display: inline-flex; align-items: center; gap: 4px; }
+.sc-unpin { min-height: 36px; padding: 0 10px; border: 1px solid var(--line-soft); border-radius: 999px; background: #fff; color: var(--ink-mid); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+/* 문자 버튼 (20261126a) — PC 는 번호 복사 버튼 · 못 쓰면 꺼짐 + 이유 */
+.sc-ph button.sc-ph__sms { display: inline-flex; align-items: center; min-height: 36px; padding: 0 8px; border: 1px solid var(--line-soft); border-radius: 999px; background: #fff; color: #4A34B8; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.sc-ph button.sc-ph__sms:disabled { color: var(--ink-light); background: var(--surface-2); cursor: not-allowed; }
+.sc-ph__why { margin-left: 2px; font-size: 11px; color: var(--ink-light); white-space: nowrap; }
 .sc-more { display: block; margin-top: 6px; min-height: 36px; padding: 0 4px; border: 0; background: none; color: #5A3FD0; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .sc-dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; margin: 8px 0 0; font-size: 13px; }
 .sc-dl dt { color: var(--ink-light); }
@@ -5396,4 +5406,70 @@ dialog.rs-modal[open] { display: flex; flex-direction: column; }
   .rs-modal .modal__foot { padding: 10px 14px 14px; }
   .rs-foot .btn { flex: 1 1 auto; }
   .rs-foot .spacer { display: none; }
+}
+
+/* ============================================================
+   📨 레포트 알림톡 보내기 (online-report.js · 20261126a · migration-129) — 온라인 반 화면 제목 줄
+   ============================================================ */
+dialog.orp-modal { width: min(760px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); }
+dialog.orp-modal[open] { display: flex; flex-direction: column; }
+.orp-modal .modal__head, .orp-modal .modal__foot { flex: none; }
+.orp-modal .modal__title small { font-size: 13px; font-weight: 700; color: var(--ink-light); }
+.orp-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; display: grid; gap: 10px; align-content: start; }
+.orp-ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.orp-f { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 700; min-height: 40px; }
+.orp-fb { font-weight: 600; }
+.orp-fb input { width: 18px; height: 18px; }
+.orp-seg { display: inline-flex; padding: 3px; border-radius: 12px; background: var(--surface-2); }
+.orp-sg { min-height: 36px; padding: 0 16px; border: 0; border-radius: 9px; background: none; font: inherit; font-size: 13.5px; font-weight: 800; color: var(--ink-mid); cursor: pointer; }
+.orp-sg.is-on { background: #fff; color: #4A34B8; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+.orp-tpls { display: flex; flex-wrap: wrap; gap: 4px 6px; }
+.orp-tpl { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #EEF0F6; color: #5B5F7A; }
+.orp-tpl.is-ok b { color: #135C3B; }
+.orp-tpl.is-no { background: #FFF1D6; color: #7A4A00; }
+.orp-legend { margin: 0; }
+.orp-all { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.orp-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.orp-r { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-width: 0; padding: 8px 10px; border: 1px solid #DDD8F5; border-radius: 12px; background: #fff; font-size: 13.5px; }
+.orp-r.is-on { border-color: #5B42D6; background: #F7F5FF; }
+.orp-r.is-off { background: var(--surface-2); }
+.orp-chk { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; min-width: 0; flex: 0 1 auto; cursor: pointer; }
+.orp-chk input { width: 18px; height: 18px; flex: none; }
+.orp-nm { font-weight: 800; overflow-wrap: anywhere; }
+.orp-nm i, .orp-ph i { color: #B3261E; font-style: normal; font-weight: 700; }
+.orp-ph { color: var(--ink-light); font-size: 12.5px; white-space: nowrap; }
+.orp-wk { font-size: 12.5px; color: var(--ink-mid); white-space: nowrap; }
+.orp-case { max-width: 100%; min-height: 36px; }
+.orp-see { min-height: 36px; }
+.orp-tags { display: flex; flex-wrap: wrap; gap: 4px; flex-basis: 100%; }
+.orp-tag { font-size: 11.5px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: #EEF0F6; color: #6B6F8A; }
+.orp-tag.is-bad { background: #FDECEA; color: #9B2C24; }
+.orp-tag.is-warn { background: #FFF1D6; color: #7A4A00; }
+.orp-tag.is-ok { background: #EAF7EE; color: #135C3B; }
+.orp-text { flex-basis: 100%; margin: 4px 0 0; padding: 10px 12px; border-radius: 10px; background: #FFFBEA; border: 1px solid #F3E6B3; font: inherit; font-size: 13px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.orp-sum { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); font-size: 13.5px; line-height: 1.7; overflow-wrap: anywhere; }
+.orp-warn { color: #9B2C24; font-weight: 700; }
+.orp-msg { margin: 0; padding: 8px 10px; border-radius: 10px; background: #EEF3FF; font-size: 13px; overflow-wrap: anywhere; }
+.orp-err { margin: 0; color: #9B2C24; font-weight: 700; }
+.orp-go { display: flex; flex-wrap: wrap; gap: 8px; }
+.orp-go .btn { flex: 1 1 220px; min-height: 44px; }
+.orp-why { margin: 0; }
+.orp-foot { border-top: 1px solid var(--line-soft); padding-top: 10px; }
+.orp-tlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.orp-ti { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 0; border-bottom: 1px solid var(--line-soft); font-size: 13.5px; }
+.orp-ti__n { flex: 0 0 170px; font-weight: 700; }
+.orp-ti .input { flex: 1 1 200px; min-width: 0; }
+.orp-some { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 13.5px; }
+.orp-some .input { width: 70px; }
+.orp-log { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.orp-log__i { padding: 8px 10px; border: 1px solid var(--line-soft); border-radius: 12px; font-size: 13.5px; line-height: 1.6; overflow-wrap: anywhere; }
+.orp-res { font-weight: 700; }
+@media (max-width: 480px) {
+  .orp-body { padding: 12px 14px; }
+  .orp-modal .modal__head { padding: 14px 14px 10px; }
+  .orp-modal .modal__foot { padding: 10px 14px 14px; flex-wrap: wrap; }
+  .orp-foot .btn { flex: 1 1 auto; }
+  .orp-foot .spacer { display: none; }
+  .orp-ti__n { flex-basis: 100%; }
+  .orp-case { flex: 1 1 100%; }
 }
