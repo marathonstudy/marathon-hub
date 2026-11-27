@@ -5473,3 +5473,9 @@ dialog.orp-modal[open] { display: flex; flex-direction: column; }
   .orp-ti__n { flex-basis: 100%; }
   .orp-case { flex: 1 1 100%; }
 }
+
+/* 「오늘」 설정 「앱 러닝노트」 (app-note.js · 20261127a) */
+.an-cls { display: flex; flex-wrap: wrap; gap: 4px 14px; max-height: 180px; overflow-y: auto; padding: 4px 0; }
+.an-cls__i { margin: 0; }
+.an-log { width: 100%; max-width: 520px; border-collapse: collapse; font-size: 13px; margin-top: 6px; }
+.an-log th, .an-log td { text-align: left; padding: 4px 6px; border-bottom: 1px solid #ECECF3; }

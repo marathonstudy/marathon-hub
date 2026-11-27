@@ -1385,16 +1385,18 @@
 
       /* 학생 링크 · 학부모 링크 (migration-015). 015 전에는 role 이 없다 — 예전처럼 모두 입력 가능 */
       var canWrite = d.can_write !== false;
+      /* 마라톤 앱 안(앱 모드 · app-mode.js · 20261127a) — 로그아웃 · 「이 기기에 기억」 · 나가기는 앱이 맡는다 (이 기기에 코드를 남기지 않는다) */
+      var INAPP = !PV && !!(global.AppMode && global.AppMode.on);
       roleTag(d.role);
-      if (EL && EL.get() === h.code) logoutButton(EL);
+      if (EL && EL.get() === h.code && !INAPP) logoutButton(EL);
       /* 이 기기에 기억 — 홈 화면 앱 시작 주소(/s/?app=1) · /me 만 열어도 이 러닝노트로 (20261101k · 20261110b)
          개인 링크를 이 기기에서 처음 열면 「이 기기에 기억할까요?」 — 기본은 기억하지 않음 (가족 · 친구 휴대폰에 저절로 남지 않게 · 20261110k) */
-      if (!PV && EL && EL.last) rememberAsk(EL, h.code, !!kept);
+      if (!PV && EL && EL.last && !INAPP) rememberAsk(EL, h.code, !!kept);
       /* 공유하기 (share.js · 20261110k) — 홈 프로필 카드 · 레포트 「주간 레포트」 줄 끝 · 미리보기에는 없음 */
       if (!PV && global.HubShare) HubShare.init({ code: h.code, role: d.role || '', base: '../assets/', data: function () { return global.HubHome && HubHome.shareData ? HubHome.shareData() : null; } });
       /* 맨 아래 「다른 학생으로 보기 · 이 기기에서 나가기」 — 이 기기에 기억한 코드를 지운다 */
       var exitBox = $('#hubExit');
-      if (exitBox && !PV && EL) {
+      if (exitBox && !PV && EL && !INAPP) {
         exitBox.hidden = false;
         var forget = function () { try { EL.clear(); if (EL.last) EL.last(''); } catch (e) {} };
         $('#hubOther').onclick = function () { forget(); global.location.replace('../s/?out=1'); };
@@ -1560,6 +1562,14 @@
         if (ONST && ONST.ym === r.ym && ONST.day === todayISO()) { if (ONST.streak != null) r.streak = +ONST.streak || 0; if (ONST.ok != null) r.okN = +ONST.ok || 0; r.fromStats = true; }
         return r;
       }
+      /* 앱 모드 홈 「이번 달 완주 달력」 미리보기 (app-mode.js · 20261127a) — 완주 달력 탭과 같은 달력 · 온라인 반만 (아니면 빈 글) */
+      if (INAPP) global.AppMode.runPreview = function () {
+        return appData(h.code).then(function (data) {
+          if (!data || !MODE.online || !global.OnlineRun) return '';
+          var ms = OnlineRun.months(data, todayISO());
+          return OnlineRun.calHtml(runOf(data, ms[0]), { months: ms, staff: false, data: data });
+        }, function () { return ''; });
+      };
       /* 불러오기 실패(시간 초과 · 서버 · 네트워크) — 「잠시 후 다시 시도해 주세요 [다시 시도]」 · 연결이 안 된 학생은 예전 안내 (앱에서 새로 받기는 직원 화면에만) */
       function noData(host, again) {
         if (APP.fail) {

@@ -1,0 +1,125 @@
+/* ============================================================
+   app-mode.css — 마라톤 앱 안 「내 러닝노트」 (앱 모드 · 20261127a · app-mode.js)
+   html.in-app 일 때만 (서명 링크로 열었을 때만) — 일반 링크 · 코치룸 미리보기 · 현강 화면은 그대로
+   통과 시안 .local/앱모드시안(appmode.css + 배치) 그대로 · 앱 값 출처 .local/앱디자인_정리.md
+   게임 요소(레벨 · XP · 연속 · 달력 · 도장 · 구간)는 그대로, 색 · 글꼴 · 카드 · 버튼 · 위쪽 막대만 앱 값으로
+   ============================================================ */
+
+/* ---------- 앱 값 ---------- */
+html.in-app {
+  --app-primary: #7858FE;
+  --app-primary-soft: #F3F1FF;
+  --app-primary-tint: #F6F4FF;
+  --app-bg: #FDFDFF;
+  --app-card: #FFFFFF;
+  --app-ink: #111111;
+  --app-ink-2: #212121;
+  --app-ink-3: #505050;
+  --app-ink-4: #999999;
+  --app-line: #EBEFF5;
+  --app-orange: #FFB84D;
+  --app-shadow: 0 2px 10px rgba(0, 0, 0, .05);
+  --app-top: calc(60px + env(safe-area-inset-top, 0px));
+
+  --grad-bg: var(--app-bg);
+  --grad-strong: var(--app-primary);
+  --grad-soft: var(--app-primary-tint);
+  --grad-bar: var(--app-primary);
+  --ink: var(--app-ink-2);
+  --ink-deep: var(--app-ink);
+  --ink-mid: var(--app-ink);
+  --ink-light: var(--app-ink-4);
+  --track: #EEEEEE;
+  --muted: #CCCCCC;
+  --card-radius: 18px;
+  --card-shadow: var(--app-shadow);
+  background: var(--app-bg);
+}
+html.in-app body {
+  font-family: Pretendard, 'Pretendard Variable', -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  letter-spacing: -0.025em;
+  background: var(--app-bg);
+  max-width: none;
+  overflow-x: hidden;
+  /* 위 = 앱 막대(노치 포함) · 아래 = 홈 표시줄(노치 기기) · 좌우 = 가로 화면 노치 */
+  padding: var(--app-top) calc(20px + env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) calc(20px + env(safe-area-inset-left, 0px));
+}
+html.in-app .container { max-width: none; padding: 0; margin: 0; }
+
+/* ---------- 위쪽 막대 — 앱 상세 화면과 같게 (닫기 + 제목) ---------- */
+.app-topbar { display: none; }
+html.in-app .app-topbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 40; display: block;
+  height: var(--app-top); padding: env(safe-area-inset-top, 0px) calc(20px + env(safe-area-inset-right, 0px)) 0 calc(20px + env(safe-area-inset-left, 0px));
+  background: var(--app-bg);
+}
+html.in-app .app-topbar__in { width: 100%; max-width: 1100px; height: 60px; margin: 0 auto; display: flex; align-items: center; gap: 8px; }
+html.in-app .app-topbar__back { width: 44px; height: 44px; margin-left: -10px; border: 0; background: none; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+html.in-app .app-topbar__t { flex: 1; text-align: center; margin: 0; font-size: 18px; font-weight: 600; line-height: 140%; letter-spacing: -0.025em; color: #111; }
+html.in-app .app-topbar__sp { width: 34px; }
+
+/* ---------- 앱 안에서는 필요 없는 것 (앱이 로그인 · 문의 · 나가기를 맡음) ---------- */
+html.in-app .hub-head, html.in-app .hub-mem, html.in-app .hub-exit, html.in-app .hub-logout, html.in-app .footer { display: none !important; }
+html.in-app .lay__l.has-prof #hubBar { display: none !important; }      /* 프로필 카드가 늘 보이니 얇은 상단 바는 숨김 */
+
+/* ---------- 러닝노트 탭 — 아래 고정 막대 대신 막대 밑 「알약 탭」 ---------- */
+html.in-app .hub-tabs {
+  position: sticky !important; top: var(--app-top); bottom: auto; left: auto; right: auto; z-index: 30;
+  display: grid !important; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 0;
+  margin: 0; padding: 4px; border-radius: 18px; width: auto; max-width: none; transform: none;
+  background: #fff; box-shadow: var(--app-shadow); backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+html.in-app .hub-tabs[hidden] { display: none !important; }
+html.in-app .hub-tabs .hub-tab { min-width: 0; padding: 9px 2px; font-size: 14px; font-weight: 400; line-height: 1.25; color: var(--app-ink-4); border-radius: 12px; letter-spacing: -0.04em; white-space: normal; word-break: keep-all; background: none; box-shadow: none; }
+html.in-app .hub-tabs.hub-tabs--six .hub-tab { font-size: 13px; }
+html.in-app .hub-tabs .hub-tab[hidden] { display: none !important; }
+html.in-app .hub-tabs .hub-tab[data-i]::before { display: none; }
+html.in-app .hub-tabs .hub-tab[aria-selected="true"] { background: var(--app-primary); color: #fff; font-weight: 600; box-shadow: none; }
+html.in-app .hub-tab.has-new::after { top: 6px; right: 10%; background: #FF5A5A; }
+
+/* ---------- 카드 — 흰 바탕 · 18px · 아주 옅은 그림자 ---------- */
+html.in-app .card, html.in-app .gm-card { border-radius: 18px; box-shadow: var(--app-shadow); }
+html.in-app .card { padding: 20px; }
+html.in-app .card-title { font-size: 16px; font-weight: 600; color: #111; }
+/* 프로필 카드 — 보라 그라데이션 · 빛 · 캐릭터 · 노란 XP 막대는 그대로, 모서리 · 여백만 */
+html.in-app .gm-profile { border-radius: 18px; padding: 16px; }
+html.in-app .an { background: linear-gradient(160deg, #7858FE 0%, #6446E8 100%); border-radius: 18px; box-shadow: 0 6px 16px rgba(120, 88, 254, .22); }
+html.in-app .orn-seg--done .orn-bar i, html.in-app .gm-quest.is-perfect .gm-bar i { background: var(--app-orange); box-shadow: none; }
+html.in-app .orn-seg__done { background: var(--app-orange); }
+html.in-app .orn-today.is-done { background: var(--app-primary-tint); }
+html.in-app .orn-badge { background: #FFF4E0; color: #B86E00; }
+
+/* ---------- 버튼 — 앱 버튼(높이 44 · 모서리 14 · 주 색) ---------- */
+html.in-app .hub-btn, html.in-app .gm-btn, html.in-app .fh-btn--main {
+  min-height: 44px; border-radius: 14px; background: var(--app-primary); color: #fff; font-weight: 600; font-size: 14px; box-shadow: none; border: 0;
+}
+html.in-app .hub-btn--ghost, html.in-app .gm-btn--ghost { background: #fff; color: var(--app-primary); border: 1px solid #E1DAFF; }
+html.in-app .an-btn { border-radius: 14px; font-weight: 600; }
+html.in-app .an-btn--main { color: var(--app-primary); }
+html.in-app .an-btn--gold { background: var(--app-orange); color: #fff; }
+
+/* ---------- 배치 — 휴대폰 1단 ---------- */
+html.in-app .lay { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+html.in-app .lay__l, html.in-app .lay__r { min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+html.in-app .lay .app-slot { display: flex; flex-direction: column; gap: 14px; }
+html.in-app .lay .app-slot:empty, html.in-app .lay .app-slot[hidden] { display: none; }
+html.in-app .lay .app-slot > * { margin: 0; }
+html.in-app .lay .hub-bar { position: static; margin: 0; }
+@media (max-width: 767px) {
+  html.in-app .lay__l { display: contents; }       /* 알약 탭이 화면 전체에서 막대 밑에 붙어 다니게 */
+}
+html.in-app #hubRoot { min-width: 0; }
+html.in-app .calprev .orn-cal { margin-top: 6px; cursor: pointer; }
+html.in-app .calprev__go { margin-top: 12px; width: 100%; }
+html.in-app .app-stop { margin-top: 40px; }
+
+/* ---------- 패드(768~1279) · 노트북(1280~) — 2단 ---------- */
+@media (min-width: 768px) {
+  html.in-app .lay { display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); gap: 20px; align-items: start; }
+  html.in-app .lay__l { position: static; }        /* 붙여 두지 않음 — 왼쪽 칸이 창보다 길어도 끝까지 보이게 */
+  html.in-app .lay .hub-tabs { position: static !important; }
+  html.in-app .lay__r { max-width: 700px; }        /* 카드가 옆으로 길게 늘어나지 않게 */
+}
+@media (min-width: 1280px) {
+  html.in-app .lay { grid-template-columns: 400px minmax(0, 1fr); gap: 28px; }
+}
